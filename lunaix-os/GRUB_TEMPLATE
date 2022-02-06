@@ -1,0 +1,3 @@
+menuentry "$_OS_NAME" {
+	multiboot /boot/$_OS_NAME.bin
+}

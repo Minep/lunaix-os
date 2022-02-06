@@ -13,6 +13,8 @@
     stack_top:
 
 .section .text
+    .global start_
+    .type start_, @function
     start_:
         movl $stack_top, %esp
         /* 
