@@ -1,0 +1,6 @@
+More on VGA:
+http://www.osdever.net/FreeVGA/home.htm
+
+IBM VGA-XGA manual:
+reference-material/IBM_VGA_XGA_Technical_Reference_Manual_May92.pdf
+
