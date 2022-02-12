@@ -18,7 +18,7 @@ OS_ISO = $(OS_NAME).iso
 CC := i686-elf-gcc
 AS := i686-elf-as
 
-O := -O3
+O := -O2
 W := -Wall -Wextra
 CFLAGS := -std=gnu99 -ffreestanding $(O) $(W)
 LDFLAGS := -ffreestanding $(O) -nostdlib -lgcc

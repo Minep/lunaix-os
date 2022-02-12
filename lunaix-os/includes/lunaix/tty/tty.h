@@ -1,4 +1,4 @@
-typedef unsigned short vga_atrributes; 
+typedef unsigned short vga_attribute;
 
 #define VGA_COLOR_BLACK 0
 #define VGA_COLOR_BLUE 1
@@ -17,8 +17,17 @@ typedef unsigned short vga_atrributes;
 #define VGA_COLOR_LIGHT_BROWN 14
 #define VGA_COLOR_WHITE 15
 
-void tty_set_theme(vga_atrributes fg, vga_atrributes bg);
-void tty_put_char(char chr);
-void tty_put_str(char* str);
-void tty_scroll_up();
-void tty_clear();
+void
+tty_set_theme(vga_attribute fg, vga_attribute bg);
+
+void
+tty_put_char(char chr);
+
+void
+tty_put_str(char* str);
+
+void
+tty_scroll_up();
+
+void
+tty_clear();
