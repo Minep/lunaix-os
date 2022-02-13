@@ -28,10 +28,17 @@
         call _kernel_init
         
         subl $0x6, %esp
+
         movl $_gdt, 2(%esp)
         movw _gdt_limit, %ax
         movw %ax, (%esp)
         lgdt (%esp)
+
+        movl $_idt, 2(%esp)
+        movw _idt_limit, %ax
+        movw %ax, (%esp)
+        lidt (%esp)
+
         addl $0x6, %esp
 
         movw $0x10, %cx

@@ -73,4 +73,6 @@ tty_clear()
     for (uint32_t i = 0; i < TTY_WIDTH * TTY_HEIGHT; i++) {
         *(buffer + i) = theme_color;
     }
+    tty_x = 0;
+    tty_y = 0;
 }

@@ -1,11 +1,13 @@
 #include <lunaix/tty/tty.h>
 #include <lunaix/arch/gdt.h>
+#include <lunaix/arch/idt.h>
 
 void
 _kernel_init()
 {
     // TODO
     _init_gdt();
+    _init_idt();
 }
 
 void

@@ -39,7 +39,7 @@ $(ISO_DIR):
 
 $(OBJECT_DIR)/%.S.o: %.S
 	@mkdir -p $(@D)
-	$(CC) -c $< -o $@
+	$(CC) $(INCLUDES) -c $< -o $@
 
 $(OBJECT_DIR)/%.c.o: %.c 
 	@mkdir -p $(@D)

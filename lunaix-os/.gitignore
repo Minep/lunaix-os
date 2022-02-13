@@ -1,2 +1,3 @@
 dump*
 build/
+.vscode/settings.json
