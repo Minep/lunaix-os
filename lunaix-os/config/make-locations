@@ -1,0 +1,9 @@
+BUILD_DIR := build
+KERNEL_DIR := kernel
+OBJECT_DIR := $(BUILD_DIR)/obj
+BIN_DIR := $(BUILD_DIR)/bin
+ISO_DIR := $(BUILD_DIR)/iso
+ISO_BOOT_DIR := $(ISO_DIR)/boot
+ISO_GRUB_DIR := $(ISO_BOOT_DIR)/grub
+
+INCLUDES_DIR := includes

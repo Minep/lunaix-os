@@ -1,0 +1,2 @@
+QEMU_MON_TERM := gnome-terminal
+QEMU_MON_PORT := 45454

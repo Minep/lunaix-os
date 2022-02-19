@@ -1,0 +1,4 @@
+OS_ARCH := x86
+OS_NAME = lunaix
+OS_BIN = $(OS_NAME).bin
+OS_ISO = $(OS_NAME).iso
