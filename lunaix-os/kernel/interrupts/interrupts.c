@@ -1,4 +1,4 @@
-#include "interrupts.h"
+#include <lunaix/interrupts/interrupts.h>
 #include <lunaix/tty/tty.h>
 
 void isr0 (isr_param* param) {

@@ -11,7 +11,8 @@ void _set_gdt_entry(uint32_t index, uint32_t base, uint32_t limit, uint32_t flag
     _gdt[index] <<= 32;
     _gdt[index] |= SEG_BASE_L(base) | SEG_LIM_L(limit);
 }
-// 
+
+ 
 void
 _init_gdt() {
     _set_gdt_entry(0, 0, 0, 0);
