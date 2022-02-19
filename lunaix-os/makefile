@@ -37,7 +37,7 @@ $(BUILD_DIR)/$(OS_ISO): $(ISO_DIR) $(BIN_DIR)/$(OS_BIN) GRUB_TEMPLATE
 all: clean $(BUILD_DIR)/$(OS_ISO)
 
 all-debug: O := -O0
-all-debug: CFLAGS := -g -std=gnu99 -ffreestanding $(O) $(W) -fomit-frame-pointer
+all-debug: CFLAGS := -g -std=gnu99 -ffreestanding $(O) $(W)
 all-debug: LDFLAGS := -ffreestanding $(O) -nostdlib -lgcc
 all-debug: clean $(BUILD_DIR)/$(OS_ISO)
 	@echo "Dumping the disassembled kernel code to $(BUILD_DIR)/kdump.txt"
@@ -47,7 +47,7 @@ clean:
 	@rm -rf $(BUILD_DIR)
 
 run: $(BUILD_DIR)/$(OS_ISO)
-	@qemu-system-i386 -cdrom $(BUILD_DIR)/$(OS_ISO) -monitor telnet::45454,server,nowait &
+	@qemu-system-i386 -cdrom $(BUILD_DIR)/$(OS_ISO) -monitor telnet::$(QEMU_MON_PORT),server,nowait &
 	@sleep 1
 	@telnet 127.0.0.1 $(QEMU_MON_PORT)
 
