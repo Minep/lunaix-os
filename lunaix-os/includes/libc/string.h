@@ -1,5 +1,5 @@
-#ifndef _STRING_H
-#define _STRING_H 1
+#ifndef __LUNAIX_STRING_H
+#define __LUNAIX_STRING_H
 
 #include <stddef.h>
 
@@ -18,4 +18,7 @@ memset(void*, int, size_t);
 size_t
 strlen(const char* str);
 
-#endif
+char*
+strcpy(char* dest, const char* src);
+
+#endif /* __LUNAIX_STRING_H */
