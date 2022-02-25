@@ -1,4 +1,4 @@
-#include <lunaix/arch/gdt.h>
+#include <arch/x86/gdt.h>
 #include <stdint.h>
 
 #define GDT_ENTRY 5

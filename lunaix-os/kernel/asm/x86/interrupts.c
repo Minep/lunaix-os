@@ -1,9 +1,9 @@
-#include <lunaix/interrupts/interrupts.h>
-#include <lunaix/tty/tty.h>
+#include <arch/x86/interrupts.h>
+#include <libc/stdio.h>
 
 void isr0 (isr_param* param) {
     tty_clear();
-    tty_put_str("!!PANIC!!");
+    printf("[PANIC] Exception (%d) CS=0x%X, EIP=0x%X", param->vector, param->cs, param->eip);
 }
 
 void 

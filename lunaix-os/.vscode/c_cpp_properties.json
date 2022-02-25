@@ -6,7 +6,8 @@
                 "${workspaceFolder}/includes/**"
             ],
             "compilerArgs": [
-                "-ffreestanding"
+                "-ffreestanding",
+                "-D__ARCH_IA32"
             ],
             "defines": [],
             "compilerPath": "${HOME}/opt/cross-compiler/bin/i686-elf-gcc",

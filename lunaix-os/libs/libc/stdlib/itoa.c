@@ -1,4 +1,5 @@
 #define __LUNAIX_LIBC
+#include <stddef.h>
 #include <libc/stdlib.h>
 
 char base_char[] = "0123456789abcdefghijklmnopqrstuvwxyz";
@@ -35,10 +36,8 @@ char*
 __itoa_internal(int value, char* str, int base, unsigned int* size)
 {
     if (value < 0 && base == 10) {
-        unsigned int msk = value >> 31;
-        // evil bit level hack for abs()
-        unsigned int _v = (unsigned int)((value + msk) ^ msk);
         str[0] = '-';
+        unsigned int _v = (unsigned int)(-value);
         __uitoa_internal(_v, str + 1, base, size);
     } else {
         __uitoa_internal(value, str, base, size);
@@ -50,5 +49,5 @@ __itoa_internal(int value, char* str, int base, unsigned int* size)
 char*
 itoa(int value, char* str, int base)
 {
-    return __itoa_internal(value, str, base, (void*)0);
+    return __itoa_internal(value, str, base, NULL);
 }
