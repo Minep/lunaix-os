@@ -54,8 +54,8 @@
 // 用来获取特定的页表的虚拟地址
 #define PT_VADDR(pd_offset)           (PT_BASE_VADDR | (pd_offset << 12))
 
-typedef unsigned int ptd_t;
-typedef unsigned int pt_t;
+typedef unsigned long ptd_t;
+typedef unsigned long pt_t;
 typedef unsigned int pt_attr;
 
 

@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_CPU_H
 #define __LUNAIX_CPU_H
 
-typedef unsigned long reg32;
+typedef unsigned int reg32;
 typedef unsigned short reg16;
 
 typedef struct {

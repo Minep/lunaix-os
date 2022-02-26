@@ -8,22 +8,16 @@ char*
 __uitoa_internal(unsigned int value, char* str, int base, unsigned int* size)
 {
     unsigned int ptr = 0;
-    if (value == 0) {
-        str[0] = '0';
+    do {
+        str[ptr] = base_char[value % base];
+        value = value / base;
         ptr++;
-    } else {
-        while (value) {
-            str[ptr] = base_char[value % base];
-            value = value / base;
-            ptr++;
-        }
+    } while (value);
 
-        for (unsigned int i = 0; i < (ptr >> 1); i++) {
-            char c = str[i];
-            str[i] = str[ptr - i - 1];
-            str[ptr - i - 1] = c;
-        }
-
+    for (unsigned int i = 0; i < (ptr >> 1); i++) {
+        char c = str[i];
+        str[i] = str[ptr - i - 1];
+        str[ptr - i - 1] = c;
     }
     str[ptr] = '\0';
     if (size) {

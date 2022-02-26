@@ -15,9 +15,9 @@
 
 #include <libc/stdio.h>
 
-extern void __kernel_start;
-extern void __kernel_end;
-extern void __init_hhk_end;
+extern uint8_t __kernel_start;
+extern uint8_t __kernel_end;
+extern uint8_t __init_hhk_end;
 
 void
 _kernel_init(multiboot_info_t* mb_info)
@@ -35,12 +35,12 @@ _kernel_init(multiboot_info_t* mb_info)
 
 #pragma region INIT_MM
     // 初始化物理内存管理器
-    pmm_init(MEM_1MB + mb_info->mem_upper << 10);
+    pmm_init(MEM_1MB + (mb_info->mem_upper << 10));
     vmm_init();
 #pragma endregion
 
     // 初始化VGA
-    tty_init(VGA_BUFFER_PADDR);
+    tty_init((void*)VGA_BUFFER_PADDR);
     tty_set_theme(VGA_COLOR_GREEN, VGA_COLOR_BLACK);
 
     printf("[KERNEL] === Initialization === \n");
@@ -82,17 +82,21 @@ _kernel_init(multiboot_info_t* mb_info)
     // 重映射VGA文本缓冲区（以后会变成显存，i.e., framebuffer）
     for (size_t i = 0; i < vga_buf_pgs; i++)
     {
-        vmm_map_page(VGA_BUFFER_VADDR + (i << 12), VGA_BUFFER_PADDR + (i << 12), PG_PREM_RW, PG_PREM_RW);
+        vmm_map_page(
+            (void*)(VGA_BUFFER_VADDR + (i << 12)), 
+            (void*)(VGA_BUFFER_PADDR + (i << 12)), 
+            PG_PREM_RW, PG_PREM_RW
+        );
     }
     
     // 更新VGA缓冲区位置至虚拟地址
-    tty_set_buffer(VGA_BUFFER_VADDR);
+    tty_set_buffer((void*)VGA_BUFFER_VADDR);
 
     printf("[MM] Mapped VGA to %p.\n", VGA_BUFFER_VADDR);
 
     // 为内核创建一个专属栈空间。
     for (size_t i = 0; i < (K_STACK_SIZE >> 12); i++) {
-        vmm_alloc_page(K_STACK_START + (i << 12), PG_PREM_RW, PG_PREM_RW);
+        vmm_alloc_page((void*)(K_STACK_START + (i << 12)), PG_PREM_RW, PG_PREM_RW);
     }
     printf("[MM] Allocated %d pages for stack start at %p\n", K_STACK_SIZE>>12, K_STACK_START);
 
@@ -107,7 +111,7 @@ _kernel_post_init() {
 
     // 清除 hhk_init 与前1MiB的映射
     for (size_t i = 0; i < hhk_init_pg_count; i++) {
-        vmm_unmap_page((i << 12));
+        vmm_unmap_page((void*)(i << 12));
     }
     printf("[KERNEL] === Post Initialization Done === \n\n");
 }
@@ -115,7 +119,7 @@ _kernel_post_init() {
 void
 _kernel_main()
 {
-    char* buf[64];
+    char buf[64];
     
     printf("Hello higher half kernel world!\nWe are now running in virtual "
            "address space!\n\n");
@@ -123,7 +127,7 @@ _kernel_main()
     cpu_get_brand(buf);
     printf("CPU: %s\n\n", buf);
 
-    uintptr_t k_start = vmm_v2p(&__kernel_start);
+    void* k_start = vmm_v2p(&__kernel_start);
     printf("The kernel's base address mapping: %p->%p\n", &__kernel_start, k_start);
     // __asm__("int $0\n");
 }

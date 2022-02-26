@@ -20,16 +20,16 @@ $(ISO_DIR):
 
 $(OBJECT_DIR)/%.S.o: %.S
 	@mkdir -p $(@D)
-	@echo "Compiling: $< -> $@"
+	@echo "$@"
 	@$(CC) $(INCLUDES) -c $< -o $@
 
 $(OBJECT_DIR)/%.c.o: %.c 
 	@mkdir -p $(@D)
-	@echo "Compiling: $< -> $@"
+	@echo "$@"
 	@$(CC) $(INCLUDES) -c $< -o $@ $(CFLAGS)
 
 $(BIN_DIR)/$(OS_BIN): $(OBJECT_DIR) $(BIN_DIR) $(SRC)
-	@echo "Linking ..."
+	@echo "Generating $(BIN_DIR)/$(OS_BIN)"
 	@$(CC) -T linker.ld -o $(BIN_DIR)/$(OS_BIN) $(SRC) $(LDFLAGS)
 
 $(BUILD_DIR)/$(OS_ISO): $(ISO_DIR) $(BIN_DIR)/$(OS_BIN) GRUB_TEMPLATE

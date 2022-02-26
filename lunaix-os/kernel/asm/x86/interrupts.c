@@ -2,7 +2,6 @@
 #include <libc/stdio.h>
 
 void isr0 (isr_param* param) {
-    tty_clear();
     printf("[PANIC] Exception (%d) CS=0x%X, EIP=0x%X", param->vector, param->cs, param->eip);
 }
 

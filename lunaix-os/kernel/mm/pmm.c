@@ -93,7 +93,7 @@ void*
 pmm_alloc_page()
 {
     // Next fit approach. Maximize the throughput!
-    uintptr_t good_page_found = NULL;
+    uintptr_t good_page_found = (uintptr_t)NULL;
     size_t old_pg_ptr = pg_lookup_ptr;
     size_t upper_lim = max_pg;
     uint8_t chunk = 0;
