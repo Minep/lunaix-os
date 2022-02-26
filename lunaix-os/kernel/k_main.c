@@ -33,20 +33,24 @@ _kernel_init(multiboot_info_t* mb_info)
     //   ( )    + 映射 memory map （APCI，APIC，IO映射） （以后）
     //   (v)    + 释放 hhk_init 所占据的空间
 
+#pragma region INIT_MM
     // 初始化物理内存管理器
     pmm_init(MEM_1MB + mb_info->mem_upper << 10);
     vmm_init();
-    tty_init(VGA_BUFFER_PADDR);
+#pragma endregion
 
+    // 初始化VGA
+    tty_init(VGA_BUFFER_PADDR);
     tty_set_theme(VGA_COLOR_GREEN, VGA_COLOR_BLACK);
 
-    printf("[KERNEL] Initializing Memory ...\n");
+    printf("[KERNEL] === Initialization === \n");
     unsigned int map_size =
       mb_info->mmap_length / sizeof(multiboot_memory_map_t);
     printf("[MM] Mem: %d KiB, Extended Mem: %d KiB\n",
            mb_info->mem_lower,
            mb_info->mem_upper);
 
+#pragma region MMAP_SCAN_RESERVING_KERNEL_PGS
     // 按照 Memory map 标识可用的物理页
     for (unsigned int i = 0; i < map_size; i++) {
         multiboot_memory_map_t mmap = map[i];
@@ -68,17 +72,8 @@ _kernel_init(multiboot_info_t* mb_info)
     size_t pg_count = (uintptr_t)(&__kernel_end - &__kernel_start) >> 12;
     pmm_mark_chunk_occupied(V2P(&__kernel_start) >> 12, pg_count);
     printf("[MM] Allocated %d pages for kernel.\n", pg_count);
-
-
-    size_t hhk_init_pg_count = ((uintptr_t)(&__init_hhk_end)) >> 12;
-    printf("[MM] Releaseing %d pages from 0x0.\n", hhk_init_pg_count);
-
-    // 清除 hhk_init 与前1MiB的映射
-    // 从这里开始，到新的vga缓存地址设置前，不能够进行任何的打印操作
-    for (size_t i = 0; i < hhk_init_pg_count; i++) {
-        vmm_unmap_page((i << 12));
-    }
-
+#pragma endregion
+    
     size_t vga_buf_pgs = VGA_BUFFER_SIZE >> 12;
     
     // 首先，标记VGA部分为已占用
@@ -101,7 +96,20 @@ _kernel_init(multiboot_info_t* mb_info)
     }
     printf("[MM] Allocated %d pages for stack start at %p\n", K_STACK_SIZE>>12, K_STACK_START);
 
-    printf("[KERNEL] Done!\n\n");
+    printf("[KERNEL] === Initialization Done === \n\n");
+}
+
+void
+_kernel_post_init() {
+    printf("[KERNEL] === Post Initialization === \n");
+    size_t hhk_init_pg_count = ((uintptr_t)(&__init_hhk_end)) >> 12;
+    printf("[MM] Releaseing %d pages from 0x0.\n", hhk_init_pg_count);
+
+    // 清除 hhk_init 与前1MiB的映射
+    for (size_t i = 0; i < hhk_init_pg_count; i++) {
+        vmm_unmap_page((i << 12));
+    }
+    printf("[KERNEL] === Post Initialization Done === \n\n");
 }
 
 void

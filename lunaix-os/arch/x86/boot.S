@@ -57,9 +57,7 @@
 
         /*
             _hhk_init用来初始化我们高半核：
-                    1. 设置GDT表
-                    2. 设置IDT表（暂时，以后会拿到 kernel_init 里面）
-                    3. 初始化最简单的PTD与PT（重新映射我们的内核至3GiB处，以及对相应的地方进行Identity Map）
+                1. 初始化最简单的PD与PT（重新映射我们的内核至3GiB处，以及对相应的地方进行Identity Map）
         */
 
         movl $(KPG_SIZE), 4(%esp)

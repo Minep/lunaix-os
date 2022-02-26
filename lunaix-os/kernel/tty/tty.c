@@ -69,11 +69,11 @@ void
 tty_scroll_up()
 {
     size_t last_line = TTY_WIDTH * (TTY_HEIGHT - 1);
-    memcpy(tty_vga_buffer, tty_vga_buffer + TTY_WIDTH, last_line);
+    memcpy(tty_vga_buffer, tty_vga_buffer + TTY_WIDTH, last_line * 2);
     for (size_t i = 0; i < TTY_WIDTH; i++) {
         *(tty_vga_buffer + i + last_line) = tty_theme_color;
     }
-    tty_y = tty_y == 0 ? 0 : tty_y - 1;
+    tty_y = tty_y == 0 ? 0 : TTY_HEIGHT - 1;
 }
 
 void

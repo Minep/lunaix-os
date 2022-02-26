@@ -54,11 +54,11 @@ void* vmm_map_page(void* va, void* pa, pt_attr dattr, pt_attr tattr) {
 
     uintptr_t pd_offset = PD_INDEX(va);
     uintptr_t pt_offset = PT_INDEX(va);
-    ptd_t* ptd = PTD_BASE_VADDR;
+    ptd_t* ptd = (ptd_t*)PTD_BASE_VADDR;
 
     // 在页表与页目录中找到一个可用的空位进行映射（位于va或其附近）
     ptd_t* pde = ptd[pd_offset];
-    pt_t* pt = (uintptr_t)(PT_BASE_VADDR | (pd_offset << 12));
+    pt_t* pt = (uintptr_t)PT_VADDR(pd_offset);
     while (pde && pd_offset < 1024) {
         if (pt_offset == 1024) {
             pd_offset++;
@@ -88,8 +88,8 @@ void* vmm_map_page(void* va, void* pa, pt_attr dattr, pt_attr tattr) {
     }
     
     ptd[pd_offset] = PDE(dattr, new_pt_pa);
-    memset((void*)PT_VADDR(pd_offset), 0, PM_PAGE_SIZE);
     
+    memset((void*)PT_VADDR(pd_offset), 0, PM_PAGE_SIZE);
     pt[pt_offset] = PTE(tattr, pa);
 
     return V_ADDR(pd_offset, pt_offset, PG_OFFSET(va));

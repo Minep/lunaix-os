@@ -1,10 +1,10 @@
 ENTRY(start_)
 
 /*
-    FUTURE: Use dynamic linker to separate kernel and boot code
+    FUTURE: Use disk reader
     A bit of messy here.
     We will pull our higher half kernel out of this shit
-      and load it separately once we have our dynamic linker ready.
+      and load it separately once we have our disk reader.
 */
 
 SECTIONS {
@@ -29,7 +29,7 @@ SECTIONS {
     .hhk_init_rodata BLOCK(4K) : {
         build/obj/arch/x86/*.o (.rodata)
     }
-    __init_hhk_end = .;
+    __init_hhk_end = ALIGN(4K);
 
     /* Relocation of our higher half kernel */
     . += 0xC0000000;
@@ -38,24 +38,28 @@ SECTIONS {
     .text BLOCK(4K) : AT ( ADDR(.text) - 0xC0000000 ) {
         __kernel_start = .;
         build/obj/kernel/*.o (.text)
+        build/obj/hal/*.o (.text)
     }
 
     .bss BLOCK(4K) : AT ( ADDR(.bss) - 0xC0000000 ) {
         build/obj/kernel/*.o (.bss)
+        build/obj/hal/*.o (.bss)
     }
 
     .data BLOCK(4k) : AT ( ADDR(.data) - 0xC0000000 ) {
         build/obj/kernel/*.o (.data)
+        build/obj/hal/*.o (.data)
     }
 
     .rodata BLOCK(4K) : AT ( ADDR(.rodata) - 0xC0000000 ) {
         build/obj/kernel/*.o (.rodata)
+        build/obj/hal/*.o (.rodata)
     }
 
     .kpg BLOCK(4K) : AT ( ADDR(.kpg) - 0xC0000000 ) {
         build/obj/arch/x86/*.o (.kpg)
     }
 
-    __kernel_end = ALIGN(.);
-    __heap_start = ALIGN(.);    /* 内核结束的地方即堆开始的地方 */
+    __kernel_end = ALIGN(4K);
+    __heap_start = ALIGN(4K);    /* 内核结束的地方即堆开始的地方 */
 }
