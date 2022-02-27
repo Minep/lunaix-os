@@ -87,7 +87,7 @@ setup_memory(multiboot_memory_map_t* map, size_t map_size) {
         vmm_map_page(
             (void*)(VGA_BUFFER_VADDR + (i << PG_SIZE_BITS)), 
             (void*)(VGA_BUFFER_PADDR + (i << PG_SIZE_BITS)), 
-            PG_PREM_RW, PG_PREM_RW
+            PG_PREM_RW
         );
     }
     
@@ -101,7 +101,7 @@ void
 setup_kernel_runtime() {
     // 为内核创建一个专属栈空间。
     for (size_t i = 0; i < (K_STACK_SIZE >> PG_SIZE_BITS); i++) {
-        vmm_alloc_page((void*)(K_STACK_START + (i << PG_SIZE_BITS)), PG_PREM_RW, PG_PREM_RW);
+        vmm_alloc_page((void*)(K_STACK_START + (i << PG_SIZE_BITS)), PG_PREM_RW);
     }
     printf("[MM] Allocated %d pages for stack start at %p\n", K_STACK_SIZE>>PG_SIZE_BITS, K_STACK_START);
 }

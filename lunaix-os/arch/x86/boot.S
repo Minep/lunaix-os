@@ -41,6 +41,8 @@
                                  * linker more knowledge about the label 
                                  */
     start_: 
+        cld
+        cli
         movl $stack_top, %esp
 
         subl $16, %esp
