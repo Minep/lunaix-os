@@ -40,5 +40,14 @@ tty_scroll_up();
 void
 tty_clear();
 
+void 
+tty_clear_line(unsigned int y);
+
+void
+tty_set_cpos(unsigned int x, unsigned int y);
+
+void
+tty_get_cpos(unsigned int* x, unsigned int* y);
+
 
 #endif /* __LUNAIX_TTY_H */

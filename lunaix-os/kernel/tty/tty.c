@@ -85,3 +85,23 @@ tty_clear()
     tty_x = 0;
     tty_y = 0;
 }
+
+void
+tty_clear_line(unsigned int y) {
+    for (size_t i = 0; i < TTY_WIDTH; i++)
+    {
+        *(tty_vga_buffer + i + y * TTY_WIDTH) = tty_theme_color;
+    }
+}
+
+void
+tty_set_cpos(unsigned int x, unsigned int y) {
+    tty_x = x % TTY_WIDTH;
+    tty_y = y % TTY_HEIGHT;
+}
+
+void
+tty_get_cpos(unsigned int* x, unsigned int* y) {
+    *x = tty_x;
+    *y = tty_y;
+}

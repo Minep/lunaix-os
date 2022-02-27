@@ -39,16 +39,8 @@
     _after_gdt:
 
         movl $mb_info, (%esp)
-        call _kernel_init
 
-        /* 
-            加载新的栈指针，位于0xffbfffff，但因为16字节对齐的需求，低四位清零。
-            为什么不是0xffffffff？ 因为0xffc00000 - 0xffffffff 这4MiB的空间用于
-            对页表与页目录的循环映射。
-        */
-        mov $0xffbffff0, %esp
-
-        call _kernel_post_init
+        call _kernel_pre_init
 
         subl $6, %esp
 
@@ -59,6 +51,19 @@
         lidt (%esp)
 
         addl $6, %esp
+
+        sti
+
+        call _kernel_init
+
+        /* 
+            加载新的栈指针，位于0xffbfffff，但因为16字节对齐的需求，低四位清零。
+            为什么不是0xffffffff？ 因为0xffc00000 - 0xffffffff 这4MiB的空间用于
+            对页表与页目录的循环映射。
+        */
+        mov $0xffbffff0, %esp
+
+        call _kernel_post_init
 
         /* 进入内核 */  
         call _kernel_main
