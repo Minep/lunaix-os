@@ -41,6 +41,9 @@ void
 _asm_isr13();
 
 void
+_asm_isr14();
+
+void
 interrupt_handler(isr_param* param);
 
 #endif /* __LUNAIX_INTERRUPTS_H */

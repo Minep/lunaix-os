@@ -2,7 +2,7 @@
  * @file dmm.c
  * @author Lunaixsky
  * @brief Dynamic memory manager dedicated to kernel heap. It is not portable at
- * this moment.
+ * this moment. Implicit free list implementation.
  * @version 0.1
  * @date 2022-02-28
  *
@@ -17,8 +17,6 @@
 #include <lunaix/assert.h>
 #include <lunaix/constants.h>
 #include <lunaix/spike.h>
-
-#include <stdbool.h>
 
 #define M_ALLOCATED 0x1
 #define M_PREV_FREE 0x2
@@ -52,6 +50,8 @@ coalesce(uint8_t* chunk_ptr);
 
 void*
 lx_grow_heap(size_t sz);
+
+void place_chunk(uint8_t* ptr, size_t size);
 
 int
 dmm_init()
@@ -99,9 +99,7 @@ lxbrk(size_t size)
     {
         // if next do require new pages to be allocated
         if (!vmm_alloc_pages(heap_top_pg + PG_SIZE, ROUNDUP(size, PG_SIZE), PG_PRESENT | PG_WRITE)) {
-            // TODO: OOM, panic here! Rather than spinning.
-            spin();
-            // return NULL
+            return NULL;
         }
     
     }
@@ -143,34 +141,51 @@ lx_malloc(size_t size)
         size_t chunk_size = CHUNK_S(header);
         if (chunk_size >= size && !CHUNK_A(header)) {
             // found!
-            *((uint32_t*)ptr) = PACK(size, CHUNK_PF(header) | M_ALLOCATED);
-            uint8_t* n_hdrptr = (uint8_t*)(ptr + size);
-            uint32_t diff = chunk_size - size;
-            if (!diff) {
-                // if the current free block is fully occupied
-                uint32_t n_hdr = LW(n_hdrptr);
-                // notify the next block about our avaliability
-                SW(n_hdrptr, n_hdr & ~0x2);
-            } else {
-                // if there is remaining free space left
-                uint32_t remainder_hdr =
-                  PACK(diff, M_NOT_ALLOCATED | M_PREV_ALLOCATED);
-                SW(n_hdrptr, remainder_hdr);
-                SW(FPTR(n_hdrptr, diff), remainder_hdr);
-
-                coalesce(n_hdrptr);
-            }
+            place_chunk(ptr, size);
             return BPTR(ptr);
         }
         ptr += chunk_size;
     }
 
+    // if heap is full (seems to be!), then allocate more space (if it's okay...)
+    if ((ptr = lx_grow_heap(size))) {
+        place_chunk(ptr, size);
+        return BPTR(ptr);
+    }
+
+    // Well, we are officially OOM!
     return NULL;
+}
+
+void place_chunk(uint8_t* ptr, size_t size) {
+    uint32_t header = *((uint32_t*)ptr);
+    size_t chunk_size = CHUNK_S(header);
+    *((uint32_t*)ptr) = PACK(size, CHUNK_PF(header) | M_ALLOCATED);
+    uint8_t* n_hdrptr = (uint8_t*)(ptr + size);
+    uint32_t diff = chunk_size - size;
+    if (!diff) {
+        // if the current free block is fully occupied
+        uint32_t n_hdr = LW(n_hdrptr);
+        // notify the next block about our avaliability
+        SW(n_hdrptr, n_hdr & ~0x2);
+    } else {
+        // if there is remaining free space left
+        uint32_t remainder_hdr =
+            PACK(diff, M_NOT_ALLOCATED | M_PREV_ALLOCATED);
+        SW(n_hdrptr, remainder_hdr);
+        SW(FPTR(n_hdrptr, diff), remainder_hdr);
+
+        coalesce(n_hdrptr);
+    }
 }
 
 void
 lx_free(void* ptr)
 {
+    if (!ptr) {
+        return;
+    }
+
     uint8_t* chunk_ptr = (uint8_t*)ptr - WSIZE;
     uint32_t hdr = LW(chunk_ptr);
     uint8_t* next_hdr = chunk_ptr + CHUNK_S(hdr);

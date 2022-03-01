@@ -42,6 +42,7 @@
                                  */
     start_: 
         cld
+        # 确保屏蔽所有外中断，直到我们准备好PIC为止
         cli
         movl $stack_top, %esp
 
