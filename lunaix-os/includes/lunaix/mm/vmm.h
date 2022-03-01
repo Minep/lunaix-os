@@ -55,6 +55,18 @@ vmm_fmap_page(void* va, void* pa, pt_attr tattr);
 void*
 vmm_alloc_page(void* va, pt_attr tattr);
 
+
+/**
+ * @brief 尝试分配多个连续的虚拟页
+ * 
+ * @param va 起始虚拟地址
+ * @param sz 大小（必须为4K对齐）
+ * @param tattr 属性
+ * @return int 是否成功
+ */
+int
+vmm_alloc_pages(void* va, size_t sz, pt_attr tattr);
+
 /**
  * @brief 删除一个映射
  *

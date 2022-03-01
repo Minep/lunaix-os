@@ -5,6 +5,8 @@
 #include <lunaix/assert.h>
 #include <hal/cpu.h>
 
+#include <stdbool.h>
+
 void
 vmm_init()
 {
@@ -26,7 +28,7 @@ vmm_init_pd()
 }
 
 int
-__vmm_map_internal(uint32_t l1_inx, uint32_t l2_inx, uintptr_t pa, pt_attr attr) {
+__vmm_map_internal(uint32_t l1_inx, uint32_t l2_inx, uintptr_t pa, pt_attr attr, int forced) {
     ptd_t* l1pt = (ptd_t*)L1_BASE_VADDR;
     pt_t* l2pt = (pt_t*)L2_VADDR(l1_inx);
 
@@ -42,7 +44,11 @@ __vmm_map_internal(uint32_t l1_inx, uint32_t l2_inx, uintptr_t pa, pt_attr attr)
         }
 
         l1pt[l1_inx] = NEW_L1_ENTRY(attr, new_l1pt_pa);
-        memset((void*)L2_VADDR(l1_inx), 0, PM_PAGE_SIZE);
+        memset((void*)L2_VADDR(l1_inx), 0, PG_SIZE);
+    }
+
+    if (!forced && l2pt[l2_inx]) {
+        return 0;
     }
 
     l2pt[l2_inx] = NEW_L2_ENTRY(attr, pa);
@@ -88,7 +94,7 @@ vmm_map_page(void* va, void* pa, pt_attr tattr)
         return NULL;
     }
 
-    if (!__vmm_map_internal(l1_index, l2_index, pa, tattr)) {
+    if (!__vmm_map_internal(l1_index, l2_index, pa, tattr, false)) {
         return NULL;
     }
 
@@ -107,7 +113,7 @@ vmm_fmap_page(void* va, void* pa, pt_attr tattr) {
     uint32_t l1_index = L1_INDEX(va);
     uint32_t l2_index = L2_INDEX(va);
 
-    if (!__vmm_map_internal(l1_index, l2_index, pa, tattr)) {
+    if (!__vmm_map_internal(l1_index, l2_index, pa, tattr, true)) {
         return NULL;
     }
 
@@ -127,6 +133,32 @@ vmm_alloc_page(void* vpn, pt_attr tattr)
     return result;
 }
 
+int
+vmm_alloc_pages(void* va, size_t sz, pt_attr tattr) {
+    assert((uintptr_t)va % PG_SIZE == 0)
+    assert(sz % PG_SIZE == 0)
+    
+    void* va_ = va;
+    for (size_t i = 0; i < (sz >> PG_SIZE_BITS); i++, va_ += PG_SIZE)
+    {
+        void* pp = pmm_alloc_page();
+        uint32_t l1_index = L1_INDEX(va_);
+        uint32_t l2_index = L2_INDEX(va_);
+        if (!pp || !__vmm_map_internal(l1_index, l2_index, pp, tattr, false)) {
+            // if one failed, release previous allocated pages.
+            va_ = va;
+            for (size_t j = 0; j < i; j++, va_ += PG_SIZE)
+            {
+                vmm_unmap_page(va_);
+            }
+            
+            return false;
+        }
+    }
+    
+    return true;
+}
+
 void
 vmm_unmap_page(void* va)
 {
@@ -141,9 +173,10 @@ vmm_unmap_page(void* va)
     if (l1pte) {
         pt_t* l2pt = (pt_t*)L2_VADDR(l1_index);
         uint32_t l2pte = l2pt[l2_index];
-        if (IS_CACHED(l2pte) && pmm_free_page((void*)l2pte)) {
-            cpu_invplg(va);
+        if (IS_CACHED(l2pte)) {
+            pmm_free_page((void*)l2pte);
         }
+        cpu_invplg(va);
         l2pt[l2_index] = 0;
     }
 }

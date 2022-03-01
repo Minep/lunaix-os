@@ -4,13 +4,20 @@
 
 #include <stddef.h>
 
-void
-lxsbrk(void* current, void* next);
+#define HEAP_INIT_SIZE 4096
+
+int
+dmm_init();
+
+int
+lxsbrk(void* addr);
+void*
+lxbrk(size_t size);
+
+void*
+lx_malloc(size_t size);
 
 void
-lxmalloc(size_t size);
-
-void
-lxfree(size_t size);
+lx_free(void* ptr);
 
 #endif /* __LUNAIX_DMM_H */

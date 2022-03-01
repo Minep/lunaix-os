@@ -33,7 +33,7 @@ $(BIN_DIR)/$(OS_BIN): $(OBJECT_DIR) $(BIN_DIR) $(SRC)
 	@$(CC) -T linker.ld -o $(BIN_DIR)/$(OS_BIN) $(SRC) $(LDFLAGS)
 
 $(BUILD_DIR)/$(OS_ISO): $(ISO_DIR) $(BIN_DIR)/$(OS_BIN) GRUB_TEMPLATE
-	@./config-grub.sh ${OS_NAME} > $(ISO_GRUB_DIR)/grub.cfg
+	@./config-grub.sh ${OS_NAME} $(ISO_GRUB_DIR)/grub.cfg
 	@cp $(BIN_DIR)/$(OS_BIN) $(ISO_BOOT_DIR)
 	@grub-mkrescue -o $(BUILD_DIR)/$(OS_ISO) $(ISO_DIR)
 
@@ -48,6 +48,7 @@ all-debug: clean $(BUILD_DIR)/$(OS_ISO)
 
 clean:
 	@rm -rf $(BUILD_DIR)
+	@sleep 1
 
 run: $(BUILD_DIR)/$(OS_ISO)
 	@qemu-system-i386 -cdrom $(BUILD_DIR)/$(OS_ISO) -monitor telnet::$(QEMU_MON_PORT),server,nowait &
