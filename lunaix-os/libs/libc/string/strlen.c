@@ -8,3 +8,11 @@ strlen(const char* str)
         len++;
     return len;
 }
+
+size_t
+strnlen(const char* str, size_t max_len) {
+    size_t len = 0;
+    while (str[len] && len <= max_len)
+        len++;
+    return len;
+}

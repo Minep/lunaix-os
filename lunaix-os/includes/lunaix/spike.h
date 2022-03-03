@@ -15,8 +15,20 @@
 // 获取v最近的最小k倍数
 #define ROUNDDOWN(v, k)     ((v) & ~((k) - 1))
 
-static void inline spin() {
+inline static void spin() {
     while(1);
 }
+
+#ifdef __LUNAIXOS_DEBUG__
+#define assert(cond)                                  \
+    if (!(cond)) {                                    \
+        __assert_fail(#cond, __FILE__, __LINE__);     \
+    }
+void __assert_fail(const char* expr, const char* file, unsigned int line) __attribute__((noinline, noreturn));
+#else
+#define assert(cond) //nothing
+#endif
+
+
 
 #endif /* __LUNAIX_SPIKE_H */

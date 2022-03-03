@@ -3,6 +3,7 @@
 #include <lunaix/mm/dmm.h>
 #include <hal/cpu.h>
 #include <libc/stdio.h>
+#include <lunaix/spike.h>
 
 extern uint8_t __kernel_start;
 
@@ -19,8 +20,6 @@ _kernel_main()
 
     void* k_start = vmm_v2p(&__kernel_start);
     printf("The kernel's base address mapping: %p->%p\n", &__kernel_start, k_start);
-
-    dmm_init();
 
     // test malloc & free
     
@@ -40,5 +39,4 @@ _kernel_main()
     
     lx_free(arr);
     lx_free(big_);
-    // assert(0);
 }

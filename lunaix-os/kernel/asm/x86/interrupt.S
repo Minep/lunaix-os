@@ -1,3 +1,6 @@
+#define __ASM__
+#include <arch/x86/interrupts.h>
+
 .macro isr_template vector, no_error_code=1
     .global _asm_isr\vector
     .type _asm_isr\vector, @function
@@ -10,11 +13,21 @@
 .endm
 
 .section .text
-    isr_template 0
-    isr_template 13, no_error_code=0
-    isr_template 14, no_error_code=0
+    isr_template FAULT_DIVISION_ERROR
+    isr_template FAULT_GENERAL_PROTECTION, no_error_code=0
+    isr_template FAULT_PAGE_FAULT, no_error_code=0
+
+    isr_template LUNAIX_SYS_PANIC
 
     interrupt_wrapper:
+        pushl %esp
+        pushl %esi
+        pushl %ebp
+        pushl %edi
+        pushl %edx
+        pushl %ecx
+        pushl %ebx
+        pushl %eax
 
         movl %esp, %eax
         andl $0xfffffff0, %esp
@@ -22,8 +35,18 @@
         movl %eax, (%esp)
 
         call interrupt_handler
-        pop %eax
+        popl %eax
         movl %eax, %esp
+
+        popl %eax
+        popl %ebx
+        popl %ecx
+        popl %edx
+        popl %edi
+        popl %ebp
+        popl %esi
+        popl %esp
+
         addl $8, %esp
 
         iret

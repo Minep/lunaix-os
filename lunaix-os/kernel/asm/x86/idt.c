@@ -2,7 +2,7 @@
 #include <arch/x86/interrupts.h>
 #include <stdint.h>
 
-#define IDT_ENTRY 32
+#define IDT_ENTRY 256
 
 uint64_t _idt[IDT_ENTRY];
 uint16_t _idt_limit = sizeof(_idt) - 1;
@@ -17,7 +17,11 @@ void _set_idt_entry(uint32_t vector, uint16_t seg_selector, void (*isr)(), uint8
 
 void
 _init_idt() {
+    // CPU defined interrupts
     _set_idt_entry(FAULT_DIVISION_ERROR, 0x08, _asm_isr0, 0);
     _set_idt_entry(FAULT_GENERAL_PROTECTION, 0x08, _asm_isr13, 0);
     _set_idt_entry(FAULT_PAGE_FAULT, 0x08, _asm_isr14, 0);
+
+    // system defined interrupts
+    _set_idt_entry(LUNAIX_SYS_PANIC, 0x08, _asm_isr32, 0);
 }

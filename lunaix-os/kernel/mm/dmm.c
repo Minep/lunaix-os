@@ -10,11 +10,12 @@
  *
  */
 
+// TODO: Make the dmm portable
+
 #include <lunaix/mm/dmm.h>
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/vmm.h>
 
-#include <lunaix/assert.h>
 #include <lunaix/constants.h>
 #include <lunaix/spike.h>
 
@@ -67,7 +68,7 @@ dmm_init()
     SW(heap_start + WSIZE, PACK(0, M_ALLOCATED));
     current_heap_top += WSIZE;
 
-    return lx_grow_heap(HEAP_INIT_SIZE);
+    return lx_grow_heap(HEAP_INIT_SIZE) != NULL;
 }
 
 int
@@ -80,14 +81,14 @@ void*
 lxbrk(size_t size)
 {   
     if (size == 0) {
-        return NULL;
+        return current_heap_top;
     }
 
     // plus WSIZE is the overhead for epilogue marker
     size += WSIZE;
     void* next = current_heap_top + ROUNDUP((uintptr_t)size, WSIZE);
 
-    if (next >= K_STACK_START) {
+    if ((uintptr_t)next >= K_STACK_START) {
         return NULL;
     }
 
@@ -98,20 +99,20 @@ lxbrk(size_t size)
       if (heap_top_pg != PG_ALIGN(next))
     {
         // if next do require new pages to be allocated
-        if (!vmm_alloc_pages(heap_top_pg + PG_SIZE, ROUNDUP(size, PG_SIZE), PG_PRESENT | PG_WRITE)) {
+        if (!vmm_alloc_pages((void*)(heap_top_pg + PG_SIZE), ROUNDUP(size, PG_SIZE), PG_PREM_RW)) {
             return NULL;
         }
     
     }
 
-    uintptr_t old = current_heap_top;
+    void* old = current_heap_top;
     current_heap_top = next - WSIZE;
     return old;
 }
 
 void*
 lx_grow_heap(size_t sz) {
-    uintptr_t start;
+    void* start;
 
     sz = ROUNDUP(sz, BOUNDARY);
     if (!(start = lxbrk(sz))) {
@@ -136,7 +137,7 @@ lx_malloc(size_t size)
     // round to largest 4B aligned value
     //  and space for header
     size = ROUNDUP(size, BOUNDARY) + WSIZE;
-    while (ptr < current_heap_top) {
+    while (ptr < (uint8_t*)current_heap_top) {
         uint32_t header = *((uint32_t*)ptr);
         size_t chunk_size = CHUNK_S(header);
         if (chunk_size >= size && !CHUNK_A(header)) {
@@ -203,7 +204,6 @@ coalesce(uint8_t* chunk_ptr)
     uint32_t hdr = LW(chunk_ptr);
     uint32_t pf = CHUNK_PF(hdr);
     uint32_t sz = CHUNK_S(hdr);
-    uint32_t ftr = LW(chunk_ptr + sz - WSIZE);
 
     uint32_t n_hdr = LW(chunk_ptr + sz);
 

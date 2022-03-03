@@ -11,6 +11,8 @@
 #define PG_LAST_TABLE               PG_MAX_ENTRIES - 1
 #define PG_FIRST_TABLE              0
 
+#define PTE_NULL                    0
+
 #define P2V(paddr)          ((uintptr_t)(paddr)  +  HIGHER_HLF_BASE)
 #define V2P(vaddr)          ((uintptr_t)(vaddr)  -  HIGHER_HLF_BASE)
 
@@ -78,6 +80,13 @@ typedef struct {
     // 映射的flags
     uint16_t flags;
 } v_mapping;
+
+typedef uint32_t x86_pte_t;
+typedef struct
+{
+    x86_pte_t entry[PG_MAX_ENTRIES];
+} __attribute__((packed)) x86_page_table;
+
 
 
 #endif /* __LUNAIX_PAGE_H */

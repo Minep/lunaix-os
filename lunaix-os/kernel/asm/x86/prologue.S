@@ -52,7 +52,6 @@
 
         addl $6, %esp
 
-        movl $mb_info, (%esp)
         call _kernel_init
 
         /* 

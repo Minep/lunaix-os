@@ -4,8 +4,13 @@
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
+#include <lunaix/mm/dmm.h>
+#include <lunaix/spike.h>
 
 #include <arch/x86/boot/multiboot.h>
+#include <arch/x86/idt.h>
+
+#include <libc/stdio.h>
 
 #include <stdint.h>
 #include <stddef.h>
@@ -14,6 +19,12 @@
 extern uint8_t __kernel_start;
 extern uint8_t __kernel_end;
 extern uint8_t __init_hhk_end;
+
+void
+setup_memory(multiboot_memory_map_t* map, size_t map_size);
+
+void
+setup_kernel_runtime();
 
 void
 _kernel_pre_init(multiboot_info_t* mb_info) {
@@ -35,7 +46,7 @@ _kernel_init(multiboot_info_t* mb_info) {
            mb_info->mem_upper);
 
     unsigned int map_size = mb_info->mmap_length / sizeof(multiboot_memory_map_t);
-    setup_memory(mb_info->mmap_addr, map_size);
+    setup_memory((multiboot_memory_map_t*)mb_info->mmap_addr, map_size);
     setup_kernel_runtime();
 }
 
@@ -49,6 +60,8 @@ _kernel_post_init() {
     for (size_t i = 0; i < hhk_init_pg_count; i++) {
         vmm_unmap_page((void*)(i << PG_SIZE_BITS));
     }
+
+    assert(dmm_init());
 }
 
 // 按照 Memory map 标识可用的物理页

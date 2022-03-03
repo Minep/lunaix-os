@@ -17,7 +17,7 @@ vmm_init();
  *
  * @return ptd_entry* 页目录的物理地址，随时可以加载进CR3
  */
-ptd_t*
+x86_page_table*
 vmm_init_pd();
 
 /**
