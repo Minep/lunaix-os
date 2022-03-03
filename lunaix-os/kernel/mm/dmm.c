@@ -1,8 +1,8 @@
 /**
  * @file dmm.c
  * @author Lunaixsky
- * @brief Dynamic memory manager dedicated to kernel heap. It is not portable at
- * this moment. Implicit free list implementation.
+ * @brief Dynamic memory manager dedicated to kernel heap. Using implicit free list implementation.
+ * This is designed to be portable, so it can serve as syscalls to malloc/free in the c std lib.
  * @version 0.1
  * @date 2022-02-28
  *
@@ -10,7 +10,6 @@
  *
  */
 
-// TODO: Make the dmm portable
 
 #include <lunaix/mm/dmm.h>
 #include <lunaix/mm/page.h>
@@ -42,51 +41,46 @@
 #define BOUNDARY 4
 #define WSIZE 4
 
-extern uint8_t __kernel_heap_start;
-
-void* current_heap_top = NULL;
-
 void*
 coalesce(uint8_t* chunk_ptr);
 
 void*
-lx_grow_heap(size_t sz);
+lx_grow_heap(heap_context_t* heap, size_t sz);
 
 void place_chunk(uint8_t* ptr, size_t size);
 
 int
-dmm_init()
+dmm_init(heap_context_t* heap)
 {
-    assert((uintptr_t)&__kernel_heap_start % BOUNDARY == 0);
+    assert((uintptr_t)heap->start % BOUNDARY == 0);
 
-    current_heap_top = &__kernel_heap_start;
-    uint8_t* heap_start = &__kernel_heap_start;
+    heap->brk = heap->start;
     
-    vmm_alloc_page(current_heap_top, PG_PREM_RW);
+    vmm_alloc_page(heap->brk, PG_PREM_RW);
 
-    SW(heap_start,     PACK(4, M_ALLOCATED));
-    SW(heap_start + WSIZE, PACK(0, M_ALLOCATED));
-    current_heap_top += WSIZE;
+    SW(heap->start,         PACK(4, M_ALLOCATED));
+    SW(heap->start + WSIZE, PACK(0, M_ALLOCATED));
+    heap->brk += WSIZE;
 
-    return lx_grow_heap(HEAP_INIT_SIZE) != NULL;
+    return lx_grow_heap(heap, HEAP_INIT_SIZE) != NULL;
 }
 
 int
-lxsbrk(void* addr)
+lxsbrk(heap_context_t* heap, void* addr)
 {
-    return lxbrk(addr - current_heap_top) != NULL;
+    return lxbrk(heap, addr - heap->brk) != NULL;
 }
 
 void*
-lxbrk(size_t size)
+lxbrk(heap_context_t* heap, size_t size)
 {   
     if (size == 0) {
-        return current_heap_top;
+        return heap->brk;
     }
 
     // plus WSIZE is the overhead for epilogue marker
     size += WSIZE;
-    void* next = current_heap_top + ROUNDUP((uintptr_t)size, WSIZE);
+    void* next = heap->brk + ROUNDUP((uintptr_t)size, WSIZE);
 
     if ((uintptr_t)next >= K_STACK_START) {
         return NULL;
@@ -95,7 +89,7 @@ lxbrk(size_t size)
     // Check the invariant
     assert(size % BOUNDARY == 0)
 
-    uintptr_t heap_top_pg = PG_ALIGN(current_heap_top);
+    uintptr_t heap_top_pg = PG_ALIGN(heap->brk);
       if (heap_top_pg != PG_ALIGN(next))
     {
         // if next do require new pages to be allocated
@@ -105,17 +99,17 @@ lxbrk(size_t size)
     
     }
 
-    void* old = current_heap_top;
-    current_heap_top = next - WSIZE;
+    void* old = heap->brk;
+    heap->brk = next - WSIZE;
     return old;
 }
 
 void*
-lx_grow_heap(size_t sz) {
+lx_grow_heap(heap_context_t* heap, size_t sz) {
     void* start;
 
     sz = ROUNDUP(sz, BOUNDARY);
-    if (!(start = lxbrk(sz))) {
+    if (!(start = lxbrk(heap, sz))) {
         return NULL;
     }
 
@@ -129,15 +123,15 @@ lx_grow_heap(size_t sz) {
 }
 
 void*
-lx_malloc(size_t size)
+lx_malloc(heap_context_t* heap, size_t size)
 {
     // Simplest first fit approach.
 
-    uint8_t* ptr = &__kernel_heap_start;
+    uint8_t* ptr = heap->start;
     // round to largest 4B aligned value
     //  and space for header
     size = ROUNDUP(size, BOUNDARY) + WSIZE;
-    while (ptr < (uint8_t*)current_heap_top) {
+    while (ptr < (uint8_t*)heap->brk) {
         uint32_t header = *((uint32_t*)ptr);
         size_t chunk_size = CHUNK_S(header);
         if (chunk_size >= size && !CHUNK_A(header)) {
@@ -149,7 +143,7 @@ lx_malloc(size_t size)
     }
 
     // if heap is full (seems to be!), then allocate more space (if it's okay...)
-    if ((ptr = lx_grow_heap(size))) {
+    if ((ptr = lx_grow_heap(heap, size))) {
         place_chunk(ptr, size);
         return BPTR(ptr);
     }
@@ -189,10 +183,11 @@ lx_free(void* ptr)
 
     uint8_t* chunk_ptr = (uint8_t*)ptr - WSIZE;
     uint32_t hdr = LW(chunk_ptr);
-    uint8_t* next_hdr = chunk_ptr + CHUNK_S(hdr);
+    size_t sz = CHUNK_S(hdr);
+    uint8_t* next_hdr = chunk_ptr + sz;
 
     SW(chunk_ptr, hdr & ~M_ALLOCATED);
-    SW(FPTR(chunk_ptr, CHUNK_S(hdr)), hdr & ~M_ALLOCATED);
+    SW(FPTR(chunk_ptr, sz), hdr & ~M_ALLOCATED);
     SW(next_hdr, LW(next_hdr) | M_PREV_FREE);
 
     coalesce(chunk_ptr);

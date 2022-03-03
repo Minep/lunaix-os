@@ -6,16 +6,23 @@
 
 #define HEAP_INIT_SIZE 4096
 
-int
-dmm_init();
+typedef struct 
+{
+    void* start;
+    void* brk;
+} heap_context_t;
+
 
 int
-lxsbrk(void* addr);
+dmm_init(heap_context_t* heap);
+
+int
+lxsbrk(heap_context_t* heap, void* addr);
 void*
-lxbrk(size_t size);
+lxbrk(heap_context_t* heap, size_t size);
 
 void*
-lx_malloc(size_t size);
+lx_malloc(heap_context_t* heap, size_t size);
 
 void
 lx_free(void* ptr);
