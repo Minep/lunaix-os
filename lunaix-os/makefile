@@ -43,8 +43,8 @@ all-debug: O := -Og
 all-debug: CFLAGS := -g -std=gnu99 -ffreestanding $(O) $(W) $(ARCH_OPT) -D__LUNAIXOS_DEBUG__
 all-debug: LDFLAGS := -g -ffreestanding $(O) -nostdlib -lgcc
 all-debug: clean $(BUILD_DIR)/$(OS_ISO)
-	# @echo "Dumping the disassembled kernel code to $(BUILD_DIR)/kdump.txt"
-	# @i686-elf-objdump -D $(BIN_DIR)/$(OS_BIN) > $(BUILD_DIR)/kdump.txt
+	@echo "Dumping the disassembled kernel code to $(BUILD_DIR)/kdump.txt"
+	@i686-elf-objdump -S $(BIN_DIR)/$(OS_BIN) > $(BUILD_DIR)/kdump.txt
 
 clean:
 	@rm -rf $(BUILD_DIR)

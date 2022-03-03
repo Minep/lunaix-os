@@ -61,7 +61,7 @@ _kernel_post_init() {
         vmm_unmap_page((void*)(i << PG_SIZE_BITS));
     }
 
-    assert(kalloc_init());
+    assert_msg(kalloc_init(), "Fail to initialize heap");
 }
 
 // 按照 Memory map 标识可用的物理页

@@ -5,7 +5,7 @@
 static char buffer[1024];
 
 void __assert_fail(const char* expr, const char* file, unsigned int line) {
-    sprintf(buffer, "Assert %s failed (%s:%u)", expr, file, line);
+    sprintf(buffer, "[ASSERT] %s (%s:%u)", expr, file, line);
 
     // Here we load the buffer's address into %edi ("D" constraint)
     //  This is a convention we made that the LUNAIX_SYS_PANIC syscall will

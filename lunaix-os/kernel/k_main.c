@@ -30,13 +30,24 @@ _kernel_main()
         arr[i] = (uint32_t*) kmalloc((i + 1) * 2);
     }
 
-    void* big_ = kmalloc(8192);
 
     for (size_t i = 0; i < 10; i++)
     {
         kfree(arr[i]);
     }
+
+    void* big_ = kmalloc(8192);
     
+    // good free
     kfree(arr);
     kfree(big_);
+
+    uint8_t* bad1 = kmalloc(123);
+    void* bad2 = kmalloc(1);
+
+    *((uint32_t*)(bad1 - 4)) = 0xc2343312UL;
+
+    // bad free
+    kfree(bad1);
+    kfree(bad2 - 2);
 }
