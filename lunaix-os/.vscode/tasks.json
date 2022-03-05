@@ -1,0 +1,17 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Launch LunaixOS",
+            "type": "shell",
+            "command": "make debug-qemu-vscode",
+            "isBackground": true,
+            "problemMatcher": {
+                "background": {
+                    "activeOnStart": true,
+                    "endsPattern": "^\\(qemu\\).*"
+                }
+            }
+        }
+    ]
+}

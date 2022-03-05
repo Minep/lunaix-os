@@ -7,7 +7,7 @@ int
 kalloc_init();
 
 /**
- * @brief Allocate an accessible memory region in kernel heap. 
+ * @brief Allocate a contiguous and un-initialized memory region in kernel heap. 
  * 
  * @remarks 
  *  This is NOT the same as kmalloc in Linux! 
@@ -17,15 +17,15 @@ kalloc_init();
  * @return void* 
  */
 void*
-kmalloc(size_t size);
+lxmalloc(size_t size);
 
 /**
- * @brief calloc for kernel heap. A wrapper for kmalloc
+ * @brief Allocate a contiguous and initialized memory region in kernel heap.
  * @param size 
  * @return void*
  */
 void*
-kcalloc(size_t size);
+lxcalloc(size_t size);
 
 /**
  * @brief Free the memory region allocated by kmalloc
@@ -34,6 +34,6 @@ kcalloc(size_t size);
  * @return void* 
  */
 void
-kfree(void* ptr);
+lxfree(void* ptr);
 
 #endif /* __LUNAIX_KALLOC_H */

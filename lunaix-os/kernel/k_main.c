@@ -23,31 +23,36 @@ _kernel_main()
 
     // test malloc & free
     
-    uint32_t** arr = (uint32_t**) kmalloc(10 * sizeof(uint32_t*));
+    uint8_t** arr = (uint8_t**) lxmalloc(10 * sizeof(uint8_t*));
     
     for (size_t i = 0; i < 10; i++)
     {
-        arr[i] = (uint32_t*) kmalloc((i + 1) * 2);
+        arr[i] = (uint8_t*) lxmalloc((i + 1) * 2);
     }
 
 
     for (size_t i = 0; i < 10; i++)
     {
-        kfree(arr[i]);
+        lxfree(arr[i]);
     }
 
-    void* big_ = kmalloc(8192);
+    uint8_t* big_ = lxmalloc(8192);
+    big_[0] = 123;
+    big_[1] = 23;
+    big_[2] = 3;
+
+    printf("%u, %u, %u", big_[0], big_[1], big_[2]);
     
     // good free
-    kfree(arr);
-    kfree(big_);
+    lxfree(arr);
+    lxfree(big_);
 
-    uint8_t* bad1 = kmalloc(123);
-    void* bad2 = kmalloc(1);
+    // uint8_t* bad1 = lxmalloc(123);
+    // void* bad2 = lxmalloc(1);
 
-    *((uint32_t*)(bad1 - 4)) = 0xc2343312UL;
+    // *((uint32_t*)(bad1 - 4)) = 0xc2343312UL;
 
-    // bad free
-    kfree(bad1);
-    kfree(bad2 - 2);
+    // // bad free
+    // lxfree(bad1);
+    // lxfree(bad2 - 2);
 }

@@ -52,8 +52,14 @@ __vmm_map_internal(uint32_t l1_inx,
         memset((void*)L2_VADDR(l1_inx), 0, PG_SIZE);
     }
 
-    if (!forced && l2pt->entry[l2_inx]) {
-        return 0;
+    x86_pte_t l2pte = l2pt->entry[l2_inx];
+    if (l2pte) {
+        if (!forced) {
+            return 0;
+        }
+        if (HAS_FLAGS(l2pte, PG_PRESENT)) {
+            assert_msg(pmm_free_page(GET_PG_ADDR(l2pte)), "fail to release physical page");
+        }
     }
 
     l2pt->entry[l2_inx] = NEW_L2_ENTRY(attr, pa);

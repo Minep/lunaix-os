@@ -39,7 +39,7 @@ $(BUILD_DIR)/$(OS_ISO): $(ISO_DIR) $(BIN_DIR)/$(OS_BIN) GRUB_TEMPLATE
 
 all: clean $(BUILD_DIR)/$(OS_ISO)
 
-all-debug: O := -Og
+all-debug: O := -O0
 all-debug: CFLAGS := -g -std=gnu99 -ffreestanding $(O) $(W) $(ARCH_OPT) -D__LUNAIXOS_DEBUG__
 all-debug: LDFLAGS := -g -ffreestanding $(O) -nostdlib -lgcc
 all-debug: clean $(BUILD_DIR)/$(OS_ISO)
@@ -61,6 +61,12 @@ debug-qemu: all-debug
 	@sleep 1
 	@$(QEMU_MON_TERM) -e "telnet 127.0.0.1 $(QEMU_MON_PORT)"
 	@gdb -s $(BUILD_DIR)/kernel.dbg -ex "target remote localhost:1234"
+
+debug-qemu-vscode: all-debug
+	@i686-elf-objcopy --only-keep-debug $(BIN_DIR)/$(OS_BIN) $(BUILD_DIR)/kernel.dbg
+	@qemu-system-i386 -s -S -cdrom $(BUILD_DIR)/$(OS_ISO) -monitor telnet::$(QEMU_MON_PORT),server,nowait &
+	@sleep 0.5
+	@telnet 127.0.0.1 $(QEMU_MON_PORT)
 
 debug-bochs: all-debug
 	@bochs -q -f bochs.cfg

@@ -46,6 +46,9 @@
 #define PG_ENTRY_FLAGS(entry)   (entry & 0xFFFU)
 #define PG_ENTRY_ADDR(entry)   (entry & ~0xFFFU)
 
+#define HAS_FLAGS(entry, flags)             ((PG_ENTRY_FLAGS(entry) & (flags)) == flags)
+#define CONTAINS_FLAGS(entry, flags)        (PG_ENTRY_FLAGS(entry) & (flags))
+
 #define PG_PREM_R              PG_PRESENT
 #define PG_PREM_RW             PG_PRESENT | PG_WRITE
 #define PG_PREM_UR             PG_PRESENT | PG_ALLOW_USER

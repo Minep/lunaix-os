@@ -1,4 +1,5 @@
 build/
 playground/
 .vscode/settings.json
+.vscode/*.log
 .VSCodeCounter/
