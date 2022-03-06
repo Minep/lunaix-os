@@ -1,0 +1,47 @@
+#ifndef __LUNAIX_RTC_H
+#define __LUNAIX_RTC_H
+
+#include "io.h"
+
+#define RTC_INDEX_PORT 0x70
+#define RTC_TARGET_PORT 0x71
+
+#define WITH_NMI_DISABLED 0x80
+
+#define RTC_CURRENT_CENTRY 20
+
+#define RTC_REG_YRS 0x9
+#define RTC_REG_MTH 0x8
+#define RTC_REG_DAY 0x7
+#define RTC_REG_WDY 0x6
+#define RTC_REG_HRS 0x4
+#define RTC_REG_MIN 0x2
+#define RTC_REG_SEC 0x0
+
+#define RTC_REG_A 0xA
+#define RTC_REG_B 0xB
+#define RTC_REG_C 0xC
+#define RTC_REG_D 0xD
+
+#define RTC_BIN_ENCODED(reg)    (reg & 0x04)
+#define RTC_24HRS_ENCODED(reg)  (reg & 0x02)
+
+typedef struct
+{
+    uint32_t year;      // use int32 as we need to store the 4-digit year
+    uint8_t month;
+    uint8_t day;
+    uint8_t weekday;
+    uint8_t hour;
+    uint8_t minute;
+    uint8_t second;
+} rtc_datetime;
+
+
+uint8_t
+rtc_read_reg(uint8_t reg_selector);
+
+void 
+rtc_get_datetime(rtc_datetime* datetime);
+
+#endif /* __LUNAIX_RTC_H */
