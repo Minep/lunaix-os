@@ -1,17 +1,17 @@
 #include <klibc/string.h>
 #include <lunaix/tty/tty.h>
-#include <lunaix/constants.h>
+#include <lunaix/common.h>
 #include <stdint.h>
 
 #define TTY_WIDTH 80
 #define TTY_HEIGHT 25
 
-vga_attribute* tty_vga_buffer = (vga_attribute*)VGA_BUFFER_PADDR;
+static vga_attribute* tty_vga_buffer = (vga_attribute*)VGA_BUFFER_PADDR;
 
-vga_attribute tty_theme_color = VGA_COLOR_BLACK;
+static vga_attribute tty_theme_color = VGA_COLOR_BLACK;
 
-uint32_t tty_x = 0;
-uint16_t tty_y = 0;
+static uint32_t tty_x = 0;
+static uint16_t tty_y = 0;
 
 void tty_init(void* vga_buf) {
     tty_vga_buffer = (vga_attribute*)vga_buf;

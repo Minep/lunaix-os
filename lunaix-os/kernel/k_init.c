@@ -1,4 +1,4 @@
-#include <lunaix/constants.h>
+#include <lunaix/common.h>
 #include <lunaix/tty/tty.h>
 
 #include <lunaix/mm/page.h>
@@ -7,6 +7,7 @@
 #include <lunaix/mm/kalloc.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
+#include <lunaix/timer.h>
 
 #include <hal/rtc.h>
 #include <hal/apic.h>
@@ -27,6 +28,8 @@ extern uint8_t __kernel_start;
 extern uint8_t __kernel_end;
 extern uint8_t __init_hhk_end;
 
+
+// Set remotely by kernel/asm/x86/prologue.S
 multiboot_info_t* _k_init_mb_info;
 
 LOG_MODULE("INIT");
@@ -93,7 +96,8 @@ _kernel_post_init() {
     vmm_set_mapping(IOAPIC_BASE_VADDR, ioapic_addr, PG_PREM_RW);
 
     ioapic_init();
-    init_apic();
+    apic_init();
+    timer_init(SYS_TIMER_FREQUENCY_HZ);
 
     for (size_t i = 256; i < hhk_init_pg_count; i++) {
         vmm_unmap_page((void*)(i << PG_SIZE_BITS));

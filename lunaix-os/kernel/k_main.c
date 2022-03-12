@@ -1,14 +1,18 @@
 #include <hal/cpu.h>
-#include <hal/rtc.h>
 #include <lunaix/syslog.h>
 #include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
+#include <lunaix/time.h>
+#include <lunaix/timer.h>
 #include <stdint.h>
 
 extern uint8_t __kernel_start;
 
 LOG_MODULE("LX")
+
+void 
+test_timer(void* payload);
 
 void
 _kernel_main()
@@ -47,5 +51,21 @@ _kernel_main()
     lxfree(arr);
     lxfree(big_);
 
+    timer_run_second(1, test_timer, NULL, TIMER_MODE_PERIODIC);
+
     spin();
+}
+
+static datetime_t datetime;
+
+void test_timer(void* payload) {
+    time_getdatetime(&datetime);
+
+    kprintf(KWARN "%u/%02u/%02u %02u:%02u:%02u\r",
+           datetime.year,
+           datetime.month,
+           datetime.day,
+           datetime.hour,
+           datetime.minute,
+           datetime.second);
 }

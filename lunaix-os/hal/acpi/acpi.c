@@ -8,7 +8,7 @@
 
 #include "parser/madt_parser.h"
 
-acpi_context* toc = NULL;
+static acpi_context* toc = NULL;
 
 LOG_MODULE("ACPI")
 
@@ -51,7 +51,7 @@ acpi_init(multiboot_info_t* mb_info)
     kprintf(KINFO "OEM: %s\n", toc->oem_id);
     kprintf(KINFO "IOAPIC address: %p\n", toc->madt.ioapic->ioapic_addr);
     kprintf(KINFO "APIC address: %p\n", toc->madt.apic_addr);
-    
+
     for (size_t i = 0; i < 24; i++) {
         acpi_intso_t* intso = toc->madt.irq_exception[i];
         if (!intso)

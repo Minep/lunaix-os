@@ -9,6 +9,7 @@
  * 
  */
 #include <hal/rtc.h>
+#include <lunaix/time.h>
 #include <klibc/string.h>
 
 void
@@ -42,7 +43,7 @@ bcd2dec(uint8_t bcd)
 }
 
 int
-rtc_date_same(rtc_datetime* a, rtc_datetime* b) {
+rtc_date_same(datetime_t* a, datetime_t* b) {
     return a->year == b->year &&
            a->month == b->month &&
            a->day == b->day &&
@@ -52,14 +53,14 @@ rtc_date_same(rtc_datetime* a, rtc_datetime* b) {
 }
 
 void
-rtc_get_datetime(rtc_datetime* datetime)
+time_getdatetime(datetime_t* datetime)
 {
-    rtc_datetime current;
+    datetime_t current;
     
     do
     {
         while (rtc_read_reg(RTC_REG_A) & 0x80);
-        memcpy(&current, datetime, sizeof(rtc_datetime));
+        memcpy(&current, datetime, sizeof(datetime_t));
 
         datetime->year = rtc_read_reg(RTC_REG_YRS);
         datetime->month = rtc_read_reg(RTC_REG_MTH);

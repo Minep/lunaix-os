@@ -13,9 +13,9 @@
     uint32_t leading_shifts =                                                  \
       (page_count + offset) < 8 ? page_count : 8 - offset;
 
-uint8_t pm_bitmap[PM_BMP_MAX_SIZE];
+static uint8_t pm_bitmap[PM_BMP_MAX_SIZE];
 
-uintptr_t max_pg;
+static uintptr_t max_pg;
 
 //  ... |xxxx xxxx |
 //  ... |-->|

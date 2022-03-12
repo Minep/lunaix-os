@@ -32,17 +32,6 @@
 #define RTC_FREQUENCY_1024HZ    0b110
 #define RTC_DIVIDER_33KHZ       (0b010 << 4)
 
-typedef struct
-{
-    uint32_t year;      // use int32 as we need to store the 4-digit year
-    uint8_t month;
-    uint8_t day;
-    uint8_t weekday;
-    uint8_t hour;
-    uint8_t minute;
-    uint8_t second;
-} rtc_datetime;
-
 void
 rtc_init();
 
@@ -51,9 +40,6 @@ rtc_read_reg(uint8_t reg_selector);
 
 void
 rtc_write_reg(uint8_t reg_selector, uint8_t val);
-
-void 
-rtc_get_datetime(rtc_datetime* datetime);
 
 void
 rtc_enable_timer();

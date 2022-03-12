@@ -5,7 +5,7 @@
 #define MAX_KPRINTF_BUF_SIZE 1024
 #define MAX_XFMT_SIZE 1024
 
-char buf[MAX_KPRINTF_BUF_SIZE];
+static char buf[MAX_KPRINTF_BUF_SIZE];
 
 void
 __kprintf(const char* component, const char* fmt, va_list args) {

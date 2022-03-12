@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_PAGE_H
 #define __LUNAIX_PAGE_H
 #include <stdint.h>
-#include <lunaix/constants.h>
+#include <lunaix/common.h>
 
 #define PG_SIZE_BITS                12
 #define PG_SIZE                     (1 << PG_SIZE_BITS)

@@ -67,7 +67,7 @@
 #define apic_write_reg(reg, val)     (*(uint32_t*)(APIC_BASE_VADDR + (reg)) = (val))
 
 void
-init_apic();
+apic_init();
 
 /**
  * @brief Tell the APIC that the handler for current interrupt is finished.

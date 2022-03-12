@@ -1,7 +1,7 @@
 #include <arch/x86/boot/multiboot.h>
 #include <arch/x86/idt.h>
 #include <lunaix/mm/page.h>
-#include <lunaix/constants.h>
+#include <lunaix/common.h>
 
 #define PT_ADDR(ptd, pt_index)                       ((ptd_t*)ptd + (pt_index + 1) * 1024)
 #define SET_PDE(ptd, pde_index, pde)                 *((ptd_t*)ptd + pde_index) = pde;
