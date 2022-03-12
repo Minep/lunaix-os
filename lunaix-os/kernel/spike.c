@@ -1,11 +1,11 @@
 #include <lunaix/spike.h>
 #include <arch/x86/interrupts.h>
-#include <libc/stdio.h>
+#include <klibc/stdio.h>
 
 static char buffer[1024];
 
 void __assert_fail(const char* expr, const char* file, unsigned int line) {
-    sprintf(buffer, "[ASSERT] %s (%s:%u)", expr, file, line);
+    sprintf(buffer, "%s (%s:%u)", expr, file, line);
 
     // Here we load the buffer's address into %edi ("D" constraint)
     //  This is a convention we made that the LUNAIX_SYS_PANIC syscall will
@@ -16,4 +16,12 @@ void __assert_fail(const char* expr, const char* file, unsigned int line) {
     );
 
     spin();     // never reach
+}
+
+void panick(const char* msg) {
+    asm(
+        "int %0"
+        ::"i"(LUNAIX_SYS_PANIC), "D"(msg)
+    );
+    spin();
 }

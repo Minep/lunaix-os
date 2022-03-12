@@ -31,10 +31,15 @@ inline static void spin() {
     }
 void __assert_fail(const char* expr, const char* file, unsigned int line) __attribute__((noinline, noreturn));
 #else
-#define assert(cond) //assert nothing
-#define assert_msg(cond, msg)  //assert nothing
+#define assert(cond) (void)(cond); //assert nothing
+#define assert_msg(cond, msg) (void)(cond);  //assert nothing
 #endif
 
+void panick(const char* msg);
+
+
+#define wait_until(cond)    while(!(cond));
+#define loop_until(cond)    while(!(cond));
 
 
 #endif /* __LUNAIX_SPIKE_H */

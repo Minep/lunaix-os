@@ -7,7 +7,7 @@
         {
             "type": "gdb",
             "request": "attach",
-            "name": "Attach to QEMU",
+            "name": "LunaixOS",
             "executable": "${workspaceRoot}/build/bin/lunaix.bin",
             "target": ":1234",
             "remote": true,

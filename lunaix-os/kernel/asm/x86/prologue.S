@@ -38,7 +38,7 @@
 
     _after_gdt:
 
-        movl $mb_info, (%esp)
+        movl $mb_info, _k_init_mb_info
 
         call _kernel_pre_init
 

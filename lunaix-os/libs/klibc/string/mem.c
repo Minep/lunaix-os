@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include <libc/string.h>
+#include <klibc/string.h>
 
 void*
 memcpy(void* dest, const void* src, size_t num)

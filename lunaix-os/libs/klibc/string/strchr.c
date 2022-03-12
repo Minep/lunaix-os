@@ -1,4 +1,4 @@
-#include <libc/string.h>
+#include <klibc/string.h>
 
 const char*
 strchr(const char* str, int character)

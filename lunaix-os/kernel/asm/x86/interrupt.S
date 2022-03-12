@@ -19,6 +19,12 @@
 
     isr_template LUNAIX_SYS_PANIC
 
+    isr_template APIC_ERROR_IV
+    isr_template APIC_LINT0_IV
+    isr_template APIC_TIMER_IV
+    isr_template APIC_SPIV_IV
+    isr_template RTC_TIMER_IV
+
     interrupt_wrapper:
         pushl %esp
         pushl %esi
@@ -34,9 +40,8 @@
         subl $16, %esp
         movl %eax, (%esp)
 
-        call interrupt_handler
-        popl %eax
-        movl %eax, %esp
+        call intr_handler
+        popl %esp
 
         popl %eax
         popl %ebx

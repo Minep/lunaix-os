@@ -25,7 +25,7 @@ lxmalloc(size_t size);
  * @return void*
  */
 void*
-lxcalloc(size_t size);
+lxcalloc(size_t n, size_t elem);
 
 /**
  * @brief Free the memory region allocated by kmalloc

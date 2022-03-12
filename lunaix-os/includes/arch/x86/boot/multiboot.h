@@ -225,5 +225,8 @@ struct multiboot_apm_info
     multiboot_uint16_t cseg_16_len;
     multiboot_uint16_t dseg_len;
 };
+
+#define MB_MMAP_ENTRY_SIZE      sizeof(multiboot_memory_map_t)
+
 #endif
 #endif

@@ -39,3 +39,29 @@ void cpu_get_brand(char* brand_out) {
     }
     brand_out[48] = '\0';
 }
+
+
+int
+cpu_has_apic() {
+    // reference: Intel manual, section 10.4.2
+    reg32 eax = 0, ebx = 0, edx = 0, ecx = 0;
+    __get_cpuid(1, &eax, &ebx, &ecx, &edx);
+    
+    return (edx & 0x100);
+}
+
+void
+cpu_rdmsr(uint32_t msr_idx, uint32_t* reg_high, uint32_t* reg_low)
+{
+    uint32_t h = 0, l = 0;
+    asm volatile("rdmsr" : "=d"(h), "=a"(l) : "c"(msr_idx));
+
+    *reg_high = h;
+    *reg_low = l;
+}
+
+void
+cpu_wrmsr(uint32_t msr_idx, uint32_t reg_high, uint32_t reg_low)
+{
+    asm volatile("wrmsr" : : "d"(reg_high), "a"(reg_low), "c"(msr_idx));
+}

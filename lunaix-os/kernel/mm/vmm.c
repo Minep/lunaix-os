@@ -1,5 +1,5 @@
 #include <hal/cpu.h>
-#include <libc/string.h>
+#include <klibc/string.h>
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
@@ -169,12 +169,33 @@ vmm_alloc_pages(void* va, size_t sz, pt_attr tattr)
 }
 
 void
+vmm_set_mapping(void* va, void* pa, pt_attr attr) {
+    assert(((uintptr_t)va & 0xFFFU) == 0);
+
+    uint32_t l1_index = L1_INDEX(va);
+    uint32_t l2_index = L2_INDEX(va);
+
+    // prevent map of recursive mapping region
+    if (l1_index == 1023) {
+        return;
+    }
+    
+    __vmm_map_internal(l1_index, l2_index, (uintptr_t)pa, attr, false);
+}
+
+void
 vmm_unmap_page(void* va)
 {
     assert(((uintptr_t)va & 0xFFFU) == 0);
 
     uint32_t l1_index = L1_INDEX(va);
     uint32_t l2_index = L2_INDEX(va);
+
+    // prevent unmap of recursive mapping region
+    if (l1_index == 1023) {
+        return;
+    }
+
     x86_page_table* l1pt = (x86_page_table*)L1_BASE_VADDR;
 
     x86_pte_t l1pte = l1pt->entry[l1_index];

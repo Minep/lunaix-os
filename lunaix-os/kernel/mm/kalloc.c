@@ -17,7 +17,7 @@
 #include <lunaix/constants.h>
 #include <lunaix/spike.h>
 
-#include <libc/string.h>
+#include <klibc/string.h>
 
 #include <stdint.h>
 
@@ -82,13 +82,20 @@ lxmalloc(size_t size) {
 }
 
 void*
-lxcalloc(size_t size) {
-    void* ptr = lxmalloc(size);
+lxcalloc(size_t n, size_t elem) {
+    size_t pd = n * elem;
+
+    // overflow detection
+    if (pd < elem || pd < n) {
+        return NULL;
+    }
+
+    void* ptr = lxmalloc(pd);
     if (!ptr) {
         return NULL;
     }
 
-    return memset(ptr, 0, size);
+    return memset(ptr, 0, pd);
 }
 
 void

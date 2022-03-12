@@ -25,7 +25,21 @@
 #define FAULT_VIRTUALIZATION_EXCEPTION  20
 #define FAULT_CONTROL_PROTECTION        21
 
+// LunaixOS related
 #define LUNAIX_SYS_PANIC                32
+
+#define EX_INTERRUPT_BEGIN              200
+// APIC related
+#define APIC_ERROR_IV                   200
+#define APIC_LINT0_IV                   201
+#define APIC_TIMER_IV                   202
+#define APIC_SPIV_IV                    203
+
+#define RTC_TIMER_IV                    210
+
+
+#define PC_AT_IRQ_RTC                   8
+#define PC_AT_IRQ_KBD_BUF_FULL          1
 
 #ifndef __ASM__
 #include <hal/cpu.h>
@@ -40,6 +54,9 @@ typedef struct {
     unsigned int ss;
 } __attribute__((packed)) isr_param;
 
+typedef void (*int_subscriber)(isr_param*);
+
+#pragma region ISR_DECLARATION
 void
 _asm_isr0();
 
@@ -106,12 +123,40 @@ _asm_isr20();
 void
 _asm_isr21();
 
-
 void
 _asm_isr32();
 
 void
-interrupt_handler(isr_param* param);
+_asm_isr200();
+
+void
+_asm_isr201();
+
+void
+_asm_isr202();
+
+void
+_asm_isr203();
+
+void
+_asm_isr210();
+
+#pragma endregion
+
+void
+intr_subscribe(const uint8_t vector, int_subscriber);
+
+void
+intr_unsubscribe(const uint8_t vector, int_subscriber);
+
+void
+intr_set_fallback_handler(int_subscriber);
+
+void
+intr_handler(isr_param* param);
+
+void
+intr_routine_init();
 
 #endif
 

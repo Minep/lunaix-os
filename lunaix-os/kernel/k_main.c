@@ -1,6 +1,6 @@
 #include <hal/cpu.h>
 #include <hal/rtc.h>
-#include <libc/stdio.h>
+#include <lunaix/syslog.h>
 #include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
@@ -8,20 +8,21 @@
 
 extern uint8_t __kernel_start;
 
+LOG_MODULE("LX")
+
 void
 _kernel_main()
 {
     char buf[64];
 
-    printf("Hello higher half kernel world!\nWe are now running in virtual "
+    kprintf(KINFO "Hello higher half kernel world!\nWe are now running in virtual "
            "address space!\n\n");
 
     cpu_get_brand(buf);
-    printf("CPU: %s\n\n", buf);
+    kprintf("CPU: %s\n\n", buf);
 
     void* k_start = vmm_v2p(&__kernel_start);
-    printf(
-      "The kernel's base address mapping: %p->%p\n", &__kernel_start, k_start);
+    kprintf(KINFO "The kernel's base address mapping: %p->%p\n", &__kernel_start, k_start);
 
     // test malloc & free
 
@@ -40,21 +41,11 @@ _kernel_main()
     big_[1] = 23;
     big_[2] = 3;
 
-    printf("%u, %u, %u\n", big_[0], big_[1], big_[2]);
+    kprintf(KINFO "%u, %u, %u\n", big_[0], big_[1], big_[2]);
 
     // good free
     lxfree(arr);
     lxfree(big_);
 
-    rtc_datetime datetime;
-
-    rtc_get_datetime(&datetime);
-
-    printf("%u/%u/%u %u:%u:%u",
-           datetime.year,
-           datetime.month,
-           datetime.day,
-           datetime.hour,
-           datetime.minute,
-           datetime.second);
+    spin();
 }
