@@ -115,11 +115,11 @@ acpi_locate_rsdp(multiboot_info_t* mb_info)
 #else
     // You know what, I just search the entire 1MiB for Celestia's sake.
     uint8_t* mem_start = 0x4000;
-    for (size_t j = 0; j < 0x100000; j += 16) {
-        uint32_t sig_low = *((uint32_t*)(mem_start + j));
+    for (; mem_start < 0x100000; mem_start += 16) {
+        uint32_t sig_low = *((uint32_t*)(mem_start));
         // uint32_t sig_high = *((uint32_t*)(mem_start+j) + 1);
         if (sig_low == ACPI_RSDP_SIG_L) {
-            rsdp = (acpi_rsdp_t*)(mem_start + j);
+            rsdp = (acpi_rsdp_t*)(mem_start);
             break;
         }
     }

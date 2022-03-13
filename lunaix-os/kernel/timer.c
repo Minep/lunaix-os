@@ -76,11 +76,13 @@ timer_init(uint32_t frequency)
         Timer calibration process - measure the APIC timer base frequency
 
          step 1: setup a temporary isr for RTC timer which trigger at each tick
-       (1024Hz) step 2: setup a temporary isr for #APIC_TIMER_IV step 3: setup
-       the divider, APIC_TIMER_DCR step 4: Startup RTC timer step 5: Write a
-       large value, v, to APIC_TIMER_ICR to start APIC timer (this must be
-       followed immediately after step 4) step 6: issue a write to EOI and clean
-       up.
+                 (1024Hz) 
+         step 2: setup a temporary isr for #APIC_TIMER_IV 
+         step 3: setup the divider, APIC_TIMER_DCR 
+         step 4: Startup RTC timer 
+         step 5: Write a large value, v, to APIC_TIMER_ICR to start APIC timer (this must be
+                 followed immediately after step 4) 
+          step 6: issue a write to EOI and clean up.
 
         When the APIC ICR counting down to 0 #APIC_TIMER_IV triggered, save the
        rtc timer's counter, k, and disable RTC timer immediately (although the
@@ -147,7 +149,7 @@ timer_run(uint32_t ticks, void (*callback)(void*), void* payload, uint8_t flags)
     timer->payload = payload;
     timer->flags = flags;
 
-    llist_append(timer_ctx->active_timers, timer);
+    llist_append(timer_ctx->active_timers, &timer->link);
 
     return 1;
 }
@@ -169,7 +171,7 @@ timer_update(const isr_param* param)
         if (pos->flags & TIMER_MODE_PERIODIC) {
             pos->counter = pos->deadline;
         } else {
-            llist_delete(pos);
+            llist_delete(&pos->link);
             lxfree(pos);
         }
     }

@@ -9,15 +9,15 @@
 #include "madt.h"
 
 #define ACPI_RSDP_SIG_L       0x20445352      // 'RSD '
-#define ACPI_RSDP_SIG_H      0x20525450      // 'PTR '
+#define ACPI_RSDP_SIG_H      0x20525450       // 'PTR '
 
-#define ACPI_MADT_SIG        0x43495041      // 'APIC'
+#define ACPI_MADT_SIG        0x43495041       // 'APIC'
 
 typedef struct {
     uint32_t signature_l;
     uint32_t signature_h;
     uint8_t chksum;
-    uint8_t oem_id[6];
+    char oem_id[6];
     // Revision
     uint8_t rev;
     acpi_rsdt_t* rsdt;

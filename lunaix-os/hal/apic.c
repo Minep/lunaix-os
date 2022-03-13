@@ -21,9 +21,6 @@
 LOG_MODULE("APIC")
 
 void
-apic_setup_timer();
-
-void
 apic_setup_lvts();
 
 void

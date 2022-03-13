@@ -83,6 +83,6 @@ typedef struct
     acpi_apic_t* apic;
     acpi_ioapic_t* ioapic;
     acpi_intso_t** irq_exception;
-} acpi_madt_toc_t;
+} __attribute__((packed)) acpi_madt_toc_t;
 
 #endif /* __LUNAIX_ACPI_MADT_H */

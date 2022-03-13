@@ -95,8 +95,8 @@ _kernel_post_init() {
     vmm_set_mapping(APIC_BASE_VADDR, __APIC_BASE_PADDR, PG_PREM_RW);
     vmm_set_mapping(IOAPIC_BASE_VADDR, ioapic_addr, PG_PREM_RW);
 
-    ioapic_init();
     apic_init();
+    ioapic_init();
     timer_init(SYS_TIMER_FREQUENCY_HZ);
 
     for (size_t i = 256; i < hhk_init_pg_count; i++) {

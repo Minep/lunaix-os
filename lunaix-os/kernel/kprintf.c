@@ -26,7 +26,7 @@ __kprintf(const char* component, const char* fmt, va_list args) {
         break;
     case '1':
         tty_set_theme(VGA_COLOR_BROWN, current_theme >> 12);
-        snprintf(expanded_fmt, MAX_XFMT_SIZE, "[%s] (%s) %s", "INFO", component, fmt);
+        snprintf(expanded_fmt, MAX_XFMT_SIZE, "[%s] (%s) %s", "WARN", component, fmt);
         break;
     case '2':
         tty_set_theme(VGA_COLOR_LIGHT_RED, current_theme >> 12);
