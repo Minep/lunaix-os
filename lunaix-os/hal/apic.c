@@ -44,7 +44,7 @@ apic_init()
         "rdmsr\n"
         "orl %1, %%eax\n"
         "wrmsr\n"
-        ::"i"(IA32_APIC_BASE_MSR), "i"(IA32_APIC_ENABLE)
+        ::"i"(IA32_MSR_APIC_BASE), "i"(IA32_APIC_ENABLE)
         : "eax", "ecx", "edx"
     );
 

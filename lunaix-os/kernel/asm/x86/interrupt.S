@@ -24,6 +24,7 @@
     isr_template APIC_TIMER_IV
     isr_template APIC_SPIV_IV
     isr_template RTC_TIMER_IV
+    isr_template PC_KBD_IV
 
     interrupt_wrapper:
         pushl %esp

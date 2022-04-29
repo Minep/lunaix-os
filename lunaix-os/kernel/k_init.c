@@ -8,6 +8,8 @@
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
+#include <lunaix/clock.h>
+#include <lunaix/peripheral/ps2kbd.h>
 
 #include <hal/rtc.h>
 #include <hal/apic.h>
@@ -98,6 +100,8 @@ _kernel_post_init() {
     apic_init();
     ioapic_init();
     timer_init(SYS_TIMER_FREQUENCY_HZ);
+    clock_init();
+    ps2_kbd_init();
 
     for (size_t i = 256; i < hhk_init_pg_count; i++) {
         vmm_unmap_page((void*)(i << PG_SIZE_BITS));

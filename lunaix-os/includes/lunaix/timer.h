@@ -8,17 +8,31 @@
 
 #define TIMER_MODE_PERIODIC   0x1
 
+typedef uint32_t ticks_t;
+
 struct lx_timer_context {
     struct lx_timer *active_timers;
-    uint32_t base_frequency;
+    /**
+     * @brief APIC timer base frequency (ticks per seconds)
+     * 
+     */
+    ticks_t base_frequency;
+    /**
+     * @brief Desired system running frequency
+     * 
+     */
     uint32_t running_frequency;
-    uint32_t tick_interval;
+    /**
+     * @brief Ticks per second relative to desired system running frequency
+     * 
+     */
+    ticks_t tps;
 };
 
 struct lx_timer {
     struct llist_header link;
-    uint32_t deadline;
-    uint32_t counter;
+    ticks_t deadline;
+    ticks_t counter;
     void* payload;
     void (*callback)(void*);
     uint8_t flags;
@@ -35,8 +49,12 @@ timer_init(uint32_t frequency);
 
 int
 timer_run_second(uint32_t second, void (*callback)(void*), void* payload, uint8_t flags);
+timer_run_ms(uint32_t millisecond, void (*callback)(void*), void* payload, uint8_t flags);
 
 int
-timer_run(uint32_t ticks, void (*callback)(void*), void* payload, uint8_t flags);
+timer_run(ticks_t ticks, void (*callback)(void*), void* payload, uint8_t flags);
+
+struct lx_timer_context* 
+timer_context();
 
 #endif /* __LUNAIX_TIMER_H */

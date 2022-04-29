@@ -32,6 +32,10 @@ __kprintf(const char* component, const char* fmt, va_list args) {
         tty_set_theme(VGA_COLOR_LIGHT_RED, current_theme >> 12);
         snprintf(expanded_fmt, MAX_XFMT_SIZE, "[%s] (%s) %s", "EROR", component, fmt);
         break;
+    case '3':
+        tty_set_theme(VGA_COLOR_LIGHT_BLUE, current_theme >> 12);
+        snprintf(expanded_fmt, MAX_XFMT_SIZE, "[%s] (%s) %s", "DEBG", component, fmt);
+        break;
     default:
         snprintf(expanded_fmt, MAX_XFMT_SIZE, "[%s] (%s) %s", "LOG", component, fmt);
         break;

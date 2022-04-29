@@ -26,6 +26,7 @@ _init_idt() {
     _set_idt_entry(APIC_LINT0_IV, 0x08, _asm_isr201, 0);
     _set_idt_entry(APIC_TIMER_IV, 0x08, _asm_isr202, 0);
     _set_idt_entry(APIC_SPIV_IV,  0x08, _asm_isr203, 0);
+    _set_idt_entry(PC_KBD_IV,  0x08, _asm_isr204, 0);
 
     _set_idt_entry(RTC_TIMER_IV,  0x08, _asm_isr210, 0);
 

@@ -15,7 +15,6 @@
 #include <lunaix/mm/kalloc.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
-#include <lunaix/time.h>
 #include <lunaix/timer.h>
 
 #define LVT_ENTRY_TIMER(vector, mode) (LVT_DELIVERY_FIXED | mode | vector)
@@ -32,7 +31,7 @@ temp_intr_routine_apic_timer(const isr_param* param);
 static void
 timer_update(const isr_param* param);
 
-static volatile struct lx_timer_context* timer_ctx;
+static volatile struct lx_timer_context* timer_ctx = NULL;
 
 // Don't optimize them! Took me an half hour to figure that out...
 
@@ -117,7 +116,7 @@ timer_init(uint32_t frequency)
     kprintf(KINFO "Base frequency: %u Hz\n", timer_ctx->base_frequency);
 
     timer_ctx->running_frequency = frequency;
-    timer_ctx->tick_interval = timer_ctx->base_frequency / frequency;
+    timer_ctx->tps = timer_ctx->base_frequency / frequency;
 
     // cleanup
     intr_unsubscribe(APIC_TIMER_IV, temp_intr_routine_apic_timer);
@@ -127,7 +126,7 @@ timer_init(uint32_t frequency)
                    LVT_ENTRY_TIMER(APIC_TIMER_IV, LVT_TIMER_PERIODIC));
     intr_subscribe(APIC_TIMER_IV, timer_update);
 
-    apic_write_reg(APIC_TIMER_ICR, timer_ctx->tick_interval);
+    apic_write_reg(APIC_TIMER_ICR, timer_ctx->tps);
 }
 
 int
@@ -137,7 +136,13 @@ timer_run_second(uint32_t second, void (*callback)(void*), void* payload, uint8_
 }
 
 int
-timer_run(uint32_t ticks, void (*callback)(void*), void* payload, uint8_t flags)
+timer_run_ms(uint32_t millisecond, void (*callback)(void*), void* payload, uint8_t flags)
+{
+    return timer_run(timer_ctx->running_frequency / 1000 * millisecond, callback, payload, flags);
+}
+
+int
+timer_run(ticks_t ticks, void (*callback)(void*), void* payload, uint8_t flags)
 {
     struct lx_timer* timer = (struct lx_timer*)lxmalloc(sizeof(struct lx_timer));
 
@@ -195,4 +200,9 @@ temp_intr_routine_apic_timer(const isr_param* param)
     apic_timer_done = 1;
 
     rtc_disable_timer();
+}
+
+struct lx_timer_context* 
+timer_context() {
+    return timer_ctx;
 }

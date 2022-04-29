@@ -6,10 +6,12 @@
 #define _LEVEL_INFO  "0"
 #define _LEVEL_WARN  "1"
 #define _LEVEL_ERROR "2"
+#define _LEVEL_DEBUG "3"
 
 #define KINFO    "\x1b" _LEVEL_INFO
 #define KWARN    "\x1b" _LEVEL_WARN
 #define KERROR   "\x1b" _LEVEL_ERROR
+#define KDEBUG   "\x1b" _LEVEL_DEBUG
 
 #define LOG_MODULE(module)                  \
     static void kprintf(const char* fmt, ...) {    \
