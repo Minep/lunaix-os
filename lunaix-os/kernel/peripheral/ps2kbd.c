@@ -3,6 +3,7 @@
 #include <lunaix/timer.h>
 #include <lunaix/common.h>
 #include <lunaix/syslog.h>
+#include <lunaix/mm/kalloc.h>
 
 #include <hal/cpu.h>
 #include <hal/ioapic.h>
@@ -25,7 +26,7 @@ static struct ps2_kbd_state kbd_state;
 // 我们使用 Scancode Set 2
 
 // 大部分的扫描码（键码）
-static kbd_keycode scancode_set2[] = {
+static kbd_keycode_t scancode_set2[] = {
     0, KEY_F9, 0, KEY_F5, KEY_F3, KEY_F1, KEY_F2, KEY_F12, 0, KEY_F10, KEY_F8, KEY_F6,
     KEY_F4, KEY_HTAB, '`', 0, 0, KEY_LALT, KEY_LSHIFT, 0, KEY_LCTRL, 'q', KEY_NUM(1), 
     0, 0, 0, 'z', 's', 'a', 'w', KEY_NUM(2), 0, 0, 'c', 'x', 'd', 'e', KEY_NUM(4), KEY_NUM(3), 
@@ -39,7 +40,7 @@ static kbd_keycode scancode_set2[] = {
 };
 
 // 一些特殊的键码（以 0xe0 位前缀的）
-static kbd_keycode scancode_set2_ex[] = {
+static kbd_keycode_t scancode_set2_ex[] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, KEY_RALT, 0, 0,
     KEY_RCTRL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
@@ -51,14 +52,14 @@ static kbd_keycode scancode_set2_ex[] = {
 };
 
 // 用于处理 Shift+<key> 的情况
-static kbd_keycode scancode_set2_shift[] = {
+static kbd_keycode_t scancode_set2_shift[] = {
     0, KEY_F9, 0, KEY_F5, KEY_F3, KEY_F1, KEY_F2, KEY_F12, 0, KEY_F10, KEY_F8, KEY_F6,
     KEY_F4, KEY_HTAB, '~', 0, 0, KEY_LALT, KEY_LSHIFT, 0, KEY_LCTRL, 'Q', '!', 
     0, 0, 0, 'Z', 'S', 'A', 'W', '@', 0, 0, 'C', 'X', 'D', 'E', '$', '#', 
     0, 0, KEY_SPACE, 'V', 'F', 'T', 'R', '%',
     0, 0, 'N', 'B', 'H', 'G', 'Y', '^', 0, 0, 0, 'M', 'J', 'U', '&', '*',
-    0, 0, '<', 'K', 'I', 'O', ')', '(', 0, 0, '>', '？', 'L', ':', 'P', '_', 0, 0,
-    0, '"', '{', '+', 0, 0, KEY_CAPSLK, KEY_RSHIFT, KEY_LF, '}', 0, '|', 0, 0, 0, 0, 0, 0, 0,
+    0, 0, '<', 'K', 'I', 'O', ')', '(', 0, 0, '>', '?', 'L', ':', 'P', '_', 0, 0,
+    0, '"', 0, '{', '+', 0, 0, KEY_CAPSLK, KEY_RSHIFT, KEY_LF, '}', 0, '|', 0, 0, 0, 0, 0, 0, 0,
     0, KEY_BS, 0, 0, KEY_NPAD(1), 0, KEY_NPAD(4), KEY_NPAD(7), 0, 0, 0, KEY_NPAD(0), ON_KEYPAD('.'),
     KEY_NPAD(2), KEY_NPAD(5), KEY_NPAD(6), KEY_NPAD(8), KEY_ESC, KEY_NUMSLK, KEY_F11, ON_KEYPAD('+'),
     KEY_NPAD(3), ON_KEYPAD('-'), ON_KEYPAD('*'), KEY_SCRLLK, 0, 0, 0, 0, KEY_F7
@@ -72,7 +73,9 @@ static kbd_keycode scancode_set2_shift[] = {
 void intr_ps2_kbd_handler(const isr_param* param);
 
 void ps2_device_post_cmd(char cmd, char arg) {
-    // FIXME: Need a mutex lock on this.
+    // 不需要任何的类似lock cmpxchgl的骚操作。
+    // 这条赋值表达式最多涉及一个内存引用（e.g., movl $1, (cmd_q.lock)），因此是原子的。
+    cmd_q.lock = 1;
     int index = (cmd_q.queue_ptr + cmd_q.queue_len) % PS2_CMD_QUEUE_SIZE;
     int diff = index - cmd_q.queue_ptr;
     if (diff > 0 && diff != cmd_q.queue_len) {
@@ -84,6 +87,9 @@ void ps2_device_post_cmd(char cmd, char arg) {
     container->cmd = cmd;
     container->arg = arg;
     cmd_q.queue_len++;
+
+    // 释放锁，同理。
+    cmd_q.lock = 0;
 }
 
 void ps2_kbd_init() {
@@ -99,18 +105,18 @@ void ps2_kbd_init() {
     // XXX: 是否需要使用FADT探测PS/2控制器的存在？
 
     // 1、禁用任何的PS/2设备
-    ps2_post_cmd(PS2_CMD_PORT1_DISABLE, PS2_NO_ARG);
-    ps2_post_cmd(PS2_CMD_PORT2_DISABLE, PS2_NO_ARG);
+    ps2_post_cmd(PS2_PORT_CTRL_CMDREG, PS2_CMD_PORT1_DISABLE, PS2_NO_ARG);
+    ps2_post_cmd(PS2_PORT_CTRL_CMDREG, PS2_CMD_PORT2_DISABLE, PS2_NO_ARG);
     
     // 2、清空控制器缓冲区
-    io_inb(PS2_PORT_DATA);
+    io_inb(PS2_PORT_ENC_DATA);
 
     char result;
 
     // 3、屏蔽所有PS/2设备（端口1&2）IRQ，并且禁用键盘键码转换功能
     result = ps2_issue_cmd(PS2_CMD_READ_CFG, PS2_NO_ARG);
     result = result & ~(PS2_CFG_P1INT | PS2_CFG_P2INT | PS2_CFG_TRANSLATION);
-    ps2_post_cmd(PS2_CMD_WRITE_CFG, result);
+    ps2_post_cmd(PS2_PORT_CTRL_CMDREG, PS2_CMD_WRITE_CFG, result);
 
     // 4、控制器自检
     result = ps2_issue_cmd(PS2_CMD_SELFTEST, PS2_NO_ARG);
@@ -127,10 +133,10 @@ void ps2_kbd_init() {
     }
 
     // 6、开启位于端口1的 IRQ，并启用端口1。不用理会端口2，那儿一般是鼠标。
-    ps2_post_cmd(PS2_CMD_PORT1_ENABLE, PS2_NO_ARG);
+    ps2_post_cmd(PS2_PORT_CTRL_CMDREG, PS2_CMD_PORT1_ENABLE, PS2_NO_ARG);
     result = ps2_issue_cmd(PS2_CMD_READ_CFG, PS2_NO_ARG);
     result = result | PS2_CFG_P1INT;
-    ps2_post_cmd(PS2_CMD_WRITE_CFG, result);
+    ps2_post_cmd(PS2_PORT_CTRL_CMDREG, PS2_CMD_WRITE_CFG, result);
 
     // 至此，PS/2控制器和设备已完成初始化，可以正常使用。
 
@@ -147,12 +153,18 @@ done:
 }
 
 void ps2_process_cmd(void* arg) {
-    // FIXME: Need a mutex lock on this.
-    // if lock is hold by other, then it just simply return (not wait! as we are in isr).
-    if (!cmd_q.queue_len) {
+    // 检查锁是否已被启用，如果启用，则表明该timer中断发生时，某个指令正在入队。
+    // 如果是这种情况则跳过，留到下一轮再尝试处理。
+    // 注意，这里其实是ISR的一部分（timer中断），对于单核CPU来说，ISR等同于单个的原子操作。
+    // （因为EFLAGS.IF=0，所有可屏蔽中断被屏蔽。对于NMI的情况，那么就直接算是triple fault了，所以也没有讨论的意义）
+    // 所以，假若我们遵从互斥锁的严格定义（即这里需要阻塞），那么中断将会被阻塞，进而造成死锁。
+    // 因此，我们这里仅仅进行判断。
+    // 会不会产生指令堆积？不会，因为指令发送的频率远远低于指令队列清空的频率。在目前，我们发送的唯一指令
+    // 就只是用来开关键盘上的LED灯（如CAPSLOCK）。
+    if (!cmd_q.queue_len || cmd_q.lock) {
         return;
     }
-
+    
     // 处理队列排头的指令
     struct ps2_cmd *pending_cmd = &cmd_q.cmd_queue[cmd_q.queue_ptr];
     char result;
@@ -162,41 +174,77 @@ void ps2_process_cmd(void* arg) {
     // 如果不成功（0x60 IO口返回 0xfe，即 NAK 或 Resend）
     // 则尝试最多五次
     do {
-        result = ps2_issue_cmd(pending_cmd->cmd, pending_cmd->arg);
+        result = ps2_issue_dev_cmd(pending_cmd->cmd, pending_cmd->arg);
         attempts++;
     } while(result == PS2_RESULT_NAK && attempts < PS2_DEV_CMD_MAX_ATTEMPTS);
     
-    // TODO: 是否需要处理不成功的指令？
+    // XXX: 是否需要处理不成功的指令？
 
     cmd_q.queue_ptr = (cmd_q.queue_ptr + 1) % PS2_CMD_QUEUE_SIZE;
     cmd_q.queue_len--;
 }
 
-void kbd_buffer_key_event(kbd_keycode key, uint8_t scancode, kbd_kstate_t state) {
+static struct kdb_keyinfo_pkt* ps2_keybuffer_next_write() {
+    int index = (key_buf.read_ptr + key_buf.buffered_len) % PS2_KBD_RECV_BUFFER_SIZE;
+    if (index == key_buf.read_ptr && key_buf.buffered_len) {
+        // the reader lagged so much. It is suggested to read from beginning.
+        key_buf.read_ptr = 0;
+        key_buf.buffered_len = index;
+    }
+    else {
+        key_buf.buffered_len++;
+    }
+    return &key_buf.buffer[index];
+}
+
+void kbd_buffer_key_event(kbd_keycode_t key, uint8_t scancode, kbd_kstate_t state) {
+    // forgive me on these ugly bit-level tricks, 
+    // I really hate doing branching on these "fliping switch" things
     if (key == KEY_CAPSLK) {
-        kbd_state.key_state = kbd_state.key_state ^ (KBD_KEY_CAPSLKED & -state);
+        kbd_state.key_state ^= KBD_KEY_FCAPSLKED & -state;
     } else if (key == KEY_NUMSLK) {
-        kbd_state.key_state = kbd_state.key_state ^ (KBD_KEY_NUMBLKED & -state);
+        kbd_state.key_state ^= KBD_KEY_FNUMBLKED & -state;
     } else if (key == KEY_SCRLLK) {
-        kbd_state.key_state = kbd_state.key_state ^ (KBD_KEY_SCRLLKED & -state);
+        kbd_state.key_state ^= KBD_KEY_FSCRLLKED & -state;
     } else {
+        if ((key & MODIFR)) {
+            kbd_kstate_t tmp = (KBD_KEY_FLSHIFT_HELD << (key & 0x00ff));
+            kbd_state.key_state = (kbd_state.key_state & ~tmp) | (tmp & -state);
+        }
+        else if (!(key & 0xff00) && (kbd_state.key_state & (KBD_KEY_FLSHIFT_HELD | KBD_KEY_FRSHIFT_HELD))) {
+            key = scancode_set2_shift[scancode];
+        }
         state = state | kbd_state.key_state;
+        key = key & (0xffdf | -('a' > key || key > 'z' || !(state & KBD_KEY_FCAPSLKED)));
         time_t timestamp = clock_systime();
         // TODO: Construct the packet.
-        kprintf(KDEBUG "%c (t=%d, s=%x, c=%d)\n", key & 0x00ff, timestamp, state, (key & 0xff00) >> 8);
+        if (!key_buf.lock) {
+            struct kdb_keyinfo_pkt* keyevent_pkt = ps2_keybuffer_next_write();
+            keyevent_pkt->keycode = key;
+            keyevent_pkt->scancode = scancode;
+            keyevent_pkt->state = state;
+            keyevent_pkt->timestamp = timestamp;
+        }
+
+        // kprintf(KDEBUG "%c (t=%d, s=%x, c=%d)\n", key & 0x00ff, timestamp, state, key >> 8);
         return; // do not delete this return
     }
 
-    ps2_device_post_cmd(PS2_KBD_CMD_SETLED, kbd_state.key_state >> 1);
+    // Ooops, this guy generates irq!
+    ps2_device_post_cmd(PS2_KBD_CMD_SETLED, (kbd_state.key_state >> 1) & 0x00ff);
 }
 
 void intr_ps2_kbd_handler(const isr_param* param) {
-    uint8_t scancode = io_inb(PS2_PORT_DATA) & 0xff;
-    kbd_keycode key;
+    uint8_t scancode = io_inb(PS2_PORT_ENC_DATA) & 0xff;
+    kbd_keycode_t key;
 
-    kprintf(KINFO "%x\n", scancode & 0xff);
+    // 用于区分0xfe,0xfa等指令返回码。
+    if (scancode >= 0xFA) {
+        return;
+    }
     
-    // FIXME: 实现 Shift+<key> 
+    //kprintf(KINFO "%x\n", scancode & 0xff);
+    
     switch (kbd_state.state)
     {
     case KBD_STATE_WAIT_KEY:
@@ -207,7 +255,7 @@ void intr_ps2_kbd_handler(const isr_param* param) {
             kbd_state.translation_table = scancode_set2_ex;
         } else {
             key = kbd_state.translation_table[scancode];
-            kbd_buffer_key_event(key, scancode, KBD_KEY_PRESSED);
+            kbd_buffer_key_event(key, scancode, KBD_KEY_FPRESSED);
         }
         break;
     case KBD_STATE_SPECIAL:
@@ -215,7 +263,7 @@ void intr_ps2_kbd_handler(const isr_param* param) {
             kbd_state.state = KBD_STATE_RELEASED;       
         } else {
             key = kbd_state.translation_table[scancode];
-            kbd_buffer_key_event(key, scancode, KBD_KEY_PRESSED);
+            kbd_buffer_key_event(key, scancode, KBD_KEY_FPRESSED);
 
             kbd_state.state = KBD_STATE_WAIT_KEY;
             kbd_state.translation_table = scancode_set2;
@@ -223,11 +271,11 @@ void intr_ps2_kbd_handler(const isr_param* param) {
         break;
     case KBD_STATE_RELEASED:
         key = kbd_state.translation_table[scancode];
-        kbd_buffer_key_event(key, scancode, KBD_KEY_RELEASED);
+        kbd_buffer_key_event(key, scancode, KBD_KEY_FRELEASED);
         
         // reset the translation table to scancode_set2
-        kbd_state.translation_table = scancode_set2;
         kbd_state.state = KBD_STATE_WAIT_KEY;   
+        kbd_state.translation_table = scancode_set2;
         break;
     
     default:
@@ -236,24 +284,58 @@ void intr_ps2_kbd_handler(const isr_param* param) {
 }
 
 static uint8_t ps2_issue_cmd(char cmd, uint16_t arg) {
-    ps2_post_cmd(cmd, arg);
+    ps2_post_cmd(PS2_PORT_CTRL_CMDREG, cmd, arg);
 
     char result;
     
     // 等待PS/2控制器返回。通过轮询（polling）状态寄存器的 bit 0
     // 如置位，则表明返回代码此时就在 0x60 IO口上等待读取。
-    while(!((result = io_inb(PS2_PORT_STATUS)) & PS2_STATUS_OFULL));
+    while(!((result = io_inb(PS2_PORT_CTRL_STATUS)) & PS2_STATUS_OFULL));
 
-    return io_inb(PS2_PORT_DATA);
+    return io_inb(PS2_PORT_ENC_CMDREG);
 }
 
-static void ps2_post_cmd(char cmd, uint16_t arg) {
+static uint8_t ps2_issue_dev_cmd(char cmd, uint16_t arg) {
+    ps2_post_cmd(PS2_PORT_ENC_CMDREG, cmd, arg);
+
+    char result;
+    
+    // 等待PS/2控制器返回。通过轮询（polling）状态寄存器的 bit 0
+    // 如置位，则表明返回代码此时就在 0x60 IO口上等待读取。
+    while(!((result = io_inb(PS2_PORT_CTRL_STATUS)) & PS2_STATUS_OFULL));
+
+    return io_inb(PS2_PORT_ENC_CMDREG);
+}
+
+static void ps2_post_cmd(uint8_t port, char cmd, uint16_t arg) {
     char result;
     // 等待PS/2输入缓冲区清空，这样我们才可以写入命令
-    while((result = io_inb(PS2_PORT_STATUS)) & PS2_STATUS_IFULL);
+    while((result = io_inb(PS2_PORT_CTRL_STATUS)) & PS2_STATUS_IFULL);
 
-    io_outb(PS2_PORT_CMDREG, cmd);
+    io_outb(port, cmd);
     if (!(arg & PS2_NO_ARG)) {
-        io_outb(PS2_PORT_DATA, (uint8_t)(arg & 0x00ff));
+        // 所有参数一律通过0x60传入。
+        io_outb(PS2_PORT_ENC_CMDREG, (uint8_t)(arg & 0x00ff));
     }
+}
+
+struct kdb_keyinfo_pkt* kbd_try_read_one() {
+    if (!key_buf.buffered_len) {
+        return NULL;
+    }
+    key_buf.lock = 1;
+    struct kdb_keyinfo_pkt* pkt_copy = 
+        (struct kdb_keyinfo_pkt*) lxmalloc(sizeof(struct kdb_keyinfo_pkt));
+
+    struct kdb_keyinfo_pkt* pkt_current = &key_buf.buffer[key_buf.read_ptr];
+
+    pkt_copy->keycode = pkt_current->keycode;
+    pkt_copy->scancode = pkt_current->scancode;
+    pkt_copy->state = pkt_current->state;
+    pkt_copy->timestamp = pkt_current->timestamp;
+    key_buf.buffered_len--;
+    key_buf.read_ptr = (key_buf.read_ptr + 1) % PS2_KBD_RECV_BUFFER_SIZE;
+
+    key_buf.lock = 0;
+    return pkt_copy;
 }

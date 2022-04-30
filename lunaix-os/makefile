@@ -39,7 +39,7 @@ $(BUILD_DIR)/$(OS_ISO): $(ISO_DIR) $(BIN_DIR)/$(OS_BIN) GRUB_TEMPLATE
 
 all: clean $(BUILD_DIR)/$(OS_ISO)
 
-all-debug: O := -O0
+all-debug: O := -Og
 all-debug: CFLAGS := -g -std=gnu99 -ffreestanding $(O) $(W) $(ARCH_OPT) -D__LUNAIXOS_DEBUG__
 all-debug: LDFLAGS := -g -ffreestanding $(O) -nostdlib -lgcc
 all-debug: clean $(BUILD_DIR)/$(OS_ISO)

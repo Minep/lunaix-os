@@ -3,11 +3,11 @@
 
 #include <hal/io.h>
 #include <lunaix/keyboard.h>
-#include <lunaix/clock.h>
 
-#define PS2_PORT_DATA 0x60
-#define PS2_PORT_STATUS 0x64
-#define PS2_PORT_CMDREG 0x64
+#define PS2_PORT_ENC_DATA 0x60
+#define PS2_PORT_ENC_CMDREG 0x60
+#define PS2_PORT_CTRL_STATUS 0x64
+#define PS2_PORT_CTRL_CMDREG 0x64
 
 #define PS2_STATUS_OFULL   0x1
 #define PS2_STATUS_IFULL   0x2
@@ -48,21 +48,6 @@
 #define PS2_NO_ARG 0xff00
 
 
-#define KBD_KEY_RELEASED 0x0
-#define KBD_KEY_PRESSED 0x1
-#define KBD_KEY_SCRLLKED 0x2
-#define KBD_KEY_NUMBLKED 0x4
-#define KBD_KEY_CAPSLKED 0x8
-
-typedef unsigned char kbd_kstate_t;
-
-struct kdb_keyinfo_pkt {
-    char key;
-    kbd_keycode code;
-    kbd_kstate_t state;
-    time_t timestamp;
-};
-
 struct ps2_cmd {
     char cmd;
     char arg;
@@ -70,7 +55,8 @@ struct ps2_cmd {
 
 struct ps2_kbd_state {
     char state;
-    kbd_keycode* translation_table;
+    volatile char masked;
+    kbd_keycode_t* translation_table;
     kbd_kstate_t key_state;
 };
 
@@ -78,16 +64,22 @@ struct ps2_cmd_queue {
     struct ps2_cmd cmd_queue[PS2_CMD_QUEUE_SIZE];
     int queue_ptr;
     int queue_len;
+    // FIXME: replace lock with something specialized.
+    volatile char lock;
 };
 
 struct ps2_key_buffer {
-    struct kdb_keyinfo_pkt key_buff[PS2_KBD_RECV_BUFFER_SIZE];
-    int buffer_ptr;
-    // We don't bother whether the buff is full or not, just override.
+    struct kdb_keyinfo_pkt buffer[PS2_KBD_RECV_BUFFER_SIZE];
+    int read_ptr;
+    int buffered_len;
+    // FIXME: replace lock with something specialized.
+    volatile char lock;
 };
 
 /**
- * @brief 向PS/2控制器发送指令并等待返回代码。注意，对于没有返回代码的命令请使用`ps2_post_cmd`，否则会造成死锁。
+ * @brief 向PS/2控制器的控制端口(0x64)发送指令并等待返回代码。
+ * 注意，对于没有返回代码的命令请使用`ps2_post_cmd`，否则会造成死锁。
+ * 通过调用该方法向控制器发送指令，请区别 ps2_issue_dev_cmd
  * 
  * @param cmd 
  * @param args
@@ -95,13 +87,24 @@ struct ps2_key_buffer {
 static uint8_t ps2_issue_cmd(char cmd, uint16_t arg);
 
 /**
+ * @brief 向PS/2控制器的编码器端口(0x60)发送指令并等待返回代码。
+ * 注意，对于没有返回代码的命令请使用`ps2_post_cmd`，否则会造成死锁。
+ * 通过调用该方法向PS/2设备发送指令，请区别 ps2_issue_cmd
+ * 
+ * @param cmd 
+ * @param args
+ */
+static uint8_t ps2_issue_dev_cmd(char cmd, uint16_t arg);
+
+/**
  * @brief 向PS/2控制器发送指令，不等待返回代码。
  * 
+ * @param port 端口号
  * @param cmd 
  * @param args 
  * @return char 
  */
-static void ps2_post_cmd(char cmd, uint16_t arg);
+static void ps2_post_cmd(uint8_t port, char cmd, uint16_t arg);
 
 void ps2_device_post_cmd(char cmd, char arg);
 

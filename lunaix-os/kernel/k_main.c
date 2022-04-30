@@ -5,6 +5,8 @@
 #include <lunaix/spike.h>
 #include <lunaix/clock.h>
 #include <lunaix/timer.h>
+#include <lunaix/keyboard.h>
+#include <lunaix/tty/tty.h>
 #include <stdint.h>
 
 extern uint8_t __kernel_start;
@@ -51,7 +53,19 @@ _kernel_main()
     lxfree(arr);
     lxfree(big_);
 
-    timer_run_second(1, test_timer, NULL, TIMER_MODE_PERIODIC);
+    // timer_run_second(1, test_timer, NULL, TIMER_MODE_PERIODIC);
+
+    while (1)
+    {
+        struct kdb_keyinfo_pkt* keyevent = kbd_try_read_one();
+        if (!keyevent) {
+            continue;
+        }
+        if ((keyevent->state & KBD_KEY_FPRESSED) && (keyevent->keycode & 0xff00) <= KEYPAD) {
+            tty_put_char((char)(keyevent->keycode & 0x00ff));
+        }
+        lxfree(keyevent);
+    }
 
     spin();
 }

@@ -7,16 +7,19 @@
 // key[0:7] = sequence
 // key[8:15] = category
 //   0x0: ASCII codes
-//   0x1: Function keys
-//   0x2: keypad keys
+//   0x1: keypad keys
+//   0x2: Function keys
 //   0x3: Cursor keys (arrow keys)
 //   0x4: Modifier keys
 //   0xff: Other keys (Un-categorized)
 
-typedef unsigned short kbd_keycode;
+typedef unsigned short kbd_keycode_t;
+typedef unsigned short kbd_kstate_t;
+#include <lunaix/clock.h>
 
-#define FN_KEY  0x0100
-#define KEYPAD  0x0200
+
+#define KEYPAD  0x0100
+#define FN_KEY  0x0200
 #define CURSOR  0x0300
 #define MODIFR  0x0400
 #define OTHERS  0xff00
@@ -68,5 +71,29 @@ typedef unsigned short kbd_keycode;
 #define KEY_RCTRL        (0x3 | MODIFR)
 #define KEY_LALT         (0x4 | MODIFR)
 #define KEY_RALT         (0x5 | MODIFR)
+
+#define KBD_KEY_FRELEASED 0x0
+#define KBD_KEY_FPRESSED 0x1
+#define KBD_KEY_FSCRLLKED 0x2
+#define KBD_KEY_FNUMBLKED 0x4
+#define KBD_KEY_FCAPSLKED 0x8
+
+#define KBD_KEY_FLSHIFT_HELD 0x10
+#define KBD_KEY_FRSHIFT_HELD 0x20
+#define KBD_KEY_FLCTRL_HELD 0x40
+#define KBD_KEY_FRCTRL_HELD 0x80
+#define KBD_KEY_FLALT_HELD 0x100
+#define KBD_KEY_FRALT_HELD 0x200
+
+typedef unsigned char kbd_scancode_t;
+
+struct kdb_keyinfo_pkt {
+    kbd_scancode_t scancode;
+    kbd_keycode_t keycode;
+    kbd_kstate_t state;
+    time_t timestamp;
+};
+
+struct kdb_keyinfo_pkt* kbd_try_read_one();
 
 #endif /* __LUNAIX_KEYBOARD_H */
