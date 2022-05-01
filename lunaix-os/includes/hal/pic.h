@@ -1,6 +1,6 @@
 #ifndef __LUNAIX_PIC_H
 #define __LUNAIX_PIC_H
-// TODO: PIC
+// FUTURE: Full PIC implementation for fall back when no APIC is detected.
 
 static inline void
 pic_disable()

@@ -29,17 +29,18 @@
 #define LUNAIX_SYS_PANIC                32
 
 #define EX_INTERRUPT_BEGIN              200
-// APIC related
-#define APIC_ERROR_IV                   200
-#define APIC_LINT0_IV                   201
-#define APIC_TIMER_IV                   202
-#define APIC_SPIV_IV                    203
 
 // Keyboard
-#define PC_KBD_IV                       204
+#define PC_KBD_IV                       201
 
 #define RTC_TIMER_IV                    210
 
+// 来自APIC的中断有着最高的优先级。
+// APIC related
+#define APIC_ERROR_IV                   250
+#define APIC_LINT0_IV                   251
+#define APIC_SPIV_IV                    252
+#define APIC_TIMER_IV                   253
 
 #define PC_AT_IRQ_RTC                   8
 #define PC_AT_IRQ_KBD                   1
@@ -60,92 +61,43 @@ typedef struct {
 typedef void (*int_subscriber)(isr_param*);
 
 #pragma region ISR_DECLARATION
-void
-_asm_isr0();
 
-void
-_asm_isr1();
+#define ISR(iv) void _asm_isr##iv();
 
-void
-_asm_isr2();
+ISR(0)
+ISR(1)
+ISR(2)
+ISR(3)
+ISR(4)
+ISR(5)
+ISR(6)
+ISR(7)
+ISR(8)
+ISR(9)
+ISR(10)
+ISR(11)
+ISR(12)
+ISR(13)
+ISR(14)
+ISR(15)
+ISR(16)
+ISR(17)
+ISR(18)
+ISR(19)
+ISR(20)
+ISR(21)
 
-void
-_asm_isr3();
+ISR(32)
 
-void
-_asm_isr4();
+ISR(201)
 
-void
-_asm_isr5();
+ISR(210)
 
-void
-_asm_isr6();
-
-void
-_asm_isr7();
-
-void
-_asm_isr8();
-
-void
-_asm_isr9();
-
-void
-_asm_isr10();
-
-void
-_asm_isr11();
-
-void
-_asm_isr12();
-
-void
-_asm_isr13();
-
-void
-_asm_isr14();
-
-void
-_asm_isr15();
-
-void
-_asm_isr16();
-
-void
-_asm_isr17();
-
-void
-_asm_isr18();
-
-void
-_asm_isr19();
-
-void
-_asm_isr20();
-
-void
-_asm_isr21();
-
-void
-_asm_isr32();
-
-void
-_asm_isr200();
-
-void
-_asm_isr201();
-
-void
-_asm_isr202();
-
-void
-_asm_isr203();
-
-void
-_asm_isr204();
-
-void
-_asm_isr210();
+ISR(250)
+ISR(251)
+ISR(252)
+ISR(253)
+ISR(254)
 
 #pragma endregion
 

@@ -23,10 +23,10 @@ struct lx_timer_context {
      */
     uint32_t running_frequency;
     /**
-     * @brief Ticks per second relative to desired system running frequency
+     * @brief Ticks per hertz
      * 
      */
-    ticks_t tps;
+    ticks_t tphz;
 };
 
 struct lx_timer {

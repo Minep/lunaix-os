@@ -6,7 +6,6 @@
 #include <lunaix/mm/kalloc.h>
 
 #include <hal/cpu.h>
-#include <hal/ioapic.h>
 
 #include <arch/x86/interrupts.h>
 #include <stdint.h>
@@ -66,20 +65,23 @@ static kbd_keycode_t scancode_set2_shift[] = {
 };
 
 
-#define KBD_STATE_WAIT_KEY 0
-#define KBD_STATE_SPECIAL 1
-#define KBD_STATE_RELEASED 2
+#define KBD_STATE_KWAIT         0x00
+#define KBD_STATE_KSPECIAL      0x01
+#define KBD_STATE_KRELEASED     0x02
+// #define KBD_STATE_CMDPROCS      0x80
 
 void intr_ps2_kbd_handler(const isr_param* param);
+static struct kdb_keyinfo_pkt* ps2_keybuffer_next_write();
 
+// TODO: Abstract the bounded buffer out.
 void ps2_device_post_cmd(char cmd, char arg) {
     // 不需要任何的类似lock cmpxchgl的骚操作。
     // 这条赋值表达式最多涉及一个内存引用（e.g., movl $1, (cmd_q.lock)），因此是原子的。
     cmd_q.lock = 1;
     int index = (cmd_q.queue_ptr + cmd_q.queue_len) % PS2_CMD_QUEUE_SIZE;
-    int diff = index - cmd_q.queue_ptr;
-    if (diff > 0 && diff != cmd_q.queue_len) {
+    if (index == cmd_q.queue_ptr && cmd_q.queue_len) {
         // 队列已满！
+        cmd_q.lock = 0;
         return;
     }
 
@@ -98,7 +100,7 @@ void ps2_kbd_init() {
     memset(&key_buf, 0, sizeof(key_buf));
     memset(&kbd_state, 0, sizeof(kbd_state));
     kbd_state.translation_table = scancode_set2;
-    kbd_state.state = KBD_STATE_WAIT_KEY;
+    kbd_state.state = KBD_STATE_KWAIT;
 
     cpu_disable_interrupt();
 
@@ -164,7 +166,8 @@ void ps2_process_cmd(void* arg) {
     if (!cmd_q.queue_len || cmd_q.lock) {
         return;
     }
-    
+
+    // kbd_state.state |= KBD_STATE_CMDPROCS;
     // 处理队列排头的指令
     struct ps2_cmd *pending_cmd = &cmd_q.cmd_queue[cmd_q.queue_ptr];
     char result;
@@ -182,19 +185,6 @@ void ps2_process_cmd(void* arg) {
 
     cmd_q.queue_ptr = (cmd_q.queue_ptr + 1) % PS2_CMD_QUEUE_SIZE;
     cmd_q.queue_len--;
-}
-
-static struct kdb_keyinfo_pkt* ps2_keybuffer_next_write() {
-    int index = (key_buf.read_ptr + key_buf.buffered_len) % PS2_KBD_RECV_BUFFER_SIZE;
-    if (index == key_buf.read_ptr && key_buf.buffered_len) {
-        // the reader lagged so much. It is suggested to read from beginning.
-        key_buf.read_ptr = 0;
-        key_buf.buffered_len = index;
-    }
-    else {
-        key_buf.buffered_len++;
-    }
-    return &key_buf.buffer[index];
 }
 
 void kbd_buffer_key_event(kbd_keycode_t key, uint8_t scancode, kbd_kstate_t state) {
@@ -216,14 +206,15 @@ void kbd_buffer_key_event(kbd_keycode_t key, uint8_t scancode, kbd_kstate_t stat
         }
         state = state | kbd_state.key_state;
         key = key & (0xffdf | -('a' > key || key > 'z' || !(state & KBD_KEY_FCAPSLKED)));
-        time_t timestamp = clock_systime();
-        // TODO: Construct the packet.
+
         if (!key_buf.lock) {
             struct kdb_keyinfo_pkt* keyevent_pkt = ps2_keybuffer_next_write();
-            keyevent_pkt->keycode = key;
-            keyevent_pkt->scancode = scancode;
-            keyevent_pkt->state = state;
-            keyevent_pkt->timestamp = timestamp;
+            *keyevent_pkt = (struct kdb_keyinfo_pkt) {
+                .keycode = key,
+                .scancode = scancode,
+                .state = state,
+                .timestamp = clock_systime()
+            };
         }
 
         // kprintf(KDEBUG "%c (t=%d, s=%x, c=%d)\n", key & 0x00ff, timestamp, state, key >> 8);
@@ -235,11 +226,34 @@ void kbd_buffer_key_event(kbd_keycode_t key, uint8_t scancode, kbd_kstate_t stat
 }
 
 void intr_ps2_kbd_handler(const isr_param* param) {
-    uint8_t scancode = io_inb(PS2_PORT_ENC_DATA) & 0xff;
+
+    // Do not move this line. It is in the right place and right order.
+    // This is to ensure we've cleared the output buffer everytime, so it won't pile up across irqs.
+    uint8_t scancode = io_inb(PS2_PORT_ENC_DATA);
     kbd_keycode_t key;
 
-    // 用于区分0xfe,0xfa等指令返回码。
-    if (scancode >= 0xFA) {
+    /*  
+     *    判断键盘是否处在指令发送状态，防止误触发。（伪输入中断）
+     * 这是因为我们需要向ps/2设备发送指令（比如控制led灯），而指令会有返回码。
+     * 这就会有可能导致ps/2控制器在受到我们的命令后（在ps2_process_cmd中），
+     * 产生IRQ#1中断（虽然说这种情况取决于底层BIOS实现，但还是会发生，比如QEMU和bochs）。
+     * 所以这就是说，当IRQ#1中断产生时，我们的CPU正处在另一个ISR中。这样就会导致所有的外部中断被缓存在APIC内部的
+     * FIFO队列里，进行排队等待（APIC长度为二的队列 {IRR, TMR}；参考 Intel Manual Vol.3A 10.8.4）
+     * 那么当ps2_process_cmd执行完后（内嵌在#APIC_TIMER_IV），CPU返回EOI给APIC，APIC紧接着将排在队里的IRQ#1发送给CPU
+     * 造成误触发。也就是说，我们此时读入的scancode实则上是上一个指令的返回代码。
+     * 
+     * Problem 1:
+     *      但是这种方法有个问题，那就是，假若我们的某一个命令失败了一次，ps/2给出0xfe，我们重传，ps/2收到指令并给出0xfa。
+     *  那么这样一来，将会由两个连续的IRQ#1产生。而APIC是最多可以缓存两个IRQ，于是我们就会漏掉一个IRQ，依然会误触发。
+     */
+    // FIXME: Address Problem #1
+    // if ((kbd_state.state & KBD_STATE_CMDPROCS)) {
+    //     kbd_state.state &= ~KBD_STATE_CMDPROCS;
+    //     return;
+    // }
+
+    // 目前还是使用该方法。。。
+    if (scancode >= 0xfa) {
         return;
     }
     
@@ -247,34 +261,34 @@ void intr_ps2_kbd_handler(const isr_param* param) {
     
     switch (kbd_state.state)
     {
-    case KBD_STATE_WAIT_KEY:
+    case KBD_STATE_KWAIT:
         if (scancode == 0xf0) { // release code
-            kbd_state.state = KBD_STATE_RELEASED;       
+            kbd_state.state = KBD_STATE_KRELEASED;       
         } else if (scancode == 0xe0) {
-            kbd_state.state = KBD_STATE_SPECIAL;
+            kbd_state.state = KBD_STATE_KSPECIAL;
             kbd_state.translation_table = scancode_set2_ex;
         } else {
             key = kbd_state.translation_table[scancode];
             kbd_buffer_key_event(key, scancode, KBD_KEY_FPRESSED);
         }
         break;
-    case KBD_STATE_SPECIAL:
+    case KBD_STATE_KSPECIAL:
         if (scancode == 0xf0) { //release code
-            kbd_state.state = KBD_STATE_RELEASED;       
+            kbd_state.state = KBD_STATE_KRELEASED;       
         } else {
             key = kbd_state.translation_table[scancode];
             kbd_buffer_key_event(key, scancode, KBD_KEY_FPRESSED);
 
-            kbd_state.state = KBD_STATE_WAIT_KEY;
+            kbd_state.state = KBD_STATE_KWAIT;
             kbd_state.translation_table = scancode_set2;
         }
         break;
-    case KBD_STATE_RELEASED:
+    case KBD_STATE_KRELEASED:
         key = kbd_state.translation_table[scancode];
         kbd_buffer_key_event(key, scancode, KBD_KEY_FRELEASED);
         
         // reset the translation table to scancode_set2
-        kbd_state.state = KBD_STATE_WAIT_KEY;   
+        kbd_state.state = KBD_STATE_KWAIT;   
         kbd_state.translation_table = scancode_set2;
         break;
     
@@ -329,13 +343,24 @@ struct kdb_keyinfo_pkt* kbd_try_read_one() {
 
     struct kdb_keyinfo_pkt* pkt_current = &key_buf.buffer[key_buf.read_ptr];
 
-    pkt_copy->keycode = pkt_current->keycode;
-    pkt_copy->scancode = pkt_current->scancode;
-    pkt_copy->state = pkt_current->state;
-    pkt_copy->timestamp = pkt_current->timestamp;
+    *pkt_copy = *pkt_current;
     key_buf.buffered_len--;
     key_buf.read_ptr = (key_buf.read_ptr + 1) % PS2_KBD_RECV_BUFFER_SIZE;
 
     key_buf.lock = 0;
     return pkt_copy;
+}
+
+static struct kdb_keyinfo_pkt* ps2_keybuffer_next_write() {
+    int index = (key_buf.read_ptr + key_buf.buffered_len) % PS2_KBD_RECV_BUFFER_SIZE;
+    if (index == key_buf.read_ptr && key_buf.buffered_len) {
+        // the reader is lagged so much such that the buffer is full.
+        // It is suggested to read from beginning for nearly up-to-date readings.
+        key_buf.read_ptr = 0;
+        key_buf.buffered_len = index;
+    }
+    else {
+        key_buf.buffered_len++;
+    }
+    return &key_buf.buffer[index];
 }

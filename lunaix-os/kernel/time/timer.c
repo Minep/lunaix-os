@@ -63,8 +63,7 @@ timer_init(uint32_t frequency)
     // Setup APIC timer
 
     // Setup a one-shot timer, we will use this to measure the bus speed. So we
-    // can
-    //   then calibrate apic timer to work at *nearly* accurate hz
+    // can then calibrate apic timer to work at *nearly* accurate hz
     apic_write_reg(APIC_TIMER_LVT,
                    LVT_ENTRY_TIMER(APIC_TIMER_IV, LVT_TIMER_ONESHOT));
 
@@ -81,7 +80,7 @@ timer_init(uint32_t frequency)
          step 4: Startup RTC timer 
          step 5: Write a large value, v, to APIC_TIMER_ICR to start APIC timer (this must be
                  followed immediately after step 4) 
-          step 6: issue a write to EOI and clean up.
+         step 6: issue a write to EOI and clean up.
 
         When the APIC ICR counting down to 0 #APIC_TIMER_IV triggered, save the
        rtc timer's counter, k, and disable RTC timer immediately (although the
@@ -93,6 +92,12 @@ timer_init(uint32_t frequency)
             =>  F_apic = v / k * 1024
 
     */
+
+    #ifdef __LUNAIXOS_DEBUG__
+    if (frequency < 1000) {
+        kprintf(KWARN "Frequency too low. Millisecond timer might be dodgy.");
+    }
+    #endif
 
     timer_ctx->base_frequency = 0;
     rtc_counter = 0;
@@ -109,14 +114,13 @@ timer_init(uint32_t frequency)
 
     wait_until(apic_timer_done);
 
-    // cpu_disable_interrupt();
 
     assert_msg(timer_ctx->base_frequency, "Fail to initialize timer (NOFREQ)");
 
     kprintf(KINFO "Base frequency: %u Hz\n", timer_ctx->base_frequency);
 
     timer_ctx->running_frequency = frequency;
-    timer_ctx->tps = timer_ctx->base_frequency / frequency;
+    timer_ctx->tphz = timer_ctx->base_frequency / frequency;
 
     // cleanup
     intr_unsubscribe(APIC_TIMER_IV, temp_intr_routine_apic_timer);
@@ -126,7 +130,7 @@ timer_init(uint32_t frequency)
                    LVT_ENTRY_TIMER(APIC_TIMER_IV, LVT_TIMER_PERIODIC));
     intr_subscribe(APIC_TIMER_IV, timer_update);
 
-    apic_write_reg(APIC_TIMER_ICR, timer_ctx->tps);
+    apic_write_reg(APIC_TIMER_ICR, timer_ctx->tphz);
 }
 
 int
