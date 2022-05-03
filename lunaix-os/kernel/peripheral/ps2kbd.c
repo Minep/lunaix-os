@@ -3,13 +3,12 @@
 #include <lunaix/timer.h>
 #include <lunaix/common.h>
 #include <lunaix/syslog.h>
-#include <lunaix/mm/kalloc.h>
 
 #include <hal/cpu.h>
-
 #include <arch/x86/interrupts.h>
-#include <stdint.h>
 #include <klibc/string.h>
+
+#include <stdint.h>
 
 #define PS2_DEV_CMD_MAX_ATTEMPTS 5
 
@@ -68,20 +67,18 @@ static kbd_keycode_t scancode_set2_shift[] = {
 #define KBD_STATE_KWAIT         0x00
 #define KBD_STATE_KSPECIAL      0x01
 #define KBD_STATE_KRELEASED     0x02
-// #define KBD_STATE_CMDPROCS      0x80
+#define KBD_STATE_CMDPROCS      0x40
 
 void intr_ps2_kbd_handler(const isr_param* param);
 static struct kdb_keyinfo_pkt* ps2_keybuffer_next_write();
 
 // TODO: Abstract the bounded buffer out.
 void ps2_device_post_cmd(char cmd, char arg) {
-    // 不需要任何的类似lock cmpxchgl的骚操作。
-    // 这条赋值表达式最多涉及一个内存引用（e.g., movl $1, (cmd_q.lock)），因此是原子的。
-    cmd_q.lock = 1;
+    mutex_lock(&cmd_q.mutex);
     int index = (cmd_q.queue_ptr + cmd_q.queue_len) % PS2_CMD_QUEUE_SIZE;
     if (index == cmd_q.queue_ptr && cmd_q.queue_len) {
         // 队列已满！
-        cmd_q.lock = 0;
+        mutex_unlock(&cmd_q.mutex);
         return;
     }
 
@@ -91,7 +88,7 @@ void ps2_device_post_cmd(char cmd, char arg) {
     cmd_q.queue_len++;
 
     // 释放锁，同理。
-    cmd_q.lock = 0;
+    mutex_unlock(&cmd_q.mutex);
 }
 
 void ps2_kbd_init() {
@@ -99,6 +96,11 @@ void ps2_kbd_init() {
     memset(&cmd_q, 0, sizeof(cmd_q));
     memset(&key_buf, 0, sizeof(key_buf));
     memset(&kbd_state, 0, sizeof(kbd_state));
+    
+    mutex_init(&cmd_q.mutex);
+    mutex_init(&key_buf.mutex);
+
+
     kbd_state.translation_table = scancode_set2;
     kbd_state.state = KBD_STATE_KWAIT;
 
@@ -163,11 +165,10 @@ void ps2_process_cmd(void* arg) {
     // 因此，我们这里仅仅进行判断。
     // 会不会产生指令堆积？不会，因为指令发送的频率远远低于指令队列清空的频率。在目前，我们发送的唯一指令
     // 就只是用来开关键盘上的LED灯（如CAPSLOCK）。
-    if (!cmd_q.queue_len || cmd_q.lock) {
+    if (mutex_on_hold(&cmd_q.mutex) || !cmd_q.queue_len) {
         return;
     }
 
-    // kbd_state.state |= KBD_STATE_CMDPROCS;
     // 处理队列排头的指令
     struct ps2_cmd *pending_cmd = &cmd_q.cmd_queue[cmd_q.queue_ptr];
     char result;
@@ -178,6 +179,7 @@ void ps2_process_cmd(void* arg) {
     // 则尝试最多五次
     do {
         result = ps2_issue_dev_cmd(pending_cmd->cmd, pending_cmd->arg);
+        kbd_state.state += KBD_STATE_CMDPROCS;
         attempts++;
     } while(result == PS2_RESULT_NAK && attempts < PS2_DEV_CMD_MAX_ATTEMPTS);
     
@@ -207,7 +209,7 @@ void kbd_buffer_key_event(kbd_keycode_t key, uint8_t scancode, kbd_kstate_t stat
         state = state | kbd_state.key_state;
         key = key & (0xffdf | -('a' > key || key > 'z' || !(state & KBD_KEY_FCAPSLKED)));
 
-        if (!key_buf.lock) {
+        if (!mutex_on_hold(&key_buf.mutex)) {
             struct kdb_keyinfo_pkt* keyevent_pkt = ps2_keybuffer_next_write();
             *keyevent_pkt = (struct kdb_keyinfo_pkt) {
                 .keycode = key,
@@ -242,18 +244,14 @@ void intr_ps2_kbd_handler(const isr_param* param) {
      * 那么当ps2_process_cmd执行完后（内嵌在#APIC_TIMER_IV），CPU返回EOI给APIC，APIC紧接着将排在队里的IRQ#1发送给CPU
      * 造成误触发。也就是说，我们此时读入的scancode实则上是上一个指令的返回代码。
      * 
-     * Problem 1:
+     * Problem 1 (Fixed):
      *      但是这种方法有个问题，那就是，假若我们的某一个命令失败了一次，ps/2给出0xfe，我们重传，ps/2收到指令并给出0xfa。
      *  那么这样一来，将会由两个连续的IRQ#1产生。而APIC是最多可以缓存两个IRQ，于是我们就会漏掉一个IRQ，依然会误触发。
+     * Solution:
+     *      累加掩码 ;)
      */
-    // FIXME: Address Problem #1
-    // if ((kbd_state.state & KBD_STATE_CMDPROCS)) {
-    //     kbd_state.state &= ~KBD_STATE_CMDPROCS;
-    //     return;
-    // }
-
-    // 目前还是使用该方法。。。
-    if (scancode >= 0xfa) {
+    if ((kbd_state.state & 0xc0)) {
+        kbd_state.state -= KBD_STATE_CMDPROCS;
         return;
     }
     
@@ -333,22 +331,20 @@ static void ps2_post_cmd(uint8_t port, char cmd, uint16_t arg) {
     }
 }
 
-struct kdb_keyinfo_pkt* kbd_try_read_one() {
+int kbd_recv_key(struct kdb_keyinfo_pkt* key_event) {
     if (!key_buf.buffered_len) {
-        return NULL;
+        return 0;
     }
-    key_buf.lock = 1;
-    struct kdb_keyinfo_pkt* pkt_copy = 
-        (struct kdb_keyinfo_pkt*) lxmalloc(sizeof(struct kdb_keyinfo_pkt));
+    mutex_lock(&key_buf.mutex);
 
     struct kdb_keyinfo_pkt* pkt_current = &key_buf.buffer[key_buf.read_ptr];
 
-    *pkt_copy = *pkt_current;
+    *key_event = *pkt_current;
     key_buf.buffered_len--;
     key_buf.read_ptr = (key_buf.read_ptr + 1) % PS2_KBD_RECV_BUFFER_SIZE;
 
-    key_buf.lock = 0;
-    return pkt_copy;
+    mutex_unlock(&key_buf.mutex);
+    return 1;
 }
 
 static struct kdb_keyinfo_pkt* ps2_keybuffer_next_write() {

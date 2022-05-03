@@ -2,6 +2,7 @@
 #include <lunaix/tty/tty.h>
 #include <lunaix/common.h>
 #include <stdint.h>
+#include <hal/io.h>
 
 #define TTY_WIDTH 80
 #define TTY_HEIGHT 25
@@ -11,11 +12,17 @@ static vga_attribute* tty_vga_buffer = (vga_attribute*)VGA_BUFFER_PADDR;
 static vga_attribute tty_theme_color = VGA_COLOR_BLACK;
 
 static uint32_t tty_x = 0;
-static uint16_t tty_y = 0;
+static uint32_t tty_y = 0;
 
 void tty_init(void* vga_buf) {
     tty_vga_buffer = (vga_attribute*)vga_buf;
     tty_clear();
+
+    io_outb(0x3D4, 0x0A);
+	io_outb(0x3D5, (io_inb(0x3D5) & 0xC0) | 13);
+ 
+	io_outb(0x3D4, 0x0B);
+	io_outb(0x3D5, (io_inb(0x3D5) & 0xE0) | 15);
 }
 
 void tty_set_buffer(void* vga_buf) {
@@ -60,6 +67,22 @@ tty_put_char(char chr)
     }
 }
 
+void tty_sync_cursor() {
+    tty_set_cursor(tty_x, tty_y);
+}
+
+
+void tty_set_cursor(uint8_t x, uint8_t y) {
+    if (x >= TTY_WIDTH || y >= TTY_HEIGHT) {
+        x = y = 0;
+    }
+    uint32_t pos = y * TTY_WIDTH + x;
+    io_outb(0x3D4, 14);
+    io_outb(0x3D5, pos / 256);
+    io_outb(0x3D4, 15);
+    io_outb(0x3D5, pos % 256);
+}
+
 void
 tty_put_str(char* str)
 {
@@ -67,6 +90,7 @@ tty_put_str(char* str)
         tty_put_char(*str);
         str++;
     }
+    tty_sync_cursor();
 }
 
 void

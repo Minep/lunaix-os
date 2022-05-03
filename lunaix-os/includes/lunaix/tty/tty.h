@@ -52,5 +52,9 @@ tty_get_cpos(unsigned int* x, unsigned int* y);
 vga_attribute
 tty_get_theme();
 
+void tty_set_cursor(unsigned char x, unsigned char y);
+
+void tty_sync_cursor();
+
 
 #endif /* __LUNAIX_TTY_H */

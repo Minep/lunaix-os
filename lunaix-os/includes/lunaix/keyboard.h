@@ -94,6 +94,6 @@ struct kdb_keyinfo_pkt {
     time_t timestamp;
 };
 
-struct kdb_keyinfo_pkt* kbd_try_read_one();
+int kbd_recv_key(struct kdb_keyinfo_pkt* key_event);
 
 #endif /* __LUNAIX_KEYBOARD_H */

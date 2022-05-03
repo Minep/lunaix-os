@@ -3,6 +3,8 @@
 
 #include <hal/io.h>
 #include <lunaix/keyboard.h>
+#include <lunaix/ds/mutex.h>
+
 
 #define PS2_PORT_ENC_DATA 0x60
 #define PS2_PORT_ENC_CMDREG 0x60
@@ -64,16 +66,14 @@ struct ps2_cmd_queue {
     struct ps2_cmd cmd_queue[PS2_CMD_QUEUE_SIZE];
     int queue_ptr;
     int queue_len;
-    // FIXME: replace lock with something specialized.
-    volatile char lock;
+    mutex_t mutex;
 };
 
 struct ps2_key_buffer {
     struct kdb_keyinfo_pkt buffer[PS2_KBD_RECV_BUFFER_SIZE];
     int read_ptr;
     int buffered_len;
-    // FIXME: replace lock with something specialized.
-    volatile char lock;
+    mutex_t mutex;
 };
 
 /**

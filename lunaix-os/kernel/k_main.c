@@ -55,16 +55,16 @@ _kernel_main()
 
     // timer_run_second(1, test_timer, NULL, TIMER_MODE_PERIODIC);
 
+    struct kdb_keyinfo_pkt keyevent;
     while (1)
     {
-        struct kdb_keyinfo_pkt* keyevent = kbd_try_read_one();
-        if (!keyevent) {
+        if (!kbd_recv_key(&keyevent)) {
             continue;
         }
-        if ((keyevent->state & KBD_KEY_FPRESSED) && (keyevent->keycode & 0xff00) <= KEYPAD) {
-            tty_put_char((char)(keyevent->keycode & 0x00ff));
+        if ((keyevent.state & KBD_KEY_FPRESSED) && (keyevent.keycode & 0xff00) <= KEYPAD) {
+            tty_put_char((char)(keyevent.keycode & 0x00ff));
+            tty_sync_cursor();
         }
-        lxfree(keyevent);
     }
 
     spin();
