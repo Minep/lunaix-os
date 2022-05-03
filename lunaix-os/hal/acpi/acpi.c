@@ -8,7 +8,7 @@
 
 #include "parser/madt_parser.h"
 
-static acpi_context* toc = NULL;
+static acpi_context* ctx = NULL;
 
 LOG_MODULE("ACPI")
 
@@ -30,30 +30,34 @@ acpi_init(multiboot_info_t* mb_info)
 
     acpi_rsdt_t* rsdt = rsdp->rsdt;
 
-    toc = lxcalloc(1, sizeof(acpi_context));
-    assert_msg(toc, "Fail to create ACPI context");
+    ctx = lxcalloc(1, sizeof(acpi_context));
+    assert_msg(ctx, "Fail to create ACPI context");
 
-    strncpy(toc->oem_id, rsdt->header.oem_id, 6);
-    toc->oem_id[6] = '\0';
+    strncpy(ctx->oem_id, rsdt->header.oem_id, 6);
+    ctx->oem_id[6] = '\0';
 
     size_t entry_n = (rsdt->header.length - sizeof(acpi_sdthdr_t)) >> 2;
     for (size_t i = 0; i < entry_n; i++) {
         acpi_sdthdr_t* sdthdr = ((acpi_apic_t**)&(rsdt->entry))[i];
         switch (sdthdr->signature) {
             case ACPI_MADT_SIG:
-                madt_parse((acpi_madt_t*)sdthdr, toc);
+                madt_parse((acpi_madt_t*)sdthdr, ctx);
+                break;
+            case ACPI_FADT_SIG:
+                // FADT just a plain structure, no need to parse.
+                ctx->fadt = *(acpi_fadt_t*)sdthdr;
                 break;
             default:
                 break;
         }
     }
 
-    kprintf(KINFO "OEM: %s\n", toc->oem_id);
-    kprintf(KINFO "IOAPIC address: %p\n", toc->madt.ioapic->ioapic_addr);
-    kprintf(KINFO "APIC address: %p\n", toc->madt.apic_addr);
+    kprintf(KINFO "OEM: %s\n", ctx->oem_id);
+    kprintf(KINFO "IOAPIC address: %p\n", ctx->madt.ioapic->ioapic_addr);
+    kprintf(KINFO "APIC address: %p\n", ctx->madt.apic_addr);
 
     for (size_t i = 0; i < 24; i++) {
-        acpi_intso_t* intso = toc->madt.irq_exception[i];
+        acpi_intso_t* intso = ctx->madt.irq_exception[i];
         if (!intso)
             continue;
 
@@ -64,8 +68,8 @@ acpi_init(multiboot_info_t* mb_info)
 acpi_context*
 acpi_get_context()
 {
-    assert_msg(toc, "ACPI is not initialized");
-    return toc;
+    assert_msg(ctx, "ACPI is not initialized");
+    return ctx;
 }
 
 int
@@ -117,6 +121,7 @@ acpi_locate_rsdp(multiboot_info_t* mb_info)
     uint8_t* mem_start = 0x4000;
     for (; mem_start < 0x100000; mem_start += 16) {
         uint32_t sig_low = *((uint32_t*)(mem_start));
+        // XXX: do we need to compare this as well?
         // uint32_t sig_high = *((uint32_t*)(mem_start+j) + 1);
         if (sig_low == ACPI_RSDP_SIG_L) {
             rsdp = (acpi_rsdp_t*)(mem_start);

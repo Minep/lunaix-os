@@ -3,7 +3,9 @@
 
 #include <stdint.h>
 
-typedef struct
+#define ACPI_TABLE_PACKED   __attribute__((packed))
+
+typedef struct acpi_sdthdr
 {
     uint32_t signature;
     uint32_t length;
@@ -15,12 +17,12 @@ typedef struct
     uint32_t oem_rev;
     uint32_t vendor_id;
     uint32_t vendor_rev;
-} __attribute__((packed)) acpi_sdthdr_t;
+} ACPI_TABLE_PACKED acpi_sdthdr_t;
 
-typedef struct
+typedef struct acpi_rsdt
 {
     acpi_sdthdr_t header;
     acpi_sdthdr_t* entry;
-} __attribute__((packed)) acpi_rsdt_t;
+} ACPI_TABLE_PACKED acpi_rsdt_t;
 
 #endif /* __LUNAIX_ACPI_SDT_H */

@@ -7,11 +7,16 @@
 
 #include "sdt.h"
 #include "madt.h"
+#include "fadt.h"
+
+// * for quick conversion from a table name into ACPI favoured signature
+// * use `echo <TableName> | xxd -eg4`
 
 #define ACPI_RSDP_SIG_L       0x20445352      // 'RSD '
 #define ACPI_RSDP_SIG_H      0x20525450       // 'PTR '
 
 #define ACPI_MADT_SIG        0x43495041       // 'APIC'
+#define ACPI_FADT_SIG        0x50434146       // 'FACP' Notice that it is not 'FADT'.
 
 typedef struct {
     uint32_t signature_l;
@@ -36,6 +41,7 @@ typedef struct
     // Make it as null terminated
     char oem_id[7];
     acpi_madt_toc_t madt;
+    acpi_fadt_t fadt;
 } acpi_context;
 
 int

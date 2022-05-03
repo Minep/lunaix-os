@@ -15,7 +15,7 @@ typedef struct
 {
     uint8_t type;
     uint8_t length;
-} __attribute__((packed)) acpi_ics_hdr_t;
+} ACPI_TABLE_PACKED acpi_ics_hdr_t;
 
 /**
  * @brief ACPI Processor Local APIC Structure (PLAS)
@@ -29,7 +29,7 @@ typedef struct
     uint8_t processor_id;
     uint8_t apic_id;
     uint32_t flags;
-} __attribute__((packed)) acpi_apic_t;
+} ACPI_TABLE_PACKED acpi_apic_t;
 
 /**
  * @brief ACPI IO APIC Structure (IOAS)
@@ -46,7 +46,7 @@ typedef struct
     uint32_t ioapic_addr;
     // The global system interrupt offset for this IOAPIC. (Kind of IRQ offset for a slave IOAPIC)
     uint32_t gis_offset;
-} __attribute__((packed)) acpi_ioapic_t;
+} ACPI_TABLE_PACKED acpi_ioapic_t;
 
 /**
  * @brief ACPI Interrupt Source Override (INTSO)
@@ -67,7 +67,7 @@ typedef struct
     // global system interrupt. The override of source in APIC mode
     uint32_t gsi;
     uint16_t flags;
-} __attribute__((packed)) acpi_intso_t;
+} ACPI_TABLE_PACKED acpi_intso_t;
 
 typedef struct
 {
@@ -75,7 +75,7 @@ typedef struct
     void* apic_addr;
     uint32_t flags;
     // Here is a bunch of packed ICS reside here back-to-back.
-} __attribute__((packed)) acpi_madt_t;
+} ACPI_TABLE_PACKED acpi_madt_t;
 
 typedef struct
 {
@@ -83,6 +83,6 @@ typedef struct
     acpi_apic_t* apic;
     acpi_ioapic_t* ioapic;
     acpi_intso_t** irq_exception;
-} __attribute__((packed)) acpi_madt_toc_t;
+} ACPI_TABLE_PACKED acpi_madt_toc_t;
 
 #endif /* __LUNAIX_ACPI_MADT_H */

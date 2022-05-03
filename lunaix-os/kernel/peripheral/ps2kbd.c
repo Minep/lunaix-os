@@ -3,6 +3,7 @@
 #include <lunaix/timer.h>
 #include <lunaix/common.h>
 #include <lunaix/syslog.h>
+#include <hal/acpi/acpi.h>
 
 #include <hal/cpu.h>
 #include <arch/x86/interrupts.h>
@@ -104,9 +105,14 @@ void ps2_kbd_init() {
     kbd_state.translation_table = scancode_set2;
     kbd_state.state = KBD_STATE_KWAIT;
 
+    acpi_context* acpi_ctx = acpi_get_context();
+    if (!(acpi_ctx->fadt.boot_arch & IAPC_ARCH_8042)) {
+        kprintf(KERROR "No PS/2 controller detected.\n");
+        // FUTURE: Some alternative fallback on this? Check PCI bus for USB controller instead?
+        return;
+    }
+    
     cpu_disable_interrupt();
-
-    // XXX: 是否需要使用FADT探测PS/2控制器的存在？
 
     // 1、禁用任何的PS/2设备
     ps2_post_cmd(PS2_PORT_CTRL_CMDREG, PS2_CMD_PORT1_DISABLE, PS2_NO_ARG);
