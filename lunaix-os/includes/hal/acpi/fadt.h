@@ -43,6 +43,7 @@ typedef struct acpi_fadt {
     acpi_sdthdr_t header;
     uint32_t firmware_controller_addr;
     uint32_t dsdt_addr;
+    uint8_t reserved;
     uint8_t pm_profile;
     uint16_t sci_int;
     uint32_t smi_cmd_port_addr;
@@ -67,7 +68,6 @@ typedef struct acpi_fadt {
     uint8_t time_info[3];
     uint16_t boot_arch;
 } ACPI_TABLE_PACKED acpi_fadt_t;
-
 
 // TODO: FADT parser & support
 

@@ -110,5 +110,15 @@ io_outl(int port, uint32_t data)
 {
     asm volatile("outl %0,%w1" : : "a"(data), "d"(port));
 }
+static inline void
+io_delay(int counter)
+{
+    asm volatile (
+        "   test %0, %0\n"
+        "   jz 1f\n"
+        "2: dec %0\n"
+        "   jnz 2b\n"
+        "1: dec %0"::"a"(counter));
+}
 
 #endif /* __LUNAIX_IO_H */

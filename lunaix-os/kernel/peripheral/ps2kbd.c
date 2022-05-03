@@ -4,6 +4,7 @@
 #include <lunaix/common.h>
 #include <lunaix/syslog.h>
 #include <hal/acpi/acpi.h>
+#include <hal/ioapic.h>
 
 #include <hal/cpu.h>
 #include <arch/x86/interrupts.h>
@@ -106,11 +107,25 @@ void ps2_kbd_init() {
     kbd_state.state = KBD_STATE_KWAIT;
 
     acpi_context* acpi_ctx = acpi_get_context();
-    if (!(acpi_ctx->fadt.boot_arch & IAPC_ARCH_8042)) {
-        kprintf(KERROR "No PS/2 controller detected.\n");
-        // FUTURE: Some alternative fallback on this? Check PCI bus for USB controller instead?
-        return;
+    if (acpi_ctx->fadt.header.rev > 1) {
+        /*
+         *  只有当前ACPI版本大于1时，我们才使用FADT的IAPC_BOOT_ARCH去判断8042是否存在。
+         *  这是一个坑，在ACPI v1中，这个字段是reserved！而这及至APCI v2才出现。
+         *  需要注意：Bochs 和 QEMU 使用的是ACPI v1，而非 v2 （virtualbox好像是v4）
+         * 
+         *  请看Bochs的bios源码（QEMU的BIOS其实是照抄bochs的，所以也是一个德行。。）：
+         *      https://bochs.sourceforge.io/cgi-bin/lxr/source/bios/rombios32.c#L1314
+         */
+        if (!(acpi_ctx->fadt.boot_arch & IAPC_ARCH_8042)) {
+            kprintf(KERROR "No PS/2 controller detected.\n");
+            // FUTURE: Some alternative fallback on this? Check PCI bus for USB controller instead?
+            return;
+        }
     }
+    else {
+        kprintf(KWARN "Outdated FADT used, assuming 8042 always exist.\n");
+    }
+    
     
     cpu_disable_interrupt();
 
@@ -157,6 +172,19 @@ void ps2_kbd_init() {
     //  为什么只执行队头的命令，而不是全部的命令？
     //      因为我们需要保证isr尽量的简短，运行起来快速。而发送这些命令非常的耗时。
     timer_run_ms(5, ps2_process_cmd, NULL, TIMER_MODE_PERIODIC);
+
+    /*
+     *   一切准备就绪后，我们才教ioapic去启用IRQ#1。
+     *   至于为什么要在这里，原因是：初始化所使用的一些指令可能会导致IRQ#1的触发（因为返回码），或者是一些什么
+     *  情况导致IRQ#1的误触发（可能是未初始化导致IRQ#1线上不稳定）。于是这些IRQ#1会堆积在APIC的队列里（因为此时我们正在
+     *  初始化8042，屏蔽了所有中断，IF=0）。
+     *  当sti后，这些堆积的中断会紧跟着递送进CPU里，导致我们的键盘handler误认为由按键按下，从而将这个毫无意义的数值加入
+     *  我们的队列中，以供上层读取。
+     *  
+     *  所以，保险的方法是：在初始化后才去设置ioapic，这样一来我们就能有一个稳定的IRQ#1以放心使用。  
+    */
+    uint8_t irq_kbd = ioapic_get_irq(acpi_ctx, PC_AT_IRQ_KBD);
+    ioapic_redirect(irq_kbd, PC_KBD_IV, 0, IOAPIC_DELMOD_FIXED);
 
 done:
     cpu_enable_interrupt();
@@ -261,7 +289,7 @@ void intr_ps2_kbd_handler(const isr_param* param) {
         return;
     }
     
-    //kprintf(KINFO "%x\n", scancode & 0xff);
+    //kprintf(KDEBUG "%x\n", scancode & 0xff);
     
     switch (kbd_state.state)
     {
@@ -331,9 +359,12 @@ static void ps2_post_cmd(uint8_t port, char cmd, uint16_t arg) {
     while((result = io_inb(PS2_PORT_CTRL_STATUS)) & PS2_STATUS_IFULL);
 
     io_outb(port, cmd);
+    io_delay(PS2_DELAY);
+    
     if (!(arg & PS2_NO_ARG)) {
         // 所有参数一律通过0x60传入。
         io_outb(PS2_PORT_ENC_CMDREG, (uint8_t)(arg & 0x00ff));
+        io_delay(PS2_DELAY);
     }
 }
 
