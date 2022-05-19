@@ -1,14 +1,44 @@
 # LunaixOS Project 
 
-《从零开始自制操作系统系列》支持仓库
-
-[相关视频](https://space.bilibili.com/12995787/channel/collectiondetail?sid=196337)
+LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有浓重个人风格的操作系统。开发过程以视频教程形式在Bilibili呈现：[《从零开始自制操作系统系列》](https://space.bilibili.com/12995787/channel/collectiondetail?sid=196337)。
 
 ## 目录结构
 
 | | |
 |-----|------|
-| [lunaix-os](lunaix-os/) | LunaixOS项目 |
-| `practice-c*` | PPT与补充材料（>= EP5.3） |
-| [previous-slides](previous-slides/) | 以前的PPT（< EP5.3） |
-| [reference-material](reference-material/)| 参考资料 |
+| [lunaix-os](lunaix-os/) | LunaixOS源代码 |
+| [slides](slides/) | 视频中所用的幻灯片和补充材料 |
+| [reference-material](reference-material/)| 标准，技术文档和参考文献 |
+
+## 参考教程
+
+**没有！！** 本教程以及该操作系统均为原创，没有基于任何市面上现行的操作系统开发教程，且并非是基于任何的开源内核的二次开发。
+
+为了制作LunaixOS，作者耗费大量时间和精力钻研技术文档，手册，理论书籍以及现行工业标准，从而尽量保证了知识的一手性。（这样一来，读者和听众们也算是拿到了二手的知识，而不是三手，四手，甚至n手的知识）。
+
+大部分的文档和标准可以在上述的[reference-material](reference-material/)中找到。
+
+当然，您也可以参考以下列表来了解现阶段的LunaixOS都使用了哪些资料（本列表会随着开发进度更新）：
+
+#### 手册，标准，技术文档
++ [Intel 64 and IA-32 Architecture Software Developer's Manual (Full Volume Bundle)](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html)
++ [ACPI Specification (version 6.4)](https://uefi.org/sites/default/files/resources/ACPI_Spec_6_4_Jan22.pdf)
++ IBM PC/AT Technical Reference
++ IBM VGA/XGA Technical Reference
++ 82093AA I/O Advanced Programmable Controller (IOAPIC) (Datasheet)
++ MC146818A (Datasheet)
++ Intel 500 Series Chipset Family Platform Controller Hub (Datasheet - Volume 2)
+
+#### 理论书籍
++ *Computer System - A Programmer's Perspective Third Edition* (Bryant, R & O'Hallaron, D)
++ *Modern Operating System* (Tanenbaum, A)
++ 《汇编语言》（王爽） - 用于入门汇编
++ 《微机原理与接口技术》 - 用于大致了解x86架构的微机体系（更加细致的了解可以阅读Intel Manual）
+
+#### 网站
++ [OSDev](https://wiki.osdev.org/Main_Page) - 杂七杂八的参考，很多过来人的经验。作者主要用于上古资料查询以及收集；技术文献，手册，标准的粗略总结；以及开发环境/工具链的搭建。
++ [FreeVGA](http://www.osdever.net/FreeVGA/home.htm) - 98年的资源！关于VGA编程技术的宝藏网站。
++ GNU CC 和 GNU LD 的官方文档。
+
+#### 其他
++ Linux Manual - 用于查询*nix API的一些具体行为。
