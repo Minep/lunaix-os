@@ -35,7 +35,7 @@
 #define PS2_CMD_SELFTEST      0xaa
 #define PS2_CMD_SELFTEST_PORT1      0xab
 
-#define PS2_CMD_READ_CFG       0x20
+#define PS2_CMD_READ_CFG       0x20 
 #define PS2_CMD_WRITE_CFG       0x60
 
 #define PS2_CFG_P1INT             0x1
@@ -56,7 +56,7 @@ struct ps2_cmd {
 };
 
 struct ps2_kbd_state {
-    char state;
+    volatile char state;
     volatile char masked;
     kbd_keycode_t* translation_table;
     kbd_kstate_t key_state;

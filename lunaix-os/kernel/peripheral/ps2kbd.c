@@ -71,10 +71,12 @@ static kbd_keycode_t scancode_set2_shift[] = {
 #define KBD_STATE_KRELEASED     0x02
 #define KBD_STATE_CMDPROCS      0x40
 
+#define KBD_ENABLE_SPIRQ_FIX
+//#define KBD_DBGLOG
+
 void intr_ps2_kbd_handler(const isr_param* param);
 static struct kdb_keyinfo_pkt* ps2_keybuffer_next_write();
 
-// TODO: Abstract the bounded buffer out.
 void ps2_device_post_cmd(char cmd, char arg) {
     mutex_lock(&cmd_q.mutex);
     int index = (cmd_q.queue_ptr + cmd_q.queue_len) % PS2_CMD_QUEUE_SIZE;
@@ -110,7 +112,7 @@ void ps2_kbd_init() {
     if (acpi_ctx->fadt.header.rev > 1) {
         /*
          *  只有当前ACPI版本大于1时，我们才使用FADT的IAPC_BOOT_ARCH去判断8042是否存在。
-         *  这是一个坑，在ACPI v1中，这个字段是reserved！而这及至APCI v2才出现。
+         *  这是一个坑，在ACPI v1中，这个字段是reserved！而这及至ACPI v2才出现。
          *  需要注意：Bochs 和 QEMU 使用的是ACPI v1，而非 v2 （virtualbox好像是v4）
          * 
          *  请看Bochs的bios源码（QEMU的BIOS其实是照抄bochs的，所以也是一个德行。。）：
@@ -126,6 +128,7 @@ void ps2_kbd_init() {
         kprintf(KWARN "Outdated FADT used, assuming 8042 always exist.\n");
     }
     
+    char result;
     
     cpu_disable_interrupt();
 
@@ -136,7 +139,6 @@ void ps2_kbd_init() {
     // 2、清空控制器缓冲区
     io_inb(PS2_PORT_ENC_DATA);
 
-    char result;
 
     // 3、屏蔽所有PS/2设备（端口1&2）IRQ，并且禁用键盘键码转换功能
     result = ps2_issue_cmd(PS2_CMD_READ_CFG, PS2_NO_ARG);
@@ -191,14 +193,16 @@ done:
 }
 
 void ps2_process_cmd(void* arg) {
-    // 检查锁是否已被启用，如果启用，则表明该timer中断发生时，某个指令正在入队。
-    // 如果是这种情况则跳过，留到下一轮再尝试处理。
-    // 注意，这里其实是ISR的一部分（timer中断），对于单核CPU来说，ISR等同于单个的原子操作。
-    // （因为EFLAGS.IF=0，所有可屏蔽中断被屏蔽。对于NMI的情况，那么就直接算是triple fault了，所以也没有讨论的意义）
-    // 所以，假若我们遵从互斥锁的严格定义（即这里需要阻塞），那么中断将会被阻塞，进而造成死锁。
-    // 因此，我们这里仅仅进行判断。
-    // 会不会产生指令堆积？不会，因为指令发送的频率远远低于指令队列清空的频率。在目前，我们发送的唯一指令
-    // 就只是用来开关键盘上的LED灯（如CAPSLOCK）。
+    /* 
+     * 检查锁是否已被启用，如果启用，则表明该timer中断发生时，某个指令正在入队。
+     * 如果是这种情况则跳过，留到下一轮再尝试处理。
+     * 注意，这里其实是ISR的一部分（timer中断），对于单核CPU来说，ISR等同于单个的原子操作。
+     * （因为EFLAGS.IF=0，所有可屏蔽中断被屏蔽。对于NMI的情况，那么就直接算是triple fault了，所以也没有讨论的意义）
+     * 所以，假若我们遵从互斥锁的严格定义（即这里需要阻塞），那么中断将会被阻塞，进而造成死锁。
+     * 因此，我们这里仅仅进行判断。
+     * 会不会产生指令堆积？不会，因为指令发送的频率远远低于指令队列清空的频率。在目前，我们发送的唯一指令
+     * 就只是用来开关键盘上的LED灯（如CAPSLOCK）。
+     */
     if (mutex_on_hold(&cmd_q.mutex) || !cmd_q.queue_len) {
         return;
     }
@@ -209,11 +213,13 @@ void ps2_process_cmd(void* arg) {
     int attempts = 0;
 
     // 尝试将命令发送至PS/2键盘（通过PS/2控制器）
-    // 如果不成功（0x60 IO口返回 0xfe，即 NAK 或 Resend）
+    // 如果不成功（0x60 IO口返回 0xfe，即 NAK i.e. Resend）
     // 则尝试最多五次
     do {
         result = ps2_issue_dev_cmd(pending_cmd->cmd, pending_cmd->arg);
+#ifdef KBD_ENABLE_SPIRQ_FIX
         kbd_state.state += KBD_STATE_CMDPROCS;
+#endif
         attempts++;
     } while(result == PS2_RESULT_NAK && attempts < PS2_DEV_CMD_MAX_ATTEMPTS);
     
@@ -224,8 +230,10 @@ void ps2_process_cmd(void* arg) {
 }
 
 void kbd_buffer_key_event(kbd_keycode_t key, uint8_t scancode, kbd_kstate_t state) {
-    // forgive me on these ugly bit-level tricks, 
-    // I really hate doing branching on these "fliping switch" things
+    /* 
+        forgive me on these ugly bit-level tricks, 
+        I really hate doing branching on these "fliping switch" things 
+    */
     if (key == KEY_CAPSLK) {
         kbd_state.key_state ^= KBD_KEY_FCAPSLKED & -state;
     } else if (key == KEY_NUMSLK) {
@@ -253,17 +261,22 @@ void kbd_buffer_key_event(kbd_keycode_t key, uint8_t scancode, kbd_kstate_t stat
             };
         }
 
-        // kprintf(KDEBUG "%c (t=%d, s=%x, c=%d)\n", key & 0x00ff, timestamp, state, key >> 8);
-        return; // do not delete this return
+        return;
     }
 
-    // Ooops, this guy generates irq!
-    ps2_device_post_cmd(PS2_KBD_CMD_SETLED, (kbd_state.key_state >> 1) & 0x00ff);
+    if (state & KBD_KEY_FPRESSED) {
+        // Ooops, this guy generates irq!
+        ps2_device_post_cmd(PS2_KBD_CMD_SETLED, (kbd_state.key_state >> 1) & 0x00ff);
+    }
 }
 
 void intr_ps2_kbd_handler(const isr_param* param) {
 
-    // Do not move this line. It is in the right place and right order.
+    // This is important! Don't believe me? try comment it out and run on Bochs!
+    while (!(io_inb(PS2_PORT_CTRL_STATUS) & PS2_STATUS_OFULL));
+
+    // I know you are tempting to move this chunk after the keyboard state check.
+    // But DO NOT. This chunk is in right place and right order. Moving it at your own risk 
     // This is to ensure we've cleared the output buffer everytime, so it won't pile up across irqs.
     uint8_t scancode = io_inb(PS2_PORT_ENC_DATA);
     kbd_keycode_t key;
@@ -283,13 +296,22 @@ void intr_ps2_kbd_handler(const isr_param* param) {
      *  那么这样一来，将会由两个连续的IRQ#1产生。而APIC是最多可以缓存两个IRQ，于是我们就会漏掉一个IRQ，依然会误触发。
      * Solution:
      *      累加掩码 ;)
+     * 
+     * Problem 2:
+     *    + 这种累加掩码的操作是基于只有一号IRQ产生的中断的假设，万一中间夹杂了别的中断？Race Condition!
+     *    + 不很稳定x1，假如连续4次发送失败，那么就会导致累加的掩码上溢出，从而导致下述判断失败。
      */
+#ifdef KBD_ENABLE_SPIRQ_FIX
     if ((kbd_state.state & 0xc0)) {
         kbd_state.state -= KBD_STATE_CMDPROCS;
+
         return;
     }
-    
-    //kprintf(KDEBUG "%x\n", scancode & 0xff);
+#endif
+
+#ifdef KBD_DBGLOG
+    kprintf(KDEBUG "%x\n", scancode & 0xff);
+#endif
     
     switch (kbd_state.state)
     {
@@ -331,32 +353,17 @@ void intr_ps2_kbd_handler(const isr_param* param) {
 
 static uint8_t ps2_issue_cmd(char cmd, uint16_t arg) {
     ps2_post_cmd(PS2_PORT_CTRL_CMDREG, cmd, arg);
-
-    char result;
     
     // 等待PS/2控制器返回。通过轮询（polling）状态寄存器的 bit 0
     // 如置位，则表明返回代码此时就在 0x60 IO口上等待读取。
-    while(!((result = io_inb(PS2_PORT_CTRL_STATUS)) & PS2_STATUS_OFULL));
-
-    return io_inb(PS2_PORT_ENC_CMDREG);
-}
-
-static uint8_t ps2_issue_dev_cmd(char cmd, uint16_t arg) {
-    ps2_post_cmd(PS2_PORT_ENC_CMDREG, cmd, arg);
-
-    char result;
-    
-    // 等待PS/2控制器返回。通过轮询（polling）状态寄存器的 bit 0
-    // 如置位，则表明返回代码此时就在 0x60 IO口上等待读取。
-    while(!((result = io_inb(PS2_PORT_CTRL_STATUS)) & PS2_STATUS_OFULL));
+    while(!(io_inb(PS2_PORT_CTRL_STATUS) & PS2_STATUS_OFULL));
 
     return io_inb(PS2_PORT_ENC_CMDREG);
 }
 
 static void ps2_post_cmd(uint8_t port, char cmd, uint16_t arg) {
-    char result;
     // 等待PS/2输入缓冲区清空，这样我们才可以写入命令
-    while((result = io_inb(PS2_PORT_CTRL_STATUS)) & PS2_STATUS_IFULL);
+    while(io_inb(PS2_PORT_CTRL_STATUS) & PS2_STATUS_IFULL);
 
     io_outb(port, cmd);
     io_delay(PS2_DELAY);
@@ -366,6 +373,16 @@ static void ps2_post_cmd(uint8_t port, char cmd, uint16_t arg) {
         io_outb(PS2_PORT_ENC_CMDREG, (uint8_t)(arg & 0x00ff));
         io_delay(PS2_DELAY);
     }
+}
+
+static uint8_t ps2_issue_dev_cmd(char cmd, uint16_t arg) {
+    ps2_post_cmd(PS2_PORT_ENC_CMDREG, cmd, arg);
+    
+    // 等待PS/2控制器返回。通过轮询（polling）状态寄存器的 bit 0
+    // 如置位，则表明返回代码此时就在 0x60 IO口上等待读取。
+    while(!(io_inb(PS2_PORT_CTRL_STATUS) & PS2_STATUS_OFULL));
+
+    return io_inb(PS2_PORT_ENC_CMDREG);
 }
 
 int kbd_recv_key(struct kdb_keyinfo_pkt* key_event) {
