@@ -119,6 +119,22 @@ vmm_lookup(void* va);
  * @return void* 包含虚拟页副本的物理页地址。
  * 
  */
-void* vmm_dup_page(void* va);
+void* vmm_dup_page(pid_t pid, void* pa);
+
+/**
+ * @brief 挂载另一个虚拟地址空间至当前虚拟地址空间
+ * 
+ * @param pde 页目录的物理地址
+ * @return void* 
+ */
+void*
+vmm_mount_pd(void* pde);
+
+/**
+ * @brief 卸载已挂载的虚拟地址空间
+ * 
+ */
+void*
+vmm_unmount_pd();
 
 #endif /* __LUNAIX_VMM_H */

@@ -62,7 +62,7 @@ SECTIONS {
 
     __kernel_end = ALIGN(4K);
     __pg_mount_point = ALIGN(4K);
-    . += 12K;
+    . += 16K;
     __proc_table = ALIGN(4K);
     . += 128M;
     __kernel_heap_start = ALIGN(4K);    /* 内核结束的地方即堆开始的地方 */

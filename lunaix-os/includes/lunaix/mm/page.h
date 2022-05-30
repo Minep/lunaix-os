@@ -95,11 +95,13 @@ typedef struct
 
 extern void __pg_mount_point;
 
-/* 三个页挂载点： 用于临时创建&编辑页表 */
+/* 三个页挂载点，一个页目录挂载点： 用于临时创建&编辑页表 */
 
+#define PD_MOUNT    0xAFC00000
 #define PG_MOUNT_1  (&__pg_mount_point)
 #define PG_MOUNT_2  (&__pg_mount_point + 0x1000)
 #define PG_MOUNT_3  (&__pg_mount_point + 0x2000)
+#define PG_MOUNT_4  (&__pg_mount_point + 0x3000)
 
 
 #endif /* __LUNAIX_PAGE_H */

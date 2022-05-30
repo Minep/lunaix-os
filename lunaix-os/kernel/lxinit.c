@@ -35,10 +35,6 @@ _lxinit_main()
         kprintf(KINFO "Forked %d\n", pid);
     }
 
-    // FIXME: 这里fork会造成下面lxmalloc产生Heap corruption，需要实现COW和加入mutex
-    // fork();
-      
-
     char buf[64];
 
     kprintf(KINFO "Hello higher half kernel world!\nWe are now running in virtual "
@@ -50,35 +46,14 @@ _lxinit_main()
     void* k_start = vmm_v2p(&__kernel_start);
     kprintf(KINFO "The kernel's base address mapping: %p->%p\n", &__kernel_start, k_start);
 
-    // test malloc & free
-
-    uint8_t** arr = (uint8_t**)lxmalloc(10 * sizeof(uint8_t*));
-
-    for (size_t i = 0; i < 10; i++) {
-        arr[i] = (uint8_t*)lxmalloc((i + 1) * 2);
-    }
-
-    for (size_t i = 0; i < 10; i++) {
-        lxfree(arr[i]);
-    }
-
-    uint8_t* big_ = lxmalloc(8192);
-    big_[0] = 123;
-    big_[1] = 23;
-    big_[2] = 3;
-
-    kprintf(KINFO "%u, %u, %u\n", big_[0], big_[1], big_[2]);
-
-    // good free
-    lxfree(arr);
-    lxfree(big_);
-
-    // timer_run_second(1, test_timer, NULL, TIMER_MODE_PERIODIC);
+    // no lxmalloc here! This can only be used within kernel, but here, we are in a dedicated process!
+    // any access to kernel method must be done via syscall
 
     struct kdb_keyinfo_pkt keyevent;
     while (1)
     {
         if (!kbd_recv_key(&keyevent)) {
+            // yield();
             continue;
         }
         if ((keyevent.state & KBD_KEY_FPRESSED) && (keyevent.keycode & 0xff00) <= KEYPAD) {

@@ -61,7 +61,9 @@
 
         call _kernel_init
 
-        /* _kernel_init 永不返回 */
+        movl $KSTACK_TOP, %esp
+
+        call _kernel_post_init
 
     1:
         hlt

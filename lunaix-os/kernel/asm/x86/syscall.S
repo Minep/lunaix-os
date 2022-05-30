@@ -6,12 +6,17 @@
         注意，这里的顺序非常重要。每个系统调用在这个地址表里的索引等于其调用号。
     */
     syscall_table:
+        1:
         .dc.l 0
         .dc.l dup_proc
         .dc.l schedule
         .dc.l terminate_process
         .dc.l _syscall_sbrk
         .dc.l _syscall_brk
+        2:
+        .rept __SYSCALL_MAX - (2b - 1b)/4
+            .dc.l 0
+        .endr
 
 .global syscall_hndlr
 
@@ -24,7 +29,13 @@
 
         movl  (%ebp), %eax
         cmpl  $__SYSCALL_MAX, %eax
-        jb 1f
+        jae 2f
+
+        shll $2, %eax
+        addl $syscall_table, %eax
+        cmpl $0, (%eax)
+        jne 1f
+    2:    
         neg   %eax
         popl  %ebp
         ret
@@ -35,14 +46,13 @@
         pushl 12(%ebp)    /* edx - #3 arg */
         pushl 8(%ebp)    /* ecx - #2 arg */
         pushl 4(%ebp)    /* ebx - #1 arg */
-        shll $2, %eax
-        addl $syscall_table, %eax
-
+        
         call (%eax)
 
         addl $24, %esp
 
         popl %ebp
+        
         ret
 
 

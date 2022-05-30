@@ -256,3 +256,16 @@ vmm_v2p(void* va)
 {
     return (void*)vmm_lookup(va).pa;
 }
+
+void*
+vmm_mount_pd(void* pde) {
+    x86_page_table* l1pt = (x86_page_table*)L1_BASE_VADDR;
+    l1pt->entry[(PD_MOUNT >> 22)] = NEW_L1_ENTRY(PG_PREM_RW, pde);
+    return PD_MOUNT;
+}
+
+void*
+vmm_unmount_pd() {
+    x86_page_table* l1pt = (x86_page_table*)L1_BASE_VADDR;
+    l1pt->entry[(PD_MOUNT >> 22)] = 0;
+}

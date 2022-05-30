@@ -18,7 +18,6 @@
 
 
 struct proc_mm {
-    heap_context_t k_heap;
     heap_context_t u_heap;
     struct mm_region* region;
 };
@@ -49,6 +48,8 @@ pid_t alloc_pid();
 void push_process(struct proc_info* process);
 
 void destroy_process(pid_t pid);
+
+void* dup_pagetable(pid_t pid);
 
 /**
  * @brief 复制当前进程（LunaixOS的类 fork (unix) 实现）
