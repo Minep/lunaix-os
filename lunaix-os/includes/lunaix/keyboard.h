@@ -1,5 +1,6 @@
 #ifndef __LUNAIX_KEYBOARD_H
 #define __LUNAIX_KEYBOARD_H
+#include <lunaix/clock.h>
 
 //      Lunaix Keycode
 //       15        7         0
@@ -15,8 +16,6 @@
 
 typedef unsigned short kbd_keycode_t;
 typedef unsigned short kbd_kstate_t;
-#include <lunaix/clock.h>
-
 
 #define KEYPAD  0x0100
 #define FN_KEY  0x0200

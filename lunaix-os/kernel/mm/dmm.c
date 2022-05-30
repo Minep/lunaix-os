@@ -17,8 +17,26 @@
 #include <lunaix/mm/dmm.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/mm/page.h>
+#include <lunaix/status.h>
 
 #include <lunaix/spike.h>
+
+
+int _syscall_sbrk(void* addr) {
+    heap_context_t* uheap = &__current->mm.u_heap;
+    mutex_lock(&uheap->lock);
+    int r = lxsbrk(uheap, addr);
+    mutex_unlock(&uheap->lock);
+    return r;
+}
+
+void* _syscall_brk(size_t size) {
+    heap_context_t* uheap = &__current->mm.u_heap;
+    mutex_lock(&uheap->lock);
+    void* r = lxbrk(uheap, size);
+    mutex_unlock(&uheap->lock);
+    return r;
+}
 
 int
 dmm_init(heap_context_t* heap)
@@ -26,8 +44,9 @@ dmm_init(heap_context_t* heap)
     assert((uintptr_t)heap->start % BOUNDARY == 0);
 
     heap->brk = heap->start;
+    mutex_init(&heap->lock);
 
-    return vmm_alloc_page(heap->brk, PG_PREM_RW) != NULL;
+    return vmm_alloc_page(__current->pid, heap->brk, NULL, PG_PREM_RW, 0) != NULL;
 }
 
 int
@@ -51,17 +70,16 @@ lxbrk(heap_context_t* heap, size_t size)
 
     // any invalid situations
     if (next >= heap->max_addr || next < current_brk) {
-        return NULL;
+        __current->k_status = LXINVLDPTR;
     }
 
     uintptr_t diff = PG_ALIGN(next) - PG_ALIGN(current_brk);
     if (diff) {
         // if next do require new pages to be allocated
-        if (!vmm_alloc_pages((void*)(PG_ALIGN(current_brk) + PG_SIZE),
+        if (!vmm_alloc_pages(__current->pid, (void*)(PG_ALIGN(current_brk) + PG_SIZE),
                              diff,
-                             PG_PREM_RW)) {
-            // for debugging
-            assert_msg(0, "unable to brk");
+                             PG_PREM_RW, 0)) {
+            __current->k_status = LXHEAPFULL;
             return NULL;
         }
     }

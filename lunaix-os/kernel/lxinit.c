@@ -7,18 +7,38 @@
 #include <lunaix/timer.h>
 #include <lunaix/keyboard.h>
 #include <lunaix/tty/tty.h>
-#include <stdint.h>
+#include <lunaix/lunistd.h>
+#include <lunaix/proc.h>
 
 extern uint8_t __kernel_start;
 
-LOG_MODULE("LX")
+LOG_MODULE("INIT")
 
 void 
 test_timer(void* payload);
 
 void
-_kernel_main()
+_lxinit_main()
 {
+    // 这里是就是LunaixOS的第一个进程了！
+    for (size_t i = 0; i < 10; i++)
+    {
+        pid_t pid = 0;
+        if (!(pid = fork())) {
+            while (1)
+            {
+                // kprintf(KINFO "Process %d\n", i);
+                tty_put_char('0'+i);
+                yield();
+            }
+        }
+        kprintf(KINFO "Forked %d\n", pid);
+    }
+
+    // FIXME: 这里fork会造成下面lxmalloc产生Heap corruption，需要实现COW和加入mutex
+    // fork();
+      
+
     char buf[64];
 
     kprintf(KINFO "Hello higher half kernel world!\nWe are now running in virtual "
@@ -66,6 +86,7 @@ _kernel_main()
             tty_sync_cursor();
         }
     }
+    
 
     spin();
 }

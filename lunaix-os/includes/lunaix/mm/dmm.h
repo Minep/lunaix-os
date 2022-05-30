@@ -3,6 +3,8 @@
 // Dynamic Memory (i.e., heap) Manager
 
 #include <stddef.h>
+#include <lunaix/mm/mm.h>
+#include <lunaix/process.h>
 
 #define M_ALLOCATED 0x1
 #define M_PREV_FREE 0x2
@@ -28,13 +30,6 @@
 #define WSIZE 4
 
 #define HEAP_INIT_SIZE 4096
-
-typedef struct 
-{
-    void* start;
-    void* brk;
-    void* max_addr;
-} heap_context_t;
 
 
 int

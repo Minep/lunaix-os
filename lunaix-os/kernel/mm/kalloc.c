@@ -23,9 +23,6 @@
 
 extern uint8_t __kernel_heap_start;
 
-// FIXME: This should go to PCB once we're started to support multitasking
-static heap_context_t __kalloc_kheap;
-
 void*
 lx_malloc_internal(heap_context_t* heap, size_t size);
 
@@ -62,24 +59,25 @@ lx_grow_heap(heap_context_t* heap, size_t sz);
 
 int
 kalloc_init() {
-    __kalloc_kheap.start = &__kernel_heap_start;
-    __kalloc_kheap.brk = NULL;
-    __kalloc_kheap.max_addr = (void*)K_STACK_START;
+    heap_context_t* kheap = &__current->mm.k_heap;
+    kheap->start = &__kernel_heap_start;
+    kheap->brk = NULL;
+    kheap->max_addr = (void*)KSTACK_START;
 
-    if (!dmm_init(&__kalloc_kheap)) {
+    if (!dmm_init(kheap)) {
         return 0;
     }
 
-    SW(__kalloc_kheap.start, PACK(4, M_ALLOCATED));
-    SW(__kalloc_kheap.start + WSIZE, PACK(0, M_ALLOCATED));
-    __kalloc_kheap.brk += WSIZE;
+    SW(kheap->start, PACK(4, M_ALLOCATED));
+    SW(kheap->start + WSIZE, PACK(0, M_ALLOCATED));
+    kheap->brk += WSIZE;
 
-    return lx_grow_heap(&__kalloc_kheap, HEAP_INIT_SIZE) != NULL;
+    return lx_grow_heap(kheap, HEAP_INIT_SIZE) != NULL;
 }
 
 void*
 lxmalloc(size_t size) {
-    return lx_malloc_internal(&__kalloc_kheap, size);
+    return lx_malloc_internal(&__current->mm.k_heap, size);
 }
 
 void*

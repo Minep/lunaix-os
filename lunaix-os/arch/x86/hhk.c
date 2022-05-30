@@ -14,12 +14,12 @@
 // use table #1
 #define PG_TABLE_IDENTITY           0
 
-// use table #2-4
+// use table #2-8
 // hence the max size of kernel is 8MiB
 #define PG_TABLE_KERNEL             1
 
-// use table #5
-#define PG_TABLE_STACK              4
+// use table #9
+#define PG_TABLE_STACK              8
 
 // Provided by linker (see linker.ld)
 extern uint8_t __kernel_start;
@@ -29,7 +29,7 @@ extern uint8_t _k_stack;
 
 void 
 _init_page(ptd_t* ptd) {
-    SET_PDE(ptd, 0, NEW_L1_ENTRY(PG_PRESENT, ptd + PG_MAX_ENTRIES))
+    SET_PDE(ptd, 0, NEW_L1_ENTRY(PG_PREM_RW, ptd + PG_MAX_ENTRIES))
     
     // 对低1MiB空间进行对等映射（Identity mapping），也包括了我们的VGA，方便内核操作。
     for (uint32_t i = 0; i < 256; i++)
@@ -67,7 +67,7 @@ _init_page(ptd_t* ptd) {
     if (kernel_pg_counts > (PG_TABLE_STACK - PG_TABLE_KERNEL) * PG_MAX_ENTRIES) {
         // ERROR: require more pages
         //  here should do something else other than head into blocking
-        while (1);
+        asm ("ud2");
     }
     
     // 计算内核.text段的物理地址

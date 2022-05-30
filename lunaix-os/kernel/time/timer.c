@@ -16,6 +16,7 @@
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
+#include <lunaix/sched.h>
 
 #define LVT_ENTRY_TIMER(vector, mode) (LVT_DELIVERY_FIXED | mode | vector)
 
@@ -38,6 +39,9 @@ static volatile struct lx_timer_context* timer_ctx = NULL;
 static volatile uint32_t rtc_counter = 0;
 static volatile uint8_t apic_timer_done = 0;
 
+static volatile uint32_t sched_ticks = 0;
+static volatile uint32_t sched_ticks_counter = 0;
+
 #define APIC_CALIBRATION_CONST 0x100000
 
 void
@@ -51,6 +55,7 @@ timer_init_context()
     timer_ctx->active_timers =
       (struct lx_timer*)lxmalloc(sizeof(struct lx_timer));
     llist_init_head(timer_ctx->active_timers);
+
 }
 
 void
@@ -131,6 +136,9 @@ timer_init(uint32_t frequency)
     intr_subscribe(APIC_TIMER_IV, timer_update);
 
     apic_write_reg(APIC_TIMER_ICR, timer_ctx->tphz);
+
+    sched_ticks = timer_ctx->running_frequency / 1000 * SCHED_TIME_SLICE;
+    sched_ticks_counter = 0;
 }
 
 int
@@ -183,6 +191,13 @@ timer_update(const isr_param* param)
             llist_delete(&pos->link);
             lxfree(pos);
         }
+    }
+    
+    sched_ticks_counter++;
+
+    if (sched_ticks_counter >= sched_ticks) {
+        sched_ticks_counter = 0;
+        schedule();
     }
 }
 

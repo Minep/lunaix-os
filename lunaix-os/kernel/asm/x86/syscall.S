@@ -1,0 +1,48 @@
+#define __ASM__
+#include <lunaix/syscall.h>
+
+.section .data
+    /*
+        注意，这里的顺序非常重要。每个系统调用在这个地址表里的索引等于其调用号。
+    */
+    syscall_table:
+        .dc.l 0
+        .dc.l dup_proc
+        .dc.l schedule
+        .dc.l terminate_process
+        .dc.l _syscall_sbrk
+        .dc.l _syscall_brk
+
+.global syscall_hndlr
+
+.section .text
+    syscall_hndlr:
+        pushl %ebp
+        movl %esp, %ebp
+        addl $0x8, %ebp
+        movl (%ebp), %ebp
+
+        movl  (%ebp), %eax
+        cmpl  $__SYSCALL_MAX, %eax
+        jb 1f
+        neg   %eax
+        popl  %ebp
+        ret
+    1:
+        pushl 24(%ebp)    /* esi - #6 arg */
+        pushl 20(%ebp)    /* ebp - #5 arg */
+        pushl 16(%ebp)    /* edi - #4 arg */
+        pushl 12(%ebp)    /* edx - #3 arg */
+        pushl 8(%ebp)    /* ecx - #2 arg */
+        pushl 4(%ebp)    /* ebx - #1 arg */
+        shll $2, %eax
+        addl $syscall_table, %eax
+
+        call (%eax)
+
+        addl $24, %esp
+
+        popl %ebp
+        ret
+
+

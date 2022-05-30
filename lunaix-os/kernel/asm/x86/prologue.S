@@ -1,5 +1,8 @@
 /* 高半核入口点 - 0xC0000000 */
 
+#define __ASM__
+#include <lunaix/common.h>
+
 .section .text
     .global hhk_entry_
     hhk_entry_:
@@ -24,7 +27,7 @@
         lgdt (%esp)
 
         /* 更新段寄存器 */
-        movw $0x10, %cx
+        movw $KDATA_SEG, %cx
         movw %cx, %es
         movw %cx, %ds
         movw %cx, %fs
@@ -32,7 +35,7 @@
         movw %cx, %ss
 
         /* 更新 CS:EIP */
-        pushw $0x08
+        pushw $KCODE_SEG
         pushl $_after_gdt
         retf
 
@@ -50,23 +53,16 @@
         movw %ax, (%esp)
         lidt (%esp)
 
+        /* 加载TSS段选择器 */
+        movw $TSS_SEG, %ax
+        ltr %ax
+
         addl $6, %esp
 
         call _kernel_init
 
-        /* 
-            加载新的栈指针，位于0xffbfffff，但因为16字节对齐的需求，低四位清零。
-            为什么不是0xffffffff？ 因为0xffc00000 - 0xffffffff 这4MiB的空间用于
-            对页表与页目录的循环映射。
-        */
-        mov $0xffbffff0, %esp
+        /* _kernel_init 永不返回 */
 
-        call _kernel_post_init
-
-        /* 进入内核 */  
-        call _kernel_main
-
-        cli
-    j_:
+    1:
         hlt
-        jmp j_
+        jmp 1b

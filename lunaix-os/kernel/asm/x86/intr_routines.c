@@ -7,8 +7,12 @@
 
 #include <hal/apic.h>
 
+LOG_MODULE("INTR")
 
-static void 
+extern void
+intr_routine_page_fault (const isr_param* param);
+
+void 
 __print_panic_msg(const char* msg, const isr_param* param) 
 {
     kprint_panic("  INT %u: (%x) [%p: %p] %s",
@@ -30,20 +34,6 @@ void
 intr_routine_general_protection (const isr_param* param) 
 {
     __print_panic_msg("General Protection", param);
-    spin();
-}
-
-void
-intr_routine_page_fault (const isr_param* param) 
-{
-    void* pg_fault_ptr = cpu_rcr2();
-    if (!pg_fault_ptr) {
-        __print_panic_msg("Null pointer reference", param);
-    } else {
-        char buf[32];
-        sprintf(buf, "Page fault on %p", pg_fault_ptr);
-        __print_panic_msg(buf, param);
-    }
     spin();
 }
 

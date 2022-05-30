@@ -1,4 +1,5 @@
 #include <lunaix/ds/semaphore.h>
+#include <lunaix/sched.h>
 
 void sem_init(struct sem_t *sem, unsigned int initial) {
     sem->counter = ATOMIC_VAR_INIT(initial);
@@ -6,7 +7,7 @@ void sem_init(struct sem_t *sem, unsigned int initial) {
 
 void sem_wait(struct sem_t *sem) {
     while (!atomic_load(&sem->counter)) {
-        // TODO: yield the cpu
+        schedule();
     }
     atomic_fetch_sub(&sem->counter, 1);
 }

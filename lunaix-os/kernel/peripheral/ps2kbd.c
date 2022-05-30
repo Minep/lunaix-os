@@ -72,7 +72,7 @@ static kbd_keycode_t scancode_set2_shift[] = {
 #define KBD_STATE_CMDPROCS      0x40
 
 #define KBD_ENABLE_SPIRQ_FIX
-//#define KBD_DBGLOG
+// #define KBD_DBGLOG
 
 void intr_ps2_kbd_handler(const isr_param* param);
 static struct kdb_keyinfo_pkt* ps2_keybuffer_next_write();

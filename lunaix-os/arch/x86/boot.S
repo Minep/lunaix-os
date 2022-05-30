@@ -2,7 +2,7 @@
 #include <arch/x86/boot/multiboot.h>
 
 #define MB_FLAGS    MULTIBOOT_MEMORY_INFO | MULTIBOOT_PAGE_ALIGN
-#define KPG_SIZE    24*1024
+#define KPG_SIZE    10*4096
 
 .section .multiboot
     .long MULTIBOOT_MAGIC
@@ -24,9 +24,9 @@
 
 /* 
     1 page directory, 
-    5 page tables:
+    9 page tables:
         1. Mapping reserved area and hhk_init
-        2-5. Remapping the kernels
+        2-9. Remapping the kernels
 */
 
 .section .kpg
@@ -77,9 +77,9 @@
         andl $0xfffff000, %eax      # 有点多余，但写上还算明白一点
         movl %eax, %cr3
 
-        /* 开启分页与地址转换 (CR0.PG=1) */
+        /* 开启分页与地址转换 (CR0.PG=1, PG.WP=1) */
         movl %cr0, %eax
-        orl $0x80000000, %eax
+        orl $0x80010000, %eax
         movl %eax, %cr0
 
         addl $16, %esp

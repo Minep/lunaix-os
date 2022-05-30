@@ -70,6 +70,7 @@
 typedef unsigned long ptd_t;
 typedef unsigned long pt_t;
 typedef unsigned int pt_attr;
+typedef uint32_t x86_pte_t;
 
 /**
  * @brief 虚拟映射属性
@@ -82,14 +83,23 @@ typedef struct {
     uintptr_t pa;
     // 映射的flags
     uint16_t flags;
+    // PTE地址
+    x86_pte_t *pte;
 } v_mapping;
 
-typedef uint32_t x86_pte_t;
 typedef struct
 {
     x86_pte_t entry[PG_MAX_ENTRIES];
 } __attribute__((packed)) x86_page_table;
 
+
+extern void __pg_mount_point;
+
+/* 三个页挂载点： 用于临时创建&编辑页表 */
+
+#define PG_MOUNT_1  (&__pg_mount_point)
+#define PG_MOUNT_2  (&__pg_mount_point + 0x1000)
+#define PG_MOUNT_3  (&__pg_mount_point + 0x2000)
 
 
 #endif /* __LUNAIX_PAGE_H */

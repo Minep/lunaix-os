@@ -3,7 +3,7 @@
         {
             "name": "OS-DEV",
             "includePath": [
-                "${workspaceFolder}/includes/**"
+                "${workspaceFolder}/includes"
             ],
             "compilerArgs": [
                 "-ffreestanding",
@@ -13,8 +13,7 @@
             "defines": [],
             "compilerPath": "${HOME}/opt/cross-compiler/bin/i686-elf-gcc",
             "cStandard": "gnu99",
-            "intelliSenseMode": "gcc-x86",
-            "configurationProvider": "ms-vscode.makefile-tools"
+            "intelliSenseMode": "gcc-x86"
         }
     ],
     "version": 4

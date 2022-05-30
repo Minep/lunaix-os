@@ -39,19 +39,36 @@ cpu_has_apic();
 static inline reg32
 cpu_rcr0()
 {
-    asm("mov %cr0, %eax");
+    uintptr_t val;
+    asm volatile("movl %%cr0,%0" : "=r" (val));
+    return val;
 }
 
 static inline reg32
 cpu_rcr2()
 {
-    asm("mov %cr2, %eax");
+    uintptr_t val;
+    asm volatile("movl %%cr2,%0" : "=r" (val));
+    return val;
 }
 
 static inline reg32
 cpu_rcr3()
 {
-    asm("mov %cr3, %eax");
+    uintptr_t val;
+    asm volatile("movl %%cr3,%0" : "=r" (val));
+    return val;
+}
+
+static inline reg32
+cpu_reflags()
+{
+    uintptr_t val;
+    asm volatile(
+        "pushf\n"
+        "popl %0\n"
+        :"=r"(val)::);
+    return val;
 }
 #pragma GCC diagnostic pop
 
