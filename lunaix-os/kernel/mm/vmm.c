@@ -258,14 +258,14 @@ vmm_v2p(void* va)
 }
 
 void*
-vmm_mount_pd(void* pde) {
+vmm_mount_pd(uintptr_t mnt, void* pde) {
     x86_page_table* l1pt = (x86_page_table*)L1_BASE_VADDR;
-    l1pt->entry[(PD_MOUNT >> 22)] = NEW_L1_ENTRY(PG_PREM_RW, pde);
-    return PD_MOUNT;
+    l1pt->entry[(mnt >> 22)] = NEW_L1_ENTRY(PG_PREM_RW, pde);
+    return mnt;
 }
 
 void*
-vmm_unmount_pd() {
+vmm_unmount_pd(uintptr_t mnt) {
     x86_page_table* l1pt = (x86_page_table*)L1_BASE_VADDR;
-    l1pt->entry[(PD_MOUNT >> 22)] = 0;
+    l1pt->entry[(mnt >> 22)] = 0;
 }

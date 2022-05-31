@@ -20,9 +20,10 @@
 #include <lunaix/status.h>
 
 #include <lunaix/spike.h>
+#include <lunaix/syscall.h>
 
 
-int _syscall_sbrk(void* addr) {
+__DEFINE_LXSYSCALL1(int, sbrk, void*, addr) {
     heap_context_t* uheap = &__current->mm.u_heap;
     mutex_lock(&uheap->lock);
     int r = lxsbrk(uheap, addr);
@@ -30,7 +31,7 @@ int _syscall_sbrk(void* addr) {
     return r;
 }
 
-void* _syscall_brk(size_t size) {
+__DEFINE_LXSYSCALL1(void*, brk, size_t, size) {
     heap_context_t* uheap = &__current->mm.u_heap;
     mutex_lock(&uheap->lock);
     void* r = lxbrk(uheap, size);

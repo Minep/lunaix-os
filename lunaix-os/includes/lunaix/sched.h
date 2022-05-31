@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_SCHEDULER_H
 #define __LUNAIX_SCHEDULER_H
 
-#define SCHED_TIME_SLICE 1000
+#define SCHED_TIME_SLICE 200
 
 struct scheduler {
     struct proc_info* _procs;

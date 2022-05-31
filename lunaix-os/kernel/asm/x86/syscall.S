@@ -7,15 +7,18 @@
     */
     syscall_table:
         1:
-        .dc.l 0
-        .dc.l dup_proc
-        .dc.l schedule
-        .dc.l terminate_process
-        .dc.l _syscall_sbrk
-        .dc.l _syscall_brk
+        .long 0
+        .long __lxsys_fork
+        .long __lxsys_yield
+        .long __lxsys_sbrk
+        .long __lxsys_brk
+        .long __lxsys_getpid
+        .long __lxsys_getppid
+        .long __lxsys_sleep
+        .long __lxsys_exit
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
-            .dc.l 0
+            .long 0
         .endr
 
 .global syscall_hndlr

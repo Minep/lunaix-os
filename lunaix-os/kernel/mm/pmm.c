@@ -134,12 +134,9 @@ pmm_free_page(pid_t owner, void* page)
         return 0;
     }
 
-    // 检查权限，保证：1) 用户只能释放用户页； 2) 内核可释放所有页。
-    if ((pm->owner & owner) == pm->owner) {
-        pm->ref_counts--;
-        return 1;
-    }
-    return 0;
+    // TODO: 检查权限，保证：1) 只有正在使用该页（包括被分享者）的进程可以释放； 2) 内核可释放所有页。
+    pm->ref_counts--;
+    return 1;
 }
 
 int pmm_ref_page(pid_t owner, void* page) {

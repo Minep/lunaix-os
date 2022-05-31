@@ -17,6 +17,12 @@
 #define UDATA_SEG              0x23
 #define TSS_SEG                0x28
 
+#define USER_START             0x400000
+#define USTACK_SIZE            0x100000
+#define USTACK_TOP             0x9fffffff
+#define USTACK_END             (USTACK_TOP - USTACK_SIZE + 1)
+#define UMMAP_AREA             0x4D000000
+
 #define SYS_TIMER_FREQUENCY_HZ  2048
 
 #ifndef __ASM__

@@ -103,7 +103,7 @@ void spawn_lxinit() {
     struct proc_info kinit;
 
     memset(&kinit, 0, sizeof(kinit));
-    kinit.parent = -1;
+    kinit.parent = (void*)0;
     kinit.pid = 1;
     kinit.intr_ctx = (isr_param) {
         .registers.esp = KSTACK_TOP - 20,
@@ -112,7 +112,8 @@ void spawn_lxinit() {
         .ss = KDATA_SEG,
         .eflags = cpu_reflags()
     };
-    kinit.page_table = dup_pagetable(kinit.pid);
+
+    setup_proc_mem(&kinit, PD_REFERENCED);
 
     // Ok... 准备fork进我们的init进程
     /*
@@ -238,7 +239,7 @@ setup_memory(multiboot_memory_map_t* map, size_t map_size) {
             KERNEL_PID,
             (void*)(VGA_BUFFER_VADDR + (i << PG_SIZE_BITS)), 
             (void*)(VGA_BUFFER_PADDR + (i << PG_SIZE_BITS)), 
-            PG_PREM_RW
+            PG_PREM_URW
         );
     }
     

@@ -6,5 +6,6 @@
 #define LXINVLDPTR -(2)
 #define LXOUTOFMEM -(3)
 #define LXINVLDPID -(4)
+#define LXSEGFAULT -(5)
 
 #endif /* __LUNAIX_CODE_H */

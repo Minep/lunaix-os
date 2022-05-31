@@ -95,13 +95,17 @@ typedef struct
 
 extern void __pg_mount_point;
 
-/* 三个页挂载点，一个页目录挂载点： 用于临时创建&编辑页表 */
+/* 四个页挂载点，两个页目录挂载点： 用于临时创建&编辑页表 */
 
-#define PD_MOUNT    0xAFC00000
-#define PG_MOUNT_1  (&__pg_mount_point)
-#define PG_MOUNT_2  (&__pg_mount_point + 0x1000)
-#define PG_MOUNT_3  (&__pg_mount_point + 0x2000)
-#define PG_MOUNT_4  (&__pg_mount_point + 0x3000)
+#define PD_MOUNT_1          0xAFC00000
+#define PD_MOUNT_2          0xAF800000
+#define PG_MOUNT_BASE       0xAF7FF000
+#define PG_MOUNT_1          (PG_MOUNT_BASE)
+#define PG_MOUNT_2          (PG_MOUNT_BASE - 0x1000)
+#define PG_MOUNT_3          (PG_MOUNT_BASE - 0x2000)
+#define PG_MOUNT_4          (PG_MOUNT_BASE - 0x3000)
+#define PD_REFERENCED       L2_BASE_VADDR
 
+#define CURPROC_PTE(vpn)     (&((x86_page_table*)(PD_MOUNT_1 | (((vpn) & 0xffc00) << 2)))->entry[(vpn) & 0x3ff])
 
 #endif /* __LUNAIX_PAGE_H */

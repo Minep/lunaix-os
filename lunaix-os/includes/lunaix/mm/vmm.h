@@ -128,13 +128,13 @@ void* vmm_dup_page(pid_t pid, void* pa);
  * @return void* 
  */
 void*
-vmm_mount_pd(void* pde);
+vmm_mount_pd(uintptr_t mnt, void* pde);
 
 /**
  * @brief 卸载已挂载的虚拟地址空间
  * 
  */
 void*
-vmm_unmount_pd();
+vmm_unmount_pd(uintptr_t mnt);
 
 #endif /* __LUNAIX_VMM_H */
