@@ -11,6 +11,7 @@
 #define __SYSCALL_getppid    6
 #define __SYSCALL_sleep    7
 #define __SYSCALL__exit    8
+#define __SYSCALL_wait    9
 
 #define __SYSCALL_MAX     0x100
 

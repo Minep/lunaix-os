@@ -23,18 +23,18 @@
 #include <lunaix/syscall.h>
 
 
-__DEFINE_LXSYSCALL1(int, sbrk, void*, addr) {
+__DEFINE_LXSYSCALL1(int, sbrk, size_t, size) {
     heap_context_t* uheap = &__current->mm.u_heap;
     mutex_lock(&uheap->lock);
-    int r = lxsbrk(uheap, addr);
+    void* r = lxsbrk(uheap, size);
     mutex_unlock(&uheap->lock);
     return r;
 }
 
-__DEFINE_LXSYSCALL1(void*, brk, size_t, size) {
+__DEFINE_LXSYSCALL1(void*, brk, void*, addr) {
     heap_context_t* uheap = &__current->mm.u_heap;
     mutex_lock(&uheap->lock);
-    void* r = lxbrk(uheap, size);
+    int r = lxbrk(uheap, addr);
     mutex_unlock(&uheap->lock);
     return r;
 }
@@ -51,13 +51,13 @@ dmm_init(heap_context_t* heap)
 }
 
 int
-lxsbrk(heap_context_t* heap, void* addr)
+lxbrk(heap_context_t* heap, void* addr)
 {
-    return lxbrk(heap, addr - heap->brk) != NULL;
+    return -(lxsbrk(heap, addr - heap->brk) == (void*)-1);
 }
 
 void*
-lxbrk(heap_context_t* heap, size_t size)
+lxsbrk(heap_context_t* heap, size_t size)
 {
     if (size == 0) {
         return heap->brk;
@@ -72,6 +72,7 @@ lxbrk(heap_context_t* heap, size_t size)
     // any invalid situations
     if (next >= heap->max_addr || next < current_brk) {
         __current->k_status = LXINVLDPTR;
+        return (void*)-1;
     }
 
     uintptr_t diff = PG_ALIGN(next) - PG_ALIGN(current_brk);

@@ -97,7 +97,6 @@ pmm_alloc_page(pid_t owner, pp_attr_t attr)
     while (!good_page_found && pg_lookup_ptr < upper_lim) {
         pm = &pm_table[pg_lookup_ptr];
 
-        // skip the fully occupied chunk, reduce # of iterations
         if (!pm->ref_counts) {
             *pm = (struct pp_struct) {
                 .attr = attr,
@@ -105,6 +104,7 @@ pmm_alloc_page(pid_t owner, pp_attr_t attr)
                 .ref_counts = 1
             };
             good_page_found = pg_lookup_ptr << 12;
+            break;
         } else {
             pg_lookup_ptr++;
 
@@ -129,8 +129,8 @@ pmm_free_page(pid_t owner, void* page)
 {
     struct pp_struct* pm = &pm_table[(intptr_t)page >> 12];
     
-    // Oops, double free!
-    if (!(pm->ref_counts)) {
+    // Is this a MMIO mapping or double free?
+    if (((intptr_t)page >> 12) >= max_pg || !(pm->ref_counts)) {
         return 0;
     }
 
@@ -149,7 +149,7 @@ int pmm_ref_page(pid_t owner, void* page) {
     }
 
     struct pp_struct* pm = &pm_table[ppn];
-    if (!pm->ref_counts) {
+    if (ppn >= max_pg || !pm->ref_counts) {
         return 0;
     }
 

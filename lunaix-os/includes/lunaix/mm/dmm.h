@@ -36,9 +36,10 @@ int
 dmm_init(heap_context_t* heap);
 
 int
-lxsbrk(heap_context_t* heap, void* addr);
+lxbrk(heap_context_t* heap, void* addr);
+
 void*
-lxbrk(heap_context_t* heap, size_t size);
+lxsbrk(heap_context_t* heap, size_t size);
 
 void*
 lx_malloc_internal(heap_context_t* heap, size_t size);

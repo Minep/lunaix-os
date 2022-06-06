@@ -102,9 +102,7 @@ _kernel_init() {
 void spawn_lxinit() {
     struct proc_info kinit;
 
-    memset(&kinit, 0, sizeof(kinit));
-    kinit.parent = (void*)0;
-    kinit.pid = 1;
+    init_proc(&kinit);
     kinit.intr_ctx = (isr_param) {
         .registers.esp = KSTACK_TOP - 20,
         .cs = KCODE_SEG,

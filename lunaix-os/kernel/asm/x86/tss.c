@@ -7,7 +7,6 @@ struct x86_tss _tss = {
     .ss0  = KDATA_SEG
 };
 
-void tss_update(uint32_t ss0, uint32_t esp0) {
+void tss_update_esp(uint32_t esp0) {
     _tss.esp0 = esp0;
-    _tss.ss0 = ss0;
 }

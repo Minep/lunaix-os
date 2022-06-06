@@ -31,6 +31,7 @@ typedef struct
 #define REGION_WSHARED      0x2
 
 #define REGION_PERM_MASK  0x1c
+
 #define REGION_READ       (1 << 2)
 #define REGION_WRITE      (1 << 3)
 #define REGION_EXEC       (1 << 4)

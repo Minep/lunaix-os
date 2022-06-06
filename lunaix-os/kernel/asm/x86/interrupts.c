@@ -36,22 +36,20 @@ extern x86_page_table* __kernel_ptd;
 void
 intr_handler(isr_param* param)
 {
-    // if (param->vector == LUNAIX_SYS_CALL) {
-    //     kprintf(KDEBUG "%p", param->registers.esp);
-    // }
     __current->intr_ctx = *param;
-
+    
+#ifdef USE_KERNEL_PT
     cpu_lcr3(__kernel_ptd);
 
-    // 将当前进程的页目录挂载到内核地址空间里（页目录挂载点#1），方便访问。
     vmm_mount_pd(PD_MOUNT_1, __current->page_table);
+#endif
 
     isr_param *lparam = &__current->intr_ctx;
     
     if (lparam->vector <= 255) {
         int_subscriber subscriber = subscribers[lparam->vector];
         if (subscriber) {
-            subscriber(lparam);
+            subscriber(param);
             goto done;
         }
     }
@@ -68,20 +66,14 @@ intr_handler(isr_param* param)
             lparam->eip);
 
 done:
-
-    // if (__current->state != PROC_RUNNING) {
-    //     schedule();
-    // }
-
     // for all external interrupts except the spurious interrupt
     //  this is required by Intel Manual Vol.3A, section 10.8.1 & 10.8.5
     if (lparam->vector >= EX_INTERRUPT_BEGIN && lparam->vector != APIC_SPIV_IV) {
         apic_done_servicing();
     }
 
+#ifdef USE_KERNEL_PT
     cpu_lcr3(__current->page_table);
-
-    *param = __current->intr_ctx;
-
+#endif
     return;
 }

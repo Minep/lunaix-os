@@ -14,12 +14,36 @@ extern uint8_t __kernel_start;
 
 LOG_MODULE("INIT")
 
-void 
-test_timer(void* payload);
+// #define FORK_BOMB_DEMO
+#define WAIT_DEMO
 
 void
 _lxinit_main()
 {
+#ifdef FORK_BOMB_DEMO
+    // fork炸弹
+    for (;;) {
+        pid_t p;
+        if ((p = fork())) {
+            kprintf(KDEBUG "Forked %d\n", p);
+        }
+    }
+#endif
+
+#ifdef WAIT_DEMO
+    // 测试wait
+    kprintf("I am parent, going to fork my child and wait.\n");
+    if (!fork()) {
+        kprintf("I am child, going to sleep for 2 seconds\n");
+        sleep(2);
+        kprintf("I am child, I am about to terminated\n");
+        _exit(1);
+    }
+    int status;
+    pid_t child = wait(&status);
+    kprintf("I am parent, my child (%d) terminated with code: %d.\n", child, status);
+#endif
+    
     // 这里是就是LunaixOS的第一个进程了！
     for (size_t i = 0; i < 10; i++)
     {
@@ -27,9 +51,10 @@ _lxinit_main()
         if (!(pid = fork())) {
             sleep(i);
             if (i == 3) {
-                i = *(int*)0x400000;
+                i = *(int*)0xdeadc0de;    // seg fault!
             }
             tty_put_char('0'+i);
+            tty_put_char('\n');
             _exit(0);
         }
         kprintf(KINFO "Forked %d\n", pid);
@@ -37,14 +62,10 @@ _lxinit_main()
 
     char buf[64];
 
-    kprintf(KINFO "Hello higher half kernel world!\nWe are now running in virtual "
-           "address space!\n\n");
+    kprintf(KINFO "Hello processes!\n");
 
     cpu_get_brand(buf);
     kprintf("CPU: %s\n\n", buf);
-
-    void* k_start = vmm_v2p(&__kernel_start);
-    kprintf(KINFO "The kernel's base address mapping: %p->%p\n", &__kernel_start, k_start);
 
     // no lxmalloc here! This can only be used within kernel, but here, we are in a dedicated process!
     // any access to kernel method must be done via syscall
@@ -64,18 +85,4 @@ _lxinit_main()
     
 
     spin();
-}
-
-static datetime_t datetime;
-
-void test_timer(void* payload) {
-    clock_walltime(&datetime);
-
-    kprintf(KWARN "%u/%02u/%02u %02u:%02u:%02u\r",
-           datetime.year,
-           datetime.month,
-           datetime.day,
-           datetime.hour,
-           datetime.minute,
-           datetime.second);
 }

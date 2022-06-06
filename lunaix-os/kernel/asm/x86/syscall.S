@@ -8,14 +8,15 @@
     syscall_table:
         1:
         .long 0
-        .long __lxsys_fork
+        .long __lxsys_fork          /* 1 */
         .long __lxsys_yield
         .long __lxsys_sbrk
         .long __lxsys_brk
-        .long __lxsys_getpid
+        .long __lxsys_getpid        /* 5 */
         .long __lxsys_getppid
         .long __lxsys_sleep
         .long __lxsys_exit
+        .long __lxsys_wait          /* 9 */
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
             .long 0
@@ -26,11 +27,9 @@
 .section .text
     syscall_hndlr:
         pushl %ebp
-        movl %esp, %ebp
-        addl $0x8, %ebp
-        movl (%ebp), %ebp
+        movl 8(%esp), %ebp
 
-        movl  (%ebp), %eax
+        movl  (%ebp), %eax          /* eax: call code as well as the return value from syscall */
         cmpl  $__SYSCALL_MAX, %eax
         jae 2f
 
@@ -43,16 +42,18 @@
         popl  %ebp
         ret
     1:
-        pushl 24(%ebp)    /* esi - #6 arg */
-        pushl 20(%ebp)    /* ebp - #5 arg */
-        pushl 16(%ebp)    /* edi - #4 arg */
-        pushl 12(%ebp)    /* edx - #3 arg */
-        pushl 8(%ebp)    /* ecx - #2 arg */
-        pushl 4(%ebp)    /* ebx - #1 arg */
+        pushl 24(%ebp)      /* esi - #6 arg */
+        pushl 20(%ebp)      /* ebp - #5 arg */
+        pushl 16(%ebp)      /* edi - #4 arg */
+        pushl 12(%ebp)      /* edx - #3 arg */
+        pushl 8(%ebp)       /* ecx - #2 arg */
+        pushl 4(%ebp)       /* ebx - #1 arg */
         
         call (%eax)
 
-        addl $24, %esp
+        movl %eax, (%ebp)    /* save the return value */
+
+        addl $24, %esp      /* remove the parameters from stack */
 
         popl %ebp
         

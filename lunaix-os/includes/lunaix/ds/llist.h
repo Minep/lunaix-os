@@ -58,6 +58,10 @@ llist_delete(struct llist_header* elem) {
     elem->next = elem;
 }
 
+static inline int llist_empty(struct llist_header* elem) {
+    return elem->next == elem;
+}
+
 /**
  * list_entry - get the struct for this entry
  * @ptr:	the &struct list_head pointer.

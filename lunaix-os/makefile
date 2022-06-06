@@ -47,8 +47,8 @@ all-debug: clean $(BUILD_DIR)/$(OS_ISO)
 	@${TOOLCHAIN}/i686-elf-objdump -S $(BIN_DIR)/$(OS_BIN) > $(BUILD_DIR)/kdump.txt
 
 clean:
-	@rm -rf $(BUILD_DIR)
-	@sleep 1
+	@rm -rf $(BUILD_DIR) || exit 1
+	@sleep 2
 
 run: $(BUILD_DIR)/$(OS_ISO)
 	@qemu-system-i386 -cdrom $(BUILD_DIR)/$(OS_ISO) -monitor telnet::$(QEMU_MON_PORT),server,nowait &

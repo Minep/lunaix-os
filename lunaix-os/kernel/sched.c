@@ -1,8 +1,10 @@
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/mm/vmm.h>
+#include <lunaix/mm/kalloc.h>
 #include <hal/cpu.h>
 #include <arch/x86/interrupts.h>
+#include <arch/x86/tss.h>
 #include <hal/apic.h>
 
 #include <lunaix/spike.h>
@@ -12,7 +14,8 @@
 
 #define MAX_PROCESS 512
 
-struct proc_info* __current;
+volatile struct proc_info* __current;
+
 struct proc_info dummy;
 
 extern void __proc_table;
@@ -41,9 +44,17 @@ void run(struct proc_info* proc) {
     }
     proc->state = PROC_RUNNING;
     
-    __current = proc;
+    // FIXME: 这里还是得再考虑一下。
+    // tss_update_esp(__current->intr_ctx.esp);
 
-    cpu_lcr3(__current->page_table);
+    if (__current->page_table != proc->page_table) {
+        __current = proc;
+        cpu_lcr3(__current->page_table);
+        // from now on, the we are in the kstack of another process
+    }
+    else {
+        __current = proc;
+    }
 
     apic_done_servicing();
 
@@ -67,7 +78,8 @@ void schedule() {
     } while(next->state != PROC_STOPPED && ptr != prev_ptr);
     
     sched_ctx.procs_index = ptr;
-    
+
+
     run(next);
 }
 
@@ -77,6 +89,7 @@ static void proc_timer_callback(struct proc_info* proc) {
 }
 
 __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds) {
+    // FIXME: sleep的实现或许需要改一下。专门绑一个计时器好像没有必要……
     if (!seconds) {
         return 0;
     }
@@ -99,13 +112,32 @@ __DEFINE_LXSYSCALL(void, yield) {
     schedule();
 }
 
+__DEFINE_LXSYSCALL1(pid_t, wait, int*, status) {
+    pid_t cur = __current->pid;
+    struct proc_info *proc, *n;
+    if (llist_empty(&__current->children)) {
+        return -1;
+    }
+repeat:
+    llist_for_each(proc, n, &__current->children, siblings) {
+        if (proc->state == PROC_TERMNAT) {
+            goto done;
+        }
+    }
+    // FIXME: 除了循环，也许有更高效的办法…… (在这里进行schedule，需要重写context switch!)
+    goto repeat;
+
+done:
+    *status = proc->exit_code;
+    return destroy_process(proc->pid);
+}
+
 pid_t alloc_pid() {
     pid_t i = 0;
     for (; i < sched_ctx.ptable_len && sched_ctx._procs[i].state != PROC_DESTROY; i++);
 
     if (i == MAX_PROCESS) {
-        __current->k_status = LXPROCFULL;
-        return -1;
+        panick("Process table is full");
     }
     return i + 1;
 }
@@ -121,27 +153,54 @@ void push_process(struct proc_info* process) {
         sched_ctx.ptable_len++;
     }
     
-    // every process is the parent of first process (pid=1)
-    process->parent = process->parent ? process->parent : &sched_ctx._procs;
-    process->state = PROC_STOPPED;
-
     sched_ctx._procs[index] = *process;
+
+    process = &sched_ctx._procs[index];
+
+    // make sure the address is in the range of process table
+    llist_init_head(&process->children);
+    // every process is the child of first process (pid=1)
+    if (process->parent) {
+        llist_append(&process->parent->children, &process->siblings);
+    }
+    else {
+        process->parent = &sched_ctx._procs[0];
+    }
+
+    process->state = PROC_STOPPED;    
 }
 
-void destroy_process(pid_t pid) {
+// from <kernel/process.c>
+extern void __del_pagetable(pid_t pid, uintptr_t mount_point);
+
+pid_t destroy_process(pid_t pid) {
     int index = pid - 1;
     if (index <= 0 || index > sched_ctx.ptable_len) {
         __current->k_status = LXINVLDPID;
         return;
     }
+    struct proc_info *proc = &sched_ctx._procs[index];
+    proc->state = PROC_DESTROY;
+    llist_delete(&proc->siblings);
 
-    sched_ctx._procs[index].state = PROC_DESTROY;
+    if (proc->mm.regions) {
+        struct mm_region *pos, *n;
+        llist_for_each(pos, n, &proc->mm.regions->head, head) {
+            lxfree(pos);
+        }
+    }
 
-    // TODO: recycle the physical pages used by page tables
+    vmm_mount_pd(PD_MOUNT_2, proc->page_table);
+
+    __del_pagetable(pid, PD_MOUNT_2);
+
+    vmm_unmount_pd(PD_MOUNT_2);
+
+    return pid;
 }
 
 void terminate_proc(int exit_code) {
-    __current->state = exit_code < 0 ? PROC_SPOILED : PROC_TERMNAT;
+    __current->state = PROC_TERMNAT;
     __current->exit_code = exit_code;
 
     schedule();
@@ -161,7 +220,7 @@ int orphaned_proc(pid_t pid) {
     struct proc_info* proc = &sched_ctx._procs[pid-1];
     struct proc_info* parent = proc->parent;
     
-    // 如果其父进程的状态是terminated, spoiled 或 destroy中的一种
+    // 如果其父进程的状态是terminated 或 destroy中的一种
     // 或者其父进程是在该进程之后创建的，那么该进程为孤儿进程
-    return (parent->state & 0xe) || parent->created > proc->created;
+    return (parent->state & PROC_TERMMASK) || parent->created > proc->created;
 }
