@@ -1,14 +1,14 @@
 #include <hal/cpu.h>
-#include <lunaix/syslog.h>
+#include <lunaix/clock.h>
+#include <lunaix/keyboard.h>
+#include <lunaix/lunistd.h>
 #include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/vmm.h>
-#include <lunaix/spike.h>
-#include <lunaix/clock.h>
-#include <lunaix/timer.h>
-#include <lunaix/keyboard.h>
-#include <lunaix/tty/tty.h>
-#include <lunaix/lunistd.h>
 #include <lunaix/proc.h>
+#include <lunaix/spike.h>
+#include <lunaix/syslog.h>
+#include <lunaix/timer.h>
+#include <lunaix/tty/tty.h>
 
 extern uint8_t __kernel_start;
 
@@ -25,7 +25,7 @@ _lxinit_main()
     for (;;) {
         pid_t p;
         if ((p = fork())) {
-            kprintf(KDEBUG "Forked %d\n", p);
+            kprintf(KDEBUG "Pinkie Pie #%d: FUN!\n", p);
         }
     }
 #endif
@@ -41,19 +41,21 @@ _lxinit_main()
     }
     int status;
     pid_t child = wait(&status);
-    kprintf("I am parent, my child (%d) terminated with code: %d.\n", child, status);
+    kprintf(
+      "I am parent, my child (%d) terminated with code: %d.\n", child, status);
 #endif
-    
+
+    sleep(5);
+
     // 这里是就是LunaixOS的第一个进程了！
-    for (size_t i = 0; i < 10; i++)
-    {
+    for (size_t i = 0; i < 10; i++) {
         pid_t pid = 0;
         if (!(pid = fork())) {
             sleep(i);
             if (i == 3) {
-                i = *(int*)0xdeadc0de;    // seg fault!
+                i = *(int*)0xdeadc0de; // seg fault!
             }
-            tty_put_char('0'+i);
+            tty_put_char('0' + i);
             tty_put_char('\n');
             _exit(0);
         }
@@ -67,22 +69,22 @@ _lxinit_main()
     cpu_get_brand(buf);
     kprintf("CPU: %s\n\n", buf);
 
-    // no lxmalloc here! This can only be used within kernel, but here, we are in a dedicated process!
-    // any access to kernel method must be done via syscall
+    // no lxmalloc here! This can only be used within kernel, but here, we are
+    // in a dedicated process! any access to kernel method must be done via
+    // syscall
 
     struct kdb_keyinfo_pkt keyevent;
-    while (1)
-    {
+    while (1) {
         if (!kbd_recv_key(&keyevent)) {
             // yield();
             continue;
         }
-        if ((keyevent.state & KBD_KEY_FPRESSED) && (keyevent.keycode & 0xff00) <= KEYPAD) {
+        if ((keyevent.state & KBD_KEY_FPRESSED) &&
+            (keyevent.keycode & 0xff00) <= KEYPAD) {
             tty_put_char((char)(keyevent.keycode & 0x00ff));
             tty_sync_cursor();
         }
     }
-    
 
     spin();
 }

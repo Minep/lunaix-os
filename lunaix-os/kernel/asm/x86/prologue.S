@@ -61,10 +61,6 @@
 
         call _kernel_init
 
-        movl $KSTACK_TOP, %esp
-
-        call _kernel_post_init
-
     1:
         hlt
         jmp 1b
