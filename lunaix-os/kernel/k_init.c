@@ -118,18 +118,22 @@ spawn_proc0()
      *      2. 将_kernel_post_init搬进proc0进程
      * （_kernel_post_init已经更名为init_platform）
      *
-     * 目前的解决方案是两者都使用
+     * 目前的解决方案是2
      */
 
     init_proc(&proc0);
-    proc0.intr_ctx = (isr_param){ .registers.esp = KSTACK_TOP - 20,
+    proc0.intr_ctx = (isr_param){ .registers = { .ds = KDATA_SEG,
+                                                 .es = KDATA_SEG,
+                                                 .fs = KDATA_SEG,
+                                                 .gs = KDATA_SEG },
                                   .cs = KCODE_SEG,
                                   .eip = (void*)__proc0,
                                   .ss = KDATA_SEG,
                                   .eflags = cpu_reflags() };
 
-    // 必须在读取eflags之后禁用。否则当进程被调度时，中断依然是关闭的！
-    cpu_disable_interrupt();
+    // 方案1：必须在读取eflags之后禁用。否则当进程被调度时，中断依然是关闭的！
+    // cpu_disable_interrupt();
+
     setup_proc_mem(&proc0, PD_REFERENCED);
 
     // Ok... 首先fork进我们的零号进程，而后由那里，我们fork进init进程。
@@ -139,18 +143,21 @@ spawn_proc0()
     */
     asm volatile("movl %%cr3, %%eax\n"
                  "movl %%esp, %%ebx\n"
-                 "movl %0, %%cr3\n"
-                 "movl %1, %%esp\n"
+                 "movl %1, %%cr3\n"
+                 "movl %2, %%esp\n"
                  "pushf\n"
-                 "pushl %2\n"
                  "pushl %3\n"
+                 "pushl %4\n"
                  "pushl $0\n"
                  "pushl $0\n"
+                 "movl %%esp, %0\n"
                  "movl %%eax, %%cr3\n"
-                 "movl %%ebx, %%esp\n" ::"r"(proc0.page_table),
-                 "i"(KSTACK_TOP),
-                 "i"(KCODE_SEG),
-                 "r"(proc0.intr_ctx.eip)
+                 "movl %%ebx, %%esp\n"
+                 : "=m"(proc0.intr_ctx.registers.esp)
+                 : "r"(proc0.page_table),
+                   "i"(KSTACK_TOP),
+                   "i"(KCODE_SEG),
+                   "r"(proc0.intr_ctx.eip)
                  : "%eax", "%ebx", "memory");
 
     // 向调度器注册进程。

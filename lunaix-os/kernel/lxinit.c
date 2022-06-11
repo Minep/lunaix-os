@@ -30,6 +30,7 @@ _lxinit_main()
     }
 #endif
 
+    int status;
 #ifdef WAIT_DEMO
     // 测试wait
     kprintf("I am parent, going to fork my child and wait.\n");
@@ -39,13 +40,25 @@ _lxinit_main()
         kprintf("I am child, I am about to terminated\n");
         _exit(1);
     }
-    int status;
     pid_t child = wait(&status);
-    kprintf(
-      "I am parent, my child (%d) terminated with code: %d.\n", child, status);
+    kprintf("I am parent, my child (%d) terminated normally with code: %d.\n",
+            child,
+            WEXITSTATUS(status));
 #endif
 
-    sleep(5);
+    pid_t p = 0;
+
+    if (!(p = fork())) {
+        kprintf("Test no hang!");
+        sleep(1);
+        _exit(0);
+    }
+
+    waitpid(-1, &status, 0);
+    // FIXME: WNOHANG还有点问题……
+    // waitpid(-1, &status, WNOHANG);
+
+    sleep(2);
 
     // 这里是就是LunaixOS的第一个进程了！
     for (size_t i = 0; i < 10; i++) {
@@ -60,6 +73,15 @@ _lxinit_main()
             _exit(0);
         }
         kprintf(KINFO "Forked %d\n", pid);
+    }
+
+    while ((p = wait(&status)) >= 0) {
+        short code = WEXITSTATUS(status);
+        if (WIFEXITED(status)) {
+            kprintf(KINFO "Process %d exited with code %d\n", p, code);
+        } else {
+            kprintf(KWARN "Process %d aborted with code %d\n", p, code);
+        }
     }
 
     char buf[64];

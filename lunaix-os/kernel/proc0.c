@@ -3,6 +3,7 @@
 #include <lunaix/lunistd.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/peripheral/ps2kbd.h>
+#include <lunaix/proc.h>
 #include <lunaix/spike.h>
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
@@ -39,7 +40,9 @@ __proc0()
         asm("jmp _lxinit_main");
     }
 
-    asm("1: jmp 1b");
+    while (1) {
+        yield();
+    }
 }
 
 extern uint8_t __kernel_start;            /* link/linker.ld */

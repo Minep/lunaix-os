@@ -81,6 +81,8 @@ schedule()
 
     sched_ctx.procs_index = ptr;
 
+    // 上下文切换相当的敏感！我们不希望任何的中断打乱栈的顺序……
+    cpu_disable_interrupt();
     run(next);
 }
 
@@ -116,12 +118,27 @@ __DEFINE_LXSYSCALL1(void, exit, int, status)
 
 __DEFINE_LXSYSCALL(void, yield)
 {
-    schedule();
+    sched_yield();
 }
+
+pid_t
+_wait(pid_t wpid, int* status, int options);
 
 __DEFINE_LXSYSCALL1(pid_t, wait, int*, status)
 {
+    return _wait(-1, status, 0);
+}
+
+__DEFINE_LXSYSCALL3(pid_t, waitpid, pid_t, pid, int*, status, int, options)
+{
+    return _wait(pid, status, options);
+}
+
+pid_t
+_wait(pid_t wpid, int* status, int options)
+{
     pid_t cur = __current->pid;
+    int status_flags = 0;
     struct proc_info *proc, *n;
     if (llist_empty(&__current->children)) {
         return -1;
@@ -129,16 +146,26 @@ __DEFINE_LXSYSCALL1(pid_t, wait, int*, status)
 repeat:
     llist_for_each(proc, n, &__current->children, siblings)
     {
-        if (proc->state == PROC_TERMNAT) {
-            goto done;
+        if (!~wpid || proc->pid == wpid) {
+            if (proc->state == PROC_TERMNAT && !options) {
+                status_flags |= PROCTERM;
+                goto done;
+            }
+            if (proc->state == PROC_STOPPED && (options & WUNTRACED)) {
+                status_flags |= PROCSTOP;
+                goto done;
+            }
         }
     }
-    // FIXME: 除了循环，也许有更高效的办法……
-    // (在这里进行schedule，需要重写context switch!)
+    if ((options & WNOHANG)) {
+        return 0;
+    }
+    // 放弃当前的运行机会
+    sched_yield();
     goto repeat;
 
 done:
-    *status = proc->exit_code;
+    *status = (proc->exit_code & 0xffff) | status_flags;
     return destroy_process(proc->pid);
 }
 

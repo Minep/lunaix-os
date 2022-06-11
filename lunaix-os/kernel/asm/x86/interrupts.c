@@ -1,33 +1,36 @@
 #include <arch/x86/interrupts.h>
 #include <hal/apic.h>
 #include <hal/cpu.h>
-#include <lunaix/syslog.h>
-#include <lunaix/tty/tty.h>
-#include <lunaix/process.h>
-#include <lunaix/sched.h>
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/vmm.h>
+#include <lunaix/process.h>
+#include <lunaix/sched.h>
+#include <lunaix/syslog.h>
+#include <lunaix/tty/tty.h>
 
 LOG_MODULE("intr")
 
 static int_subscriber subscribers[256];
 
-static int_subscriber fallback = (int_subscriber) 0;
+static int_subscriber fallback = (int_subscriber)0;
 
 void
-intr_subscribe(const uint8_t vector, int_subscriber subscriber) {
+intr_subscribe(const uint8_t vector, int_subscriber subscriber)
+{
     subscribers[vector] = subscriber;
 }
 
 void
-intr_unsubscribe(const uint8_t vector, int_subscriber subscriber) {
+intr_unsubscribe(const uint8_t vector, int_subscriber subscriber)
+{
     if (subscribers[vector] == subscriber) {
-        subscribers[vector] = (int_subscriber) 0;
+        subscribers[vector] = (int_subscriber)0;
     }
 }
 
 void
-intr_set_fallback_handler(int_subscriber subscribers) {
+intr_set_fallback_handler(int_subscriber subscribers)
+{
     fallback = subscribers;
 }
 
@@ -37,15 +40,15 @@ void
 intr_handler(isr_param* param)
 {
     __current->intr_ctx = *param;
-    
+
 #ifdef USE_KERNEL_PT
     cpu_lcr3(__kernel_ptd);
 
     vmm_mount_pd(PD_MOUNT_1, __current->page_table);
 #endif
 
-    isr_param *lparam = &__current->intr_ctx;
-    
+    isr_param* lparam = &__current->intr_ctx;
+
     if (lparam->vector <= 255) {
         int_subscriber subscriber = subscribers[lparam->vector];
         if (subscriber) {
@@ -58,17 +61,18 @@ intr_handler(isr_param* param)
         fallback(lparam);
         goto done;
     }
-    
+
     kprint_panic("INT %u: (%x) [%p: %p] Unknown",
-            lparam->vector,
-            lparam->err_code,
-            lparam->cs,
-            lparam->eip);
+                 lparam->vector,
+                 lparam->err_code,
+                 lparam->cs,
+                 lparam->eip);
 
 done:
     // for all external interrupts except the spurious interrupt
     //  this is required by Intel Manual Vol.3A, section 10.8.1 & 10.8.5
-    if (lparam->vector >= EX_INTERRUPT_BEGIN && lparam->vector != APIC_SPIV_IV) {
+    if (lparam->vector >= EX_INTERRUPT_BEGIN &&
+        lparam->vector != APIC_SPIV_IV) {
         apic_done_servicing();
     }
 

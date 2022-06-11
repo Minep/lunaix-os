@@ -16,7 +16,8 @@
         .long __lxsys_getppid
         .long __lxsys_sleep
         .long __lxsys_exit
-        .long __lxsys_wait          /* 9 */
+        .long __lxsys_wait          
+        .long __lxsys_waitpid       /* 10 */
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
             .long 0

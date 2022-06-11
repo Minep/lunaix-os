@@ -18,6 +18,4 @@ __LXSYSCALL1(void, _exit, int, status)
 
 __LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
 
-__LXSYSCALL1(pid_t, wait, int*, status);
-
 #endif /* __LUNAIX_UNISTD_H */

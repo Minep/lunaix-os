@@ -20,12 +20,10 @@ typedef struct
 
 typedef struct
 {
-    reg16 ss;
-    reg16 es;
     reg16 ds;
+    reg16 es;
     reg16 fs;
     reg16 gs;
-    reg16 cs;
 } __attribute__((packed)) sg_reg;
 
 void
@@ -40,7 +38,7 @@ static inline reg32
 cpu_rcr0()
 {
     uintptr_t val;
-    asm volatile("movl %%cr0,%0" : "=r" (val));
+    asm volatile("movl %%cr0,%0" : "=r"(val));
     return val;
 }
 
@@ -48,7 +46,7 @@ static inline reg32
 cpu_rcr2()
 {
     uintptr_t val;
-    asm volatile("movl %%cr2,%0" : "=r" (val));
+    asm volatile("movl %%cr2,%0" : "=r"(val));
     return val;
 }
 
@@ -56,7 +54,7 @@ static inline reg32
 cpu_rcr3()
 {
     uintptr_t val;
-    asm volatile("movl %%cr3,%0" : "=r" (val));
+    asm volatile("movl %%cr3,%0" : "=r"(val));
     return val;
 }
 
@@ -64,10 +62,9 @@ static inline reg32
 cpu_reflags()
 {
     uintptr_t val;
-    asm volatile(
-        "pushf\n"
-        "popl %0\n"
-        :"=r"(val)::);
+    asm volatile("pushf\n"
+                 "popl %0\n"
+                 : "=r"(val)::);
     return val;
 }
 #pragma GCC diagnostic pop

@@ -1,25 +1,25 @@
 /**
  * @file timer.c
  * @author Lunaixsky
- * @brief A simple timer implementation based on APIC with adjustable frequency and subscribable "timerlets"
+ * @brief A simple timer implementation based on APIC with adjustable frequency
+ * and subscribable "timerlets"
  * @version 0.1
  * @date 2022-03-12
- * 
+ *
  * @copyright Copyright (c) 2022
- * 
+ *
  */
 #include <arch/x86/interrupts.h>
 #include <hal/apic.h>
 #include <hal/rtc.h>
 
 #include <lunaix/mm/kalloc.h>
+#include <lunaix/sched.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
-#include <lunaix/sched.h>
 
 #define LVT_ENTRY_TIMER(vector, mode) (LVT_DELIVERY_FIXED | mode | vector)
-
 
 LOG_MODULE("TIMER");
 
@@ -55,7 +55,6 @@ timer_init_context()
     timer_ctx->active_timers =
       (struct lx_timer*)lxmalloc(sizeof(struct lx_timer));
     llist_init_head(timer_ctx->active_timers);
-
 }
 
 void
@@ -79,13 +78,13 @@ timer_init(uint32_t frequency)
         Timer calibration process - measure the APIC timer base frequency
 
          step 1: setup a temporary isr for RTC timer which trigger at each tick
-                 (1024Hz) 
-         step 2: setup a temporary isr for #APIC_TIMER_IV 
-         step 3: setup the divider, APIC_TIMER_DCR 
-         step 4: Startup RTC timer 
-         step 5: Write a large value, v, to APIC_TIMER_ICR to start APIC timer (this must be
-                 followed immediately after step 4) 
-         step 6: issue a write to EOI and clean up.
+                 (1024Hz)
+         step 2: setup a temporary isr for #APIC_TIMER_IV
+         step 3: setup the divider, APIC_TIMER_DCR
+         step 4: Startup RTC timer
+         step 5: Write a large value, v, to APIC_TIMER_ICR to start APIC timer
+       (this must be followed immediately after step 4) step 6: issue a write to
+       EOI and clean up.
 
         When the APIC ICR counting down to 0 #APIC_TIMER_IV triggered, save the
        rtc timer's counter, k, and disable RTC timer immediately (although the
@@ -98,11 +97,11 @@ timer_init(uint32_t frequency)
 
     */
 
-    #ifdef __LUNAIXOS_DEBUG__
+#ifdef __LUNAIXOS_DEBUG__
     if (frequency < 1000) {
         kprintf(KWARN "Frequency too low. Millisecond timer might be dodgy.");
     }
-    #endif
+#endif
 
     timer_ctx->base_frequency = 0;
     rtc_counter = 0;
@@ -118,7 +117,6 @@ timer_init(uint32_t frequency)
     cpu_enable_interrupt();
 
     wait_until(apic_timer_done);
-
 
     assert_msg(timer_ctx->base_frequency, "Fail to initialize timer (NOFREQ)");
 
@@ -142,23 +140,35 @@ timer_init(uint32_t frequency)
 }
 
 struct lx_timer*
-timer_run_second(uint32_t second, void (*callback)(void*), void* payload, uint8_t flags)
+timer_run_second(uint32_t second,
+                 void (*callback)(void*),
+                 void* payload,
+                 uint8_t flags)
 {
-    return timer_run(second * timer_ctx->running_frequency, callback, payload, flags);
+    return timer_run(
+      second * timer_ctx->running_frequency, callback, payload, flags);
 }
 
 struct lx_timer*
-timer_run_ms(uint32_t millisecond, void (*callback)(void*), void* payload, uint8_t flags)
+timer_run_ms(uint32_t millisecond,
+             void (*callback)(void*),
+             void* payload,
+             uint8_t flags)
 {
-    return timer_run(timer_ctx->running_frequency / 1000 * millisecond, callback, payload, flags);
+    return timer_run(timer_ctx->running_frequency / 1000 * millisecond,
+                     callback,
+                     payload,
+                     flags);
 }
 
 struct lx_timer*
 timer_run(ticks_t ticks, void (*callback)(void*), void* payload, uint8_t flags)
 {
-    struct lx_timer* timer = (struct lx_timer*)lxmalloc(sizeof(struct lx_timer));
+    struct lx_timer* timer =
+      (struct lx_timer*)lxmalloc(sizeof(struct lx_timer));
 
-    if (!timer) return NULL;
+    if (!timer)
+        return NULL;
 
     timer->callback = callback;
     timer->counter = ticks;
@@ -179,12 +189,6 @@ timer_update(const isr_param* param)
 
     llist_for_each(pos, n, &timer_list_head->link, link)
     {
-        if (!pos->counter) {
-            llist_delete(&pos->link);
-            lxfree(pos);
-            continue;
-        }
-        
         if (--(pos->counter)) {
             continue;
         }
@@ -193,15 +197,24 @@ timer_update(const isr_param* param)
 
         if ((pos->flags & TIMER_MODE_PERIODIC)) {
             pos->counter = pos->deadline;
+        } else {
+            llist_delete(&pos->link);
+            lxfree(pos);
         }
     }
-    
+
     sched_ticks_counter++;
 
     if (sched_ticks_counter >= sched_ticks) {
         sched_ticks_counter = 0;
         schedule();
     }
+}
+
+void
+sched_yield()
+{
+    sched_ticks_counter = sched_ticks;
 }
 
 static void
@@ -224,7 +237,8 @@ temp_intr_routine_apic_timer(const isr_param* param)
     rtc_disable_timer();
 }
 
-struct lx_timer_context* 
-timer_context() {
+struct lx_timer_context*
+timer_context()
+{
     return timer_ctx;
 }
