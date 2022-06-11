@@ -70,6 +70,8 @@ schedule()
         return;
     }
 
+    // 上下文切换相当的敏感！我们不希望任何的中断打乱栈的顺序……
+    cpu_disable_interrupt();
     struct proc_info* next;
     int prev_ptr = sched_ctx.procs_index;
     int ptr = prev_ptr;
@@ -81,8 +83,6 @@ schedule()
 
     sched_ctx.procs_index = ptr;
 
-    // 上下文切换相当的敏感！我们不希望任何的中断打乱栈的顺序……
-    cpu_disable_interrupt();
     run(next);
 }
 
@@ -99,6 +99,7 @@ __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
     if (!seconds) {
         return 0;
     }
+
     if (__current->timer) {
         return __current->timer->counter / timer_context()->running_frequency;
     }
@@ -118,7 +119,7 @@ __DEFINE_LXSYSCALL1(void, exit, int, status)
 
 __DEFINE_LXSYSCALL(void, yield)
 {
-    sched_yield();
+    schedule();
 }
 
 pid_t
@@ -143,6 +144,8 @@ _wait(pid_t wpid, int* status, int options)
     if (llist_empty(&__current->children)) {
         return -1;
     }
+
+    cpu_enable_interrupt();
 repeat:
     llist_for_each(proc, n, &__current->children, siblings)
     {
@@ -165,6 +168,7 @@ repeat:
     goto repeat;
 
 done:
+    cpu_disable_interrupt();
     *status = (proc->exit_code & 0xffff) | status_flags;
     return destroy_process(proc->pid);
 }

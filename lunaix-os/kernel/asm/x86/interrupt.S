@@ -1,7 +1,7 @@
 #define __ASM__
 #include <arch/x86/interrupts.h>
 #include <lunaix/common.h>
-// #define __ASM_INTR_DIAGNOSIS
+#define __ASM_INTR_DIAGNOSIS
 
 .macro isr_template vector, no_error_code=1
     .global _asm_isr\vector
@@ -118,14 +118,9 @@
         addl $8, %esp
 
 #ifdef __ASM_INTR_DIAGNOSIS
-        cmpl $0, (%esp)
-        jz 1f
-        iret
-1:
-        movl $__current, %eax
-        movl  (%esp), %ebx
-        movl $debug_resv, %ecx
-        ud2
-#else
-        iret
+        pushl %eax
+        movl 4(%esp), %eax
+        movl %eax, debug_resv
+        popl %eax
 #endif
+        iret

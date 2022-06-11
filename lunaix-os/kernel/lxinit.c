@@ -15,7 +15,7 @@ extern uint8_t __kernel_start;
 LOG_MODULE("INIT")
 
 // #define FORK_BOMB_DEMO
-#define WAIT_DEMO
+// #define WAIT_DEMO
 
 void
 _lxinit_main()
@@ -48,20 +48,16 @@ _lxinit_main()
 
     pid_t p = 0;
 
-    if (!(p = fork())) {
+    if (!fork()) {
         kprintf("Test no hang!");
-        sleep(1);
+        sleep(12);
         _exit(0);
     }
 
-    waitpid(-1, &status, 0);
-    // FIXME: WNOHANG还有点问题……
-    // waitpid(-1, &status, WNOHANG);
-
-    sleep(2);
+    waitpid(-1, &status, WNOHANG);
 
     // 这里是就是LunaixOS的第一个进程了！
-    for (size_t i = 0; i < 10; i++) {
+    for (size_t i = 0; i < 5; i++) {
         pid_t pid = 0;
         if (!(pid = fork())) {
             sleep(i);

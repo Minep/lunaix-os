@@ -1,12 +1,13 @@
 /**
  * @file llist.h
  * @author Lunaixsky
- * @brief This doubly linked cyclic list is adopted from Linux kernel <linux/list.h>
+ * @brief This doubly linked cyclic list is adopted from Linux kernel
+ * <linux/list.h>
  * @version 0.1
  * @date 2022-03-12
- * 
+ *
  * @copyright Copyright (c) 2022
- * 
+ *
  */
 #ifndef __LUNAIX_LLIST_H
 #define __LUNAIX_LLIST_H
@@ -31,7 +32,8 @@ __llist_add(struct llist_header* elem,
 }
 
 static inline void
-llist_init_head(struct llist_header* head) {
+llist_init_head(struct llist_header* head)
+{
     head->next = head;
     head->prev = head;
 }
@@ -49,16 +51,19 @@ llist_prepend(struct llist_header* head, struct llist_header* elem)
 }
 
 static inline void
-llist_delete(struct llist_header* elem) {
+llist_delete(struct llist_header* elem)
+{
     elem->prev->next = elem->next;
-    elem->next->prev = elem->next;
-    
+    elem->next->prev = elem->prev;
+
     // make elem orphaned
-    elem->prev = elem;
-    elem->next = elem;
+    // elem->prev = elem;
+    // elem->next = elem;
 }
 
-static inline int llist_empty(struct llist_header* elem) {
+static inline int
+llist_empty(struct llist_header* elem)
+{
     return elem->next == elem;
 }
 
@@ -68,8 +73,7 @@ static inline int llist_empty(struct llist_header* elem) {
  * @type:	the type of the struct this is embedded in.
  * @member:	the name of the list_struct within the struct.
  */
-#define list_entry(ptr, type, member) \
-	container_of(ptr, type, member)
+#define list_entry(ptr, type, member) container_of(ptr, type, member)
 
 /**
  * list_for_each_entry	-	iterate over list of given type
@@ -77,10 +81,10 @@ static inline int llist_empty(struct llist_header* elem) {
  * @head:	the head for your list.
  * @member:	the name of the list_struct within the struct.
  */
-#define llist_for_each(pos, n, head, member)				    \
-	for (pos = list_entry((head)->next, typeof(*pos), member),	\
-		n = list_entry(pos->member.next, typeof(*pos), member);	\
-	     &pos->member != (head); 					            \
-	     pos = n, n = list_entry(n->member.next, typeof(*n), member))
+#define llist_for_each(pos, n, head, member)                                   \
+    for (pos = list_entry((head)->next, typeof(*pos), member),                 \
+        n = list_entry(pos->member.next, typeof(*pos), member);                \
+         &pos->member != (head);                                               \
+         pos = n, n = list_entry(n->member.next, typeof(*n), member))
 
 #endif /* __LUNAIX_LLIST_H */
