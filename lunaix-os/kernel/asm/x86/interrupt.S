@@ -1,6 +1,7 @@
 #define __ASM__
 #include <arch/x86/interrupts.h>
 #include <lunaix/common.h>
+#include <lunaix/syscall.h>
 #define __ASM_INTR_DIAGNOSIS
 
 .macro isr_template vector, no_error_code=1
@@ -38,10 +39,10 @@
 
     interrupt_wrapper:
         /*
-         Stack layout
+         Stack layout (layout of struct isr_param)
     msa:   [ss]
            [esp]
-           eflags
+           eflags     > offset = 48 + 16 = 64
            cs
            eip
            err_code   
@@ -62,6 +63,7 @@
             las: Least Significant Address
             msa: Most Significant Address
         */
+        cld
         pushl %esp
 
         subl $16, %esp
@@ -88,6 +90,12 @@
         movw %ax, %ds
         movw %ax, %es
 
+        # 保存用户栈顶指针。这是因为我们允许系统调用内进行上下文切换，而这样一来，我们就失去了用户栈的信息，
+        # 这样一来，就无法设置信号上下文。这主要是为了实现了pause()而做的准备
+        movl (__current), %eax  
+        movl 68(%esp), %ebx     # 取出esp
+        movl %ebx, 84(%eax)     # 存入__current->ustack_top
+
     1:
         movl %esp, %eax
         andl $0xfffffff0, %esp
@@ -98,6 +106,7 @@
 
     .global soft_iret
     soft_iret:
+        cli
         popl %esp
 
         popl %eax
@@ -124,3 +133,39 @@
         popl %eax
 #endif
         iret
+
+    handle_signal:
+        # 注意1：任何对proc_sig的布局改动，都须及时的保证这里的一致性！
+        # 注意2：handle_signal在调用之前，须确保proc_sig已经写入用户栈！
+        popl %eax               # arg1: addr of proc_sig structure in user stack
+        leal 8(%eax), %ebx
+
+        pushl 72(%ebx)          # proc_sig->prev_context.ss
+        pushl %eax              # esp
+        pushl 64(%ebx)          # proc_sig->prev_context.eflags
+        pushl $UCODE_SEG        # cs
+        pushl $sig_wrapper      # eip for sig wrapper
+
+        movw $UDATA_SEG, %cx    # switch data seg to user mode
+        movw %cx, %es
+        movw %cx, %ds
+        movw %cx, %fs
+        movw %cx, %gs
+
+        iret  
+
+    sig_wrapper:                # in user mode
+        movl %esp, %eax
+        and $0xfffffff0, %esp
+        subl $8, %esp
+        pushl %eax              # Addr to proc_sig structure 
+        pushl 4(%eax)           # proc_sig->sig_num     ---- 16 bytes aligned
+
+        call (%eax)             # invoke signal handler
+
+        # invoke the sigreturn syscall to exit the signal wrapper
+        movl $__SYSCALL_sigreturn, %eax
+        movl 4(%esp), %ebx
+        int $LUNAIX_SYS_CALL    
+
+        ud2                     # never reach!

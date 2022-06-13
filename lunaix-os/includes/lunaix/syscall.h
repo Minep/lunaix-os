@@ -13,6 +13,10 @@
 #define __SYSCALL__exit 8
 #define __SYSCALL_wait 9
 #define __SYSCALL_waitpid 10
+#define __SYSCALL_sigreturn 11
+#define __SYSCALL_sigprocmask 12
+#define __SYSCALL_signal 13
+#define __SYSCALL_pause 14
 
 #define __SYSCALL_MAX 0x100
 
@@ -52,7 +56,7 @@ syscall(unsigned int callcode)
     asmlinkage rettype __lxsys_##name(__PARAM_MAP3(t1, p1, t2, p2, t3, p3))
 
 #define __DEFINE_LXSYSCALL4(rettype, name, t1, p1, t2, p2, t3, p3, t4, p4)     \
-    asmlinkage rettype __lxsys_##nam(                                          \
+    asmlinkage rettype __lxsys_##name(                                         \
       __PARAM_MAP4(t1, p1, t2, p2, t3, p3, t4, p4))
 
 #define __LXSYSCALL(rettype, name)                                             \

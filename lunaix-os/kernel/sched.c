@@ -1,12 +1,14 @@
 #include <arch/x86/interrupts.h>
 #include <arch/x86/tss.h>
+
 #include <hal/apic.h>
 #include <hal/cpu.h>
+
 #include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
-
+#include <lunaix/signal.h>
 #include <lunaix/spike.h>
 #include <lunaix/status.h>
 #include <lunaix/syscall.h>
@@ -57,6 +59,8 @@ run(struct proc_info* proc)
     }
 
     apic_done_servicing();
+
+    signal_dispatch();
 
     asm volatile("pushl %0\n"
                  "jmp soft_iret\n" ::"r"(&__current->intr_ctx)
