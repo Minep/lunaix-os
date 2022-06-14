@@ -57,8 +57,8 @@ llist_delete(struct llist_header* elem)
     elem->next->prev = elem->prev;
 
     // make elem orphaned
-    // elem->prev = elem;
-    // elem->next = elem;
+    elem->prev = elem;
+    elem->next = elem;
 }
 
 static inline int

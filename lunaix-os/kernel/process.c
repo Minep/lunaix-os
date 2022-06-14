@@ -5,6 +5,7 @@
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
+#include <lunaix/status.h>
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
 
@@ -90,6 +91,36 @@ __DEFINE_LXSYSCALL(pid_t, getppid)
     return __current->parent->pid;
 }
 
+__DEFINE_LXSYSCALL(pid_t, getpgid)
+{
+    return __current->pgid;
+}
+
+__DEFINE_LXSYSCALL2(int, setpgid, pid_t, pid, pid_t, pgid)
+{
+    struct proc_info* proc = pid ? get_process(pid) : __current;
+
+    if (!proc) {
+        __current->k_status = LXINVL;
+        return -1;
+    }
+
+    pgid = pgid ? pgid : proc->pid;
+
+    llist_delete(&proc->grp_member);
+    struct proc_info* gruppenfuhrer = get_process(pgid);
+
+    if (!gruppenfuhrer) {
+        __current->k_status = LXINVL;
+        return -1;
+    }
+
+    llist_append(&gruppenfuhrer->grp_member, &proc->grp_member);
+
+    proc->pgid = pgid;
+    return 0;
+}
+
 void
 init_proc(struct proc_info* pcb)
 {
@@ -98,6 +129,7 @@ init_proc(struct proc_info* pcb)
     pcb->pid = alloc_pid();
     pcb->created = clock_systime();
     pcb->state = PROC_CREATED;
+    pcb->pgid = pcb->pid;
 }
 
 pid_t
