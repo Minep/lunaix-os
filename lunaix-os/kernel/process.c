@@ -107,14 +107,14 @@ __DEFINE_LXSYSCALL2(int, setpgid, pid_t, pid, pid_t, pgid)
 
     pgid = pgid ? pgid : proc->pid;
 
-    llist_delete(&proc->grp_member);
     struct proc_info* gruppenfuhrer = get_process(pgid);
 
-    if (!gruppenfuhrer) {
+    if (!gruppenfuhrer || proc->pgid == proc->pid) {
         __current->k_status = LXINVL;
         return -1;
     }
 
+    llist_delete(&proc->grp_member);
     llist_append(&gruppenfuhrer->grp_member, &proc->grp_member);
 
     proc->pgid = pgid;

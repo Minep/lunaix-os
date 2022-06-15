@@ -36,6 +36,20 @@ void
 __proc0()
 {
     init_platform();
+    asm volatile("movw %0, %ax\n"
+                 "movw %ax, %es\n"
+                 "movw %ax, %ds\n"
+                 "movw %ax, %fs\n"
+                 "movw %ax, %gs\n"
+                 "pushl %0\n"
+                 "pushl %1\n"
+                 "pushl %2\n"
+                 "pushl %3\n"
+                 "retf" ::"i"(UDATA_SEG),
+                 "i"(USTACK_TOP & ~0xf),
+                 "i"(UCODE_SEG),
+                 "r"(&&usr));
+usr:
     if (!fork()) {
         asm("jmp _lxinit_main");
     }

@@ -49,14 +49,13 @@ _lxinit_main()
     pid_t p = 0;
 
     if (!fork()) {
-        kprintf("Test no hang!");
-        sleep(12);
+        kprintf("Test no hang!\n");
+        sleep(6);
         _exit(0);
     }
 
     waitpid(-1, &status, WNOHANG);
 
-    // 这里是就是LunaixOS的第一个进程了！
     for (size_t i = 0; i < 5; i++) {
         pid_t pid = 0;
         if (!(pid = fork())) {
