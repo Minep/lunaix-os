@@ -44,6 +44,7 @@ struct proc_info
     uintptr_t ustack_top;
     struct llist_header siblings;
     struct llist_header children;
+    struct llist_header grp_member;
     struct proc_mm mm;
     void* page_table;
     time_t created;
@@ -53,6 +54,7 @@ struct proc_info
     sigset_t sig_pending;
     sigset_t sig_mask;
     void* sig_handler[_SIG_NUM];
+    pid_t pgid;
     struct lx_timer* timer;
 };
 

@@ -24,12 +24,6 @@
 void
 syscall_install();
 
-static void*
-syscall(unsigned int callcode)
-{
-    asm volatile("int %0" ::"i"(LUNAIX_SYS_CALL), "D"(callcode) : "eax");
-}
-
 #define asmlinkage __attribute__((regparm(0)))
 
 #define __PARAM_MAP1(t1, p1) t1 p1

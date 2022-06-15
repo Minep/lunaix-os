@@ -149,11 +149,12 @@ _wait(pid_t wpid, int* status, int options)
         return -1;
     }
 
+    wpid = wpid ? wpid : -__current->pgid;
     cpu_enable_interrupt();
 repeat:
     llist_for_each(proc, n, &__current->children, siblings)
     {
-        if (!~wpid || proc->pid == wpid) {
+        if (!~wpid || proc->pid == wpid || proc->pgid == -wpid) {
             if (proc->state == PROC_TERMNAT && !options) {
                 status_flags |= PROCTERM;
                 goto done;
@@ -209,8 +210,10 @@ push_process(struct proc_info* process)
 
     process = &sched_ctx._procs[index];
 
-    // make sure the address is in the range of process table
+    // make sure the reference is relative to process table
     llist_init_head(&process->children);
+    llist_init_head(&process->grp_member);
+
     // every process is the child of first process (pid=1)
     if (process->parent) {
         llist_append(&process->parent->children, &process->siblings);
