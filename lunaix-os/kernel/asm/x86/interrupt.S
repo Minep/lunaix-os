@@ -96,9 +96,11 @@
 
         call intr_handler
 
+        movl (%esp), %eax
+
     .global soft_iret
     soft_iret:
-        popl %esp
+        movl %eax, %esp
 
         popl %eax
         popl %ebx

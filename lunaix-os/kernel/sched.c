@@ -58,9 +58,9 @@ run(struct proc_info* proc)
 
     apic_done_servicing();
 
-    asm volatile("pushl %0\n"
+    asm volatile("movl %0, %%eax\n"
                  "jmp soft_iret\n" ::"r"(&__current->intr_ctx)
-                 : "memory");
+                 : "eax", "memory");
 }
 
 void
