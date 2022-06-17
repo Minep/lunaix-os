@@ -1,6 +1,7 @@
 #include <arch/x86/boot/multiboot.h>
 #include <lunaix/common.h>
 #include <lunaix/lunistd.h>
+#include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/peripheral/ps2kbd.h>
 #include <lunaix/proc.h>
@@ -79,7 +80,7 @@ init_platform()
     // Fuck it, I will no longer bother this little 1MiB
     // I just release 4 pages for my APIC & IOAPIC remappings
     for (size_t i = 0; i < 3; i++) {
-        vmm_unmap_page(KERNEL_PID, (void*)(i << PG_SIZE_BITS));
+        vmm_del_mapping(PD_REFERENCED, (void*)(i << PG_SIZE_BITS));
     }
 
     // 锁定所有系统预留页（内存映射IO，ACPI之类的），并且进行1:1映射
@@ -91,8 +92,9 @@ init_platform()
       KERNEL_PID, FLOOR(__APIC_BASE_PADDR, PG_SIZE_BITS), 0);
     pmm_mark_page_occupied(KERNEL_PID, FLOOR(ioapic_addr, PG_SIZE_BITS), 0);
 
-    vmm_set_mapping(KERNEL_PID, APIC_BASE_VADDR, __APIC_BASE_PADDR, PG_PREM_RW);
-    vmm_set_mapping(KERNEL_PID, IOAPIC_BASE_VADDR, ioapic_addr, PG_PREM_RW);
+    vmm_set_mapping(
+      PD_REFERENCED, APIC_BASE_VADDR, __APIC_BASE_PADDR, PG_PREM_RW);
+    vmm_set_mapping(PD_REFERENCED, IOAPIC_BASE_VADDR, ioapic_addr, PG_PREM_RW);
 
     apic_init();
     ioapic_init();
@@ -103,7 +105,7 @@ init_platform()
     syscall_install();
 
     for (size_t i = 256; i < hhk_init_pg_count; i++) {
-        vmm_unmap_page(KERNEL_PID, (void*)(i << PG_SIZE_BITS));
+        vmm_del_mapping(PD_REFERENCED, (void*)(i << PG_SIZE_BITS));
     }
 }
 
@@ -113,6 +115,7 @@ lock_reserved_memory()
     multiboot_memory_map_t* mmaps = _k_init_mb_info->mmap_addr;
     size_t map_size =
       _k_init_mb_info->mmap_length / sizeof(multiboot_memory_map_t);
+    v_mapping mapping;
     for (unsigned int i = 0; i < map_size; i++) {
         multiboot_memory_map_t mmap = mmaps[i];
         if (mmap.type == MULTIBOOT_MEMORY_AVAILABLE) {
@@ -121,10 +124,12 @@ lock_reserved_memory()
         uint8_t* pa = PG_ALIGN(mmap.addr_low);
         size_t pg_num = CEIL(mmap.len_low, PG_SIZE_BITS);
         for (size_t j = 0; j < pg_num; j++) {
-            vmm_set_mapping(KERNEL_PID,
-                            (pa + (j << PG_SIZE_BITS)),
-                            (pa + (j << PG_SIZE_BITS)),
-                            PG_PREM_R);
+            uintptr_t _pa = pa + (j << PG_SIZE_BITS);
+            if (vmm_lookup(_pa, &mapping) && *mapping.pte) {
+                continue;
+            }
+            vmm_set_mapping(PD_REFERENCED, _pa, _pa, PG_PREM_R);
+            pmm_mark_page_occupied(KERNEL_PID, _pa >> 12, 0);
         }
     }
 }

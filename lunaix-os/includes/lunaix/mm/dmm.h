@@ -2,9 +2,9 @@
 #define __LUNAIX_DMM_H
 // Dynamic Memory (i.e., heap) Manager
 
-#include <stddef.h>
 #include <lunaix/mm/mm.h>
 #include <lunaix/process.h>
+#include <stddef.h>
 
 #define M_ALLOCATED 0x1
 #define M_PREV_FREE 0x2
@@ -31,15 +31,14 @@
 
 #define HEAP_INIT_SIZE 4096
 
-
 int
 dmm_init(heap_context_t* heap);
 
 int
-lxbrk(heap_context_t* heap, void* addr);
+lxbrk(heap_context_t* heap, void* addr, int user);
 
 void*
-lxsbrk(heap_context_t* heap, size_t size);
+lxsbrk(heap_context_t* heap, size_t size, int user);
 
 void*
 lx_malloc_internal(heap_context_t* heap, size_t size);

@@ -5,6 +5,7 @@
 #include <hal/cpu.h>
 
 #include <lunaix/mm/kalloc.h>
+#include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
@@ -30,9 +31,11 @@ void
 sched_init()
 {
     size_t pg_size = ROUNDUP(sizeof(struct proc_info) * MAX_PROCESS, 0x1000);
-    assert_msg(vmm_alloc_pages(
-                 KERNEL_PID, &__proc_table, pg_size, PG_PREM_RW, PP_FGPERSIST),
-               "Fail to allocate proc table");
+
+    for (size_t i = 0; i <= pg_size; i += 4096) {
+        uintptr_t pa = pmm_alloc_page(KERNEL_PID, PP_FGPERSIST);
+        vmm_set_mapping(PD_REFERENCED, &__proc_table + i, pa, PG_PREM_RW);
+    }
 
     sched_ctx = (struct scheduler){ ._procs = (struct proc_info*)&__proc_table,
                                     .ptable_len = 0,

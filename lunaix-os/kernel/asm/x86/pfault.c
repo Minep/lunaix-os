@@ -20,11 +20,26 @@ kprintf(const char* fmt, ...)
 extern void
 __print_panic_msg(const char* msg, const isr_param* param);
 
+extern void __kernel_heap_start;
+
 void
 intr_routine_page_fault(const isr_param* param)
 {
     uintptr_t ptr = cpu_rcr2();
     if (!ptr) {
+        goto segv_term;
+    }
+
+    v_mapping mapping;
+    if (!vmm_lookup(ptr, &mapping)) {
+        goto segv_term;
+    }
+
+    if (!SEL_RPL(param->cs)) {
+        // 如果是内核页错误……
+        if (do_kernel(&mapping)) {
+            return;
+        }
         goto segv_term;
     }
 
@@ -77,4 +92,22 @@ segv_term:
             param->eip);
     terminate_proc(LXSEGFAULT);
     // should not reach
+}
+
+int
+do_kernel(v_mapping* mapping)
+{
+    uintptr_t addr = mapping->va;
+    if (addr >= &__kernel_heap_start && addr < L2_BASE_VADDR) {
+        // This is kernel heap page
+        uintptr_t pa = pmm_alloc_page(KERNEL_PID, 0);
+        *mapping->pte = (*mapping->pte & 0xfff) | pa | PG_PRESENT;
+        cpu_invplg(mapping->pte);
+        cpu_invplg(addr);
+        goto done;
+    }
+
+    return 0;
+done:
+    return 1;
 }

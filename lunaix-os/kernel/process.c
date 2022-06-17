@@ -1,6 +1,7 @@
 #include <klibc/string.h>
 #include <lunaix/clock.h>
 #include <lunaix/common.h>
+#include <lunaix/mm/pmm.h>
 #include <lunaix/mm/region.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
@@ -15,7 +16,9 @@ void*
 __dup_pagetable(pid_t pid, uintptr_t mount_point)
 {
     void* ptd_pp = pmm_alloc_page(pid, PP_FGPERSIST);
-    x86_page_table* ptd = vmm_fmap_page(pid, PG_MOUNT_1, ptd_pp, PG_PREM_RW);
+    vmm_set_mapping(PD_REFERENCED, PG_MOUNT_1, ptd_pp, PG_PREM_RW);
+
+    x86_page_table* ptd = PG_MOUNT_1;
     x86_page_table* pptd = (x86_page_table*)(mount_point | (0x3FF << 12));
 
     for (size_t i = 0; i < PG_MAX_ENTRIES - 1; i++) {
@@ -25,9 +28,11 @@ __dup_pagetable(pid_t pid, uintptr_t mount_point)
             continue;
         }
 
-        x86_page_table* ppt = (x86_page_table*)(mount_point | (i << 12));
         void* pt_pp = pmm_alloc_page(pid, PP_FGPERSIST);
-        x86_page_table* pt = vmm_fmap_page(pid, PG_MOUNT_2, pt_pp, PG_PREM_RW);
+        vmm_set_mapping(PD_REFERENCED, PG_MOUNT_2, pt_pp, PG_PREM_RW);
+
+        x86_page_table* ppt = (x86_page_table*)(mount_point | (i << 12));
+        x86_page_table* pt = PG_MOUNT_2;
 
         for (size_t j = 0; j < PG_MAX_ENTRIES; j++) {
             x86_pte_t pte = ppt->entry[j];

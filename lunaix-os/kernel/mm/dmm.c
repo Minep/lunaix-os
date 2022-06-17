@@ -2,11 +2,13 @@
  * @file dmm.c
  * @author Lunaixsky
  * @brief Dynamic memory manager for heap. This design do not incorporate any\
- * specific implementation of malloc family. The main purpose of this routines is to
- * provide handy method to initialize & grow the heap as needed by upstream implementation.
- * 
- * This is designed to be portable, so it can serve as syscalls to malloc/free in the c std lib. 
- * 
+ * specific implementation of malloc family. The main purpose of this routines
+ * is to provide handy method to initialize & grow the heap as needed by
+ * upstream implementation.
+ *
+ * This is designed to be portable, so it can serve as syscalls to malloc/free
+ * in the c std lib.
+ *
  * @version 0.2
  * @date 2022-03-3
  *
@@ -15,26 +17,29 @@
  */
 
 #include <lunaix/mm/dmm.h>
-#include <lunaix/mm/vmm.h>
 #include <lunaix/mm/page.h>
+#include <lunaix/mm/vmm.h>
 #include <lunaix/status.h>
 
 #include <lunaix/spike.h>
 #include <lunaix/syscall.h>
 
+extern void __kernel_heap_start;
 
-__DEFINE_LXSYSCALL1(int, sbrk, size_t, size) {
+__DEFINE_LXSYSCALL1(int, sbrk, size_t, size)
+{
     heap_context_t* uheap = &__current->mm.u_heap;
     mutex_lock(&uheap->lock);
-    void* r = lxsbrk(uheap, size);
+    void* r = lxsbrk(uheap, size, PG_ALLOW_USER);
     mutex_unlock(&uheap->lock);
     return r;
 }
 
-__DEFINE_LXSYSCALL1(void*, brk, void*, addr) {
+__DEFINE_LXSYSCALL1(void*, brk, void*, addr)
+{
     heap_context_t* uheap = &__current->mm.u_heap;
     mutex_lock(&uheap->lock);
-    int r = lxbrk(uheap, addr);
+    int r = lxbrk(uheap, addr, PG_ALLOW_USER);
     mutex_unlock(&uheap->lock);
     return r;
 }
@@ -47,17 +52,23 @@ dmm_init(heap_context_t* heap)
     heap->brk = heap->start;
     mutex_init(&heap->lock);
 
-    return vmm_alloc_page(__current->pid, heap->brk, NULL, PG_PREM_RW, 0) != NULL;
+    int perm = PG_ALLOW_USER;
+    if (heap->brk >= &__kernel_heap_start) {
+        perm = 0;
+    }
+
+    return vmm_set_mapping(PD_REFERENCED, heap->brk, 0, PG_WRITE | perm) !=
+           NULL;
 }
 
 int
-lxbrk(heap_context_t* heap, void* addr)
+lxbrk(heap_context_t* heap, void* addr, int user)
 {
-    return -(lxsbrk(heap, addr - heap->brk) == (void*)-1);
+    return -(lxsbrk(heap, addr - heap->brk, user) == (void*)-1);
 }
 
 void*
-lxsbrk(heap_context_t* heap, size_t size)
+lxsbrk(heap_context_t* heap, size_t size, int user)
 {
     if (size == 0) {
         return heap->brk;
@@ -77,12 +88,12 @@ lxsbrk(heap_context_t* heap, size_t size)
 
     uintptr_t diff = PG_ALIGN(next) - PG_ALIGN(current_brk);
     if (diff) {
-        // if next do require new pages to be allocated
-        if (!vmm_alloc_pages(__current->pid, (void*)(PG_ALIGN(current_brk) + PG_SIZE),
-                             diff,
-                             PG_PREM_RW, 0)) {
-            __current->k_status = LXHEAPFULL;
-            return NULL;
+        // if next do require new pages to be mapped
+        for (size_t i = 0; i < diff; i += PG_SIZE) {
+            vmm_set_mapping(PD_REFERENCED,
+                            PG_ALIGN(current_brk) + PG_SIZE + i,
+                            0,
+                            PG_WRITE | user);
         }
     }
 

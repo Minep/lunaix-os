@@ -82,11 +82,9 @@ _kernel_init()
 
     // 为内核创建一个专属栈空间。
     for (size_t i = 0; i < (KSTACK_SIZE >> PG_SIZE_BITS); i++) {
-        vmm_alloc_page(KERNEL_PID,
-                       (void*)(KSTACK_START + (i << PG_SIZE_BITS)),
-                       NULL,
-                       PG_PREM_RW,
-                       0);
+        uintptr_t pa = pmm_alloc_page(KERNEL_PID, 0);
+        vmm_set_mapping(
+          PD_REFERENCED, KSTACK_START + (i << PG_SIZE_BITS), pa, PG_PREM_RW);
     }
     kprintf(KINFO "[MM] Allocated %d pages for stack start at %p\n",
             KSTACK_SIZE >> PG_SIZE_BITS,
@@ -206,10 +204,10 @@ setup_memory(multiboot_memory_map_t* map, size_t map_size)
 
     // 重映射VGA文本缓冲区（以后会变成显存，i.e., framebuffer）
     for (size_t i = 0; i < vga_buf_pgs; i++) {
-        vmm_map_page(KERNEL_PID,
-                     (void*)(VGA_BUFFER_VADDR + (i << PG_SIZE_BITS)),
-                     (void*)(VGA_BUFFER_PADDR + (i << PG_SIZE_BITS)),
-                     PG_PREM_URW);
+        vmm_set_mapping(PD_REFERENCED,
+                        VGA_BUFFER_VADDR + (i << PG_SIZE_BITS),
+                        VGA_BUFFER_PADDR + (i << PG_SIZE_BITS),
+                        PG_PREM_URW);
     }
 
     // 更新VGA缓冲区位置至虚拟地址

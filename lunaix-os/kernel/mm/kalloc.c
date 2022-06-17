@@ -2,17 +2,17 @@
  * @file kalloc.c
  * @author Lunaixsky
  * @brief Implicit free list implementation of malloc family, for kernel use.
- * 
+ *
  * This version of code is however the simplest and yet insecured, thread unsafe
  * it just to demonstrate how the malloc/free works behind the curtain
  * @version 0.1
  * @date 2022-03-05
- * 
+ *
  * @copyright Copyright (c) 2022
- * 
+ *
  */
-#include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/dmm.h>
+#include <lunaix/mm/kalloc.h>
 
 #include <lunaix/common.h>
 #include <lunaix/spike.h>
@@ -40,16 +40,17 @@ lx_grow_heap(heap_context_t* heap, size_t sz);
 
 /*
     At the beginning, we allocate an empty page and put our initial marker
-    
+
     | 4/1 | 0/1 |
     ^     ^ brk
     start
 
-    Then, expand the heap further, with HEAP_INIT_SIZE (evaluated to 4096, i.e., 1 pg size)
-    This will allocate as much pages and override old epilogue marker with a free region hdr
-        and put new epilogue marker. These are handled by lx_grow_heap which is internally used
-        by alloc to expand the heap at many moment when needed.
-    
+    Then, expand the heap further, with HEAP_INIT_SIZE (evaluated to 4096, i.e.,
+   1 pg size) This will allocate as much pages and override old epilogue marker
+   with a free region hdr and put new epilogue marker. These are handled by
+   lx_grow_heap which is internally used by alloc to expand the heap at many
+   moment when needed.
+
     | 4/1 | 4096/0 |   .......   | 4096/0 | 0/1 |
     ^     ^ brk_old                       ^
     start                                 brk
@@ -57,10 +58,12 @@ lx_grow_heap(heap_context_t* heap, size_t sz);
     Note: the brk always point to the beginning of epilogue.
 */
 
+// FIXME: This should be per-process but not global!
 static heap_context_t kheap;
 
 int
-kalloc_init() {
+kalloc_init()
+{
     kheap.start = &__kernel_heap_start;
     kheap.brk = NULL;
     kheap.max_addr = (void*)KSTACK_START;
@@ -77,7 +80,8 @@ kalloc_init() {
 }
 
 void*
-lxmalloc(size_t size) {
+lxmalloc(size_t size)
+{
     mutex_lock(&kheap.lock);
     void* r = lx_malloc_internal(&kheap, size);
     mutex_unlock(&kheap.lock);
@@ -86,7 +90,8 @@ lxmalloc(size_t size) {
 }
 
 void*
-lxcalloc(size_t n, size_t elem) {
+lxcalloc(size_t n, size_t elem)
+{
     size_t pd = n * elem;
 
     // overflow detection
@@ -103,7 +108,8 @@ lxcalloc(size_t n, size_t elem) {
 }
 
 void
-lxfree(void* ptr) {
+lxfree(void* ptr)
+{
     if (!ptr) {
         return;
     }
@@ -116,22 +122,20 @@ lxfree(void* ptr) {
 
     // make sure the ptr we are 'bout to free makes sense
     //   the size trick is stolen from glibc's malloc/malloc.c:4437 ;P
-    
+
     assert_msg(((uintptr_t)ptr < (uintptr_t)(-sz)) && !((uintptr_t)ptr & 0x3),
                "free(): invalid pointer");
-    
-    assert_msg(sz > WSIZE,
-               "free(): invalid size");
+
+    assert_msg(sz > WSIZE, "free(): invalid size");
 
     SW(chunk_ptr, hdr & ~M_ALLOCATED);
     SW(FPTR(chunk_ptr, sz), hdr & ~M_ALLOCATED);
     SW(next_hdr, LW(next_hdr) | M_PREV_FREE);
-    
+
     coalesce(chunk_ptr);
 
     mutex_unlock(&kheap.lock);
 }
-
 
 void*
 lx_malloc_internal(heap_context_t* heap, size_t size)
@@ -196,7 +200,7 @@ place_chunk(uint8_t* ptr, size_t size)
 
                         |
                         v
-                        
+
             | xxxx |                |
         */
         coalesce(n_hdrptr);
@@ -242,14 +246,13 @@ coalesce(uint8_t* chunk_ptr)
     return chunk_ptr;
 }
 
-
 void*
 lx_grow_heap(heap_context_t* heap, size_t sz)
 {
     void* start;
 
     // The "+ WSIZE" capture the overhead for epilogue marker
-    if (!(start = lxsbrk(heap, sz + WSIZE))) {
+    if (!(start = lxsbrk(heap, sz + WSIZE, 0))) {
         return NULL;
     }
     sz = ROUNDUP(sz, BOUNDARY);
