@@ -135,11 +135,39 @@
 #endif
         iret
 
+    .global switch_to
+    switch_to:
+        # 约定
+        # arg1: 目标进程PCB地址 (next)
+        popl %ecx               # next
+
+        call signal_dispatch    # kernel/signal.c
+        movl %eax, %edx
+
+        movl __current, %eax    
+        movl 88(%eax), %ebx     # __current->pagetable
+        movl 88(%ecx), %eax     # next->pagetable
+        
+        cmpl %ebx, %eax         # if(next->pagtable != __current->pagetable) {
+        jz 1f
+        movl %eax, %cr3         #   cpu_lcr3(next->pagetable)
+                                # }
+    1:
+        movl %ecx, __current    # __current = next
+
+        test %edx, %edx         # do we have signal to handle?
+        jz 1f
+        movl %edx, %eax
+        jmp handle_signal
+    1:
+        leal 8(%ecx), %eax
+        jmp soft_iret
+
+    .global handle_signal
     handle_signal:
         # 注意1：任何对proc_sig的布局改动，都须及时的保证这里的一致性！
         # 注意2：handle_signal在调用之前，须确保proc_sig已经写入用户栈！
-        popl %eax               # arg1: addr of proc_sig structure in user stack
-        leal 8(%eax), %ebx
+        leal 8(%eax), %ebx      # arg1 in %eax: addr of proc_sig structure in user stack
 
         pushl 72(%ebx)          # proc_sig->prev_context.ss
         pushl %eax              # esp

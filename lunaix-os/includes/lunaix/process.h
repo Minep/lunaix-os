@@ -42,11 +42,11 @@ struct proc_info
     struct proc_info* parent;
     isr_param intr_ctx; // size=76
     uintptr_t ustack_top;
+    void* page_table;
     struct llist_header siblings;
     struct llist_header children;
     struct llist_header grp_member;
     struct proc_mm mm;
-    void* page_table;
     time_t created;
     uint8_t state;
     int32_t exit_code;

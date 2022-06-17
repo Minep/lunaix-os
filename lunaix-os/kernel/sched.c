@@ -49,22 +49,10 @@ run(struct proc_info* proc)
 
     // FIXME: 这里还是得再考虑一下。
     // tss_update_esp(__current->intr_ctx.esp);
-
-    if (__current->page_table != proc->page_table) {
-        __current = proc;
-        cpu_lcr3(__current->page_table);
-        // from now on, the we are in the kstack of another process
-    } else {
-        __current = proc;
-    }
-
     apic_done_servicing();
 
-    signal_dispatch();
-
-    asm volatile("movl %0, %%eax\n"
-                 "jmp soft_iret\n" ::"r"(&__current->intr_ctx)
-                 : "eax", "memory");
+    asm volatile("pushl %0\n"
+                 "jmp switch_to\n" ::"r"(proc)); // kernel/asm/x86/interrupt.S
 }
 
 void

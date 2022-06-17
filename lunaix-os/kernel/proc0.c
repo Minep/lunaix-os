@@ -24,6 +24,8 @@ init_platform();
 void
 lock_reserved_memory();
 
+// #define ENABLE_USER_MODE
+
 /**
  * @brief LunaixOS的零号进程，该进程永远为可执行。
  *
@@ -36,11 +38,12 @@ void
 __proc0()
 {
     init_platform();
-    asm volatile("movw %0, %ax\n"
-                 "movw %ax, %es\n"
-                 "movw %ax, %ds\n"
-                 "movw %ax, %fs\n"
-                 "movw %ax, %gs\n"
+#ifdef ENABLE_USER_MODE
+    asm volatile("movw %0, %%ax\n"
+                 "movw %%ax, %%es\n"
+                 "movw %%ax, %%ds\n"
+                 "movw %%ax, %%fs\n"
+                 "movw %%ax, %%gs\n"
                  "pushl %0\n"
                  "pushl %1\n"
                  "pushl %2\n"
@@ -49,6 +52,7 @@ __proc0()
                  "i"(USTACK_TOP & ~0xf),
                  "i"(UCODE_SEG),
                  "r"(&&usr));
+#endif
 usr:
     if (!fork()) {
         asm("jmp _lxinit_main");

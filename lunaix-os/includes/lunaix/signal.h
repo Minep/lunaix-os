@@ -23,7 +23,4 @@
 typedef unsigned int sigset_t;
 typedef void (*sighandler_t)(int);
 
-void
-signal_dispatch();
-
 #endif /* __LUNAIX_SIGNAL_H */

@@ -9,17 +9,18 @@ void* default_handlers[_SIG_NUM] = {
     // TODO: 添加默认handler
 };
 
-void
+// Referenced in kernel/asm/x86/interrupt.S
+void*
 signal_dispatch()
 {
     // if (!(SEL_RPL(__current->intr_ctx.cs))) {
     //     // 同特权级间调度不进行信号处理
-    //     return;
+    //     return 0;
     // }
 
     if (!__current->sig_pending) {
         // 没有待处理信号
-        return;
+        return 0;
     }
 
     int sig_selected =
@@ -30,14 +31,14 @@ signal_dispatch()
     if (!__current->sig_handler[sig_selected] &&
         !default_handlers[sig_selected]) {
         // 如果该信号没有handler，则忽略
-        return;
+        return 0;
     }
 
     uintptr_t ustack = __current->ustack_top;
 
     if ((int)(ustack - USTACK_END) < (int)sizeof(struct proc_sig)) {
         // 用户栈没有空间存放信号上下文
-        return;
+        return 0;
     }
 
     struct proc_sig* sig_ctx =
@@ -52,8 +53,7 @@ signal_dispatch()
         sig_ctx->signal_handler = default_handlers[sig_selected];
     }
 
-    asm volatile("pushl %0\n"
-                 "jmp handle_signal" ::"r"(sig_ctx));
+    return sig_ctx;
 }
 
 __DEFINE_LXSYSCALL1(int, sigreturn, struct proc_sig, *sig_ctx)
