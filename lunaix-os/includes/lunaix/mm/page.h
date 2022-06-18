@@ -13,8 +13,8 @@
 
 #define PTE_NULL 0
 
-#define P2V(paddr) ((uintptr_t)(paddr) + HIGHER_HLF_BASE)
-#define V2P(vaddr) ((uintptr_t)(vaddr)-HIGHER_HLF_BASE)
+#define P2V(paddr) ((uintptr_t)(paddr) + KERNEL_MM_BASE)
+#define V2P(vaddr) ((uintptr_t)(vaddr)-KERNEL_MM_BASE)
 
 #define PG_ALIGN(addr) ((uintptr_t)(addr)&0xFFFFF000UL)
 
@@ -99,13 +99,13 @@ extern void __pg_mount_point;
 
 /* 四个页挂载点，两个页目录挂载点： 用于临时创建&编辑页表 */
 #define PG_MOUNT_RANGE(l1_index) (701 <= l1_index && l1_index <= 703)
-#define PD_MOUNT_1 0xAFC00000
-#define PD_MOUNT_2 0xAF800000
-#define PG_MOUNT_BASE 0xAF7FF000
+#define PD_MOUNT_1 (MMIO_BASE + MEM_4MB)
+#define PG_MOUNT_BASE (PD_MOUNT_1 + MEM_4MB)
 #define PG_MOUNT_1 (PG_MOUNT_BASE)
-#define PG_MOUNT_2 (PG_MOUNT_BASE - 0x1000)
-#define PG_MOUNT_3 (PG_MOUNT_BASE - 0x2000)
-#define PG_MOUNT_4 (PG_MOUNT_BASE - 0x3000)
+#define PG_MOUNT_2 (PG_MOUNT_BASE + 0x1000)
+#define PG_MOUNT_3 (PG_MOUNT_BASE + 0x2000)
+#define PG_MOUNT_4 (PG_MOUNT_BASE + 0x3000)
+
 #define PD_REFERENCED L2_BASE_VADDR
 
 #define CURPROC_PTE(vpn)                                                       \

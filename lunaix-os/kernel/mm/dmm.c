@@ -24,8 +24,6 @@
 #include <lunaix/spike.h>
 #include <lunaix/syscall.h>
 
-extern void __kernel_heap_start;
-
 __DEFINE_LXSYSCALL1(int, sbrk, size_t, size)
 {
     heap_context_t* uheap = &__current->mm.u_heap;
@@ -53,7 +51,7 @@ dmm_init(heap_context_t* heap)
     mutex_init(&heap->lock);
 
     int perm = PG_ALLOW_USER;
-    if (heap->brk >= &__kernel_heap_start) {
+    if (heap->brk >= KHEAP_START) {
         perm = 0;
     }
 

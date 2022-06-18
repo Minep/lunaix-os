@@ -62,14 +62,13 @@ lx_grow_heap(heap_context_t* heap, size_t sz);
 // FIXME: This should be per-process but not global!
 static heap_context_t kheap;
 
-#define KHEAP_SIZE_MB 256
-
 int
 kalloc_init()
 {
-    kheap.start = &__kernel_heap_start;
+    kheap.start = KHEAP_START;
     kheap.brk = NULL;
-    kheap.max_addr = (void*)((uintptr_t)kheap.start + (KHEAP_SIZE_MB << 20));
+    kheap.max_addr =
+      (void*)PROC_START; // 在新的布局中，堆结束的地方即为进程表开始的地方
 
     for (size_t i = 0; i < KHEAP_SIZE_MB >> 2; i++) {
         vmm_set_mapping(PD_REFERENCED,

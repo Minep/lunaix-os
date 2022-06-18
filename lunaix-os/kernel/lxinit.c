@@ -15,7 +15,7 @@ extern uint8_t __kernel_start;
 LOG_MODULE("INIT")
 
 // #define FORK_BOMB_DEMO
-// #define WAIT_DEMO
+#define WAIT_DEMO
 
 void
 _lxinit_main()

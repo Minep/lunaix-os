@@ -93,9 +93,9 @@ init_platform()
     pmm_mark_page_occupied(KERNEL_PID, FLOOR(ioapic_addr, PG_SIZE_BITS), 0);
 
     vmm_set_mapping(
-      PD_REFERENCED, APIC_BASE_VADDR, __APIC_BASE_PADDR, PG_PREM_RW, VMAP_NULL);
+      PD_REFERENCED, MMIO_APIC, __APIC_BASE_PADDR, PG_PREM_RW, VMAP_NULL);
     vmm_set_mapping(
-      PD_REFERENCED, IOAPIC_BASE_VADDR, ioapic_addr, PG_PREM_RW, VMAP_NULL);
+      PD_REFERENCED, MMIO_IOAPIC, ioapic_addr, PG_PREM_RW, VMAP_NULL);
 
     apic_init();
     ioapic_init();

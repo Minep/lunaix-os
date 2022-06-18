@@ -21,8 +21,6 @@ volatile struct proc_info* __current;
 
 struct proc_info dummy;
 
-extern void __proc_table;
-
 struct scheduler sched_ctx;
 
 LOG_MODULE("SCHED")
@@ -35,10 +33,10 @@ sched_init()
     for (size_t i = 0; i <= pg_size; i += 4096) {
         uintptr_t pa = pmm_alloc_page(KERNEL_PID, PP_FGPERSIST);
         vmm_set_mapping(
-          PD_REFERENCED, &__proc_table + i, pa, PG_PREM_RW, VMAP_NULL);
+          PD_REFERENCED, PROC_START + i, pa, PG_PREM_RW, VMAP_NULL);
     }
 
-    sched_ctx = (struct scheduler){ ._procs = (struct proc_info*)&__proc_table,
+    sched_ctx = (struct scheduler){ ._procs = (struct proc_info*)PROC_START,
                                     .ptable_len = 0,
                                     .procs_index = 0 };
 }
@@ -240,11 +238,11 @@ destroy_process(pid_t pid)
         }
     }
 
-    vmm_mount_pd(PD_MOUNT_2, proc->page_table);
+    vmm_mount_pd(PD_MOUNT_1, proc->page_table);
 
-    __del_pagetable(pid, PD_MOUNT_2);
+    __del_pagetable(pid, PD_MOUNT_1);
 
-    vmm_unmount_pd(PD_MOUNT_2);
+    vmm_unmount_pd(PD_MOUNT_1);
 
     return pid;
 }

@@ -161,8 +161,13 @@ spawn_proc0()
     // 向调度器注册进程。
     push_process(&proc0);
 
-    // 由于时钟中断未就绪，我们需要手动通知调度器进行第一次调度。这里也会同时隐式地恢复我们的eflags.IF位
-    schedule();
+    // 由于时钟中断与APIC未就绪，我们需要手动进行第一次调度。这里也会同时隐式地恢复我们的eflags.IF位
+    struct proc_info* proc = get_process(0);
+    assert_msg(proc, "fail to get proc0!");
+
+    proc->state = PROC_RUNNING;
+    asm volatile("pushl %0\n"
+                 "jmp switch_to\n" ::"r"(proc));
 
     /* Should not return */
     assert_msg(0, "Unexpected Return");

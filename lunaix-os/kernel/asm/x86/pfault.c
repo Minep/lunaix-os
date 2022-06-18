@@ -20,8 +20,6 @@ kprintf(const char* fmt, ...)
 extern void
 __print_panic_msg(const char* msg, const isr_param* param);
 
-extern void __kernel_heap_start;
-
 void
 intr_routine_page_fault(const isr_param* param)
 {
@@ -98,7 +96,7 @@ int
 do_kernel(v_mapping* mapping)
 {
     uintptr_t addr = mapping->va;
-    if (addr >= &__kernel_heap_start && addr < L2_BASE_VADDR) {
+    if (addr >= KHEAP_START && addr < PROC_START) {
         // This is kernel heap page
         uintptr_t pa = pmm_alloc_page(KERNEL_PID, 0);
         *mapping->pte = (*mapping->pte & 0xfff) | pa | PG_PRESENT;

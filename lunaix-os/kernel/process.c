@@ -21,19 +21,19 @@ __dup_pagetable(pid_t pid, uintptr_t mount_point)
     x86_page_table* ptd = PG_MOUNT_1;
     x86_page_table* pptd = (x86_page_table*)(mount_point | (0x3FF << 12));
 
+    size_t kspace_l1inx = L1_INDEX(KERNEL_MM_BASE);
+
     for (size_t i = 0; i < PG_MAX_ENTRIES - 1; i++) {
-        // 没有必要拷贝临时挂载点
-        if (PG_MOUNT_RANGE(i)) {
-            ptd->entry[i] = 0;
-            continue;
-        }
 
         x86_pte_t ptde = pptd->entry[i];
-        if (!ptde || !(ptde & PG_PRESENT)) {
+        // 空或者是未在内存中的L1页表项直接照搬过去。
+        // 内核地址空间直接共享过去。
+        if (!ptde || i >= kspace_l1inx || !(ptde & PG_PRESENT)) {
             ptd->entry[i] = ptde;
             continue;
         }
 
+        // 复制L2页表
         void* pt_pp = pmm_alloc_page(pid, PP_FGPERSIST);
         vmm_set_mapping(
           PD_REFERENCED, PG_MOUNT_2, pt_pp, PG_PREM_RW, VMAP_NULL);
@@ -60,7 +60,8 @@ __del_pagetable(pid_t pid, uintptr_t mount_point)
 {
     x86_page_table* pptd = (x86_page_table*)(mount_point | (0x3FF << 12));
 
-    for (size_t i = 0; i < PG_MAX_ENTRIES - 1; i++) {
+    // only remove user address space
+    for (size_t i = 0; i < L1_INDEX(KERNEL_MM_BASE); i++) {
         x86_pte_t ptde = pptd->entry[i];
         if (!ptde || !(ptde & PG_PRESENT)) {
             continue;
@@ -149,7 +150,7 @@ __mark_region(uintptr_t start_vpn, uintptr_t end_vpn, int attr)
 {
     for (size_t i = start_vpn; i < end_vpn; i++) {
         x86_pte_t* curproc = &PTE_MOUNTED(PD_REFERENCED, i);
-        x86_pte_t* newproc = &PTE_MOUNTED(PD_MOUNT_2, i);
+        x86_pte_t* newproc = &PTE_MOUNTED(PD_MOUNT_1, i);
         cpu_invplg(newproc);
 
         if (attr == REGION_RSHARED) {
@@ -175,11 +176,7 @@ dup_proc()
 
     region_copy(&__current->mm.regions, &pcb.mm.regions);
 
-#ifdef USE_KERNEL_PG
-    setup_proc_mem(&pcb, PD_MOUNT_1); //挂载点#1是当前进程的页表
-#else
     setup_proc_mem(&pcb, PD_REFERENCED);
-#endif
 
     // 根据 mm_region 进一步配置页表
     if (!__current->mm.regions) {
@@ -200,7 +197,7 @@ dup_proc()
     }
 
 not_copy:
-    vmm_unmount_pd(PD_MOUNT_2);
+    vmm_unmount_pd(PD_MOUNT_1);
 
     // 正如同fork，返回两次。
     pcb.intr_ctx.registers.eax = 0;
@@ -219,11 +216,11 @@ setup_proc_mem(struct proc_info* proc, uintptr_t usedMnt)
     pid_t pid = proc->pid;
     void* pt_copy = __dup_pagetable(pid, usedMnt);
 
-    vmm_mount_pd(PD_MOUNT_2, pt_copy); // 将新进程的页表挂载到挂载点#2
+    vmm_mount_pd(PD_MOUNT_1, pt_copy); // 将新进程的页表挂载到挂载点#2
 
     // copy the kernel stack
     for (size_t i = KSTACK_START >> 12; i <= KSTACK_TOP >> 12; i++) {
-        volatile x86_pte_t* ppte = &PTE_MOUNTED(PD_MOUNT_2, i);
+        volatile x86_pte_t* ppte = &PTE_MOUNTED(PD_MOUNT_1, i);
 
         /*
             This is a fucking nightmare, the TLB caching keep the rewrite to PTE
@@ -237,6 +234,7 @@ setup_proc_mem(struct proc_info* proc, uintptr_t usedMnt)
 
         x86_pte_t p = *ppte;
         void* ppa = vmm_dup_page(pid, PG_ENTRY_ADDR(p));
+        pmm_free_page(pid, PG_ENTRY_ADDR(p));
         *ppte = (p & 0xfff) | (uintptr_t)ppa;
     }
 
