@@ -57,8 +57,8 @@ dmm_init(heap_context_t* heap)
         perm = 0;
     }
 
-    return vmm_set_mapping(PD_REFERENCED, heap->brk, 0, PG_WRITE | perm) !=
-           NULL;
+    return vmm_set_mapping(
+             PD_REFERENCED, heap->brk, 0, PG_WRITE | perm, VMAP_NULL) != NULL;
 }
 
 int
@@ -93,7 +93,8 @@ lxsbrk(heap_context_t* heap, size_t size, int user)
             vmm_set_mapping(PD_REFERENCED,
                             PG_ALIGN(current_brk) + PG_SIZE + i,
                             0,
-                            PG_WRITE | user);
+                            PG_WRITE | user,
+                            VMAP_NULL);
         }
     }
 

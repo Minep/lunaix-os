@@ -93,8 +93,9 @@ init_platform()
     pmm_mark_page_occupied(KERNEL_PID, FLOOR(ioapic_addr, PG_SIZE_BITS), 0);
 
     vmm_set_mapping(
-      PD_REFERENCED, APIC_BASE_VADDR, __APIC_BASE_PADDR, PG_PREM_RW);
-    vmm_set_mapping(PD_REFERENCED, IOAPIC_BASE_VADDR, ioapic_addr, PG_PREM_RW);
+      PD_REFERENCED, APIC_BASE_VADDR, __APIC_BASE_PADDR, PG_PREM_RW, VMAP_NULL);
+    vmm_set_mapping(
+      PD_REFERENCED, IOAPIC_BASE_VADDR, ioapic_addr, PG_PREM_RW, VMAP_NULL);
 
     apic_init();
     ioapic_init();
@@ -115,7 +116,7 @@ lock_reserved_memory()
     multiboot_memory_map_t* mmaps = _k_init_mb_info->mmap_addr;
     size_t map_size =
       _k_init_mb_info->mmap_length / sizeof(multiboot_memory_map_t);
-    v_mapping mapping;
+    // v_mapping mapping;
     for (unsigned int i = 0; i < map_size; i++) {
         multiboot_memory_map_t mmap = mmaps[i];
         if (mmap.type == MULTIBOOT_MEMORY_AVAILABLE) {
@@ -125,10 +126,10 @@ lock_reserved_memory()
         size_t pg_num = CEIL(mmap.len_low, PG_SIZE_BITS);
         for (size_t j = 0; j < pg_num; j++) {
             uintptr_t _pa = pa + (j << PG_SIZE_BITS);
-            if (vmm_lookup(_pa, &mapping) && *mapping.pte) {
-                continue;
-            }
-            vmm_set_mapping(PD_REFERENCED, _pa, _pa, PG_PREM_R);
+            // if (vmm_lookup(_pa, &mapping) && *mapping.pte) {
+            //     continue;
+            // }
+            vmm_set_mapping(PD_REFERENCED, _pa, _pa, PG_PREM_R, VMAP_IGNORE);
             pmm_mark_page_occupied(KERNEL_PID, _pa >> 12, 0);
         }
     }

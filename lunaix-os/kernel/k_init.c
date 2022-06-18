@@ -83,8 +83,11 @@ _kernel_init()
     // 为内核创建一个专属栈空间。
     for (size_t i = 0; i < (KSTACK_SIZE >> PG_SIZE_BITS); i++) {
         uintptr_t pa = pmm_alloc_page(KERNEL_PID, 0);
-        vmm_set_mapping(
-          PD_REFERENCED, KSTACK_START + (i << PG_SIZE_BITS), pa, PG_PREM_RW);
+        vmm_set_mapping(PD_REFERENCED,
+                        KSTACK_START + (i << PG_SIZE_BITS),
+                        pa,
+                        PG_PREM_RW,
+                        VMAP_NULL);
     }
     kprintf(KINFO "[MM] Allocated %d pages for stack start at %p\n",
             KSTACK_SIZE >> PG_SIZE_BITS,
@@ -207,7 +210,8 @@ setup_memory(multiboot_memory_map_t* map, size_t map_size)
         vmm_set_mapping(PD_REFERENCED,
                         VGA_BUFFER_VADDR + (i << PG_SIZE_BITS),
                         VGA_BUFFER_PADDR + (i << PG_SIZE_BITS),
-                        PG_PREM_URW);
+                        PG_PREM_URW,
+                        VMAP_NULL);
     }
 
     // 更新VGA缓冲区位置至虚拟地址

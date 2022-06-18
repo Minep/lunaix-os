@@ -4,8 +4,6 @@
 #include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
 
-#include <stdbool.h>
-
 void
 vmm_init()
 {
@@ -28,7 +26,11 @@ vmm_init_pd()
 }
 
 int
-vmm_set_mapping(uintptr_t mnt, uintptr_t va, uintptr_t pa, pt_attr attr)
+vmm_set_mapping(uintptr_t mnt,
+                uintptr_t va,
+                uintptr_t pa,
+                pt_attr attr,
+                int options)
 {
     assert((uintptr_t)va % PG_SIZE == 0);
 
@@ -51,6 +53,11 @@ vmm_set_mapping(uintptr_t mnt, uintptr_t va, uintptr_t pa, pt_attr attr)
         // This must be writable
         l1pt->entry[l1_inx] = NEW_L1_ENTRY(attr | PG_WRITE, new_l1pt_pa);
         memset((void*)l2pt, 0, PG_SIZE);
+    } else {
+        x86_pte_t pte = l2pt->entry[l2_inx];
+        if (pte && (options & VMAP_IGNORE)) {
+            return 1;
+        }
     }
 
     if (mnt == PD_REFERENCED) {
@@ -61,7 +68,7 @@ vmm_set_mapping(uintptr_t mnt, uintptr_t va, uintptr_t pa, pt_attr attr)
     return 1;
 }
 
-int
+uintptr_t
 vmm_del_mapping(uintptr_t mnt, uintptr_t va)
 {
     assert(((uintptr_t)va & 0xFFFU) == 0);
@@ -84,14 +91,16 @@ vmm_del_mapping(uintptr_t mnt, uintptr_t va)
 
         cpu_invplg(va);
         l2pt->entry[l2_index] = PTE_NULL;
+
+        return PG_ENTRY_ADDR(l2pte);
     }
+
+    return 0;
 }
 
 int
 vmm_lookup(uintptr_t va, v_mapping* mapping)
 {
-    // va = va & ~0xfff;
-
     uint32_t l1_index = L1_INDEX(va);
     uint32_t l2_index = L2_INDEX(va);
 

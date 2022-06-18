@@ -6,6 +6,9 @@
 #include <stdint.h>
 // Virtual memory manager
 
+#define VMAP_NULL 0
+#define VMAP_IGNORE 1
+
 /**
  * @brief 初始化虚拟内存管理器
  *
@@ -31,7 +34,11 @@ vmm_init_pd();
  * @return int
  */
 int
-vmm_set_mapping(uintptr_t mnt, uintptr_t va, uintptr_t pa, pt_attr attr);
+vmm_set_mapping(uintptr_t mnt,
+                uintptr_t va,
+                uintptr_t pa,
+                pt_attr attr,
+                int options);
 
 /**
  * @brief 删除一个映射
@@ -41,7 +48,7 @@ vmm_set_mapping(uintptr_t mnt, uintptr_t va, uintptr_t pa, pt_attr attr);
  * @param va
  * @return int
  */
-int
+uintptr_t
 vmm_del_mapping(uintptr_t mnt, uintptr_t va);
 
 /**

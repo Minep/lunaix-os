@@ -34,7 +34,8 @@ sched_init()
 
     for (size_t i = 0; i <= pg_size; i += 4096) {
         uintptr_t pa = pmm_alloc_page(KERNEL_PID, PP_FGPERSIST);
-        vmm_set_mapping(PD_REFERENCED, &__proc_table + i, pa, PG_PREM_RW);
+        vmm_set_mapping(
+          PD_REFERENCED, &__proc_table + i, pa, PG_PREM_RW, VMAP_NULL);
     }
 
     sched_ctx = (struct scheduler){ ._procs = (struct proc_info*)&__proc_table,

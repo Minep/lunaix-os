@@ -16,7 +16,7 @@ void*
 __dup_pagetable(pid_t pid, uintptr_t mount_point)
 {
     void* ptd_pp = pmm_alloc_page(pid, PP_FGPERSIST);
-    vmm_set_mapping(PD_REFERENCED, PG_MOUNT_1, ptd_pp, PG_PREM_RW);
+    vmm_set_mapping(PD_REFERENCED, PG_MOUNT_1, ptd_pp, PG_PREM_RW, VMAP_NULL);
 
     x86_page_table* ptd = PG_MOUNT_1;
     x86_page_table* pptd = (x86_page_table*)(mount_point | (0x3FF << 12));
@@ -29,7 +29,8 @@ __dup_pagetable(pid_t pid, uintptr_t mount_point)
         }
 
         void* pt_pp = pmm_alloc_page(pid, PP_FGPERSIST);
-        vmm_set_mapping(PD_REFERENCED, PG_MOUNT_2, pt_pp, PG_PREM_RW);
+        vmm_set_mapping(
+          PD_REFERENCED, PG_MOUNT_2, pt_pp, PG_PREM_RW, VMAP_NULL);
 
         x86_page_table* ppt = (x86_page_table*)(mount_point | (i << 12));
         x86_page_table* pt = PG_MOUNT_2;
