@@ -80,15 +80,6 @@ _kernel_init()
 
     setup_memory((multiboot_memory_map_t*)_k_init_mb_info->mmap_addr, map_size);
 
-    // 为内核创建一个专属栈空间。
-    for (size_t i = 0; i < (KSTACK_SIZE >> PG_SIZE_BITS); i++) {
-        uintptr_t pa = pmm_alloc_page(KERNEL_PID, 0);
-        vmm_set_mapping(PD_REFERENCED,
-                        KSTACK_START + (i << PG_SIZE_BITS),
-                        pa,
-                        PG_PREM_RW,
-                        VMAP_NULL);
-    }
     kprintf(KINFO "[MM] Allocated %d pages for stack start at %p\n",
             KSTACK_SIZE >> PG_SIZE_BITS,
             KSTACK_START);
@@ -135,31 +126,37 @@ spawn_proc0()
     // 方案1：必须在读取eflags之后禁用。否则当进程被调度时，中断依然是关闭的！
     // cpu_disable_interrupt();
 
-    setup_proc_mem(&proc0, PD_REFERENCED);
+    /* Ok... 首先fork进我们的零号进程，而后由那里，我们fork进init进程。 */
 
-    // Ok... 首先fork进我们的零号进程，而后由那里，我们fork进init进程。
-    /*
-        这里是一些栈的设置，因为我们将切换到一个新的地址空间里，并且使用一个全新的栈。
-        让iret满意！
-    */
-    asm volatile("movl %%cr3, %%eax\n"
-                 "movl %%esp, %%ebx\n"
-                 "movl %1, %%cr3\n"
-                 "movl %2, %%esp\n"
+    // 把当前虚拟地址空间（内核）复制一份。
+    proc0.page_table = vmm_dup_vmspace(proc0.pid);
+
+    // 直接切换到新的拷贝，进行配置。
+    cpu_lcr3(proc0.page_table);
+
+    // 为内核创建一个专属栈空间。
+    for (size_t i = 0; i < (KSTACK_SIZE >> PG_SIZE_BITS); i++) {
+        uintptr_t pa = pmm_alloc_page(KERNEL_PID, 0);
+        vmm_set_mapping(PD_REFERENCED,
+                        KSTACK_START + (i << PG_SIZE_BITS),
+                        pa,
+                        PG_PREM_RW,
+                        VMAP_NULL);
+    }
+
+    // 手动设置进程上下文：用于第一次调度
+    asm volatile("movl %%esp, %%ebx\n"
+                 "movl %1, %%esp\n"
                  "pushf\n"
+                 "pushl %2\n"
                  "pushl %3\n"
-                 "pushl %4\n"
                  "pushl $0\n"
                  "pushl $0\n"
                  "movl %%esp, %0\n"
-                 "movl %%eax, %%cr3\n"
                  "movl %%ebx, %%esp\n"
                  : "=m"(proc0.intr_ctx.registers.esp)
-                 : "r"(proc0.page_table),
-                   "i"(KSTACK_TOP),
-                   "i"(KCODE_SEG),
-                   "r"(proc0.intr_ctx.eip)
-                 : "%eax", "%ebx", "memory");
+                 : "i"(KSTACK_TOP), "i"(KCODE_SEG), "r"(proc0.intr_ctx.eip)
+                 : "%ebx", "memory");
 
     // 向调度器注册进程。
     push_process(&proc0);

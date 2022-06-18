@@ -98,7 +98,7 @@ typedef struct
 extern void __pg_mount_point;
 
 /* 四个页挂载点，两个页目录挂载点： 用于临时创建&编辑页表 */
-
+#define PG_MOUNT_RANGE(l1_index) (701 <= l1_index && l1_index <= 703)
 #define PD_MOUNT_1 0xAFC00000
 #define PD_MOUNT_2 0xAF800000
 #define PG_MOUNT_BASE 0xAF7FF000

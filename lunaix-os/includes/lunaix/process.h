@@ -38,11 +38,22 @@ struct proc_sig
 
 struct proc_info
 {
+    /*
+        Any change to *critical section*, including layout, size
+        must be reflected in kernel/asm/x86/interrupt.S to avoid
+        disaster!
+     */
+
+    /* ---- critical section start ---- */
+
     pid_t pid;
     struct proc_info* parent;
     isr_param intr_ctx; // size=76
     uintptr_t ustack_top;
     void* page_table;
+
+    /* ---- critical section end ---- */
+
     struct llist_header siblings;
     struct llist_header children;
     struct llist_header grp_member;

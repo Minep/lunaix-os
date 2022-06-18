@@ -43,7 +43,7 @@ intr_routine_page_fault(const isr_param* param)
         goto segv_term;
     }
 
-    struct mm_region* hit_region = region_get(__current, ptr);
+    struct mm_region* hit_region = region_get(&__current->mm.regions, ptr);
 
     if (!hit_region) {
         // Into the void...

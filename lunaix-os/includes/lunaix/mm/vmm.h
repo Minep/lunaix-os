@@ -7,7 +7,16 @@
 // Virtual memory manager
 
 #define VMAP_NULL 0
+/**
+ * @brief 映射模式：忽略已存在映射
+ *
+ */
 #define VMAP_IGNORE 1
+/**
+ * @brief 映射模式：不作实际映射。该功能用于预留出特定的地址空间
+ *
+ */
+#define VMAP_NOMAP 2
 
 /**
  * @brief 初始化虚拟内存管理器
@@ -68,6 +77,9 @@ vmm_lookup(uintptr_t va, v_mapping* mapping);
  */
 void*
 vmm_dup_page(pid_t pid, void* pa);
+
+void*
+vmm_dup_vmspace(pid_t pid);
 
 /**
  * @brief 挂载另一个虚拟地址空间至当前虚拟地址空间

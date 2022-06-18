@@ -22,6 +22,12 @@ __dup_pagetable(pid_t pid, uintptr_t mount_point)
     x86_page_table* pptd = (x86_page_table*)(mount_point | (0x3FF << 12));
 
     for (size_t i = 0; i < PG_MAX_ENTRIES - 1; i++) {
+        // 没有必要拷贝临时挂载点
+        if (PG_MOUNT_RANGE(i)) {
+            ptd->entry[i] = 0;
+            continue;
+        }
+
         x86_pte_t ptde = pptd->entry[i];
         if (!ptde || !(ptde & PG_PRESENT)) {
             ptd->entry[i] = ptde;
@@ -77,7 +83,7 @@ __del_pagetable(pid_t pid, uintptr_t mount_point)
 }
 
 void*
-dup_pagetable(pid_t pid)
+vmm_dup_vmspace(pid_t pid)
 {
     return __dup_pagetable(pid, PD_REFERENCED);
 }
@@ -138,6 +144,26 @@ init_proc(struct proc_info* pcb)
     pcb->pgid = pcb->pid;
 }
 
+void
+__mark_region(uintptr_t start_vpn, uintptr_t end_vpn, int attr)
+{
+    for (size_t i = start_vpn; i < end_vpn; i++) {
+        x86_pte_t* curproc = &PTE_MOUNTED(PD_REFERENCED, i);
+        x86_pte_t* newproc = &PTE_MOUNTED(PD_MOUNT_2, i);
+        cpu_invplg(newproc);
+
+        if (attr == REGION_RSHARED) {
+            // 如果读共享，则将两者的都标注为只读，那么任何写入都将会应用COW策略。
+            cpu_invplg(curproc);
+            *curproc = *curproc & ~PG_WRITE;
+            *newproc = *newproc & ~PG_WRITE;
+        } else {
+            // 如果是私有页，则将该页从新进程中移除。
+            *newproc = 0;
+        }
+    }
+}
+
 pid_t
 dup_proc()
 {
@@ -146,6 +172,8 @@ dup_proc()
     pcb.mm = __current->mm;
     pcb.intr_ctx = __current->intr_ctx;
     pcb.parent = __current;
+
+    region_copy(&__current->mm.regions, &pcb.mm.regions);
 
 #ifdef USE_KERNEL_PG
     setup_proc_mem(&pcb, PD_MOUNT_1); //挂载点#1是当前进程的页表
@@ -158,12 +186,9 @@ dup_proc()
         goto not_copy;
     }
 
-    llist_init_head(&pcb.mm.regions);
     struct mm_region *pos, *n;
-    llist_for_each(pos, n, &__current->mm.regions->head, head)
+    llist_for_each(pos, n, &pcb.mm.regions->head, head)
     {
-        region_add(&pcb, pos->start, pos->end, pos->attr);
-
         // 如果写共享，则不作处理。
         if ((pos->attr & REGION_WSHARED)) {
             continue;
@@ -171,21 +196,7 @@ dup_proc()
 
         uintptr_t start_vpn = PG_ALIGN(pos->start) >> 12;
         uintptr_t end_vpn = PG_ALIGN(pos->end) >> 12;
-        for (size_t i = start_vpn; i < end_vpn; i++) {
-            x86_pte_t* curproc = &PTE_MOUNTED(PD_MOUNT_1, i);
-            x86_pte_t* newproc = &PTE_MOUNTED(PD_MOUNT_2, i);
-            cpu_invplg(newproc);
-
-            if (pos->attr == REGION_RSHARED) {
-                // 如果读共享，则将两者的都标注为只读，那么任何写入都将会应用COW策略。
-                cpu_invplg(curproc);
-                *curproc = *curproc & ~PG_WRITE;
-                *newproc = *newproc & ~PG_WRITE;
-            } else {
-                // 如果是私有页，则将该页从新进程中移除。
-                *newproc = 0;
-            }
-        }
+        __mark_region(start_vpn, end_vpn, pos->attr);
     }
 
 not_copy:
@@ -235,9 +246,9 @@ setup_proc_mem(struct proc_info* proc, uintptr_t usedMnt)
     // 定义用户栈区域，但是不分配实际的物理页。我们会在Page fault
     // handler里面实现动态分配物理页的逻辑。（虚拟内存的好处！）
     // FIXME: 这里应该放到spawn_proc里面。
-    // region_add(proc, USTACK_END, USTACK_SIZE, REGION_PRIVATE | REGION_RW);
+    // region_add(proc, USTACK_END, USTACK_SIZE, REGION_PRIVATE |
+    // REGION_RW);
 
     // 至于其他的区域我们暂时没有办法知道，因为那需要知道用户程序的信息。我们留到之后在处理。
-
     proc->page_table = pt_copy;
 }

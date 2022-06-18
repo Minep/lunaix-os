@@ -64,6 +64,10 @@ vmm_set_mapping(uintptr_t mnt,
         cpu_invplg(va);
     }
 
+    if ((options & VMAP_NOMAP)) {
+        return 1;
+    }
+
     l2pt->entry[l2_inx] = NEW_L2_ENTRY(attr, pa);
     return 1;
 }

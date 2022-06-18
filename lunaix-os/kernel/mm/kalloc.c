@@ -13,6 +13,7 @@
  */
 #include <lunaix/mm/dmm.h>
 #include <lunaix/mm/kalloc.h>
+#include <lunaix/mm/vmm.h>
 
 #include <lunaix/common.h>
 #include <lunaix/spike.h>
@@ -61,12 +62,22 @@ lx_grow_heap(heap_context_t* heap, size_t sz);
 // FIXME: This should be per-process but not global!
 static heap_context_t kheap;
 
+#define KHEAP_SIZE_MB 256
+
 int
 kalloc_init()
 {
     kheap.start = &__kernel_heap_start;
     kheap.brk = NULL;
-    kheap.max_addr = (void*)KSTACK_START;
+    kheap.max_addr = (void*)((uintptr_t)kheap.start + (KHEAP_SIZE_MB << 20));
+
+    for (size_t i = 0; i < KHEAP_SIZE_MB >> 2; i++) {
+        vmm_set_mapping(PD_REFERENCED,
+                        (uintptr_t)kheap.start + (i << 22),
+                        0,
+                        PG_PREM_RW,
+                        VMAP_NOMAP);
+    }
 
     if (!dmm_init(&kheap)) {
         return 0;
