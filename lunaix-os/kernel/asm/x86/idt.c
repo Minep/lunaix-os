@@ -45,6 +45,7 @@ _init_idt()
     _set_idt_intr_entry(FAULT_DIVISION_ERROR, 0x08, _asm_isr0, 0);
     _set_idt_intr_entry(FAULT_GENERAL_PROTECTION, 0x08, _asm_isr13, 0);
     _set_idt_intr_entry(FAULT_PAGE_FAULT, 0x08, _asm_isr14, 0);
+    _set_idt_intr_entry(FAULT_STACK_SEG_FAULT, 0x08, _asm_isr12, 0);
 
     _set_idt_intr_entry(APIC_ERROR_IV, 0x08, _asm_isr250, 0);
     _set_idt_intr_entry(APIC_LINT0_IV, 0x08, _asm_isr251, 0);
@@ -57,12 +58,7 @@ _init_idt()
     // system defined interrupts
     _set_idt_intr_entry(LUNAIX_SYS_PANIC, 0x08, _asm_isr32, 0);
 
-    // syscall is a trap gate (recall: trap does NOT clear IF flag upon
-    // interruption)
-    // // XXX: this should be fine, as our design of context switch support
-    // interruptible syscall We make this a non-trap entry, and enable interrupt
+    // We make this a non-trap entry, and enable interrupt
     // only when needed!
-    // FIXME: This may cause nasty concurrency bug! We should 'lockify' our
-    // code!
     _set_idt_intr_entry(LUNAIX_SYS_CALL, 0x08, _asm_isr33, 3);
 }

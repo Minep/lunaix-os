@@ -16,8 +16,9 @@ LOG_MODULE("INIT")
 
 // #define FORK_BOMB_DEMO
 #define WAIT_DEMO
+#define IN_USER_MODE
 
-void
+void __USER__
 _lxinit_main()
 {
 #ifdef FORK_BOMB_DEMO
@@ -93,15 +94,15 @@ _lxinit_main()
     struct kdb_keyinfo_pkt keyevent;
     while (1) {
         if (!kbd_recv_key(&keyevent)) {
-            // yield();
+            yield();
             continue;
         }
         if ((keyevent.state & KBD_KEY_FPRESSED) &&
             (keyevent.keycode & 0xff00) <= KEYPAD) {
             tty_put_char((char)(keyevent.keycode & 0x00ff));
-            tty_sync_cursor();
+            // FIXME: io to vga port is privileged and cause #GP in user mode
+            // tty_sync_cursor();
         }
     }
-
     spin();
 }

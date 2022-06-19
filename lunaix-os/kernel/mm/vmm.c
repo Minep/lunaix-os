@@ -51,7 +51,9 @@ vmm_set_mapping(uintptr_t mnt,
         }
 
         // This must be writable
-        l1pt->entry[l1_inx] = NEW_L1_ENTRY(attr | PG_WRITE, new_l1pt_pa);
+        l1pt->entry[l1_inx] =
+          NEW_L1_ENTRY(attr | PG_WRITE | PG_PRESENT, new_l1pt_pa);
+
         memset((void*)l2pt, 0, PG_SIZE);
     } else {
         x86_pte_t pte = l2pt->entry[l2_inx];

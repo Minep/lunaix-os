@@ -26,6 +26,7 @@
     isr_template FAULT_DIVISION_ERROR
     isr_template FAULT_GENERAL_PROTECTION, no_error_code=0
     isr_template FAULT_PAGE_FAULT, no_error_code=0
+    isr_template FAULT_STACK_SEG_FAULT, no_error_code=0
 
     isr_template LUNAIX_SYS_PANIC
     isr_template LUNAIX_SYS_CALL
@@ -183,6 +184,7 @@
 
         iret  
 
+.section .usrtext
     sig_wrapper:                # in user mode
         movl %esp, %eax
         and $0xfffffff0, %esp

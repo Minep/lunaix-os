@@ -83,9 +83,10 @@ intr_routine_init()
     intr_subscribe(FAULT_DIVISION_ERROR, intr_routine_divide_zero);
     intr_subscribe(FAULT_GENERAL_PROTECTION, intr_routine_general_protection);
     intr_subscribe(FAULT_PAGE_FAULT, intr_routine_page_fault);
+    intr_subscribe(FAULT_STACK_SEG_FAULT, intr_routine_page_fault);
     intr_subscribe(LUNAIX_SYS_PANIC, intr_routine_sys_panic);
     intr_subscribe(APIC_SPIV_IV, intr_routine_apic_spi);
     intr_subscribe(APIC_ERROR_IV, intr_routine_apic_error);
 
-    intr_set_fallback_handler(intr_set_fallback_handler);
+    intr_set_fallback_handler(intr_routine_fallback);
 }

@@ -41,6 +41,12 @@ SECTIONS {
         build/obj/hal/*.o (.text)
     }
 
+    __usrtext_start = ALIGN(4K);
+    .usrtext BLOCK(4K) : AT ( ADDR(.usrtext) - 0xC0000000 ) {
+        build/obj/kernel/*.o (.usrtext)
+    }
+    __usrtext_end = ALIGN(4K);
+
     .bss BLOCK(4K) : AT ( ADDR(.bss) - 0xC0000000 ) {
         build/obj/kernel/*.o (.bss)
         build/obj/hal/*.o (.bss)

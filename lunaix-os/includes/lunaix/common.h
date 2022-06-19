@@ -32,8 +32,8 @@
 
 #define USER_START 0x400000
 #define USTACK_SIZE 0x100000
-#define USTACK_TOP 0x9fffffff
-#define USTACK_END (USTACK_TOP - USTACK_SIZE + 1)
+#define USTACK_TOP 0x9ffffff0
+#define USTACK_END (0x9fffffff - USTACK_SIZE + 1)
 #define UMMAP_AREA 0x4D000000
 
 #define SYS_TIMER_FREQUENCY_HZ 2048

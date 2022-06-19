@@ -96,7 +96,7 @@ _kernel_init()
 void
 spawn_proc0()
 {
-    struct proc_info proc0;
+    struct proc_info* proc0 = alloc_process();
 
     /**
      * @brief
@@ -113,15 +113,14 @@ spawn_proc0()
      * 目前的解决方案是2
      */
 
-    init_proc(&proc0);
-    proc0.intr_ctx = (isr_param){ .registers = { .ds = KDATA_SEG,
-                                                 .es = KDATA_SEG,
-                                                 .fs = KDATA_SEG,
-                                                 .gs = KDATA_SEG },
-                                  .cs = KCODE_SEG,
-                                  .eip = (void*)__proc0,
-                                  .ss = KDATA_SEG,
-                                  .eflags = cpu_reflags() };
+    proc0->intr_ctx = (isr_param){ .registers = { .ds = KDATA_SEG,
+                                                  .es = KDATA_SEG,
+                                                  .fs = KDATA_SEG,
+                                                  .gs = KDATA_SEG },
+                                   .cs = KCODE_SEG,
+                                   .eip = (void*)__proc0,
+                                   .ss = KDATA_SEG,
+                                   .eflags = cpu_reflags() };
 
     // 方案1：必须在读取eflags之后禁用。否则当进程被调度时，中断依然是关闭的！
     // cpu_disable_interrupt();
@@ -129,10 +128,10 @@ spawn_proc0()
     /* Ok... 首先fork进我们的零号进程，而后由那里，我们fork进init进程。 */
 
     // 把当前虚拟地址空间（内核）复制一份。
-    proc0.page_table = vmm_dup_vmspace(proc0.pid);
+    proc0->page_table = vmm_dup_vmspace(proc0->pid);
 
     // 直接切换到新的拷贝，进行配置。
-    cpu_lcr3(proc0.page_table);
+    cpu_lcr3(proc0->page_table);
 
     // 为内核创建一个专属栈空间。
     for (size_t i = 0; i < (KSTACK_SIZE >> PG_SIZE_BITS); i++) {
@@ -154,24 +153,24 @@ spawn_proc0()
                  "pushl $0\n"
                  "movl %%esp, %0\n"
                  "movl %%ebx, %%esp\n"
-                 : "=m"(proc0.intr_ctx.registers.esp)
-                 : "i"(KSTACK_TOP), "i"(KCODE_SEG), "r"(proc0.intr_ctx.eip)
+                 : "=m"(proc0->intr_ctx.registers.esp)
+                 : "i"(KSTACK_TOP), "i"(KCODE_SEG), "r"(proc0->intr_ctx.eip)
                  : "%ebx", "memory");
 
     // 向调度器注册进程。
-    push_process(&proc0);
+    commit_process(proc0);
 
     // 由于时钟中断与APIC未就绪，我们需要手动进行第一次调度。这里也会同时隐式地恢复我们的eflags.IF位
-    struct proc_info* proc = get_process(0);
-    assert_msg(proc, "fail to get proc0!");
-
-    proc->state = PROC_RUNNING;
+    proc0->state = PROC_RUNNING;
     asm volatile("pushl %0\n"
-                 "jmp switch_to\n" ::"r"(proc));
+                 "jmp switch_to\n" ::"r"(proc0));
 
     /* Should not return */
     assert_msg(0, "Unexpected Return");
 }
+
+extern void __usrtext_start;
+extern void __usrtext_end;
 
 // 按照 Memory map 标识可用的物理页
 void
@@ -214,6 +213,14 @@ setup_memory(multiboot_memory_map_t* map, size_t map_size)
                         VGA_BUFFER_PADDR + (i << PG_SIZE_BITS),
                         PG_PREM_URW,
                         VMAP_NULL);
+    }
+
+    assert_msg(!((uintptr_t)&__usrtext_start & 0xfff) &&
+                 !((uintptr_t)&__usrtext_end & 0xfff),
+               "Bad usrtext alignment");
+
+    for (uintptr_t i = &__usrtext_start; i < &__usrtext_end; i += PG_SIZE) {
+        vmm_set_mapping(PD_REFERENCED, i, V2P(i), PG_PREM_UR, VMAP_NULL);
     }
 
     // 更新VGA缓冲区位置至虚拟地址

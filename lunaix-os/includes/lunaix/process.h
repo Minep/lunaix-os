@@ -24,7 +24,7 @@
 struct proc_mm
 {
     heap_context_t u_heap;
-    struct mm_region* regions;
+    struct mm_region regions;
 };
 
 struct proc_sig
@@ -71,11 +71,21 @@ struct proc_info
 
 extern volatile struct proc_info* __current;
 
-pid_t
-alloc_pid();
+/**
+ * @brief 分配并初始化一个进程控制块
+ *
+ * @return struct proc_info*
+ */
+struct proc_info*
+alloc_process();
 
+/**
+ * @brief 初始化进程用户空间
+ *
+ * @param pcb
+ */
 void
-init_proc(struct proc_info* pcb);
+init_proc_user_space(struct proc_info* pcb);
 
 /**
  * @brief 向系统发布一个进程，使其可以被调度。
@@ -83,7 +93,7 @@ init_proc(struct proc_info* pcb);
  * @param process
  */
 void
-push_process(struct proc_info* process);
+commit_process(struct proc_info* process);
 
 pid_t
 destroy_process(pid_t pid);

@@ -49,8 +49,9 @@ run(struct proc_info* proc)
     }
     proc->state = PROC_RUNNING;
 
-    // FIXME: 这里还是得再考虑一下。
+    // XXX: 我们需要这一步吗？
     // tss_update_esp(__current->intr_ctx.esp);
+
     apic_done_servicing();
 
     asm volatile("pushl %0\n"
@@ -168,8 +169,8 @@ done:
     return destroy_process(proc->pid);
 }
 
-pid_t
-alloc_pid()
+struct proc_info*
+alloc_process()
 {
     pid_t i = 0;
     for (;
@@ -180,29 +181,35 @@ alloc_pid()
     if (i == MAX_PROCESS) {
         panick("Panic in Ponyville shimmer!");
     }
-    return i;
-}
 
-void
-push_process(struct proc_info* process)
-{
-    int index = process->pid;
-    if (index < 0 || index > sched_ctx.ptable_len) {
-        __current->k_status = LXINVLDPID;
-        return;
-    }
-
-    if (index == sched_ctx.ptable_len) {
+    if (i == sched_ctx.ptable_len) {
         sched_ctx.ptable_len++;
     }
 
-    sched_ctx._procs[index] = *process;
+    struct proc_info* proc = &sched_ctx._procs[i];
+    memset(proc, 0, sizeof(*proc));
 
-    process = &sched_ctx._procs[index];
+    proc->state = PROC_CREATED;
+    proc->pid = i;
+    proc->created = clock_systime();
+    proc->pgid = proc->pid;
 
-    // make sure the reference is relative to process table
-    llist_init_head(&process->children);
-    llist_init_head(&process->grp_member);
+    llist_init_head(&proc->mm.regions);
+    llist_init_head(&proc->children);
+    llist_init_head(&proc->grp_member);
+
+    return proc;
+}
+
+void
+commit_process(struct proc_info* process)
+{
+    assert(process == &sched_ctx._procs[process->pid]);
+
+    if (process->state != PROC_CREATED) {
+        __current->k_status = LXINVL;
+        return;
+    }
 
     // every process is the child of first process (pid=1)
     if (process->parent) {
@@ -230,12 +237,10 @@ destroy_process(pid_t pid)
     proc->state = PROC_DESTROY;
     llist_delete(&proc->siblings);
 
-    if (proc->mm.regions) {
-        struct mm_region *pos, *n;
-        llist_for_each(pos, n, &proc->mm.regions->head, head)
-        {
-            lxfree(pos);
-        }
+    struct mm_region *pos, *n;
+    llist_for_each(pos, n, &proc->mm.regions.head, head)
+    {
+        lxfree(pos);
     }
 
     vmm_mount_pd(PD_MOUNT_1, proc->page_table);

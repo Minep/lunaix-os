@@ -17,6 +17,8 @@ kprintf(const char* fmt, ...)
     va_end(args);
 }
 
+#define COW_MASK (REGION_RSHARED | REGION_READ | REGION_WRITE)
+
 extern void
 __print_panic_msg(const char* msg, const isr_param* param);
 
@@ -48,17 +50,16 @@ intr_routine_page_fault(const isr_param* param)
         goto segv_term;
     }
 
-    x86_pte_t* pte = PTE_MOUNTED(PD_REFERENCED, ptr >> 12);
-    if (*pte & PG_PRESENT) {
-        if ((hit_region->attr & REGION_PERM_MASK) ==
-            (REGION_RSHARED | REGION_READ)) {
+    x86_pte_t* pte = &PTE_MOUNTED(PD_REFERENCED, ptr >> 12);
+    if ((*pte & PG_PRESENT)) {
+        if ((hit_region->attr & COW_MASK) == COW_MASK) {
             // normal page fault, do COW
             cpu_invplg(pte);
             uintptr_t pa =
               (uintptr_t)vmm_dup_page(__current->pid, PG_ENTRY_ADDR(*pte));
             pmm_free_page(__current->pid, *pte & ~0xFFF);
             *pte = (*pte & 0xFFF) | pa | PG_WRITE;
-            return;
+            goto resolved;
         }
         // impossible cases or accessing privileged page
         goto segv_term;
@@ -68,15 +69,18 @@ intr_routine_page_fault(const isr_param* param)
         // Invalid location
         goto segv_term;
     }
+
     uintptr_t loc = *pte & ~0xfff;
-    // a writable page, not present, pte attr is not null
-    //   and no indication of cached page -> a new page need to be alloc
+
+    // a writable page, not present, not cached, pte attr is not null
+    //   -> a new page need to be alloc
     if ((hit_region->attr & REGION_WRITE) && (*pte & 0xfff) && !loc) {
         cpu_invplg(pte);
         uintptr_t pa = pmm_alloc_page(__current->pid, 0);
         *pte = *pte | pa | PG_PRESENT;
-        return;
+        goto resolved;
     }
+
     // page not present, bring it from disk or somewhere else
     __print_panic_msg("WIP page fault route", param);
     while (1)
@@ -90,6 +94,12 @@ segv_term:
             param->eip);
     terminate_proc(LXSEGFAULT);
     // should not reach
+    while (1)
+        ;
+
+resolved:
+    cpu_invplg(ptr);
+    return;
 }
 
 int
