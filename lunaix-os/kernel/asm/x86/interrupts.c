@@ -1,4 +1,5 @@
 #include <arch/x86/interrupts.h>
+#include <arch/x86/tss.h>
 #include <hal/apic.h>
 #include <hal/cpu.h>
 #include <lunaix/mm/page.h>

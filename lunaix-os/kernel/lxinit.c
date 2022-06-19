@@ -5,6 +5,7 @@
 #include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/proc.h>
+#include <lunaix/signal.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
@@ -19,6 +20,12 @@ LOG_MODULE("INIT")
 #define IN_USER_MODE
 
 void __USER__
+sigchild_handler(int signum)
+{
+    kprintf(KINFO "SIGCHLD received\n");
+}
+
+void __USER__
 _lxinit_main()
 {
 #ifdef FORK_BOMB_DEMO
@@ -30,6 +37,8 @@ _lxinit_main()
         }
     }
 #endif
+
+    signal(_SIGCHLD, sigchild_handler);
 
     int status;
 #ifdef WAIT_DEMO
@@ -57,7 +66,7 @@ _lxinit_main()
 
     waitpid(-1, &status, WNOHANG);
 
-    for (size_t i = 0; i < 5; i++) {
+    for (size_t i = 0; i < 10; i++) {
         pid_t pid = 0;
         if (!(pid = fork())) {
             sleep(i);

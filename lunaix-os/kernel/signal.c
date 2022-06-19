@@ -26,7 +26,7 @@ signal_dispatch()
     int sig_selected =
       31 - __builtin_clz(__current->sig_pending & ~__current->sig_mask);
 
-    __current->sig_pending = __current->sig_pending & ~(1 << sig_selected);
+    __current->sig_pending = __current->sig_pending & ~__SIGNAL(sig_selected);
 
     if (!__current->sig_handler[sig_selected] &&
         !default_handlers[sig_selected]) {
@@ -34,7 +34,7 @@ signal_dispatch()
         return 0;
     }
 
-    uintptr_t ustack = __current->ustack_top;
+    uintptr_t ustack = __current->ustack_top & ~0xf;
 
     if ((int)(ustack - USTACK_END) < (int)sizeof(struct proc_sig)) {
         // 用户栈没有空间存放信号上下文
@@ -53,12 +53,15 @@ signal_dispatch()
         sig_ctx->signal_handler = default_handlers[sig_selected];
     }
 
+    __current->sig_mask |= __SIGNAL(sig_selected);
+
     return sig_ctx;
 }
 
 __DEFINE_LXSYSCALL1(int, sigreturn, struct proc_sig, *sig_ctx)
 {
     __current->intr_ctx = sig_ctx->prev_context;
+    __current->sig_mask &= ~__SIGNAL(sig_ctx->sig_num);
     schedule();
 }
 

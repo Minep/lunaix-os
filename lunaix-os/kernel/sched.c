@@ -49,8 +49,15 @@ run(struct proc_info* proc)
     }
     proc->state = PROC_RUNNING;
 
-    // XXX: 我们需要这一步吗？
-    // tss_update_esp(__current->intr_ctx.esp);
+    /*
+        将tss.esp0设置为上次调度前的esp值。
+        当处理信号时，上下文信息是不会恢复的，而是保存在用户栈中，然后直接跳转进位于用户空间的sig_wrapper进行
+          信号的处理。当用户自定义的信号处理函数返回时，sigreturn的系统调用才开始进行上下文的恢复（或者说是进行
+          另一次调度。
+        由于这中间没有进行地址空间的交换，所以第二次跳转使用的是同一个内核栈，而之前默认tss.esp0的值是永远指向最顶部
+        这样一来就有可能会覆盖更早的上下文信息（比如嵌套的信号捕获函数）
+    */
+    tss_update_esp(proc->intr_ctx.registers.esp);
 
     apic_done_servicing();
 
@@ -257,6 +264,8 @@ terminate_proc(int exit_code)
 {
     __current->state = PROC_TERMNAT;
     __current->exit_code = exit_code;
+
+    __SET_SIGNAL(__current->parent->sig_pending, _SIGCHLD);
 
     schedule();
 }

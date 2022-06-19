@@ -22,6 +22,12 @@
         .skip 16
 #endif
 
+.section .bss
+    .align 16
+    lo_tmp_stack:
+        .skip 128
+    tmp_stack:
+
 .section .text
     isr_template FAULT_DIVISION_ERROR
     isr_template FAULT_GENERAL_PROTECTION, no_error_code=0
@@ -128,23 +134,30 @@
 
         addl $8, %esp
 
-#ifdef __ASM_INTR_DIAGNOSIS
         pushl %eax
+#ifdef __ASM_INTR_DIAGNOSIS
         movl 4(%esp), %eax
         movl %eax, debug_resv
-        popl %eax
 #endif
+        # 处理TSS.ESP的一些边界条件。如果是正常iret（即从内核模式*优雅地*退出）
+        # 那么TSS.ESP0应该为iret进行弹栈后，%esp的值。
+        # 所以这里的边界条件是：如返回用户模式，iret会额外弹出8个字节（ss,esp）
+        movl 8(%esp), %eax
+        andl $3, %eax
+        setnz %al
+        shll $3, %eax
+        addl $16, %eax
+        addl %esp, %eax
+        movl %eax, (_tss + 4)
+        popl %eax
         iret
 
     .global switch_to
     switch_to:
         # 约定
-        # arg1: 目标进程PCB地址 (next)
+        # arg1: 目标进程PCB地址 (next
+
         popl %ecx               # next
-
-        call signal_dispatch    # kernel/signal.c
-        movl %eax, %edx
-
         movl __current, %eax    
         movl 88(%eax), %ebx     # __current->pagetable
         movl 88(%ecx), %eax     # next->pagetable
@@ -156,9 +169,13 @@
     1:
         movl %ecx, __current    # __current = next
 
-        test %edx, %edx         # do we have signal to handle?
+        # 我们已经处在了新的地址空间，为了避免影响其先前的栈布局
+        # 需要使用一个临时的栈空间
+        movl $tmp_stack, %esp
+        call signal_dispatch    # kernel/signal.c
+
+        test %eax, %eax         # do we have signal to handle?
         jz 1f
-        movl %edx, %eax
         jmp handle_signal
     1:
         leal 8(%ecx), %eax
@@ -170,7 +187,7 @@
         # 注意2：handle_signal在调用之前，须确保proc_sig已经写入用户栈！
         leal 8(%eax), %ebx      # arg1 in %eax: addr of proc_sig structure in user stack
 
-        pushl 72(%ebx)          # proc_sig->prev_context.ss
+        pushl $UDATA_SEG        # proc_sig->prev_context.ss
         pushl %eax              # esp
         pushl 64(%ebx)          # proc_sig->prev_context.eflags
         pushl $UCODE_SEG        # cs

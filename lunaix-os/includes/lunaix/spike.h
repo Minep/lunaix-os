@@ -15,7 +15,7 @@
 // 获取v最近的最小k倍数
 #define ROUNDDOWN(v, k) ((v) & ~((k)-1))
 
-#define __USER__ __attribute__((section("usrtext")))
+#define __USER__ __attribute__((section(".usrtext")))
 
 inline static void
 spin()
