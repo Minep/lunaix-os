@@ -21,6 +21,8 @@
 
 #define PROC_TERMMASK 0x6
 
+#define PROC_FINPAUSE 1
+
 struct proc_mm
 {
     heap_context_t u_heap;
@@ -64,6 +66,7 @@ struct proc_info
     int32_t k_status;
     sigset_t sig_pending;
     sigset_t sig_mask;
+    int flags;
     void* sig_handler[_SIG_NUM];
     pid_t pgid;
     struct lx_timer* timer;

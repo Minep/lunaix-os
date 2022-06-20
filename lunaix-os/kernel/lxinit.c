@@ -50,6 +50,7 @@ _lxinit_main()
         kprintf("I am child, I am about to terminated\n");
         _exit(1);
     }
+    pause();
     pid_t child = wait(&status);
     kprintf("I am parent, my child (%d) terminated normally with code: %d.\n",
             child,

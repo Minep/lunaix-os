@@ -1,6 +1,7 @@
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/signal.h>
+#include <lunaix/status.h>
 #include <lunaix/syscall.h>
 
 extern struct scheduler sched_ctx; /* kernel/sched.c */
@@ -62,6 +63,7 @@ __DEFINE_LXSYSCALL1(int, sigreturn, struct proc_sig, *sig_ctx)
 {
     __current->intr_ctx = sig_ctx->prev_context;
     __current->sig_mask &= ~__SIGNAL(sig_ctx->sig_num);
+    __current->flags &= ~PROC_FINPAUSE;
     schedule();
 }
 
@@ -101,4 +103,17 @@ __DEFINE_LXSYSCALL2(int, signal, int, signum, sighandler_t, handler)
     __current->sig_handler[signum] = (void*)handler;
 
     return 0;
+}
+
+__DEFINE_LXSYSCALL(int, pause)
+{
+    __current->flags |= PROC_FINPAUSE;
+
+    __SYSCALL_INTERRUPTIBLE({
+        while ((__current->flags & PROC_FINPAUSE)) {
+            sched_yield();
+        }
+    })
+    __current->k_status = EINTR;
+    return -1;
 }

@@ -33,11 +33,6 @@ syscall_install();
 #define __PARAM_MAP5(t1, p1, ...) t1 p1, __PARAM_MAP4(__VA_ARGS__)
 #define __PARAM_MAP6(t1, p1, ...) t1 p1, __PARAM_MAP5(__VA_ARGS__)
 
-#define ___DOINT33(callcode, rettype)                                          \
-    int v;                                                                     \
-    asm volatile("int %1\n" : "=a"(v) : "i"(LUNAIX_SYS_CALL), "a"(callcode));  \
-    return (rettype)v;
-
 #define __DEFINE_LXSYSCALL(rettype, name) asmlinkage rettype __lxsys_##name()
 
 #define __DEFINE_LXSYSCALL1(rettype, name, t1, p1)                             \
@@ -52,6 +47,16 @@ syscall_install();
 #define __DEFINE_LXSYSCALL4(rettype, name, t1, p1, t2, p2, t3, p3, t4, p4)     \
     asmlinkage rettype __lxsys_##name(                                         \
       __PARAM_MAP4(t1, p1, t2, p2, t3, p3, t4, p4))
+
+#define __SYSCALL_INTERRUPTIBLE(code)                                          \
+    asm("sti");                                                                \
+    { code };                                                                  \
+    asm("cli");
+
+#define ___DOINT33(callcode, rettype)                                          \
+    int v;                                                                     \
+    asm volatile("int %1\n" : "=a"(v) : "i"(LUNAIX_SYS_CALL), "a"(callcode));  \
+    return (rettype)v;
 
 #define __LXSYSCALL(rettype, name)                                             \
     static rettype name()                                                      \
