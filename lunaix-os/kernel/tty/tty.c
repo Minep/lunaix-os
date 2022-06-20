@@ -1,8 +1,8 @@
-#include <klibc/string.h>
-#include <lunaix/tty/tty.h>
-#include <lunaix/common.h>
-#include <stdint.h>
 #include <hal/io.h>
+#include <klibc/string.h>
+#include <lunaix/common.h>
+#include <lunaix/tty/tty.h>
+#include <stdint.h>
 
 #define TTY_WIDTH 80
 #define TTY_HEIGHT 25
@@ -14,18 +14,22 @@ static vga_attribute tty_theme_color = VGA_COLOR_BLACK;
 static uint32_t tty_x = 0;
 static uint32_t tty_y = 0;
 
-void tty_init(void* vga_buf) {
+void
+tty_init(void* vga_buf)
+{
     tty_vga_buffer = (vga_attribute*)vga_buf;
     tty_clear();
 
     io_outb(0x3D4, 0x0A);
-	io_outb(0x3D5, (io_inb(0x3D5) & 0xC0) | 13);
- 
-	io_outb(0x3D4, 0x0B);
-	io_outb(0x3D5, (io_inb(0x3D5) & 0xE0) | 15);
+    io_outb(0x3D5, (io_inb(0x3D5) & 0xC0) | 13);
+
+    io_outb(0x3D4, 0x0B);
+    io_outb(0x3D5, (io_inb(0x3D5) & 0xE0) | 15);
 }
 
-void tty_set_buffer(void* vga_buf) {
+void
+tty_set_buffer(void* vga_buf)
+{
     tty_vga_buffer = (vga_attribute*)vga_buf;
 }
 
@@ -50,10 +54,12 @@ tty_put_char(char chr)
             break;
         case '\x08':
             tty_x = tty_x ? tty_x - 1 : 0;
-            *(tty_vga_buffer + tty_x + tty_y * TTY_WIDTH) = (tty_theme_color | 0x20);
+            *(tty_vga_buffer + tty_x + tty_y * TTY_WIDTH) =
+              (tty_theme_color | 0x20);
             break;
         default:
-            *(tty_vga_buffer + tty_x + tty_y * TTY_WIDTH) = (tty_theme_color | chr);
+            *(tty_vga_buffer + tty_x + tty_y * TTY_WIDTH) =
+              (tty_theme_color | chr);
             tty_x++;
             break;
     }
@@ -67,12 +73,15 @@ tty_put_char(char chr)
     }
 }
 
-void tty_sync_cursor() {
+void
+tty_sync_cursor()
+{
     tty_set_cursor(tty_x, tty_y);
 }
 
-
-void tty_set_cursor(uint8_t x, uint8_t y) {
+void
+tty_set_cursor(uint8_t x, uint8_t y)
+{
     if (x >= TTY_WIDTH || y >= TTY_HEIGHT) {
         x = y = 0;
     }
@@ -90,7 +99,11 @@ tty_put_str(char* str)
         tty_put_char(*str);
         str++;
     }
-    tty_sync_cursor();
+    // FIXME: This does not work in user mode.
+    // Work around:
+    //  1. (Easy) Define an IO Permission bitmap in TSS
+    //  2. (More effort) Mount onto file system. (/dev/tty)
+    // tty_sync_cursor();
 }
 
 void
@@ -115,26 +128,29 @@ tty_clear()
 }
 
 void
-tty_clear_line(unsigned int y) {
-    for (size_t i = 0; i < TTY_WIDTH; i++)
-    {
+tty_clear_line(unsigned int y)
+{
+    for (size_t i = 0; i < TTY_WIDTH; i++) {
         *(tty_vga_buffer + i + y * TTY_WIDTH) = tty_theme_color;
     }
 }
 
 void
-tty_set_cpos(unsigned int x, unsigned int y) {
+tty_set_cpos(unsigned int x, unsigned int y)
+{
     tty_x = x % TTY_WIDTH;
     tty_y = y % TTY_HEIGHT;
 }
 
 void
-tty_get_cpos(unsigned int* x, unsigned int* y) {
+tty_get_cpos(unsigned int* x, unsigned int* y)
+{
     *x = tty_x;
     *y = tty_y;
 }
 
 vga_attribute
-tty_get_theme() {
+tty_get_theme()
+{
     return tty_theme_color;
 }

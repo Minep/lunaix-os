@@ -1,12 +1,15 @@
 #include <arch/x86/interrupts.h>
 #include <arch/x86/tss.h>
+
 #include <hal/apic.h>
 #include <hal/cpu.h>
+
 #include <lunaix/mm/kalloc.h>
+#include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
-
+#include <lunaix/signal.h>
 #include <lunaix/spike.h>
 #include <lunaix/status.h>
 #include <lunaix/syscall.h>
@@ -18,8 +21,6 @@ volatile struct proc_info* __current;
 
 struct proc_info dummy;
 
-extern void __proc_table;
-
 struct scheduler sched_ctx;
 
 LOG_MODULE("SCHED")
@@ -28,11 +29,14 @@ void
 sched_init()
 {
     size_t pg_size = ROUNDUP(sizeof(struct proc_info) * MAX_PROCESS, 0x1000);
-    assert_msg(vmm_alloc_pages(
-                 KERNEL_PID, &__proc_table, pg_size, PG_PREM_RW, PP_FGPERSIST),
-               "Fail to allocate proc table");
 
-    sched_ctx = (struct scheduler){ ._procs = (struct proc_info*)&__proc_table,
+    for (size_t i = 0; i <= pg_size; i += 4096) {
+        uintptr_t pa = pmm_alloc_page(KERNEL_PID, PP_FGPERSIST);
+        vmm_set_mapping(
+          PD_REFERENCED, PROC_START + i, pa, PG_PREM_RW, VMAP_NULL);
+    }
+
+    sched_ctx = (struct scheduler){ ._procs = (struct proc_info*)PROC_START,
                                     .ptable_len = 0,
                                     .procs_index = 0 };
 }
@@ -45,22 +49,20 @@ run(struct proc_info* proc)
     }
     proc->state = PROC_RUNNING;
 
-    // FIXME: 这里还是得再考虑一下。
-    // tss_update_esp(__current->intr_ctx.esp);
-
-    if (__current->page_table != proc->page_table) {
-        __current = proc;
-        cpu_lcr3(__current->page_table);
-        // from now on, the we are in the kstack of another process
-    } else {
-        __current = proc;
-    }
+    /*
+        将tss.esp0设置为上次调度前的esp值。
+        当处理信号时，上下文信息是不会恢复的，而是保存在用户栈中，然后直接跳转进位于用户空间的sig_wrapper进行
+          信号的处理。当用户自定义的信号处理函数返回时，sigreturn的系统调用才开始进行上下文的恢复（或者说是进行
+          另一次调度。
+        由于这中间没有进行地址空间的交换，所以第二次跳转使用的是同一个内核栈，而之前默认tss.esp0的值是永远指向最顶部
+        这样一来就有可能会覆盖更早的上下文信息（比如嵌套的信号捕获函数）
+    */
+    tss_update_esp(proc->intr_ctx.registers.esp);
 
     apic_done_servicing();
 
-    asm volatile("movl %0, %%eax\n"
-                 "jmp soft_iret\n" ::"r"(&__current->intr_ctx)
-                 : "eax", "memory");
+    asm volatile("pushl %0\n"
+                 "jmp switch_to\n" ::"r"(proc)); // kernel/asm/x86/interrupt.S
 }
 
 void
@@ -174,8 +176,8 @@ done:
     return destroy_process(proc->pid);
 }
 
-pid_t
-alloc_pid()
+struct proc_info*
+alloc_process()
 {
     pid_t i = 0;
     for (;
@@ -186,29 +188,35 @@ alloc_pid()
     if (i == MAX_PROCESS) {
         panick("Panic in Ponyville shimmer!");
     }
-    return i;
-}
 
-void
-push_process(struct proc_info* process)
-{
-    int index = process->pid;
-    if (index < 0 || index > sched_ctx.ptable_len) {
-        __current->k_status = LXINVLDPID;
-        return;
-    }
-
-    if (index == sched_ctx.ptable_len) {
+    if (i == sched_ctx.ptable_len) {
         sched_ctx.ptable_len++;
     }
 
-    sched_ctx._procs[index] = *process;
+    struct proc_info* proc = &sched_ctx._procs[i];
+    memset(proc, 0, sizeof(*proc));
 
-    process = &sched_ctx._procs[index];
+    proc->state = PROC_CREATED;
+    proc->pid = i;
+    proc->created = clock_systime();
+    proc->pgid = proc->pid;
 
-    // make sure the reference is relative to process table
-    llist_init_head(&process->children);
-    llist_init_head(&process->grp_member);
+    llist_init_head(&proc->mm.regions);
+    llist_init_head(&proc->children);
+    llist_init_head(&proc->grp_member);
+
+    return proc;
+}
+
+void
+commit_process(struct proc_info* process)
+{
+    assert(process == &sched_ctx._procs[process->pid]);
+
+    if (process->state != PROC_CREATED) {
+        __current->k_status = LXINVL;
+        return;
+    }
 
     // every process is the child of first process (pid=1)
     if (process->parent) {
@@ -236,19 +244,17 @@ destroy_process(pid_t pid)
     proc->state = PROC_DESTROY;
     llist_delete(&proc->siblings);
 
-    if (proc->mm.regions) {
-        struct mm_region *pos, *n;
-        llist_for_each(pos, n, &proc->mm.regions->head, head)
-        {
-            lxfree(pos);
-        }
+    struct mm_region *pos, *n;
+    llist_for_each(pos, n, &proc->mm.regions.head, head)
+    {
+        lxfree(pos);
     }
 
-    vmm_mount_pd(PD_MOUNT_2, proc->page_table);
+    vmm_mount_pd(PD_MOUNT_1, proc->page_table);
 
-    __del_pagetable(pid, PD_MOUNT_2);
+    __del_pagetable(pid, PD_MOUNT_1);
 
-    vmm_unmount_pd(PD_MOUNT_2);
+    vmm_unmount_pd(PD_MOUNT_1);
 
     return pid;
 }
@@ -258,6 +264,8 @@ terminate_proc(int exit_code)
 {
     __current->state = PROC_TERMNAT;
     __current->exit_code = exit_code;
+
+    __SET_SIGNAL(__current->parent->sig_pending, _SIGCHLD);
 
     schedule();
 }

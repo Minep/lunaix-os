@@ -41,6 +41,12 @@ SECTIONS {
         build/obj/hal/*.o (.text)
     }
 
+    __usrtext_start = ALIGN(4K);
+    .usrtext BLOCK(4K) : AT ( ADDR(.usrtext) - 0xC0000000 ) {
+        build/obj/kernel/*.o (.usrtext)
+    }
+    __usrtext_end = ALIGN(4K);
+
     .bss BLOCK(4K) : AT ( ADDR(.bss) - 0xC0000000 ) {
         build/obj/kernel/*.o (.bss)
         build/obj/hal/*.o (.bss)
@@ -61,7 +67,4 @@ SECTIONS {
     }
 
     __kernel_end = ALIGN(4K);
-    __proc_table = ALIGN(4K);
-    . += 4M;
-    __kernel_heap_start = ALIGN(4K);    /* 内核结束的地方即堆开始的地方 */
 }

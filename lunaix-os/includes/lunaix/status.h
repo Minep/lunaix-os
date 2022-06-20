@@ -9,4 +9,6 @@
 #define LXSEGFAULT -(5)
 #define LXINVL -(6)
 
+#define EINTR -(7)
+
 #endif /* __LUNAIX_CODE_H */

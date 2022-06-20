@@ -18,6 +18,10 @@
         .long __lxsys_exit
         .long __lxsys_wait          
         .long __lxsys_waitpid       /* 10 */
+        .long __lxsys_sigreturn
+        .long __lxsys_sigprocmask
+        .long __lxsys_signal
+        .long __lxsys_pause
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
             .long 0
@@ -59,5 +63,3 @@
         popl %ebp
         
         ret
-
-

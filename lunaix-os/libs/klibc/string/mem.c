@@ -1,14 +1,14 @@
-#include <stdint.h>
 #include <klibc/string.h>
+#include <stdint.h>
 
 void*
 memcpy(void* dest, const void* src, size_t num)
 {
-    uint8_t* dest_ptr = (uint8_t*)dest;
-    const uint8_t* src_ptr = (const uint8_t*)src;
-    for (size_t i = 0; i < num; i++) {
-        *(dest_ptr + i) = *(src_ptr + i);
-    }
+    asm volatile("movl %1, %%edi\n"
+                 "rep movsb\n" ::"S"(src),
+                 "r"(dest),
+                 "c"(num)
+                 : "edi", "memory");
     return dest;
 }
 
@@ -32,10 +32,11 @@ memmove(void* dest, const void* src, size_t num)
 void*
 memset(void* ptr, int value, size_t num)
 {
-    uint8_t* c_ptr = (uint8_t*)ptr;
-    for (size_t i = 0; i < num; i++) {
-        *(c_ptr + i) = (uint8_t)value;
-    }
+    asm volatile("movl %1, %%edi\n"
+                 "rep stosb\n" ::"c"(num),
+                 "r"(ptr),
+                 "a"(value)
+                 : "edi", "memory");
     return ptr;
 }
 

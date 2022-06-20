@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define SEL_RPL(selector) ((selector)&0x3)
+
 typedef unsigned int reg32;
 typedef unsigned short reg16;
 

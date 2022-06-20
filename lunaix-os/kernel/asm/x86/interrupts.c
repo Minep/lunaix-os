@@ -1,4 +1,5 @@
 #include <arch/x86/interrupts.h>
+#include <arch/x86/tss.h>
 #include <hal/apic.h>
 #include <hal/cpu.h>
 #include <lunaix/mm/page.h>
@@ -41,12 +42,6 @@ intr_handler(isr_param* param)
 {
     __current->intr_ctx = *param;
 
-#ifdef USE_KERNEL_PT
-    cpu_lcr3(__kernel_ptd);
-
-    vmm_mount_pd(PD_MOUNT_1, __current->page_table);
-#endif
-
     isr_param* lparam = &__current->intr_ctx;
 
     if (lparam->vector <= 255) {
@@ -76,8 +71,5 @@ done:
         apic_done_servicing();
     }
 
-#ifdef USE_KERNEL_PT
-    cpu_lcr3(__current->page_table);
-#endif
     return;
 }

@@ -4,6 +4,7 @@
 #include <arch/x86/interrupts.h>
 #include <lunaix/clock.h>
 #include <lunaix/mm/mm.h>
+#include <lunaix/signal.h>
 #include <lunaix/timer.h>
 #include <lunaix/types.h>
 #include <stdint.h>
@@ -20,37 +21,74 @@
 
 #define PROC_TERMMASK 0x6
 
+#define PROC_FINPAUSE 1
+
 struct proc_mm
 {
     heap_context_t u_heap;
-    struct mm_region* regions;
+    struct mm_region regions;
 };
+
+struct proc_sig
+{
+    void* signal_handler;
+    int sig_num;
+    isr_param prev_context;
+};
+
+#define PROC_SIG_SIZE sizeof(struct proc_sig) // size=84
 
 struct proc_info
 {
+    /*
+        Any change to *critical section*, including layout, size
+        must be reflected in kernel/asm/x86/interrupt.S to avoid
+        disaster!
+     */
+
+    /* ---- critical section start ---- */
+
     pid_t pid;
     struct proc_info* parent;
-    isr_param intr_ctx;
+    isr_param intr_ctx; // size=76
+    uintptr_t ustack_top;
+    void* page_table;
+
+    /* ---- critical section end ---- */
+
     struct llist_header siblings;
     struct llist_header children;
     struct llist_header grp_member;
     struct proc_mm mm;
-    void* page_table;
     time_t created;
     uint8_t state;
     int32_t exit_code;
     int32_t k_status;
+    sigset_t sig_pending;
+    sigset_t sig_mask;
+    int flags;
+    void* sig_handler[_SIG_NUM];
     pid_t pgid;
     struct lx_timer* timer;
 };
 
 extern volatile struct proc_info* __current;
 
-pid_t
-alloc_pid();
+/**
+ * @brief 分配并初始化一个进程控制块
+ *
+ * @return struct proc_info*
+ */
+struct proc_info*
+alloc_process();
 
+/**
+ * @brief 初始化进程用户空间
+ *
+ * @param pcb
+ */
 void
-init_proc(struct proc_info* pcb);
+init_proc_user_space(struct proc_info* pcb);
 
 /**
  * @brief 向系统发布一个进程，使其可以被调度。
@@ -58,7 +96,7 @@ init_proc(struct proc_info* pcb);
  * @param process
  */
 void
-push_process(struct proc_info* process);
+commit_process(struct proc_info* process);
 
 pid_t
 destroy_process(pid_t pid);

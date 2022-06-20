@@ -4,8 +4,19 @@
 #include <lunaix/process.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <lunaix/mm/pmm.h>
 // Virtual memory manager
+
+#define VMAP_NULL 0
+/**
+ * @brief 映射模式：忽略已存在映射
+ *
+ */
+#define VMAP_IGNORE 1
+/**
+ * @brief 映射模式：不作实际映射。该功能用于预留出特定的地址空间
+ *
+ */
+#define VMAP_NOMAP 2
 
 /**
  * @brief 初始化虚拟内存管理器
@@ -23,86 +34,31 @@ x86_page_table*
 vmm_init_pd();
 
 /**
- * @brief 尝试建立一个映射关系。映射指定的物理页地址至虚拟页地址，如果指定的虚拟页地址已被占用
- * 则尝试寻找新的可用地址（该地址总是大于指定的地址）。
+ * @brief 在指定地址空间中，添加一个映射
  *
- * @param vpn 虚拟页地址
- * @param pa 物理页地址
- * @param dattr PDE 的属性
- * @param tattr PTE 的属性
- * @return 虚拟页地址，如不成功，则为 NULL
- */
-void*
-vmm_map_page(pid_t pid, void* va, void* pa, pt_attr tattr);
-
-/**
- * @brief 建立一个映射关系，映射指定的物理页地址至虚拟页地址。如果指定的虚拟页地址已被占用，
- * 则覆盖。
- *
- * @param va 虚拟页地址
- * @param pa 物理页地址
- * @param dattr PDE 的属性
- * @param tattr PTE 的属性
- * @return 虚拟页地址
- */
-void*
-vmm_fmap_page(pid_t pid, void* va, void* pa, pt_attr tattr);
-
-/**
- * @brief 尝试为一个虚拟页地址创建一个可用的物理页映射
- *
- * @param va 虚拟页地址
- * @return 虚拟页地址，如不成功，则为 NULL
- */
-void*
-vmm_alloc_page(pid_t pid, void* va, void** pa, pt_attr tattr, pp_attr_t pattr);
-
-
-/**
- * @brief 尝试分配多个连续的虚拟页
- * 
- * @param va 起始虚拟地址
- * @param sz 大小（必须为4K对齐）
- * @param tattr 属性
- * @return int 是否成功
+ * @param mnt 地址空间挂载点
+ * @param va 虚拟地址
+ * @param pa 物理地址
+ * @param attr 映射属性
+ * @return int
  */
 int
-vmm_alloc_pages(pid_t pid, void* va, size_t sz, pt_attr tattr, pp_attr_t pattr);
-
-/**
- * @brief 设置一个映射，如果映射已存在，则忽略。
- * 
- * @param va 
- * @param pa 
- * @param attr 
- */
-int
-vmm_set_mapping(pid_t pid, void* va, void* pa, pt_attr attr);
-
-/**
- * @brief 删除并释放一个映射
- *
- * @param vpn
- */
-void
-vmm_unmap_page(pid_t pid, void* va);
+vmm_set_mapping(uintptr_t mnt,
+                uintptr_t va,
+                uintptr_t pa,
+                pt_attr attr,
+                int options);
 
 /**
  * @brief 删除一个映射
  *
- * @param vpn
+ * @param mnt
+ * @param pid
+ * @param va
+ * @return int
  */
-void
-vmm_unset_mapping(void* va);
-
-/**
- * @brief 将虚拟地址翻译为其对应的物理映射
- *
- * @param va 虚拟地址
- * @return void* 物理地址，如映射不存在，则为NULL
- */
-void*
-vmm_v2p(void* va);
+uintptr_t
+vmm_del_mapping(uintptr_t mnt, uintptr_t va);
 
 /**
  * @brief 查找一个映射
@@ -110,29 +66,33 @@ vmm_v2p(void* va);
  * @param va 虚拟地址
  * @return v_mapping 映射相关属性
  */
-v_mapping
-vmm_lookup(void* va);
+int
+vmm_lookup(uintptr_t va, v_mapping* mapping);
 
 /**
  * @brief (COW) 为虚拟页创建副本。
- * 
+ *
  * @return void* 包含虚拟页副本的物理页地址。
- * 
+ *
  */
-void* vmm_dup_page(pid_t pid, void* pa);
+void*
+vmm_dup_page(pid_t pid, void* pa);
+
+void*
+vmm_dup_vmspace(pid_t pid);
 
 /**
  * @brief 挂载另一个虚拟地址空间至当前虚拟地址空间
- * 
+ *
  * @param pde 页目录的物理地址
- * @return void* 
+ * @return void*
  */
 void*
 vmm_mount_pd(uintptr_t mnt, void* pde);
 
 /**
  * @brief 卸载已挂载的虚拟地址空间
- * 
+ *
  */
 void*
 vmm_unmount_pd(uintptr_t mnt);

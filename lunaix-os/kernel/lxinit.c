@@ -5,6 +5,7 @@
 #include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/proc.h>
+#include <lunaix/signal.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
@@ -15,9 +16,16 @@ extern uint8_t __kernel_start;
 LOG_MODULE("INIT")
 
 // #define FORK_BOMB_DEMO
-// #define WAIT_DEMO
+#define WAIT_DEMO
+#define IN_USER_MODE
 
-void
+void __USER__
+sigchild_handler(int signum)
+{
+    kprintf(KINFO "SIGCHLD received\n");
+}
+
+void __USER__
 _lxinit_main()
 {
 #ifdef FORK_BOMB_DEMO
@@ -30,6 +38,8 @@ _lxinit_main()
     }
 #endif
 
+    signal(_SIGCHLD, sigchild_handler);
+
     int status;
 #ifdef WAIT_DEMO
     // 测试wait
@@ -40,6 +50,7 @@ _lxinit_main()
         kprintf("I am child, I am about to terminated\n");
         _exit(1);
     }
+    pause();
     pid_t child = wait(&status);
     kprintf("I am parent, my child (%d) terminated normally with code: %d.\n",
             child,
@@ -49,15 +60,14 @@ _lxinit_main()
     pid_t p = 0;
 
     if (!fork()) {
-        kprintf("Test no hang!");
-        sleep(12);
+        kprintf("Test no hang!\n");
+        sleep(6);
         _exit(0);
     }
 
     waitpid(-1, &status, WNOHANG);
 
-    // 这里是就是LunaixOS的第一个进程了！
-    for (size_t i = 0; i < 5; i++) {
+    for (size_t i = 0; i < 10; i++) {
         pid_t pid = 0;
         if (!(pid = fork())) {
             sleep(i);
@@ -94,15 +104,15 @@ _lxinit_main()
     struct kdb_keyinfo_pkt keyevent;
     while (1) {
         if (!kbd_recv_key(&keyevent)) {
-            // yield();
+            yield();
             continue;
         }
         if ((keyevent.state & KBD_KEY_FPRESSED) &&
             (keyevent.keycode & 0xff00) <= KEYPAD) {
             tty_put_char((char)(keyevent.keycode & 0x00ff));
-            tty_sync_cursor();
+            // FIXME: io to vga port is privileged and cause #GP in user mode
+            // tty_sync_cursor();
         }
     }
-
     spin();
 }

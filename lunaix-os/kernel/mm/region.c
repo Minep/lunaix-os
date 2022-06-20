@@ -1,47 +1,57 @@
-#include <lunaix/mm/region.h>
 #include <lunaix/mm/kalloc.h>
-#include <lunaix/process.h>
+#include <lunaix/mm/region.h>
 
-void region_add(struct proc_info* proc,unsigned long start, unsigned long end, unsigned int attr) {
+void
+region_add(struct mm_region* regions,
+           unsigned long start,
+           unsigned long end,
+           unsigned int attr)
+{
     struct mm_region* region = lxmalloc(sizeof(struct mm_region));
 
-    *region = (struct mm_region) {
-        .attr = attr,
-        .end = end,
-        .start = start
-    };
+    *region = (struct mm_region){ .attr = attr, .end = end, .start = start };
 
-    if (!proc->mm.regions) {
-        llist_init_head(&region->head);
-        proc->mm.regions = region;
-    }
-    else {
-        llist_append(&proc->mm.regions->head, &region->head);
-    }
+    llist_append(&regions->head, &region->head);
 }
 
-void region_release_all(struct proc_info* proc) {
-    struct mm_region* head = proc->mm.regions;
+void
+region_release_all(struct mm_region* regions)
+{
     struct mm_region *pos, *n;
 
-    llist_for_each(pos, n, &head->head, head) {
+    llist_for_each(pos, n, &regions->head, head)
+    {
         lxfree(pos);
     }
-
-    proc->mm.regions = NULL;
 }
 
-struct mm_region* region_get(struct proc_info* proc, unsigned long vaddr) {
-    struct mm_region* head = proc->mm.regions;
-    
-    if (!head) {
+void
+region_copy(struct mm_region* src, struct mm_region* dest)
+{
+    if (!src) {
+        return;
+    }
+
+    struct mm_region *pos, *n;
+
+    llist_for_each(pos, n, &src->head, head)
+    {
+        region_add(dest, pos->start, pos->end, pos->attr);
+    }
+}
+
+struct mm_region*
+region_get(struct mm_region* regions, unsigned long vaddr)
+{
+    if (!regions) {
         return NULL;
     }
 
     struct mm_region *pos, *n;
 
-    llist_for_each(pos, n, &head->head, head) {
-        if (vaddr >= pos->start && vaddr < pos->end) {
+    llist_for_each(pos, n, &regions->head, head)
+    {
+        if (pos->start <= vaddr && vaddr < pos->end) {
             return pos;
         }
     }
