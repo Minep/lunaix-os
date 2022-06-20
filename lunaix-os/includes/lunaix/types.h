@@ -3,15 +3,21 @@
 
 #include <stdint.h>
 
-#define PROCTERM 0x10000
-#define PROCSTOP 0x20000
+#define PEXITTERM 0x100
+#define PEXITSTOP 0x200
+#define PEXITSIG 0x400
+
+#define PEXITNUM(flag, code) (flag | (code & 0xff))
 
 #define WNOHANG 1
 #define WUNTRACED 2
-#define WEXITSTATUS(wstatus) ((wstatus & 0xffff))
-#define WIFSTOPPED(wstatus) ((wstatus & PROCSTOP))
+#define WEXITSTATUS(wstatus) ((wstatus & 0xff))
+#define WIFSTOPPED(wstatus) ((wstatus & PEXITSTOP))
 #define WIFEXITED(wstatus)                                                     \
-    ((wstatus & PROCTERM) && ((short)WEXITSTATUS(wstatus) >= 0))
+    ((wstatus & PEXITTERM) && ((char)WEXITSTATUS(wstatus) >= 0))
+
+#define WIFSIGNALED(wstatus) ((wstatus & PEXITSIG))
+// TODO: WTERMSIG
 
 typedef int32_t pid_t;
 

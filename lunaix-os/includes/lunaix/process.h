@@ -22,6 +22,7 @@
 #define PROC_TERMMASK 0x6
 
 #define PROC_FINPAUSE 1
+#define PROC_FALRMSET (1 << 1)
 
 struct proc_mm
 {
@@ -66,6 +67,7 @@ struct proc_info
     int32_t k_status;
     sigset_t sig_pending;
     sigset_t sig_mask;
+    sigset_t sig_inprogress;
     int flags;
     void* sig_handler[_SIG_NUM];
     pid_t pgid;

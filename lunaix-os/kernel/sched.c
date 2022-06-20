@@ -44,9 +44,6 @@ sched_init()
 void
 run(struct proc_info* proc)
 {
-    if (!(__current->state & ~PROC_RUNNING)) {
-        __current->state = PROC_STOPPED;
-    }
     proc->state = PROC_RUNNING;
 
     /*
@@ -65,6 +62,23 @@ run(struct proc_info* proc)
                  "jmp switch_to\n" ::"r"(proc)); // kernel/asm/x86/interrupt.S
 }
 
+int
+can_schedule(struct proc_info* proc)
+{
+    if (__SIGTEST(proc->sig_pending, _SIGKILL)) {
+        // 如果进程受到SIGKILL，则直接终止，该进程不给予调度。
+        terminate_proc(PEXITNUM(PEXITSIG, _SIGKILL));
+        return 0;
+    } else if (__SIGTEST(proc->sig_pending, _SIGCONT)) {
+        __SIGCLEAR(proc->sig_pending, _SIGSTOP);
+    } else if (__SIGTEST(proc->sig_pending, _SIGSTOP)) {
+        // 如果进程受到SIGSTOP，则该进程不给予调度。
+        return 0;
+    }
+
+    return 1;
+}
+
 void
 schedule()
 {
@@ -77,13 +91,24 @@ schedule()
     struct proc_info* next;
     int prev_ptr = sched_ctx.procs_index;
     int ptr = prev_ptr;
+
+    if (!(__current->state & ~PROC_RUNNING)) {
+        __current->state = PROC_STOPPED;
+    }
+
     // round-robin scheduler
+redo:
     do {
         ptr = (ptr + 1) % sched_ctx.ptable_len;
         next = &sched_ctx._procs[ptr];
     } while (next->state != PROC_STOPPED && ptr != prev_ptr);
 
     sched_ctx.procs_index = ptr;
+
+    if (!can_schedule(next)) {
+        // 如果该进程不给予调度，则尝试重新选择
+        goto redo;
+    }
 
     run(next);
 }
@@ -117,6 +142,7 @@ __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
 __DEFINE_LXSYSCALL1(void, exit, int, status)
 {
     terminate_proc(status);
+    schedule();
 }
 
 __DEFINE_LXSYSCALL(void, yield)
@@ -154,11 +180,11 @@ repeat:
     {
         if (!~wpid || proc->pid == wpid || proc->pgid == -wpid) {
             if (proc->state == PROC_TERMNAT && !options) {
-                status_flags |= PROCTERM;
+                status_flags |= PEXITTERM;
                 goto done;
             }
             if (proc->state == PROC_STOPPED && (options & WUNTRACED)) {
-                status_flags |= PROCSTOP;
+                status_flags |= PEXITSTOP;
                 goto done;
             }
         }
@@ -172,7 +198,8 @@ repeat:
 
 done:
     cpu_disable_interrupt();
-    *status = (proc->exit_code & 0xffff) | status_flags;
+    status_flags |= PEXITSIG * (proc->sig_inprogress != 0);
+    *status = proc->exit_code | status_flags;
     return destroy_process(proc->pid);
 }
 
@@ -219,11 +246,11 @@ commit_process(struct proc_info* process)
     }
 
     // every process is the child of first process (pid=1)
-    if (process->parent) {
-        llist_append(&process->parent->children, &process->siblings);
-    } else {
-        process->parent = &sched_ctx._procs[0];
+    if (!process->parent) {
+        process->parent = &sched_ctx._procs[1];
     }
+
+    llist_append(&process->parent->children, &process->siblings);
 
     process->state = PROC_STOPPED;
 }
@@ -265,9 +292,7 @@ terminate_proc(int exit_code)
     __current->state = PROC_TERMNAT;
     __current->exit_code = exit_code;
 
-    __SET_SIGNAL(__current->parent->sig_pending, _SIGCHLD);
-
-    schedule();
+    __SIGSET(__current->parent->sig_pending, _SIGCHLD);
 }
 
 struct proc_info*

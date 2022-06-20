@@ -26,6 +26,14 @@ sigchild_handler(int signum)
 }
 
 void __USER__
+sigsegv_handler(int signum)
+{
+    pid_t pid = getpid();
+    kprintf(KWARN "SIGSEGV received on process %d\n", pid);
+    _exit(signum);
+}
+
+void __USER__
 _lxinit_main()
 {
 #ifdef FORK_BOMB_DEMO
@@ -39,6 +47,7 @@ _lxinit_main()
 #endif
 
     signal(_SIGCHLD, sigchild_handler);
+    signal(_SIGSEGV, sigsegv_handler);
 
     int status;
 #ifdef WAIT_DEMO
@@ -67,9 +76,10 @@ _lxinit_main()
 
     waitpid(-1, &status, WNOHANG);
 
-    for (size_t i = 0; i < 10; i++) {
+    for (size_t i = 0; i < 5; i++) {
         pid_t pid = 0;
         if (!(pid = fork())) {
+            signal(_SIGSEGV, sigsegv_handler);
             sleep(i);
             if (i == 3) {
                 i = *(int*)0xdeadc0de; // seg fault!
@@ -83,7 +93,11 @@ _lxinit_main()
 
     while ((p = wait(&status)) >= 0) {
         short code = WEXITSTATUS(status);
-        if (WIFEXITED(status)) {
+        if (WIFSIGNALED(status)) {
+            kprintf(KINFO "Process %d terminated by signal, exit_code: %d\n",
+                    p,
+                    code);
+        } else if (WIFEXITED(status)) {
             kprintf(KINFO "Process %d exited with code %d\n", p, code);
         } else {
             kprintf(KWARN "Process %d aborted with code %d\n", p, code);

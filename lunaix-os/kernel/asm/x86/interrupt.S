@@ -157,17 +157,17 @@
         # 约定
         # arg1: 目标进程PCB地址 (next
 
-        popl %ecx               # next
+        popl %ebx               # next
         movl __current, %eax    
-        movl 88(%eax), %ebx     # __current->pagetable
-        movl 88(%ecx), %eax     # next->pagetable
+        movl 88(%eax), %ecx     # __current->pagetable
+        movl 88(%ebx), %eax     # next->pagetable
         
-        cmpl %ebx, %eax         # if(next->pagtable != __current->pagetable) {
+        cmpl %ecx, %eax         # if(next->pagtable != __current->pagetable) {
         jz 1f
         movl %eax, %cr3         #   cpu_lcr3(next->pagetable)
                                 # }
     1:
-        movl %ecx, __current    # __current = next
+        movl %ebx, __current    # __current = next
 
         # 我们已经处在了新的地址空间，为了避免影响其先前的栈布局
         # 需要使用一个临时的栈空间
@@ -178,7 +178,7 @@
         jz 1f
         jmp handle_signal
     1:
-        leal 8(%ecx), %eax
+        leal 8(%ebx), %eax
         jmp soft_iret
 
     .global handle_signal

@@ -121,6 +121,7 @@ spawn_proc0()
                                    .eip = (void*)__proc0,
                                    .ss = KDATA_SEG,
                                    .eflags = cpu_reflags() };
+    proc0->parent = proc0;
 
     // 方案1：必须在读取eflags之后禁用。否则当进程被调度时，中断依然是关闭的！
     // cpu_disable_interrupt();

@@ -20,7 +20,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + 多进程
 + 14个常见的Linux/POSIX系统调用（[附录1](#appendix1)）
 + 用户模式
-+ 信号机制（进行中）
++ 信号机制（测试中）
 
 ## 目录结构
 
@@ -67,7 +67,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 ## 附录1：支持的系统调用<a id="appendix1"></a>
 
 ### Unix/Linux/POSIX
-1. `sleep(2)`
+1. `sleep(3)`
 1. `wait(2)`
 1. `waitpid(2)`
 1. `fork(2)`
@@ -80,7 +80,8 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 1. `_exit(2)`
 1. `sigreturn(2)`
 1. `sigprocmask(2)`
-1. `signal(2)   `
+1. `signal(2)`
+1. `kill(2)`
 
 ### LunaixOS自有
 

@@ -3,21 +3,24 @@
 
 #include <lunaix/syscall.h>
 
-#define _SIG_NUM 8
+#define _SIG_NUM 16
 
 #define _SIG_PENDING(bitmap, sig) ((bitmap) & (1 << (sig)))
 
-#define _SIGSEGV 0
-#define _SIGALRM 1
-#define _SIGCHLD 2
+#define _SIGSEGV 1
+#define _SIGALRM 2
+#define _SIGCHLD 3
 #define _SIGCLD _SIGCHLD
-#define _SIGINT 3
-#define _SIGKILL 4
-#define _SIGSTOP 5
-#define _SIGCONT 6
+#define _SIGINT 4
+#define _SIGKILL 5
+#define _SIGSTOP 6
+#define _SIGCONT 7
+#define _SIGTERM 8
 
 #define __SIGNAL(num) (1 << (num))
-#define __SET_SIGNAL(bitmap, num) (bitmap = bitmap | __SIGNAL(num))
+#define __SIGSET(bitmap, num) (bitmap = bitmap | __SIGNAL(num))
+#define __SIGTEST(bitmap, num) (bitmap & __SIGNAL(num))
+#define __SIGCLEAR(bitmap, num) ((bitmap) = (bitmap) & ~__SIGNAL(num))
 
 #define _SIGNAL_UNMASKABLE (__SIGNAL(_SIGKILL) | __SIGNAL(_SIGSTOP))
 
@@ -29,5 +32,14 @@ typedef unsigned int sigset_t;
 typedef void (*sighandler_t)(int);
 
 __LXSYSCALL2(int, signal, int, signum, sighandler_t, handler);
+
+__LXSYSCALL3(int,
+             sigprocmask,
+             int,
+             how,
+             const sigset_t,
+             *set,
+             sigset_t,
+             *oldset);
 
 #endif /* __LUNAIX_SIGNAL_H */

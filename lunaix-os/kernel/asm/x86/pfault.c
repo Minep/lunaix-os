@@ -1,5 +1,6 @@
 #include <arch/x86/interrupts.h>
 #include <lunaix/common.h>
+#include <lunaix/lxsignal.h>
 #include <lunaix/mm/mm.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/region.h>
@@ -92,7 +93,8 @@ segv_term:
             ptr,
             param->cs,
             param->eip);
-    terminate_proc(LXSEGFAULT);
+    signal_send(__current->pid, _SIGSEGV);
+    schedule();
     // should not reach
     while (1)
         ;
