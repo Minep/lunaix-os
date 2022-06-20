@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="256" src="docs/img/lunaix-os-logo.png">
+  <img width="auto" src="docs/img/lunaix-os-logo.png">
 </p>
 
 # LunaixOS Project 
