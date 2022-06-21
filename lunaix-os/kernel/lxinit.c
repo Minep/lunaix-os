@@ -34,6 +34,13 @@ sigsegv_handler(int signum)
 }
 
 void __USER__
+sigalrm_handler(int signum)
+{
+    pid_t pid = getpid();
+    kprintf(KWARN "I, pid %d, have received an alarm!\n", pid);
+}
+
+void __USER__
 _lxinit_main()
 {
 #ifdef FORK_BOMB_DEMO
@@ -48,6 +55,9 @@ _lxinit_main()
 
     signal(_SIGCHLD, sigchild_handler);
     signal(_SIGSEGV, sigsegv_handler);
+    signal(_SIGALRM, sigalrm_handler);
+
+    alarm(5);
 
     int status;
 #ifdef WAIT_DEMO

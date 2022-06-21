@@ -19,6 +19,7 @@ void* default_handlers[_SIG_NUM] = {
     // TODO: 添加默认handler
     [_SIGINT] = default_sighandler_term,
     [_SIGTERM] = default_sighandler_term,
+    [_SIGKILL] = default_sighandler_term,
 };
 
 // Referenced in kernel/asm/x86/interrupt.S
@@ -105,7 +106,7 @@ send_grp:
     return 0;
 
 send_single:
-    if ((proc->state & PROC_TERMMASK)) {
+    if (PROC_TERMINATED(proc->state)) {
         __current->k_status = LXINVL;
         return -1;
     }

@@ -93,7 +93,7 @@ segv_term:
             ptr,
             param->cs,
             param->eip);
-    signal_send(__current->pid, _SIGSEGV);
+    __SIGSET(__current->sig_pending, _SIGSEGV);
     schedule();
     // should not reach
     while (1)

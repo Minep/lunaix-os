@@ -64,7 +64,7 @@ llist_delete(struct llist_header* elem)
 static inline int
 llist_empty(struct llist_header* elem)
 {
-    return elem->next == elem;
+    return elem->next == elem && elem->prev == elem;
 }
 
 /**

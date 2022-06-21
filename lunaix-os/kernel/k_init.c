@@ -162,7 +162,7 @@ spawn_proc0()
     commit_process(proc0);
 
     // 由于时钟中断与APIC未就绪，我们需要手动进行第一次调度。这里也会同时隐式地恢复我们的eflags.IF位
-    proc0->state = PROC_RUNNING;
+    proc0->state = PS_RUNNING;
     asm volatile("pushl %0\n"
                  "jmp switch_to\n" ::"r"(proc0));
 

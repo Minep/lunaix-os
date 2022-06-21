@@ -18,6 +18,7 @@
 #define __SYSCALL_signal 13
 #define __SYSCALL_pause 14
 #define __SYSCALL_kill 15
+#define __SYSCALL_alarm 16
 
 #define __SYSCALL_MAX 0x100
 

@@ -44,7 +44,7 @@ sched_init()
 void
 run(struct proc_info* proc)
 {
-    proc->state = PROC_RUNNING;
+    proc->state = PS_RUNNING;
 
     /*
         将tss.esp0设置为上次调度前的esp值。
@@ -65,11 +65,7 @@ run(struct proc_info* proc)
 int
 can_schedule(struct proc_info* proc)
 {
-    if (__SIGTEST(proc->sig_pending, _SIGKILL)) {
-        // 如果进程受到SIGKILL，则直接终止，该进程不给予调度。
-        terminate_proc(PEXITNUM(PEXITSIG, _SIGKILL));
-        return 0;
-    } else if (__SIGTEST(proc->sig_pending, _SIGCONT)) {
+    if (__SIGTEST(proc->sig_pending, _SIGCONT)) {
         __SIGCLEAR(proc->sig_pending, _SIGSTOP);
     } else if (__SIGTEST(proc->sig_pending, _SIGSTOP)) {
         // 如果进程受到SIGSTOP，则该进程不给予调度。
@@ -77,6 +73,38 @@ can_schedule(struct proc_info* proc)
     }
 
     return 1;
+}
+
+void
+check_sleepers()
+{
+    struct proc_info* leader = &sched_ctx._procs[0];
+    struct proc_info *pos, *n;
+    time_t now = clock_systime();
+    llist_for_each(pos, n, &leader->sleep.sleepers, sleep.sleepers)
+    {
+        if (PROC_TERMINATED(pos->state)) {
+            goto del;
+        }
+
+        time_t wtime = pos->sleep.wakeup_time;
+        time_t atime = pos->sleep.alarm_time;
+
+        if (wtime && now >= wtime) {
+            pos->sleep.wakeup_time = 0;
+            pos->state = PS_STOPPED;
+        }
+
+        if (atime && now >= atime) {
+            pos->sleep.alarm_time = 0;
+            __SIGSET(pos->sig_pending, _SIGALRM);
+        }
+
+        if (!wtime && !atime) {
+        del:
+            llist_delete(&pos->sleep.sleepers);
+        }
+    }
 }
 
 void
@@ -92,16 +120,18 @@ schedule()
     int prev_ptr = sched_ctx.procs_index;
     int ptr = prev_ptr;
 
-    if (!(__current->state & ~PROC_RUNNING)) {
-        __current->state = PROC_STOPPED;
+    if (!(__current->state & ~PS_RUNNING)) {
+        __current->state = PS_STOPPED;
     }
+
+    check_sleepers();
 
     // round-robin scheduler
 redo:
     do {
         ptr = (ptr + 1) % sched_ctx.ptable_len;
         next = &sched_ctx._procs[ptr];
-    } while (next->state != PROC_STOPPED && ptr != prev_ptr);
+    } while (next->state != PS_STOPPED && ptr != prev_ptr);
 
     sched_ctx.procs_index = ptr;
 
@@ -113,30 +143,38 @@ redo:
     run(next);
 }
 
-static void
-proc_timer_callback(struct proc_info* proc)
-{
-    proc->timer = NULL;
-    proc->state = PROC_STOPPED;
-}
-
 __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
 {
-    // FIXME: sleep的实现或许需要改一下。专门绑一个计时器好像没有必要……
     if (!seconds) {
         return 0;
     }
 
-    if (__current->timer) {
-        return __current->timer->counter / timer_context()->running_frequency;
+    if (__current->sleep.wakeup_time) {
+        return (__current->sleep.wakeup_time - clock_systime()) / 1000U;
     }
 
-    struct lx_timer* timer =
-      timer_run_second(seconds, proc_timer_callback, __current, 0);
-    __current->timer = timer;
+    __current->sleep.wakeup_time = clock_systime() + seconds * 1000;
+    llist_append(&sched_ctx._procs[0].sleep.sleepers,
+                 &__current->sleep.sleepers);
+
     __current->intr_ctx.registers.eax = seconds;
-    __current->state = PROC_BLOCKED;
+    __current->state = PS_BLOCKED;
     schedule();
+}
+
+__DEFINE_LXSYSCALL1(unsigned int, alarm, unsigned int, seconds)
+{
+    time_t prev_ddl = __current->sleep.alarm_time;
+    time_t now = clock_systime();
+
+    __current->sleep.alarm_time = seconds ? now + seconds * 1000 : 0;
+
+    if (llist_empty(&__current->sleep.sleepers)) {
+        llist_append(&sched_ctx._procs[0].sleep.sleepers,
+                     &__current->sleep.sleepers);
+    }
+
+    return prev_ddl ? (prev_ddl - now) / 1000 : 0;
 }
 
 __DEFINE_LXSYSCALL1(void, exit, int, status)
@@ -179,11 +217,11 @@ repeat:
     llist_for_each(proc, n, &__current->children, siblings)
     {
         if (!~wpid || proc->pid == wpid || proc->pgid == -wpid) {
-            if (proc->state == PROC_TERMNAT && !options) {
+            if (proc->state == PS_TERMNAT && !options) {
                 status_flags |= PEXITTERM;
                 goto done;
             }
-            if (proc->state == PROC_STOPPED && (options & WUNTRACED)) {
+            if (proc->state == PS_STOPPED && (options & WUNTRACED)) {
                 status_flags |= PEXITSTOP;
                 goto done;
             }
@@ -207,8 +245,7 @@ struct proc_info*
 alloc_process()
 {
     pid_t i = 0;
-    for (;
-         i < sched_ctx.ptable_len && sched_ctx._procs[i].state != PROC_DESTROY;
+    for (; i < sched_ctx.ptable_len && sched_ctx._procs[i].state != PS_DESTROY;
          i++)
         ;
 
@@ -223,7 +260,7 @@ alloc_process()
     struct proc_info* proc = &sched_ctx._procs[i];
     memset(proc, 0, sizeof(*proc));
 
-    proc->state = PROC_CREATED;
+    proc->state = PS_CREATED;
     proc->pid = i;
     proc->created = clock_systime();
     proc->pgid = proc->pid;
@@ -231,6 +268,7 @@ alloc_process()
     llist_init_head(&proc->mm.regions);
     llist_init_head(&proc->children);
     llist_init_head(&proc->grp_member);
+    llist_init_head(&proc->sleep.sleepers);
 
     return proc;
 }
@@ -240,7 +278,7 @@ commit_process(struct proc_info* process)
 {
     assert(process == &sched_ctx._procs[process->pid]);
 
-    if (process->state != PROC_CREATED) {
+    if (process->state != PS_CREATED) {
         __current->k_status = LXINVL;
         return;
     }
@@ -252,7 +290,7 @@ commit_process(struct proc_info* process)
 
     llist_append(&process->parent->children, &process->siblings);
 
-    process->state = PROC_STOPPED;
+    process->state = PS_STOPPED;
 }
 
 // from <kernel/process.c>
@@ -268,7 +306,7 @@ destroy_process(pid_t pid)
         return;
     }
     struct proc_info* proc = &sched_ctx._procs[index];
-    proc->state = PROC_DESTROY;
+    proc->state = PS_DESTROY;
     llist_delete(&proc->siblings);
 
     struct mm_region *pos, *n;
@@ -289,7 +327,7 @@ destroy_process(pid_t pid)
 void
 terminate_proc(int exit_code)
 {
-    __current->state = PROC_TERMNAT;
+    __current->state = PS_TERMNAT;
     __current->exit_code = exit_code;
 
     __SIGSET(__current->parent->sig_pending, _SIGCHLD);
@@ -317,5 +355,5 @@ orphaned_proc(pid_t pid)
 
     // 如果其父进程的状态是terminated 或 destroy中的一种
     // 或者其父进程是在该进程之后创建的，那么该进程为孤儿进程
-    return (parent->state & PROC_TERMMASK) || parent->created > proc->created;
+    return PROC_TERMINATED(parent->state) || parent->created > proc->created;
 }

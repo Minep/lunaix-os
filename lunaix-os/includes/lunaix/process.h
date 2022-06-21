@@ -12,17 +12,16 @@
 // 虽然内核不是进程，但为了区分，这里使用Pid=-1来指代内核。这主要是方便物理页所有权检查。
 #define KERNEL_PID -1
 
-#define PROC_STOPPED 0
-#define PROC_RUNNING 1
-#define PROC_TERMNAT 2
-#define PROC_DESTROY 4
-#define PROC_BLOCKED 8
-#define PROC_CREATED 16
+#define PS_STOPPED 0
+#define PS_RUNNING 1
+#define PS_TERMNAT 2
+#define PS_DESTROY 4
+#define PS_BLOCKED 8
+#define PS_CREATED 16
 
-#define PROC_TERMMASK 0x6
+#define PROC_TERMINATED(state) (state & 0x6)
 
 #define PROC_FINPAUSE 1
-#define PROC_FALRMSET (1 << 1)
 
 struct proc_mm
 {
@@ -60,6 +59,14 @@ struct proc_info
     struct llist_header siblings;
     struct llist_header children;
     struct llist_header grp_member;
+
+    struct
+    {
+        struct llist_header sleepers;
+        time_t wakeup_time;
+        time_t alarm_time;
+    } sleep;
+
     struct proc_mm mm;
     time_t created;
     uint8_t state;
@@ -71,7 +78,6 @@ struct proc_info
     int flags;
     void* sig_handler[_SIG_NUM];
     pid_t pgid;
-    struct lx_timer* timer;
 };
 
 extern volatile struct proc_info* __current;
