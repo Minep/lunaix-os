@@ -13,7 +13,7 @@ LunaixOS - A simple (yet naive), POSIX-complaint (hopefully!), operating system 
 
 This operating system is a macro-kernel, has its root in Intel's x86 platform and its ecosystem. It runs in protected mode and uses 4GiB addressing with two-level paging mechanism. It does not have x86_64 variant and does not support multi-core machine. 
 
-The memory is split into two parts, that is, 3GiB for user space (0x400000~0xBFFFFFFF) and 1GiB for kernel space (0xC0000000~0xFFFFFFFF). Such paradigm is a common practicing found in major operating systems, for example x86_32 version of Linux and Windows. For a more detailed arrangement of memory in LunaixOS, please refer to [LunaixOS Virtual Memory Mappings](docs/img/lunaix-os-mem.png).
+The memory is split into two parts, that is, 3GiB for user space (0x400000 ~ 0xBFFFFFFF) and 1GiB for kernel space (0xC0000000 ~ 0xFFFFFFFF). Such paradigm is a common practicing found in major operating systems, for example x86_32 version of Linux and Windows. For a more detailed arrangement of memory in LunaixOS, please refer to [LunaixOS Virtual Memory Mappings](docs/img/lunaix-os-mem.png).
 
 
 The following list presents all features it does have in current stage.
