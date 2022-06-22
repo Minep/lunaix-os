@@ -2,6 +2,10 @@
   <img width="auto" src="docs/img/lunaix-os-logo.png">
 </p>
 
+<p align="center">
+  <span>简体中文</span> | <a href="docs/README_en.md">English</a>
+</p>
+
 # LunaixOS Project 
 LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有浓重个人风格的操作系统。开发过程以视频教程形式在Bilibili呈现：[《从零开始自制操作系统系列》](https://space.bilibili.com/12995787/channel/collectiondetail?sid=196337)。
 
