@@ -2,6 +2,7 @@
 #include <lunaix/tty/tty.h>
 
 #include <lunaix/clock.h>
+#include <lunaix/lxconsole.h>
 #include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/pmm.h>
@@ -58,7 +59,12 @@ _kernel_pre_init()
     vmm_init();
     rtc_init();
 
-    tty_init((void*)VGA_BUFFER_PADDR);
+    unsigned int map_size =
+      _k_init_mb_info->mmap_length / sizeof(multiboot_memory_map_t);
+
+    setup_memory((multiboot_memory_map_t*)_k_init_mb_info->mmap_addr, map_size);
+
+    tty_init((void*)VGA_BUFFER_VADDR);
     tty_set_theme(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
 
     __kernel_ptd = cpu_rcr3();
@@ -71,14 +77,7 @@ _kernel_pre_init()
 void
 _kernel_init()
 {
-    kprintf("[MM] Mem: %d KiB, Extended Mem: %d KiB\n",
-            _k_init_mb_info->mem_lower,
-            _k_init_mb_info->mem_upper);
-
-    unsigned int map_size =
-      _k_init_mb_info->mmap_length / sizeof(multiboot_memory_map_t);
-
-    setup_memory((multiboot_memory_map_t*)_k_init_mb_info->mmap_addr, map_size);
+    lxconsole_init();
 
     kprintf(KINFO "[MM] Allocated %d pages for stack start at %p\n",
             KSTACK_SIZE >> PG_SIZE_BITS,
@@ -181,31 +180,23 @@ setup_memory(multiboot_memory_map_t* map, size_t map_size)
     // First pass, to mark the physical pages
     for (unsigned int i = 0; i < map_size; i++) {
         multiboot_memory_map_t mmap = map[i];
-        kprintf("[MM] Base: 0x%x, len: %u KiB, type: %u\n",
-                map[i].addr_low,
-                map[i].len_low >> 10,
-                map[i].type);
         if (mmap.type == MULTIBOOT_MEMORY_AVAILABLE) {
             // 整数向上取整除法
             uintptr_t pg = map[i].addr_low + 0x0fffU;
             pmm_mark_chunk_free(pg >> PG_SIZE_BITS,
                                 map[i].len_low >> PG_SIZE_BITS);
-            kprintf(KINFO "[MM] Freed %u pages start from 0x%x\n",
-                    map[i].len_low >> PG_SIZE_BITS,
-                    pg & ~0x0fffU);
         }
     }
 
     // 将内核占据的页，包括前1MB，hhk_init 设为已占用
     size_t pg_count = V2P(&__kernel_end) >> PG_SIZE_BITS;
     pmm_mark_chunk_occupied(KERNEL_PID, 0, pg_count, 0);
-    kprintf(KINFO "[MM] Allocated %d pages for kernel.\n", pg_count);
 
     size_t vga_buf_pgs = VGA_BUFFER_SIZE >> PG_SIZE_BITS;
 
-    // 首先，标记VGA部分为已占用
+    // 首先，标记VGA部分为已占用，并且锁定
     pmm_mark_chunk_occupied(
-      KERNEL_PID, VGA_BUFFER_PADDR >> PG_SIZE_BITS, vga_buf_pgs, 0);
+      KERNEL_PID, VGA_BUFFER_PADDR >> PG_SIZE_BITS, vga_buf_pgs, PP_FGLOCKED);
 
     // 重映射VGA文本缓冲区（以后会变成显存，i.e., framebuffer）
     for (size_t i = 0; i < vga_buf_pgs; i++) {
@@ -216,16 +207,7 @@ setup_memory(multiboot_memory_map_t* map, size_t map_size)
                         VMAP_NULL);
     }
 
-    assert_msg(!((uintptr_t)&__usrtext_start & 0xfff) &&
-                 !((uintptr_t)&__usrtext_end & 0xfff),
-               "Bad usrtext alignment");
-
     for (uintptr_t i = &__usrtext_start; i < &__usrtext_end; i += PG_SIZE) {
         vmm_set_mapping(PD_REFERENCED, i, V2P(i), PG_PREM_UR, VMAP_NULL);
     }
-
-    // 更新VGA缓冲区位置至虚拟地址
-    tty_set_buffer((void*)VGA_BUFFER_VADDR);
-
-    kprintf(KINFO "[MM] Mapped VGA to %p.\n", VGA_BUFFER_VADDR);
 }

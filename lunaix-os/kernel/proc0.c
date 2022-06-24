@@ -1,6 +1,7 @@
 #include <arch/x86/boot/multiboot.h>
 #include <lunaix/common.h>
 #include <lunaix/lunistd.h>
+#include <lunaix/lxconsole.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/peripheral/ps2kbd.h>
@@ -84,12 +85,6 @@ init_platform()
 {
     assert_msg(kalloc_init(), "Fail to initialize heap");
 
-    // Fuck it, I will no longer bother this little 1MiB
-    // I just release 4 pages for my APIC & IOAPIC remappings
-    // for (size_t i = 0; i < 3; i++) {
-    //     vmm_del_mapping(PD_REFERENCED, (void*)(i << PG_SIZE_BITS));
-    // }
-
     // 锁定所有系统预留页（内存映射IO，ACPI之类的），并且进行1:1映射
     lock_reserved_memory();
 
@@ -111,6 +106,8 @@ init_platform()
     ps2_kbd_init();
 
     syscall_install();
+
+    console_start_flushing();
 
     unlock_reserved_memory();
 
