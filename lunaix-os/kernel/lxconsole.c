@@ -39,35 +39,46 @@ console_schedule_flush()
 }
 
 void
-console_view_up(struct fifo_buffer* buffer)
+console_view_up()
 {
-    // mutex_lock(&buffer->lock);
-    size_t p = buffer->rd_pos - 2;
-    while (p < buffer->rd_pos && p != buffer->wr_pos &&
+    struct fifo_buffer* buffer = &lx_console.buffer;
+    mutex_lock(&buffer->lock);
+    size_t p = lx_console.erd_pos - 2;
+    while (p < lx_console.erd_pos && p != buffer->wr_pos &&
            ((char*)buffer->data)[p] != '\n') {
         p--;
     }
     p++;
 
-    if (p < buffer->rd_pos) {
+    if (p > lx_console.erd_pos) {
         p = 0;
     }
 
-    buffer->rd_pos = p;
-    // mutex_unlock(&buffer->lock);
+    buffer->flags |= FIFO_DIRTY;
+    lx_console.erd_pos = p;
+    mutex_unlock(&buffer->lock);
+}
+
+size_t
+__find_next_line(size_t start)
+{
+    size_t p = start;
+    while (p != lx_console.buffer.wr_pos &&
+           ((char*)lx_console.buffer.data)[p] != '\n') {
+        p = (p + 1) % lx_console.buffer.size;
+    }
+    return p + 1;
 }
 
 void
-console_view_down(struct fifo_buffer* buffer)
+console_view_down()
 {
-    // mutex_lock(&buffer->lock);
-    size_t p = buffer->rd_pos;
-    while (p != buffer->wr_pos && ((char*)buffer->data)[p] != '\n') {
-        p = (p + 1) % buffer->size;
-    }
+    struct fifo_buffer* buffer = &lx_console.buffer;
+    mutex_lock(&buffer->lock);
 
-    buffer->rd_pos = p + 1;
-    // mutex_unlock(&buffer->lock);
+    lx_console.erd_pos = __find_next_line(lx_console.erd_pos);
+    buffer->flags |= FIFO_DIRTY;
+    mutex_unlock(&buffer->lock);
 }
 
 void
@@ -80,18 +91,11 @@ __flush_cb(void* arg)
         return;
     }
 
-    size_t pos = tty_flush_buffer(lx_console.buffer.data,
-                                  lx_console.buffer.rd_pos,
-                                  lx_console.buffer.wr_pos,
-                                  lx_console.buffer.size);
-    lx_console.flush_timer = NULL;
-    if (pos < lx_console.buffer.wr_pos) {
-        console_view_down(&lx_console.buffer);
-    } else {
-        // clear the dirty bit only if we have flush all the data
-        //  that means: read pointer == write pointer
-        lx_console.buffer.flags &= ~FIFO_DIRTY;
-    }
+    tty_flush_buffer(lx_console.buffer.data,
+                     lx_console.erd_pos,
+                     lx_console.buffer.wr_pos,
+                     lx_console.buffer.size);
+    lx_console.buffer.flags &= ~FIFO_DIRTY;
 }
 
 void
@@ -102,15 +106,29 @@ console_write(struct console* console, uint8_t* data, size_t size)
     uintptr_t ptr = console->buffer.wr_pos;
     uintptr_t rd_ptr = console->buffer.rd_pos;
 
+    char c;
+    int lines = 0;
     for (size_t i = 0; i < size; i++) {
-        buffer[(ptr + i) % console->buffer.size] = data[i];
+        c = data[i];
+        buffer[(ptr + i) % console->buffer.size] = c;
+        // chars += (31 < c && c < 127);
+        lines += (c == '\n');
     }
 
     uintptr_t new_ptr = (ptr + size) % console->buffer.size;
     console->buffer.wr_pos = new_ptr;
+
+    if (console->lines > TTY_HEIGHT && lines > 0) {
+        console->buffer.rd_pos =
+          __find_next_line((size + rd_ptr) % console->buffer.size);
+    }
+
     if (new_ptr < ptr + size && new_ptr > rd_ptr) {
         console->buffer.rd_pos = new_ptr;
     }
+
+    console->lines += lines;
+    console->erd_pos = console->buffer.rd_pos;
     console->buffer.flags |= FIFO_DIRTY;
     mutex_unlock(&console->buffer.lock);
 }

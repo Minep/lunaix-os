@@ -11,7 +11,7 @@ void
 sem_wait(struct sem_t* sem)
 {
     while (!atomic_load(&sem->counter)) {
-        schedule();
+        // FIXME: better thing like wait queue
     }
     atomic_fetch_sub(&sem->counter, 1);
 }

@@ -97,11 +97,14 @@ _lxinit_main()
             yield();
             continue;
         }
-        if ((keyevent.state & KBD_KEY_FPRESSED) &&
-            (keyevent.keycode & 0xff00) <= KEYPAD) {
-            console_write_char((char)(keyevent.keycode & 0x00ff));
-            // FIXME: io to vga port is privileged and cause #GP in user mode
-            // tty_sync_cursor();
+        if ((keyevent.state & KBD_KEY_FPRESSED)) {
+            if ((keyevent.keycode & 0xff00) <= KEYPAD) {
+                console_write_char((char)(keyevent.keycode & 0x00ff));
+            } else if (keyevent.keycode == KEY_UP) {
+                console_view_up();
+            } else if (keyevent.keycode == KEY_DOWN) {
+                console_view_down();
+            }
         }
     }
     spin();
