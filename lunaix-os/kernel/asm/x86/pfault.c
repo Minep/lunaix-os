@@ -41,17 +41,17 @@ intr_routine_page_fault(const isr_param* param)
         if (do_kernel(&mapping)) {
             return;
         }
-        goto segv_term;
+        // 如果不是，那么看看内核是不是需要用户页。
     }
 
     struct mm_region* hit_region = region_get(&__current->mm.regions, ptr);
 
     if (!hit_region) {
-        // Into the void...
+        // 当你凝视深渊时……
         goto segv_term;
     }
 
-    x86_pte_t* pte = &PTE_MOUNTED(PD_REFERENCED, ptr >> 12);
+    volatile x86_pte_t* pte = &PTE_MOUNTED(PD_REFERENCED, ptr >> 12);
     if ((*pte & PG_PRESENT)) {
         if ((hit_region->attr & COW_MASK) == COW_MASK) {
             // normal page fault, do COW

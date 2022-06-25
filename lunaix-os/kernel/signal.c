@@ -17,9 +17,9 @@ default_sighandler_term(int signum)
 
 void* default_handlers[_SIG_NUM] = {
     // TODO: 添加默认handler
+    [_SIGINT] = default_sighandler_term,  [_SIGTERM] = default_sighandler_term,
+    [_SIGKILL] = default_sighandler_term, [_SIGSEGV] = default_sighandler_term,
     [_SIGINT] = default_sighandler_term,
-    [_SIGTERM] = default_sighandler_term,
-    [_SIGKILL] = default_sighandler_term,
 };
 
 // Referenced in kernel/asm/x86/interrupt.S

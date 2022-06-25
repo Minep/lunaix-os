@@ -5,7 +5,6 @@
 #include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/proc.h>
-#include <lunaix/signal.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
@@ -20,27 +19,6 @@ LOG_MODULE("INIT")
 #define IN_USER_MODE
 
 void __USER__
-sigchild_handler(int signum)
-{
-    kprintf(KINFO "SIGCHLD received\n");
-}
-
-void __USER__
-sigsegv_handler(int signum)
-{
-    pid_t pid = getpid();
-    kprintf(KWARN "SIGSEGV received on process %d\n", pid);
-    _exit(signum);
-}
-
-void __USER__
-sigalrm_handler(int signum)
-{
-    pid_t pid = getpid();
-    kprintf(KWARN "I, pid %d, have received an alarm!\n", pid);
-}
-
-void __USER__
 _lxinit_main()
 {
 #ifdef FORK_BOMB_DEMO
@@ -53,12 +31,6 @@ _lxinit_main()
     }
 #endif
 
-    signal(_SIGCHLD, sigchild_handler);
-    signal(_SIGSEGV, sigsegv_handler);
-    signal(_SIGALRM, sigalrm_handler);
-
-    alarm(5);
-
     int status;
 #ifdef WAIT_DEMO
     // 测试wait
@@ -69,7 +41,7 @@ _lxinit_main()
         kprintf("I am child, I am about to terminated\n");
         _exit(1);
     }
-    pause();
+    wait(&status);
     pid_t child = wait(&status);
     kprintf("I am parent, my child (%d) terminated normally with code: %d.\n",
             child,
@@ -89,7 +61,6 @@ _lxinit_main()
     for (size_t i = 0; i < 5; i++) {
         pid_t pid = 0;
         if (!(pid = fork())) {
-            signal(_SIGSEGV, sigsegv_handler);
             sleep(i);
             if (i == 3) {
                 i = *(int*)0xdeadc0de; // seg fault!
@@ -103,11 +74,7 @@ _lxinit_main()
 
     while ((p = wait(&status)) >= 0) {
         short code = WEXITSTATUS(status);
-        if (WIFSIGNALED(status)) {
-            kprintf(KINFO "Process %d terminated by signal, exit_code: %d\n",
-                    p,
-                    code);
-        } else if (WIFEXITED(status)) {
+        if (WIFEXITED(status)) {
             kprintf(KINFO "Process %d exited with code %d\n", p, code);
         } else {
             kprintf(KWARN "Process %d aborted with code %d\n", p, code);

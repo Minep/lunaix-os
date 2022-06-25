@@ -31,11 +31,17 @@ unlock_reserved_memory();
 void
 __do_reserved_memory(int unlock);
 
+//#define DEMO_SIGNAL
+
 void __USER__
 __proc0_usr()
 {
     if (!fork()) {
+#ifdef DEMO_SIGNAL
+        asm("jmp _signal_demo_main");
+#else
         asm("jmp _lxinit_main");
+#endif
     }
 
     while (1) {
