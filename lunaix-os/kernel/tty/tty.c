@@ -1,24 +1,27 @@
 #include <hal/io.h>
 #include <klibc/string.h>
 #include <lunaix/common.h>
+#include <lunaix/spike.h>
+#include <lunaix/tty/console.h>
 #include <lunaix/tty/tty.h>
 #include <stdint.h>
 
-#define TTY_WIDTH 80
-#define TTY_HEIGHT 25
+vga_attribute* tty_vga_buffer = (vga_attribute*)VGA_BUFFER_PADDR;
 
-static vga_attribute* tty_vga_buffer = (vga_attribute*)VGA_BUFFER_PADDR;
+vga_attribute tty_theme_color = VGA_COLOR_BLACK;
 
-static vga_attribute tty_theme_color = VGA_COLOR_BLACK;
-
-static uint32_t tty_x = 0;
-static uint32_t tty_y = 0;
+#define TTY_CLEAR                                                              \
+    asm volatile("rep stosw" ::"D"(tty_vga_buffer),                            \
+                 "c"(TTY_HEIGHT * TTY_WIDTH),                                  \
+                 "a"(tty_theme_color)                                          \
+                 : "memory");
 
 void
 tty_init(void* vga_buf)
 {
     tty_vga_buffer = (vga_attribute*)vga_buf;
-    tty_clear();
+
+    TTY_CLEAR
 
     io_outb(0x3D4, 0x0A);
     io_outb(0x3D5, (io_inb(0x3D5) & 0xC0) | 13);
@@ -28,55 +31,84 @@ tty_init(void* vga_buf)
 }
 
 void
-tty_set_buffer(void* vga_buf)
-{
-    tty_vga_buffer = (vga_attribute*)vga_buf;
-}
-
-void
 tty_set_theme(vga_attribute fg, vga_attribute bg)
 {
     tty_theme_color = (bg << 4 | fg) << 8;
 }
 
-void
-tty_put_char(char chr)
+size_t
+tty_flush_buffer(char* data, size_t pos, size_t limit, size_t buf_size)
 {
-    switch (chr) {
-        case '\t':
-            tty_x += 4;
-            break;
-        case '\n':
-            tty_y++;
-            // fall through
-        case '\r':
-            tty_x = 0;
-            break;
-        case '\x08':
-            tty_x = tty_x ? tty_x - 1 : 0;
-            *(tty_vga_buffer + tty_x + tty_y * TTY_WIDTH) =
-              (tty_theme_color | 0x20);
-            break;
-        default:
-            *(tty_vga_buffer + tty_x + tty_y * TTY_WIDTH) =
-              (tty_theme_color | chr);
-            tty_x++;
-            break;
-    }
+    int x = 0, y = 0;
 
-    if (tty_x >= TTY_WIDTH) {
-        tty_x = 0;
-        tty_y++;
-    }
-    if (tty_y >= TTY_HEIGHT) {
-        tty_scroll_up();
-    }
-}
+    // Clear screen
+    TTY_CLEAR
 
-void
-tty_sync_cursor()
-{
-    tty_set_cursor(tty_x, tty_y);
+    int state = 0;
+    int g[2] = { 0, 0 };
+    vga_attribute current_theme = tty_theme_color;
+    while (1) {
+        size_t ptr = pos % buf_size;
+        if (pos == limit) {
+            break;
+        }
+        char chr = data[pos];
+        if (state == 0 && chr == '\x033') {
+            state = 1;
+        } else if (state == 1 && chr == '[') {
+            state = 2;
+        } else if (state > 1) {
+            if ('0' <= chr && chr <= '9') {
+                g[state - 2] = (chr - '0') + g[state - 2] * 10;
+            } else if (chr == ';' && state == 2) {
+                state = 3;
+            } else {
+                if (g[0] == 39 && g[1] == 49) {
+                    current_theme = tty_theme_color;
+                } else {
+                    current_theme = (g[1] << 4 | g[0]) << 8;
+                }
+                g[0] = 0;
+                g[1] = 0;
+                state = 0;
+            }
+        } else {
+            state = 0;
+            switch (chr) {
+                case '\t':
+                    x += 4;
+                    break;
+                case '\n':
+                    y++;
+                    // fall through
+                case '\r':
+                    x = 0;
+                    break;
+                case '\x08':
+                    x = x ? x - 1 : 0;
+                    *(tty_vga_buffer + x + y * TTY_WIDTH) =
+                      (current_theme | 0x20);
+                    break;
+                default:
+                    *(tty_vga_buffer + x + y * TTY_WIDTH) =
+                      (current_theme | chr);
+                    (x)++;
+                    break;
+            }
+
+            if (x >= TTY_WIDTH) {
+                x = 0;
+                y++;
+            }
+            if (y >= TTY_HEIGHT) {
+                y--;
+                break;
+            }
+        }
+        pos++;
+    }
+    tty_set_cursor(x, y);
+    return pos;
 }
 
 void
@@ -93,64 +125,25 @@ tty_set_cursor(uint8_t x, uint8_t y)
 }
 
 void
-tty_put_str(char* str)
+tty_clear_line(int line_num)
 {
-    while (*str != '\0') {
-        tty_put_char(*str);
+    asm volatile("rep stosw" ::"D"(tty_vga_buffer + line_num * TTY_WIDTH),
+                 "c"(TTY_WIDTH),
+                 "a"(tty_theme_color)
+                 : "memory");
+}
+
+void
+tty_put_str_at(char* str, int x, int y)
+{
+    char c;
+    while ((c = (*str)) && y < TTY_HEIGHT) {
+        *(tty_vga_buffer + x + y * TTY_WIDTH) = c | tty_theme_color;
+        x++;
+        if (x >= TTY_WIDTH) {
+            y++;
+            x = 0;
+        }
         str++;
     }
-    // FIXME: This does not work in user mode.
-    // Work around:
-    //  1. (Easy) Define an IO Permission bitmap in TSS
-    //  2. (More effort) Mount onto file system. (/dev/tty)
-    // tty_sync_cursor();
-}
-
-void
-tty_scroll_up()
-{
-    size_t last_line = TTY_WIDTH * (TTY_HEIGHT - 1);
-    memcpy(tty_vga_buffer, tty_vga_buffer + TTY_WIDTH, last_line * 2);
-    for (size_t i = 0; i < TTY_WIDTH; i++) {
-        *(tty_vga_buffer + i + last_line) = tty_theme_color;
-    }
-    tty_y = tty_y == 0 ? 0 : TTY_HEIGHT - 1;
-}
-
-void
-tty_clear()
-{
-    for (uint32_t i = 0; i < TTY_WIDTH * TTY_HEIGHT; i++) {
-        *(tty_vga_buffer + i) = tty_theme_color;
-    }
-    tty_x = 0;
-    tty_y = 0;
-}
-
-void
-tty_clear_line(unsigned int y)
-{
-    for (size_t i = 0; i < TTY_WIDTH; i++) {
-        *(tty_vga_buffer + i + y * TTY_WIDTH) = tty_theme_color;
-    }
-}
-
-void
-tty_set_cpos(unsigned int x, unsigned int y)
-{
-    tty_x = x % TTY_WIDTH;
-    tty_y = y % TTY_HEIGHT;
-}
-
-void
-tty_get_cpos(unsigned int* x, unsigned int* y)
-{
-    *x = tty_x;
-    *y = tty_y;
-}
-
-vga_attribute
-tty_get_theme()
-{
-    return tty_theme_color;
 }

@@ -19,6 +19,12 @@
 #define VMAP_NOMAP 2
 
 /**
+ * @brief 规定下一个可用页映射应当限定在指定的4MB地址空间内
+ *
+ */
+#define VALLOC_PDE 1
+
+/**
  * @brief 初始化虚拟内存管理器
  *
  */
@@ -96,5 +102,8 @@ vmm_mount_pd(uintptr_t mnt, void* pde);
  */
 void*
 vmm_unmount_pd(uintptr_t mnt);
+
+void*
+vmm_next_free(uintptr_t start, int options);
 
 #endif /* __LUNAIX_VMM_H */

@@ -2,13 +2,13 @@
 #include <lunaix/clock.h>
 #include <lunaix/keyboard.h>
 #include <lunaix/lunistd.h>
+#include <lunaix/lxconsole.h>
 #include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/proc.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
-#include <lunaix/tty/tty.h>
 
 extern uint8_t __kernel_start;
 
@@ -65,8 +65,7 @@ _lxinit_main()
             if (i == 3) {
                 i = *(int*)0xdeadc0de; // seg fault!
             }
-            tty_put_char('0' + i);
-            tty_put_char('\n');
+            kprintf(KINFO "%d\n", i);
             _exit(0);
         }
         kprintf(KINFO "Forked %d\n", pid);
@@ -100,7 +99,7 @@ _lxinit_main()
         }
         if ((keyevent.state & KBD_KEY_FPRESSED) &&
             (keyevent.keycode & 0xff00) <= KEYPAD) {
-            tty_put_char((char)(keyevent.keycode & 0x00ff));
+            console_write_char((char)(keyevent.keycode & 0x00ff));
             // FIXME: io to vga port is privileged and cause #GP in user mode
             // tty_sync_cursor();
         }

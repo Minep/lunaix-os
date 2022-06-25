@@ -4,16 +4,16 @@
 #include <stddef.h>
 
 int
-memcmp(const void*, const void*, size_t);
+memcmp(const void* dest, const void* src, size_t size);
 
 void*
-memcpy(void* __restrict, const void* __restrict, size_t);
+memcpy(void* dest, const void* src, size_t size);
 
 void*
-memmove(void*, const void*, size_t);
+memmove(void* dest, const void* src, size_t size);
 
 void*
-memset(void*, int, size_t);
+memset(void* dest, int val, size_t size);
 
 size_t
 strlen(const char* str);
