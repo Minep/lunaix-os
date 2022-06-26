@@ -10,7 +10,6 @@ struct console
     struct fifo_buffer buffer;
     unsigned int erd_pos;
     unsigned int lines;
-    unsigned int chars;
 };
 
 #endif /* __LUNAIX_CONSOLE_H */

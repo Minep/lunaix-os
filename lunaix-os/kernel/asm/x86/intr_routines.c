@@ -1,4 +1,5 @@
 #include <arch/x86/interrupts.h>
+#include <lunaix/lxconsole.h>
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
@@ -36,8 +37,10 @@ intr_routine_divide_zero(const isr_param* param)
 void
 intr_routine_general_protection(const isr_param* param)
 {
+    kprintf(KERROR "Pid: %d\n", __current->pid);
     kprintf(KERROR "Addr: %p\n", (&debug_resv)[0]);
-    kprintf(KERROR "Expected: %p\n", __current->intr_ctx.eip);
+    kprintf(KERROR "Expected: %p\n", (&debug_resv)[1]);
+    console_flush(0);
     __print_panic_msg("General Protection", param);
     spin();
 }

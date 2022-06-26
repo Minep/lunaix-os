@@ -160,7 +160,8 @@ __DEFINE_LXSYSCALL2(int, signal, int, signum, sighandler_t, handler)
     return 0;
 }
 
-__DEFINE_LXSYSCALL(int, pause)
+void
+__do_pause()
 {
     __current->flags |= PROC_FINPAUSE;
 
@@ -170,10 +171,30 @@ __DEFINE_LXSYSCALL(int, pause)
         }
     })
     __current->k_status = EINTR;
+}
+
+__DEFINE_LXSYSCALL(int, pause)
+{
+    __do_pause();
     return -1;
 }
 
 __DEFINE_LXSYSCALL2(int, kill, pid_t, pid, int, signum)
 {
     return signal_send(pid, signum);
+}
+
+__DEFINE_LXSYSCALL1(int, sigpending, sigset_t, *sigset)
+{
+    *sigset = __current->sig_pending;
+    return 0;
+}
+
+__DEFINE_LXSYSCALL1(int, sigsuspend, sigset_t, *mask)
+{
+    sigset_t tmp = __current->sig_mask;
+    __current->sig_mask = (*mask) & ~_SIGNAL_UNMASKABLE;
+    __do_pause();
+    __current->sig_mask = tmp;
+    return -1;
 }

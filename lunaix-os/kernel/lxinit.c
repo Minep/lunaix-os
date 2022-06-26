@@ -1,6 +1,5 @@
 #include <hal/cpu.h>
 #include <lunaix/clock.h>
-#include <lunaix/keyboard.h>
 #include <lunaix/lunistd.h>
 #include <lunaix/lxconsole.h>
 #include <lunaix/mm/kalloc.h>
@@ -87,25 +86,5 @@ _lxinit_main()
     cpu_get_brand(buf);
     kprintf("CPU: %s\n\n", buf);
 
-    // no lxmalloc here! This can only be used within kernel, but here, we are
-    // in a dedicated process! any access to kernel method must be done via
-    // syscall
-
-    struct kdb_keyinfo_pkt keyevent;
-    while (1) {
-        if (!kbd_recv_key(&keyevent)) {
-            yield();
-            continue;
-        }
-        if ((keyevent.state & KBD_KEY_FPRESSED)) {
-            if ((keyevent.keycode & 0xff00) <= KEYPAD) {
-                console_write_char((char)(keyevent.keycode & 0x00ff));
-            } else if (keyevent.keycode == KEY_UP) {
-                console_view_up();
-            } else if (keyevent.keycode == KEY_DOWN) {
-                console_view_down();
-            }
-        }
-    }
-    spin();
+    _exit(0);
 }

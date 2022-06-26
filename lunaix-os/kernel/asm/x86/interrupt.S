@@ -117,6 +117,11 @@
     soft_iret:
         movl %eax, %esp
 
+#ifdef __ASM_INTR_DIAGNOSIS
+        movl 56(%esp), %eax
+        movl %eax, (debug_resv + 4)
+#endif
+
         popl %eax
         popl %ebx
         popl %ecx

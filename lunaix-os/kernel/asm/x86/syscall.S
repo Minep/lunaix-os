@@ -24,6 +24,8 @@
         .long __lxsys_pause
         .long __lxsys_kill          /* 15 */
         .long __lxsys_alarm
+        .long __lxsys_sigpending
+        .long __lxsys_sigsuspend
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
             .long 0

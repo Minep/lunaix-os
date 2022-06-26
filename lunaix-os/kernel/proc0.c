@@ -32,18 +32,34 @@ unlock_reserved_memory();
 void
 __do_reserved_memory(int unlock);
 
-//#define DEMO_SIGNAL
+#define DEMO_SIGNAL
+
+extern void
+_pconsole_main();
+
+extern void
+_signal_demo_main();
+
+extern void
+_lxinit_main();
 
 void __USER__
 __proc0_usr()
 {
+    pid_t p;
     if (!fork()) {
+        _pconsole_main();
+    }
+
+    if (!(p = fork())) {
 #ifdef DEMO_SIGNAL
-        asm("jmp _signal_demo_main");
+        _signal_demo_main();
 #else
-        asm("jmp _lxinit_main");
+        _lxinit_main();
 #endif
     }
+
+    // waitpid(p, 0, 0);
 
     while (1) {
         yield();

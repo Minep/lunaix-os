@@ -7,8 +7,6 @@
 
 static struct console lx_console;
 
-volatile int can_flush = 0;
-
 void
 lxconsole_init()
 {
@@ -82,7 +80,7 @@ console_view_down()
 }
 
 void
-__flush_cb(void* arg)
+console_flush(void* arg)
 {
     if (mutex_on_hold(&lx_console.buffer.lock)) {
         return;
@@ -111,7 +109,6 @@ console_write(struct console* console, uint8_t* data, size_t size)
     for (size_t i = 0; i < size; i++) {
         c = data[i];
         buffer[(ptr + i) % console->buffer.size] = c;
-        // chars += (31 < c && c < 127);
         lines += (c == '\n');
     }
 
@@ -149,6 +146,6 @@ void
 console_start_flushing()
 {
     struct lx_timer* timer =
-      timer_run_ms(20, __flush_cb, NULL, TIMER_MODE_PERIODIC);
+      timer_run_ms(20, console_flush, NULL, TIMER_MODE_PERIODIC);
     lx_console.flush_timer = timer;
 }

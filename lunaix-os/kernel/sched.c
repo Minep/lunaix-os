@@ -237,7 +237,9 @@ repeat:
 done:
     cpu_disable_interrupt();
     status_flags |= PEXITSIG * (proc->sig_inprogress != 0);
-    *status = proc->exit_code | status_flags;
+    if (status) {
+        *status = proc->exit_code | status_flags;
+    }
     return destroy_process(proc->pid);
 }
 

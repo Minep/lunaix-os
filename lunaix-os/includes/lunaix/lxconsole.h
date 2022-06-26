@@ -17,5 +17,8 @@ void
 console_view_down();
 
 void
+console_flush(void* arg);
+
+void
 console_start_flushing();
 #endif /* __LUNAIX_LXCONSOLE_H */
