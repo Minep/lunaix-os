@@ -28,6 +28,7 @@ The following list presents all features it does have in current stage.
 + 17 commonly used POSIX syscall（[See Appendix 1](#appendix1)）
 + User Space
 + Signal
++ PCI 3.0 (WIP)
 
 ## Project Structure
 
@@ -55,6 +56,7 @@ The following list also enumerated such materials the author has used:
 + 82093AA I/O Advanced Programmable Controller (IOAPIC) (Datasheet)
 + MC146818A (Datasheet)
 + Intel 500 Series Chipset Family Platform Controller Hub (Datasheet - Volume 2)
++ PCI Local Bus Specification, Revision 3.0
 
 #### Textbook
 + *Computer System - A Programmer's Perspective Third Edition* (Bryant, R & O'Hallaron, D), a.k.a. CS:APP
@@ -65,6 +67,7 @@ The following list also enumerated such materials the author has used:
 + [OSDev](https://wiki.osdev.org/Main_Page) - For material gathering.
 + [FreeVGA](http://www.osdever.net/FreeVGA/home.htm) - For VGA references.
 + GNU CC & LD online documentation.
++ [PCI Lookup](https://www.pcilookup.com/) - For device look up
 
 #### Others
 + Linux Manual - For learning the system call behavior on real machine.

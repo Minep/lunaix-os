@@ -25,6 +25,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + 17个常见的Linux/POSIX系统调用（[附录1](#appendix1)）
 + 用户模式
 + 信号机制
++ PCI 3.0 (WIP)
 
 ## 目录结构
 
@@ -52,6 +53,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + 82093AA I/O Advanced Programmable Controller (IOAPIC) (Datasheet)
 + MC146818A (Datasheet)
 + Intel 500 Series Chipset Family Platform Controller Hub (Datasheet - Volume 2)
++ PCI Local Bus Specification, Revision 3.0
 
 #### 理论书籍
 + *Computer System - A Programmer's Perspective Third Edition (CS:APP)* (Bryant, R & O'Hallaron, D)
@@ -63,6 +65,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + [OSDev](https://wiki.osdev.org/Main_Page) - 杂七杂八的参考，很多过来人的经验。作者主要用于上古资料查询以及收集；技术文献，手册，标准的粗略总结；以及开发环境/工具链的搭建。
 + [FreeVGA](http://www.osdever.net/FreeVGA/home.htm) - 98年的资源！关于VGA编程技术的宝藏网站。
 + GNU CC 和 GNU LD 的官方文档。
++ [PCI Lookup](https://www.pcilookup.com/) - PCI设备编号查询
 
 #### 其他
 + Linux Manual - 用于查询*nix API的一些具体行为。
