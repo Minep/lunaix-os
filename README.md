@@ -22,9 +22,9 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + 内存管理与按需分页（Demand Paging）
 + 键盘输入
 + 多进程
-+ 14个常见的Linux/POSIX系统调用（[附录1](#appendix1)）
++ 17个常见的Linux/POSIX系统调用（[附录1](#appendix1)）
 + 用户模式
-+ 信号机制（测试中）
++ 信号机制
 
 ## 目录结构
 
@@ -86,6 +86,8 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 1. `sigprocmask(2)`
 1. `signal(2)`
 1. `kill(2)`
+1. `sigpending(2)`
+1. `sigsuspend(2)`
 
 ### LunaixOS自有
 
