@@ -1,3 +1,4 @@
+#include <hal/apic.h>
 #include <hal/pci.h>
 #include <lunaix/mm/kalloc.h>
 #include <lunaix/syslog.h>
@@ -31,7 +32,7 @@ pci_probe_device(int bus, int dev, int funct)
         }
     }
 
-    if (hdr_type != 0) {
+    if (hdr_type != PCI_TDEV) {
         // XXX: 目前忽略所有桥接设备，比如PCI-PCI桥接器，或者是CardBus桥接器
         return;
     }
@@ -87,6 +88,8 @@ pci_probe_msi_info(struct pci_device* device)
     }
 }
 
+#define PCI_PRINT_BAR_LISTING
+
 void
 pci_print_device()
 {
@@ -104,11 +107,69 @@ pci_print_device()
         kprintf(KINFO "\t IRQ: %d, INT#x: %d\n",
                 PCI_INTR_IRQ(pos->intr_info),
                 PCI_INTR_PIN(pos->intr_info));
-
+#ifdef PCI_PRINT_BAR_LISTING
+        pci_reg_t bar;
+        for (size_t i = 1; i <= 6; i++) {
+            size_t size = pci_bar_sizing(pos, &bar, i);
+            if (!bar)
+                continue;
+            if (PCI_BAR_MMIO(bar)) {
+                kprintf(KINFO "\t BAR#%d (MMIO) %p [%d]\n",
+                        i,
+                        PCI_BAR_ADDR_MM(bar),
+                        size);
+            } else {
+                kprintf(KINFO "\t BAR#%d (I/O) %p [%d]\n",
+                        i,
+                        PCI_BAR_ADDR_IO(bar),
+                        size);
+            }
+        }
+#endif
         if (pos->msi_loc) {
             kprintf(KINFO "\t MSI supported (@%xh)\n", pos->msi_loc);
         }
     }
+}
+
+size_t
+pci_bar_sizing(struct pci_device* dev, uint32_t* bar_out, uint32_t bar_num)
+{
+    pci_reg_t bar = pci_read_cspace(dev->cspace_base, PCI_REG_BAR(bar_num));
+    if (!bar) {
+        *bar_out = 0;
+        return 0;
+    }
+
+    pci_write_cspace(dev->cspace_base, PCI_REG_BAR(bar_num), 0xffffffff);
+    pci_reg_t sized =
+      pci_read_cspace(dev->cspace_base, PCI_REG_BAR(bar_num)) & ~0x1;
+    if (PCI_BAR_MMIO(bar)) {
+        sized = PCI_BAR_ADDR_MM(sized);
+    }
+    *bar_out = bar;
+    return ~sized + 1;
+}
+
+void
+pci_setup_msi(struct pci_device* device, int vector)
+{
+    // Dest: APIC#0, Physical Destination, No redirection
+    uint32_t msi_addr = (__APIC_BASE_PADDR | 0x8);
+
+    // Edge trigger, Fixed delivery
+    uint32_t msi_data = vector;
+
+    pci_write_cspace(
+      device->cspace_base, PCI_MSI_ADDR(device->msi_loc), msi_addr);
+    pci_write_cspace(
+      device->cspace_base, PCI_MSI_DATA(device->msi_loc), msi_data & 0xffff);
+
+    pci_reg_t reg1 = pci_read_cspace(device->cspace_base, device->msi_loc);
+
+    // manipulate the MSI_CTRL to allow device using MSI to request service.
+    reg1 = ((((reg1 >> 16) & ~0x70) | 0x1) << 16) | (reg1 & 0xffff);
+    pci_write_cspace(device->cspace_base, device->msi_loc, reg1);
 }
 
 struct pci_device*
