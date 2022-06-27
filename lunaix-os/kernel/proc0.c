@@ -14,6 +14,7 @@
 #include <hal/acpi/acpi.h>
 #include <hal/apic.h>
 #include <hal/ioapic.h>
+#include <hal/pci.h>
 
 LOG_MODULE("PROC0")
 
@@ -32,6 +33,7 @@ unlock_reserved_memory();
 void
 __do_reserved_memory(int unlock);
 
+//#define USE_DEMO
 #define DEMO_SIGNAL
 
 extern void
@@ -52,14 +54,16 @@ __proc0_usr()
     }
 
     if (!(p = fork())) {
-#ifdef DEMO_SIGNAL
+#ifndef USE_DEMO
+        _exit(0);
+#elif defined DEMO_SIGNAL
         _signal_demo_main();
 #else
         _lxinit_main();
 #endif
     }
 
-    // waitpid(p, 0, 0);
+    waitpid(p, 0, 0);
 
     while (1) {
         yield();
@@ -126,6 +130,8 @@ init_platform()
     timer_init(SYS_TIMER_FREQUENCY_HZ);
     clock_init();
     ps2_kbd_init();
+    pci_init();
+    pci_print_device();
 
     syscall_install();
 

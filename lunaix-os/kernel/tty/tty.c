@@ -53,7 +53,7 @@ tty_flush_buffer(char* data, size_t pos, size_t limit, size_t buf_size)
             break;
         }
         char chr = data[pos];
-        if (state == 0 && chr == '\x033') {
+        if (state == 0 && chr == '\033') {
             state = 1;
         } else if (state == 1 && chr == '[') {
             state = 2;

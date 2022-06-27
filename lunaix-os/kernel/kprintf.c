@@ -33,7 +33,7 @@ __kprintf(const char* component, const char* fmt, va_list args)
             // tty_set_theme(VGA_COLOR_BROWN, current_theme >> 12);
             snprintf(expanded_fmt,
                      MAX_XFMT_SIZE,
-                     "\x033[6;0m[%s] (%s) %s\x033[39;49m",
+                     "\033[6;0m[%s] (%s) %s\033[39;49m",
                      "WARN",
                      component,
                      fmt);
@@ -42,7 +42,7 @@ __kprintf(const char* component, const char* fmt, va_list args)
             // tty_set_theme(VGA_COLOR_LIGHT_RED, current_theme >> 12);
             snprintf(expanded_fmt,
                      MAX_XFMT_SIZE,
-                     "\x033[12;0m[%s] (%s) %s\x033[39;49m",
+                     "\033[12;0m[%s] (%s) %s\033[39;49m",
                      "EROR",
                      component,
                      fmt);
@@ -51,7 +51,7 @@ __kprintf(const char* component, const char* fmt, va_list args)
             // tty_set_theme(VGA_COLOR_LIGHT_BLUE, current_theme >> 12);
             snprintf(expanded_fmt,
                      MAX_XFMT_SIZE,
-                     "\x033[9;0m[%s] (%s) %s\x033[39;49m",
+                     "\033[9;0m[%s] (%s) %s\033[39;49m",
                      "DEBG",
                      component,
                      fmt);
