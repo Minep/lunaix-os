@@ -3,14 +3,13 @@
 #include <lunaix/syslog.h>
 #include <lunaix/tty/tty.h>
 
-#define MAX_KPRINTF_BUF_SIZE 1024
-#define MAX_XFMT_SIZE 1024
-
-static char buf[MAX_KPRINTF_BUF_SIZE];
+#define MAX_KPRINTF_BUF_SIZE 512
+#define MAX_XFMT_SIZE 512
 
 void
 __kprintf(const char* component, const char* fmt, va_list args)
 {
+    char buf[MAX_KPRINTF_BUF_SIZE];
     if (!fmt)
         return;
     char log_level = '0';
@@ -74,16 +73,15 @@ __kprintf(const char* component, const char* fmt, va_list args)
 void
 kprint_panic(const char* fmt, ...)
 {
+    char buf[MAX_KPRINTF_BUF_SIZE];
     va_list args;
     va_start(args, fmt);
 
     tty_set_theme(VGA_COLOR_WHITE, VGA_COLOR_RED);
-    tty_clear_line(10);
-    tty_clear_line(11);
-    tty_clear_line(12);
+    tty_clear_line(24);
 
     __sprintf_internal(buf, fmt, MAX_KPRINTF_BUF_SIZE, args);
-    tty_put_str_at(buf, 0, 11);
+    tty_put_str_at(buf, 0, 24);
 
     va_end(args);
 }

@@ -4,7 +4,7 @@
 #include <lunaix/ds/llist.h>
 #include <stdint.h>
 
-#define SYS_TIMER_FREQUENCY_HZ 2048
+#define SYS_TIMER_FREQUENCY_HZ 1024
 
 #define TIMER_MODE_PERIODIC 0x1
 

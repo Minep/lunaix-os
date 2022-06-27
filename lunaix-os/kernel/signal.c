@@ -22,6 +22,7 @@ void* default_handlers[_SIG_NUM] = {
     [_SIGINT] = default_sighandler_term,
 };
 
+volatile isr_param __temp_save;
 // Referenced in kernel/asm/x86/interrupt.S
 void*
 signal_dispatch()
@@ -58,7 +59,29 @@ signal_dispatch()
     struct proc_sig* sig_ctx =
       (struct proc_sig*)(ustack - sizeof(struct proc_sig));
 
-    sig_ctx->prev_context = __current->intr_ctx;
+    /*
+        这是一个相当恶心的坑。
+        问题是出在原本的sig_ctx->prev_context = __current->intr_ctx的上面
+        这个语句会被gcc在编译时，用更加高效的 rep movsl 来代替。
+
+        由于我们采用按需分页，所以在很多情况下，用户栈实际被分配的空间不允许我们进行完整的
+        注入，而需要走page fault handler进行动态分页。
+
+        竞态条件就出现在这里！
+
+        假若我们的__current->intr_ctx注入了一半，然后产生page-fault中断，
+        那么这就会导致我们的__current->intr_ctx被这个page-fault中断导致的
+        上下文信息覆盖。那么当page-fault handler成功分配了一个页，返回，
+        拷贝也就得以进行。遗憾的是，只不过这次拷贝的内容和前面的拷贝是没有任何的关系
+        （因为此时的intr_ctx已经不是之前的intr_ctx了！）
+        而这就会导致我们保存在信号上下文中的进程上下文信息不完整，从而在soft_iret时
+        触发#GP。
+
+        解决办法就是先吧intr_ctx拷贝到一个静态分配的区域里，然后再注入到用户栈。
+    */
+    __temp_save = __current->intr_ctx;
+    sig_ctx->prev_context = __temp_save;
+
     sig_ctx->sig_num = sig_selected;
     sig_ctx->signal_handler = __current->sig_handler[sig_selected];
 

@@ -118,6 +118,7 @@
         movl %eax, %esp
 
 #ifdef __ASM_INTR_DIAGNOSIS
+        movl %eax, (debug_resv + 8)
         movl 56(%esp), %eax
         movl %eax, (debug_resv + 4)
 #endif

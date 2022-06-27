@@ -59,7 +59,8 @@ run(struct proc_info* proc)
     apic_done_servicing();
 
     asm volatile("pushl %0\n"
-                 "jmp switch_to\n" ::"r"(proc)); // kernel/asm/x86/interrupt.S
+                 "jmp switch_to\n" ::"r"(proc)
+                 : "memory"); // kernel/asm/x86/interrupt.S
 }
 
 int
