@@ -26,7 +26,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + 用户模式
 + 信号机制
 + PCI 3.0
-+ PCIe 2.0 (WIP)
++ PCIe 1.1 (WIP)
 
 ## 目录结构
 
@@ -55,6 +55,10 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + MC146818A (Datasheet)
 + Intel 500 Series Chipset Family Platform Controller Hub (Datasheet - Volume 2)
 + PCI Local Bus Specification, Revision 3.0
++ PCI Express Base Specification, Revision 1.1
++ PCI Firmware Specification, Revision 3.0
+
+**免责声明：PCI相关的标准最终解释权归PCI-SIG所有。此处提供的副本仅供个人学习使用。任何商用目的须向PCI-SIG购买。**
 
 #### 理论书籍
 + *Computer System - A Programmer's Perspective Third Edition (CS:APP)* (Bryant, R & O'Hallaron, D)

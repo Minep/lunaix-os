@@ -29,7 +29,7 @@ The following list presents all features it does have in current stage.
 + User Space
 + Signal
 + PCI 3.0
-+ PCIe 2.0 (WIP)
++ PCIe 1.1 (WIP)
 
 ## Project Structure
 
@@ -58,6 +58,10 @@ The following list also enumerated such materials the author has used:
 + MC146818A (Datasheet)
 + Intel 500 Series Chipset Family Platform Controller Hub (Datasheet - Volume 2)
 + PCI Local Bus Specification, Revision 3.0
++ PCI Express Base Specification, Revision 1.1
++ PCI Firmware Specification, Revision 3.0
+
+**DISCLAIMER: All rights of PCI-related specification is reserved by PCI-SIG. It is provided ONLY for learning purpose. Any commercial use should purchase a copy from PCI-SIG**
 
 #### Textbook
 + *Computer System - A Programmer's Perspective Third Edition* (Bryant, R & O'Hallaron, D), a.k.a. CS:APP
