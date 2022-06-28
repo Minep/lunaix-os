@@ -80,7 +80,7 @@ console_view_down()
 }
 
 void
-console_flush(void* arg)
+console_flush()
 {
     if (mutex_on_hold(&lx_console.buffer.lock)) {
         return;

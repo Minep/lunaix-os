@@ -2,9 +2,12 @@
 #include <hal/acpi/acpi.h>
 #include <hal/ioapic.h>
 #include <lunaix/common.h>
+#include <lunaix/mm/mmio.h>
 
-#define IOAPIC_REG_SEL *((volatile uint32_t*)(MMIO_IOAPIC + IOAPIC_IOREGSEL))
-#define IOAPIC_REG_WIN *((volatile uint32_t*)(MMIO_IOAPIC + IOAPIC_IOWIN))
+#define IOAPIC_REG_SEL *((volatile uint32_t*)(_ioapic_base + IOAPIC_IOREGSEL))
+#define IOAPIC_REG_WIN *((volatile uint32_t*)(_ioapic_base + IOAPIC_IOWIN))
+
+static volatile uintptr_t _ioapic_base;
 
 uint8_t
 ioapic_get_irq(acpi_context* acpi_ctx, uint8_t old_irq);
@@ -15,6 +18,8 @@ ioapic_init()
     // Remapping the IRQs
 
     acpi_context* acpi_ctx = acpi_get_context();
+
+    _ioapic_base = ioremap(acpi_ctx->madt.ioapic->ioapic_addr & ~0xfff, 4096);
 
     // Remap the IRQ 8 (rtc timer's vector) to RTC_TIMER_IV in ioapic
     //       (Remarks IRQ 8 is pin INTIN8)

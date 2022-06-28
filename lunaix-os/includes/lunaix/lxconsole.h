@@ -17,7 +17,7 @@ void
 console_view_down();
 
 void
-console_flush(void* arg);
+console_flush();
 
 void
 console_start_flushing();

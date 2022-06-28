@@ -30,6 +30,7 @@ __print_panic_msg(const char* msg, const isr_param* param)
 void
 intr_routine_divide_zero(const isr_param* param)
 {
+    console_flush();
     __print_panic_msg("Divide by zero!", param);
     spin();
 }
@@ -40,7 +41,7 @@ intr_routine_general_protection(const isr_param* param)
     kprintf(KERROR "Pid: %d\n", __current->pid);
     kprintf(KERROR "Addr: %p\n", (&debug_resv)[0]);
     kprintf(KERROR "Expected: %p\n", (&debug_resv)[1]);
-    console_flush(0);
+    console_flush();
     __print_panic_msg("General Protection", param);
     spin();
 }
@@ -48,6 +49,7 @@ intr_routine_general_protection(const isr_param* param)
 void
 intr_routine_sys_panic(const isr_param* param)
 {
+    console_flush();
     __print_panic_msg((char*)(param->registers.edi), param);
     spin();
 }
@@ -55,6 +57,7 @@ intr_routine_sys_panic(const isr_param* param)
 void
 intr_routine_fallback(const isr_param* param)
 {
+    console_flush();
     __print_panic_msg("Unknown Interrupt", param);
     spin();
 }
@@ -76,6 +79,7 @@ intr_routine_apic_error(const isr_param* param)
     uint32_t error_reg = apic_read_reg(APIC_ESR);
     char buf[32];
     sprintf(buf, "APIC error, ESR=0x%x", error_reg);
+    console_flush();
     __print_panic_msg(buf, param);
     spin();
 }

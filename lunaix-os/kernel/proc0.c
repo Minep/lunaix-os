@@ -115,16 +115,6 @@ init_platform()
     lock_reserved_memory();
 
     acpi_init(_k_init_mb_info);
-    uintptr_t ioapic_addr = acpi_get_context()->madt.ioapic->ioapic_addr;
-    pmm_mark_page_occupied(
-      KERNEL_PID, FLOOR(__APIC_BASE_PADDR, PG_SIZE_BITS), 0);
-    pmm_mark_page_occupied(KERNEL_PID, FLOOR(ioapic_addr, PG_SIZE_BITS), 0);
-
-    vmm_set_mapping(
-      PD_REFERENCED, MMIO_APIC, __APIC_BASE_PADDR, PG_PREM_RW, VMAP_NULL);
-    vmm_set_mapping(
-      PD_REFERENCED, MMIO_IOAPIC, ioapic_addr, PG_PREM_RW, VMAP_NULL);
-
     apic_init();
     ioapic_init();
     timer_init(SYS_TIMER_FREQUENCY_HZ);
@@ -136,6 +126,7 @@ init_platform()
     syscall_install();
 
     console_start_flushing();
+    console_flush();
 
     unlock_reserved_memory();
 

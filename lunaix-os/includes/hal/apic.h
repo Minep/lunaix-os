@@ -66,8 +66,11 @@
 
 #define APIC_PRIORITY(cls, subcls) (((cls) << 4) | (subcls))
 
-#define apic_read_reg(reg) (*(uint32_t*)(MMIO_APIC + (reg)))
-#define apic_write_reg(reg, val) (*(uint32_t*)(MMIO_APIC + (reg)) = (val))
+unsigned int
+apic_read_reg(unsigned int reg);
+
+void
+apic_write_reg(unsigned int reg, unsigned int val);
 
 void
 apic_init();
@@ -77,10 +80,7 @@ apic_init();
  * This will issue a write action to EOI register.
  *
  */
-inline static void
-apic_done_servicing()
-{
-    apic_write_reg(APIC_EOI, 0);
-}
+void
+apic_done_servicing();
 
 #endif /* __LUNAIX_APIC_H */

@@ -104,6 +104,19 @@ void*
 vmm_unmount_pd(uintptr_t mnt);
 
 void*
+vmm_ioremap(uintptr_t paddr, size_t size);
+
+void*
 vmm_next_free(uintptr_t start, int options);
+
+/**
+ * @brief 将连续的物理地址空间映射到内核虚拟地址空间
+ *
+ * @param paddr 物理地址空间的基地址
+ * @param size 物理地址空间的大小
+ * @return void*
+ */
+void*
+vmm_vmap(uintptr_t paddr, size_t size, pt_attr attr, uint32_t pattr);
 
 #endif /* __LUNAIX_VMM_H */
