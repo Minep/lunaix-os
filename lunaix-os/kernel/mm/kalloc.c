@@ -59,7 +59,6 @@ lx_grow_heap(heap_context_t* heap, size_t sz);
     Note: the brk always point to the beginning of epilogue.
 */
 
-// FIXME: This should be per-process but not global!
 static heap_context_t kheap;
 
 int

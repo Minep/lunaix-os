@@ -28,10 +28,6 @@ sigalrm_handler(int signum)
     kprintf(KWARN "I, pid %d, have received an alarm!\n", pid);
 }
 
-// FIXME: Race condition with signal (though rare!)
-// For some reason, there is a chance that iret in soft_iret path
-//   get unhappy when return from signal handler. Investigation is needed!
-
 void __USER__
 _signal_demo_main()
 {

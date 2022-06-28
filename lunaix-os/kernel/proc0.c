@@ -12,6 +12,7 @@
 #include <stddef.h>
 
 #include <hal/acpi/acpi.h>
+#include <hal/ahci.h>
 #include <hal/apic.h>
 #include <hal/ioapic.h>
 #include <hal/pci.h>
@@ -121,6 +122,7 @@ init_platform()
     clock_init();
     ps2_kbd_init();
     pci_init();
+    ahci_init();
     pci_print_device();
 
     syscall_install();
