@@ -1,6 +1,8 @@
+#include <hal/acpi/acpi.h>
 #include <hal/apic.h>
 #include <hal/pci.h>
 #include <lunaix/mm/kalloc.h>
+#include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 
 LOG_MODULE("PCI")
@@ -24,7 +26,10 @@ pci_probe_device(int bus, int dev, int funct)
     pci_reg_t hdr_type = pci_read_cspace(base, 0xc);
     hdr_type = (hdr_type >> 16) & 0xff;
 
-    if ((hdr_type & 0x80)) {
+    // 防止堆栈溢出
+    // QEMU的ICH9/Q35实现似乎有点问题，对于多功能设备的每一个功能的header type
+    //  都将第七位置位。而virtualbox 就没有这个毛病。
+    if ((hdr_type & 0x80) && funct == 0) {
         hdr_type = hdr_type & ~0x80;
         // 探测多用途设备（multi-function device）
         for (int i = 1; i < 7; i++) {
@@ -66,6 +71,9 @@ pci_probe()
 void
 pci_probe_msi_info(struct pci_device* device)
 {
+    // Note that Virtualbox have to use ICH9 chipset for MSI support.
+    // Qemu seems ok with default PIIX3, Bochs is pending to test...
+    //    See https://www.virtualbox.org/manual/ch03.html (section 3.5.1)
     pci_reg_t status =
       pci_read_cspace(device->cspace_base, PCI_REG_STATUS_CMD) >> 16;
 
@@ -205,5 +213,12 @@ void
 pci_init()
 {
     llist_init_head(&pci_devices);
+    acpi_context* acpi = acpi_get_context();
+    assert_msg(acpi, "ACPI not initialized.");
+    if (acpi->mcfg.alloc_num) {
+        // PCIe Enhanced Configuration Mechanism is supported.
+        // TODO: support PCIe addressing mechanism
+    }
+    // Otherwise, fallback to use legacy PCI 3.0 method.
     pci_probe();
 }

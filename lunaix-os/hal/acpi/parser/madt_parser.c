@@ -1,4 +1,4 @@
-#include "madt_parser.h"
+#include "parser.h"
 #include <lunaix/mm/kalloc.h>
 
 void
@@ -25,8 +25,7 @@ madt_parse(acpi_madt_t* madt, acpi_context* toc)
             case ACPI_MADT_IOAPIC:
                 toc->madt.ioapic = (acpi_ioapic_t*)entry;
                 break;
-            case ACPI_MADT_INTSO:
-            {
+            case ACPI_MADT_INTSO: {
                 acpi_intso_t* intso_tbl = (acpi_intso_t*)entry;
                 toc->madt.irq_exception[intso_tbl->source] = intso_tbl;
                 break;

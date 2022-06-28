@@ -25,7 +25,8 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + 17个常见的Linux/POSIX系统调用（[附录1](#appendix1)）
 + 用户模式
 + 信号机制
-+ PCI 3.0 (WIP)
++ PCI 3.0
++ PCIe 2.0 (WIP)
 
 ## 目录结构
 

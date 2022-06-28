@@ -1,2 +1,10 @@
 QEMU_MON_TERM := gnome-terminal
 QEMU_MON_PORT := 45454
+
+QEMU_OPTIONS := -s -S -m 1G \
+				-rtc base=utc \
+				-no-reboot \
+				-no-shutdown \
+				-d cpu_reset \
+				-device ahci,id=ahci \
+				-monitor telnet::$(QEMU_MON_PORT),server,nowait &

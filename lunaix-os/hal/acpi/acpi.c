@@ -6,7 +6,7 @@
 
 #include <klibc/string.h>
 
-#include "parser/madt_parser.h"
+#include "parser/parser.h"
 
 static acpi_context* ctx = NULL;
 
@@ -26,7 +26,7 @@ acpi_init(multiboot_info_t* mb_info)
     assert_msg(rsdp, "Fail to locate ACPI_RSDP");
     assert_msg(acpi_rsdp_validate(rsdp), "Invalid ACPI_RSDP (checksum failed)");
 
-    kprintf(KINFO "RSDP found at %p, RSDT: %p\n", rsdp, rsdp->rsdt);
+    kprintf(KDEBUG "RSDP found at %p, RSDT: %p\n", rsdp, rsdp->rsdt);
 
     acpi_rsdt_t* rsdt = rsdp->rsdt;
 
@@ -47,21 +47,22 @@ acpi_init(multiboot_info_t* mb_info)
                 // FADT just a plain structure, no need to parse.
                 ctx->fadt = *(acpi_fadt_t*)sdthdr;
                 break;
+            case ACPI_MCFG_SIG:
+                mcfg_parse(sdthdr, ctx);
+                break;
             default:
                 break;
         }
     }
 
     kprintf(KINFO "OEM: %s\n", ctx->oem_id);
-    kprintf(KINFO "IOAPIC address: %p\n", ctx->madt.ioapic->ioapic_addr);
-    kprintf(KINFO "APIC address: %p\n", ctx->madt.apic_addr);
 
     for (size_t i = 0; i < 24; i++) {
         acpi_intso_t* intso = ctx->madt.irq_exception[i];
         if (!intso)
             continue;
 
-        kprintf(KINFO "IRQ #%u -> GSI #%u\n", intso->source, intso->gsi);
+        kprintf(KDEBUG "IRQ #%u -> GSI #%u\n", intso->source, intso->gsi);
     }
 }
 

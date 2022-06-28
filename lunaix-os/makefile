@@ -51,20 +51,20 @@ clean:
 	@sleep 2
 
 run: $(BUILD_DIR)/$(OS_ISO)
-	@qemu-system-i386 -cdrom $(BUILD_DIR)/$(OS_ISO) -d cpu_reset -monitor telnet::$(QEMU_MON_PORT),server,nowait &
+	@qemu-system-i386 -cdrom $(BUILD_DIR)/$(OS_ISO) $(QEMU_OPTIONS)
 	@sleep 1
 	@telnet 127.0.0.1 $(QEMU_MON_PORT)
 
 debug-qemu: all-debug
 	@${TOOLCHAIN}/i686-elf-objcopy --only-keep-debug $(BIN_DIR)/$(OS_BIN) $(BUILD_DIR)/kernel.dbg
-	@qemu-system-i386 -m 1G -rtc base=utc -d cpu_reset -s -S -cdrom $(BUILD_DIR)/$(OS_ISO) -monitor telnet::$(QEMU_MON_PORT),server,nowait &
+	@qemu-system-i386 -cdrom $(BUILD_DIR)/$(OS_ISO) $(QEMU_OPTIONS)
 	@sleep 1
 	@$(QEMU_MON_TERM) -- telnet 127.0.0.1 $(QEMU_MON_PORT)
 	@gdb -s $(BUILD_DIR)/kernel.dbg -ex "target remote localhost:1234"
 
 debug-qemu-vscode: all-debug
 	@${TOOLCHAIN}/i686-elf-objcopy --only-keep-debug $(BIN_DIR)/$(OS_BIN) $(BUILD_DIR)/kernel.dbg
-	@qemu-system-i386 -s -S -m 1G -cdrom $(BUILD_DIR)/$(OS_ISO) -monitor telnet::$(QEMU_MON_PORT),server,nowait &
+	@qemu-system-i386 -cdrom $(BUILD_DIR)/$(OS_ISO) $(QEMU_OPTIONS)
 	@sleep 0.5
 	@telnet 127.0.0.1 $(QEMU_MON_PORT)
 

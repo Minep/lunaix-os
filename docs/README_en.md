@@ -28,7 +28,8 @@ The following list presents all features it does have in current stage.
 + 17 commonly used POSIX syscall（[See Appendix 1](#appendix1)）
 + User Space
 + Signal
-+ PCI 3.0 (WIP)
++ PCI 3.0
++ PCIe 2.0 (WIP)
 
 ## Project Structure
 
