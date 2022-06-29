@@ -124,6 +124,7 @@ init_platform()
     pci_init();
     ahci_init();
     pci_print_device();
+    ahci_list_device();
 
     syscall_install();
 
@@ -174,6 +175,8 @@ __do_reserved_memory(int unlock)
                     break;
                 }
                 vmm_set_mapping(PD_REFERENCED, _pa, _pa, PG_PREM_R, VMAP_NULL);
+                pmm_mark_page_occupied(
+                  KERNEL_PID, _pa >> PG_SIZE_BITS, PP_FGLOCKED);
             }
             // Save the progress for later unmapping.
             mmaps[i].len_low = j * PG_SIZE;
@@ -181,6 +184,9 @@ __do_reserved_memory(int unlock)
             for (; j < pg_num; j++) {
                 uintptr_t _pa = pa + (j << PG_SIZE_BITS);
                 vmm_del_mapping(PD_REFERENCED, _pa);
+                if (mmap.type == MULTIBOOT_MEMORY_ACPI_RECLAIMABLE) {
+                    pmm_mark_page_free(_pa >> PG_SIZE_BITS);
+                }
             }
         }
     }

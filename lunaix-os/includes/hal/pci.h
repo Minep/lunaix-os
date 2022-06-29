@@ -36,6 +36,12 @@
 #define PCI_MSI_ADDR(msi_base) ((msi_base) + 4)
 #define PCI_MSI_DATA(msi_base) ((msi_base) + 8)
 
+#define PCI_RCMD_DISABLE_INTR (1 << 10)
+#define PCI_RCMD_FAST_B2B (1 << 9)
+#define PCI_RCMD_BUS_MASTER (1 << 2)
+#define PCI_RCMD_MM_ACCESS (1 << 1)
+#define PCI_RCMD_IO_ACCESS 1
+
 #define PCI_ADDRESS(bus, dev, funct)                                           \
     (((bus)&0xff) << 16) | (((dev)&0xff) << 11) | (((funct)&0xff) << 8) |      \
       0x80000000
