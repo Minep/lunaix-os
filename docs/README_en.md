@@ -30,6 +30,7 @@ The following list presents all features it does have in current stage.
 + Signal
 + PCI 3.0
 + PCIe 1.1 (WIP)
++ Serial ATA AHCI (WIP)
 
 ## Project Structure
 
@@ -60,6 +61,8 @@ The following list also enumerated such materials the author has used:
 + PCI Local Bus Specification, Revision 3.0
 + PCI Express Base Specification, Revision 1.1
 + PCI Firmware Specification, Revision 3.0
++ Serial ATA - Advanced Host Controller Interface (AHCI), Revision 1.3.1
++ Serial ATA: HIgh Speed Serialized AT Attachment, Revision 1.0a
 
 **DISCLAIMER: All rights of PCI-related specification is reserved by PCI-SIG. It is provided ONLY for learning purpose. Any commercial use should purchase a copy from PCI-SIG**
 

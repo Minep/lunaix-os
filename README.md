@@ -27,6 +27,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + 信号机制
 + PCI 3.0
 + PCIe 1.1 (WIP)
++ Serial ATA AHCI (WIP)
 
 ## 目录结构
 
@@ -57,6 +58,8 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + PCI Local Bus Specification, Revision 3.0
 + PCI Express Base Specification, Revision 1.1
 + PCI Firmware Specification, Revision 3.0
++ Serial ATA - Advanced Host Controller Interface (AHCI), Revision 1.3.1
++ Serial ATA: HIgh Speed Serialized AT Attachment, Revision 1.0a
 
 **免责声明：PCI相关的标准最终解释权归PCI-SIG所有。此处提供的副本仅供个人学习使用。任何商用目的须向PCI-SIG购买。**
 
