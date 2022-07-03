@@ -2,7 +2,9 @@
 #include <lunaix/common.h>
 #include <lunaix/lunistd.h>
 #include <lunaix/lxconsole.h>
+#include <lunaix/mm/cake.h>
 #include <lunaix/mm/pmm.h>
+#include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/peripheral/ps2kbd.h>
 #include <lunaix/proc.h>
@@ -110,10 +112,13 @@ extern multiboot_info_t* _k_init_mb_info; /* k_init.c */
 void
 init_platform()
 {
-    assert_msg(kalloc_init(), "Fail to initialize heap");
-
     // 锁定所有系统预留页（内存映射IO，ACPI之类的），并且进行1:1映射
     lock_reserved_memory();
+
+    cake_init();
+
+    assert_msg(kalloc_init(), "Fail to initialize heap");
+    valloc_init();
 
     acpi_init(_k_init_mb_info);
     apic_init();
@@ -125,6 +130,8 @@ init_platform()
     ahci_init();
     pci_print_device();
     ahci_list_device();
+
+    cake_stats();
 
     syscall_install();
 

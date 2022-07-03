@@ -66,10 +66,10 @@ pmm_alloc_cpage(pid_t owner, size_t num_pages, pp_attr_t attr)
     size_t p2 = 0;
 
     while (p2 < max_pg && p2 - p1 < num_pages) {
-        (!(&pm_table[p2])->ref_counts) ? (p2++) : (p1 = p2);
+        (!(&pm_table[p2])->ref_counts) ? (p2++) : (p1 = ++p2);
     }
 
-    if (p2 < max_pg) {
+    if (p2 == max_pg && p2 - p1 < num_pages) {
         return NULL;
     }
 
