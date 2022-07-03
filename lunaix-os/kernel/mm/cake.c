@@ -19,7 +19,7 @@
 
 LOG_MODULE("CAKE")
 
-#define SLAB_SIZE PG_SIZE
+#define CACHE_LINE_SIZE 128
 
 struct cake_pile master_pile;
 
@@ -39,8 +39,7 @@ __new_cake(struct cake_pile* pile)
 
     int max_piece = pile->pieces_per_cake;
 
-    cake->first_piece =
-      (void*)((uintptr_t)(cake + 1) + max_piece * sizeof(piece_index_t));
+    cake->first_piece = (void*)((uintptr_t)cake + pile->offset);
     cake->next_free = 0;
 
     piece_index_t* free_list = &cake->free_list;
@@ -58,14 +57,29 @@ void
 __init_pile(struct cake_pile* pile,
             char* name,
             unsigned int piece_size,
-            unsigned int pg_per_cake)
+            unsigned int pg_per_cake,
+            int options)
 {
+    unsigned int offset = sizeof(long);
+
+    // 默认每块儿蛋糕对齐到地址总线宽度
+    if ((options & PILE_CACHELINE)) {
+        // 对齐到128字节缓存行大小，主要用于DMA
+        offset = CACHE_LINE_SIZE;
+    }
+
+    piece_size = ROUNDUP(piece_size, offset);
     *pile = (struct cake_pile){ .piece_size = piece_size,
                                 .cakes_count = 1,
                                 .pieces_per_cake =
                                   (pg_per_cake * PG_SIZE) /
                                   (piece_size + sizeof(piece_index_t)),
                                 .pg_per_cake = pg_per_cake };
+
+    unsigned int overhead_size =
+      sizeof(struct cake_s) + pile->pieces_per_cake * sizeof(piece_index_t);
+
+    pile->offset = ROUNDUP(overhead_size, offset);
 
     strncpy(&pile->pile_name, name, PILE_NAME_MAXLEN);
 
@@ -78,15 +92,18 @@ __init_pile(struct cake_pile* pile,
 void
 cake_init()
 {
-    __init_pile(&master_pile, "master", sizeof(master_pile), 1);
+    __init_pile(&master_pile, "pinkamina", sizeof(master_pile), 1, 0);
 }
 
 struct cake_pile*
-cake_new_pile(char* name, unsigned int piece_size, unsigned int pg_per_cake)
+cake_new_pile(char* name,
+              unsigned int piece_size,
+              unsigned int pg_per_cake,
+              int options)
 {
     struct cake_pile* pile = (struct cake_pile*)cake_grab(&master_pile);
 
-    __init_pile(pile, name, piece_size, pg_per_cake);
+    __init_pile(pile, name, piece_size, pg_per_cake, options);
 
     return pile;
 }

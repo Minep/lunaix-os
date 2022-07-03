@@ -7,6 +7,12 @@ valloc(unsigned int size);
 void
 vfree(void* ptr);
 
+void*
+valloc_dma(unsigned int size);
+
+void
+vfree_dma(void* ptr);
+
 void
 valloc_init();
 

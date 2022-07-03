@@ -128,7 +128,6 @@ init_platform()
     ps2_kbd_init();
     pci_init();
     ahci_init();
-    pci_print_device();
     ahci_list_device();
 
     cake_stats();

@@ -1,9 +1,11 @@
-#ifndef __LUNAIX_SLAB_H
-#define __LUNAIX_SLAB_H
+#ifndef __LUNAIX_CAKE_H
+#define __LUNAIX_CAKE_H
 
 #include <lunaix/ds/llist.h>
 
 #define PILE_NAME_MAXLEN 20
+
+#define PILE_CACHELINE 1
 
 struct cake_pile
 {
@@ -11,6 +13,7 @@ struct cake_pile
     struct llist_header full;
     struct llist_header partial;
     struct llist_header free;
+    unsigned int offset;
     unsigned int piece_size;
     unsigned int cakes_count;
     unsigned int alloced_pieces;
@@ -33,15 +36,18 @@ struct cake_s
 };
 
 /**
- * @brief 创建一个堆
+ * @brief 创建一个蛋糕堆
  *
  * @param name 堆名称
- * @param piece_size 每个蛋糕上可以被切分的大小
+ * @param piece_size 每个蛋糕切块儿的大小
  * @param pg_per_cake 每个蛋糕所占据的页数
  * @return struct cake_pile*
  */
 struct cake_pile*
-cake_new_pile(char* name, unsigned int piece_size, unsigned int pg_per_cake);
+cake_new_pile(char* name,
+              unsigned int piece_size,
+              unsigned int pg_per_cake,
+              int options);
 
 /**
  * @brief 拿一块儿蛋糕
