@@ -9,7 +9,11 @@
  *
  */
 #include <hal/ahci/ahci.h>
+#include <hal/ahci/hba.h>
+#include <hal/ahci/sata.h>
+#include <hal/ahci/scsi.h>
 #include <hal/ahci/utils.h>
+
 #include <hal/pci.h>
 #include <klibc/string.h>
 #include <lunaix/mm/mmio.h>
@@ -28,6 +32,9 @@ static struct ahci_hba hba;
 
 void
 __ahci_hba_isr(isr_param param);
+
+int
+ahci_init_device(struct hba_port* port);
 
 void
 ahci_init()
@@ -76,8 +83,8 @@ ahci_init()
             continue;
         }
 
-        struct ahci_port* port =
-          (struct ahci_port*)valloc(sizeof(struct ahci_port));
+        struct hba_port* port =
+          (struct hba_port*)valloc(sizeof(struct hba_port));
         hba_reg_t* port_regs =
           (hba_reg_t*)(&hba.base[HBA_RPBASE + i * HBA_RPSIZE]);
 
@@ -98,10 +105,10 @@ ahci_init()
         port_regs[HBA_RPxCLB] = clb_pa + clbp * HBA_CLB_SIZE;
         port_regs[HBA_RPxFB] = fis_pa + fisp * HBA_FIS_SIZE;
 
-        *port = (struct ahci_port){ .regs = port_regs,
-                                    .ssts = port_regs[HBA_RPxSSTS],
-                                    .cmdlst = clb_pg_addr + clbp * HBA_CLB_SIZE,
-                                    .fis = fis_pg_addr + fisp * HBA_FIS_SIZE };
+        *port = (struct hba_port){ .regs = port_regs,
+                                   .ssts = port_regs[HBA_RPxSSTS],
+                                   .cmdlst = clb_pg_addr + clbp * HBA_CLB_SIZE,
+                                   .fis = fis_pg_addr + fisp * HBA_FIS_SIZE };
 
         /* 初始化端口，并置于就绪状态 */
         port_regs[HBA_RPxCI] = 0;
@@ -118,8 +125,9 @@ ahci_init()
             wait_until(!(port_regs[HBA_RPxCMD] & HBA_PxCMD_CR));
             port_regs[HBA_RPxCMD] |= HBA_PxCMD_FRE;
             port_regs[HBA_RPxCMD] |= HBA_PxCMD_ST;
-            if (!ahci_identify_device(port)) {
-                kprintf(KERROR "fail to probe device info");
+
+            if (!ahci_init_device(port)) {
+                kprintf(KERROR "fail to init device");
             }
         }
     }
@@ -144,11 +152,11 @@ ahci_list_device()
             hba.version,
             hba.ports_num,
             hba.cmd_slots);
-    struct ahci_port* port;
+    struct hba_port* port;
     for (size_t i = 0; i < 32; i++) {
         port = hba.ports[i];
 
-        // 愚蠢的gcc似乎认为 struct ahci_port* 不可能为空
+        // 愚蠢的gcc似乎认为 struct hba_port* 不可能为空
         //  所以将这个非常关键的if给优化掉了。
         //  这里将指针强制转换为整数，欺骗gcc :)
         if ((uintptr_t)port == 0) {
@@ -162,21 +170,20 @@ ahci_list_device()
                 &sata_ifs[device_state],
                 port->regs[HBA_RPxSIG]);
 
-        struct ahci_device_info* dev_info = port->device_info;
+        struct hba_device* dev_info = port->device;
         if (!device_state || !dev_info) {
             continue;
         }
-
         kprintf("\t\t capacity: %d KiB\n",
-                (dev_info->max_lba * dev_info->sector_size) >> 10);
-        kprintf("\t\t sector size: %dB\n", dev_info->sector_size);
+                (dev_info->max_lba * dev_info->block_size) >> 10);
+        kprintf("\t\t sector size: %dB\n", dev_info->block_size);
         kprintf("\t\t model: %s\n", &dev_info->model);
         kprintf("\t\t serial: %s\n", &dev_info->serial_num);
     }
 }
 
 int
-achi_alloc_slot(struct ahci_port* port)
+__get_free_slot(struct hba_port* port)
 {
     hba_reg_t pxsact = port->regs[HBA_RPxSACT];
     hba_reg_t pxci = port->regs[HBA_RPxCI];
@@ -188,11 +195,11 @@ achi_alloc_slot(struct ahci_port* port)
 }
 
 void
-__ahci_create_fis(struct sata_reg_fis* cmd_fis,
-                  uint8_t command,
-                  uint32_t lba_lo,
-                  uint32_t lba_hi,
-                  uint16_t sector_count)
+sata_create_fis(struct sata_reg_fis* cmd_fis,
+                uint8_t command,
+                uint32_t lba_lo,
+                uint32_t lba_hi,
+                uint16_t sector_count)
 {
     cmd_fis->head.type = SATA_REG_FIS_H2D;
     cmd_fis->head.options = SATA_REG_FIS_COMMAND;
@@ -211,47 +218,66 @@ __ahci_create_fis(struct sata_reg_fis* cmd_fis,
 }
 
 int
-ahci_identify_device(struct ahci_port* port)
+hba_alloc_slot(struct hba_port* port,
+               struct hba_cmdt** cmdt,
+               struct hba_cmdh** cmdh,
+               uint16_t header_options)
 {
-    int slot = achi_alloc_slot(port);
-    assert_msg(slot >= 0, "No free slot");
-
-    // 清空任何待响应的中断
-    port->regs[HBA_RPxIS] = 0;
-
-    /* 发送ATA命令，参考：SATA AHCI Spec Rev.1.3.1, section 5.5 */
+    int slot = __get_free_slot(port);
+    assert_msg(slot >= 0, "HBA: No free slot");
 
     // 构建命令头（Command Header）和命令表（Command Table）
-    struct ahci_hba_cmdh* cmd_header = &port->cmdlst[slot];
-    struct ahci_hba_cmdt* cmd_table = valloc_dma(sizeof(struct ahci_hba_cmdt));
+    struct hba_cmdh* cmd_header = &port->cmdlst[slot];
+    struct hba_cmdt* cmd_table = valloc_dma(sizeof(struct hba_cmdt));
 
     memset(cmd_header, 0, sizeof(*cmd_header));
     memset(cmd_table, 0, sizeof(*cmd_table));
+
+    // 将命令表挂到命令头上
+    cmd_header->prdt_len = 1;
+    cmd_header->cmd_table_base = vmm_v2p(cmd_table);
+    cmd_header->options = HBA_CMDH_FIS_LEN(sizeof(struct sata_reg_fis)) |
+                          HBA_CMDH_CLR_BUSY | (header_options & ~0x1f);
+
+    *cmdh = cmd_header;
+    *cmdt = cmd_table;
+
+    return slot;
+}
+
+int
+ahci_init_device(struct hba_port* port)
+{
+    /* 发送ATA命令，参考：SATA AHCI Spec Rev.1.3.1, section 5.5 */
+    struct hba_cmdt* cmd_table;
+    struct hba_cmdh* cmd_header;
+
+    int slot = hba_alloc_slot(port, &cmd_table, &cmd_header, 0);
+
+    // 清空任何待响应的中断
+    port->regs[HBA_RPxIS] = 0;
+    port->device = valloc(sizeof(struct hba_device));
+    port->device->signature = port->regs[HBA_RPxSIG];
 
     // 预备DMA接收缓存，用于存放HBA传回的数据
     uint16_t* data_in = (uint16_t*)valloc_dma(512);
 
     cmd_table->entries[0] =
-      (struct ahci_hba_prdte){ .data_base = vmm_v2p(data_in),
-                               .byte_count = 511 }; // byte_count是从0开始算的
+      (struct hba_prdte){ .data_base = vmm_v2p(data_in),
+                          .byte_count = 511 }; // byte_count是从0开始算的
+    cmd_header->prdt_len = 1;
 
     // 在命令表中构建命令FIS
     struct sata_reg_fis* cmd_fis = (struct sata_reg_fis*)cmd_table->command_fis;
 
     // 根据设备类型使用合适的命令
-    if (port->regs[HBA_RPxSIG] == HBA_DEV_SIG_ATA) {
+    if (port->device->signature == HBA_DEV_SIG_ATA) {
         // ATA 一般为硬盘
-        __ahci_create_fis(cmd_fis, ATA_IDENTIFY_DEVICE, 0, 0, 0);
+        sata_create_fis(cmd_fis, ATA_IDENTIFY_DEVICE, 0, 0, 0);
     } else {
         // ATAPI 一般为光驱，软驱，或者磁带机
-        __ahci_create_fis(cmd_fis, ATA_IDENTIFY_PAKCET_DEVICE, 0, 0, 0);
+        sata_create_fis(cmd_fis, ATA_IDENTIFY_PAKCET_DEVICE, 0, 0, 0);
     }
-
-    // 将命令表挂到命令头上
-    cmd_header->cmd_table_base = vmm_v2p(cmd_table);
-    cmd_header->prdt_len = 1;
-    cmd_header->options |=
-      HBA_CMDH_FIS_LEN(sizeof(*cmd_fis)) | HBA_CMDH_CLR_BUSY;
 
     // PxCI寄存器置位，告诉HBA这儿有个数据需要发送到SATA端口
     port->regs[HBA_RPxCI] = (1 << slot);
@@ -263,18 +289,49 @@ ahci_identify_device(struct ahci_port* port)
         解析IDENTIFY DEVICE传回来的数据。
           参考：
             * ATA/ATAPI Command Set - 3 (ACS-3), Section 7.12.7
+    */
+    ahci_parse_dev_info(port->device, data_in);
 
-        注意：ATAPI无法通过IDENTIFY PACKET DEVICE 获取容量信息。
-        这需要另外使用特殊的SCSI命令中的READ CAPACITY(16)
-        来获取，这种命令需要使用ATA的PACKET命令发出。
+    if (port->device->signature == HBA_DEV_SIG_ATA) {
+        goto done;
+    }
+
+    /*
+        注意：ATAPI设备是无法通过IDENTIFY PACKET DEVICE 获取容量信息的。
+        我们需要使用SCSI命令的READ_CAPACITY(16)进行获取。
+        步骤如下：
+            1. 因为ATAPI走的是SCSI，而AHCI对此专门进行了SATA的封装，
+               也就是通过SATA的PACKET命令对SCSI命令进行封装。所以我们
+               首先需要构建一个PACKET命令的FIS
+            2. 接着，在ACMD中构建命令READ_CAPACITY的CDB - 一种SCSI命令的封装
+            3. 然后把cmd_header->options的A位置位，表示这是一个送往ATAPI的命令。
+                一点细节：
+                    1. HBA往底层SATA控制器发送PACKET FIS
+                    2. SATA控制器回复PIO Setup FIS
+                    3. HBA读入ACMD中的CDB，打包成Data FIS进行答复
+                    4. SATA控制器解包，拿到CDB，通过SCSI协议转发往ATAPI设备。
+                    5. ATAPI设备回复Return Parameter，SATA通过DMA Setup FIS
+                       发起DMA请求，HBA介入，将Return Parameter写入我们在PRDT
+                       里设置的data_in位置。
+            4. 最后照常等待HBA把结果写入data_in，然后直接解析就好了。
           参考：
             * ATA/ATAPI Command Set - 3 (ACS-3), Section 7.18
             * SATA AHCI HBA Spec, Section 5.3.7
             * SCSI Command Reference Manual, Section 3.26
     */
-    port->device_info = valloc(sizeof(struct ahci_device_info));
-    ahci_parse_dev_info(port->device_info, data_in);
+    sata_create_fis(cmd_fis, ATA_PACKET, 512 << 8, 0, 0);
+    struct scsi_cdb16* cdb16 = (struct scsi_cdb16*)cmd_table->atapi_cmd;
+    scsi_create_packet16(cdb16, SCSI_READ_CAPACITY_16, 0, 0, 512);
+    cdb16->misc1 = 0x10; // service action
+    cmd_header->transferred_size = 0;
+    cmd_header->options |= HBA_CMDH_ATAPI;
 
+    port->regs[HBA_RPxCI] = (1 << slot);
+    wait_until(!(port->regs[HBA_RPxCI] & (1 << slot)));
+
+    scsi_parse_capacity(port->device, (uint32_t*)data_in);
+
+done:
     vfree_dma(data_in);
     vfree_dma(cmd_table);
 
