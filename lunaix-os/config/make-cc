@@ -1,6 +1,5 @@
-TOOLCHAIN := ${HOME}/opt/cross-compiler/bin/
-CC := ${TOOLCHAIN}i686-elf-gcc
-AS := ${TOOLCHAIN}i686-elf-as
+CC := i686-elf-gcc
+AS := i686-elf-as
 
 
 ARCH_OPT := -D__ARCH_IA32
