@@ -37,6 +37,45 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 | [slides](slides/) | 视频中所用的幻灯片和补充材料 |
 | [reference-material](reference-material/)| 标准，技术文档和参考文献 |
 
+## 编译与构建
+
+构建该项目需要满足以下条件：
+
++ gcc (目标平台: i686-elf)
++ binutils
++ make
++ xorriso
++ grub-mkrescue
+
+**注意：gcc不能是本机自带的，必须要从源码编译，并配置目标平台为：`i686-elf`，以进行交叉编译。配置过程可参考[附录二：编译gcc作为交叉编译器](#appendix2)。**
+
+假若条件满足，那么可以直接执行`make all`进行构建，完成后可在生成的`build`目录下找到可引导的iso。
+
+本项目支持的make命令：
+| 命令 | 用途 |
+|---|---|
+| `make all` | 构建镜像（`-O2`） |
+| `make all-debug` | 构建适合调试用的镜像（`-Og`） |
+| `make run` | 使用QEMU运行build目录下的镜像|
+| `make debug-qemu` | 构建并使用QEMU进行调试 |
+| `make debug-bochs` | 构建并使用Bochs进行调试 |
+| `make debug-qemu-vscode` | 用于vscode整合 |
+| `make clean` | 删除build目录 |
+
+## 运行以及Issue
+
+在大多数情况下，我都会尽量保证本机运行无误后，push到仓库中。同时，该系统是经过本机测试，能够在Bochs，QEMU (`= 7.0`)，VirtualBox下正常的运行（暂时没试过真机）。如果发现在使用`make all`之后，虚拟机中运行报错，则一般是编译器优化问题。这个问题笔者一般很快就会修复，如果你使用别的版本的gcc（笔者版本11.2），出现了此问题，欢迎提issue。请参考[附录3：Issue的提交](#appendix3)
+
+下面列出一些可能会出现的问题。
+
+#### 问题#1： QEMU下8042控制器提示找不到。
+
+这是QEMU配置ACPI时的一个bug，在7.0.0版中修复了。
+
+#### 问题#2：多进程运行时，偶尔会出现General Protection错误。
+
+这很大概率是出现了竞态条件。虽然是相当不可能的。但如果出现了，还是请提issue。
+
 ## 参考教程
 
 **没有！！** 本教程以及该操作系统均为原创，没有基于任何市面上现行的操作系统开发教程，且并非是基于任何的开源内核的二次开发。
@@ -103,3 +142,69 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 ### LunaixOS自有
 
 1. `yield`
+
+## 附录2：编译gcc作为交叉编译器<a id="appendix2"></a>
+
+注意，gcc需要从源码构建，并配置为交叉编译器，即目标平台为`i686-elf`。你可以使用本项目提供的自动化脚本，这将会涵盖gcc和binutils源码的下载，配置和编译（不能保证全平台可用，目前只试过在Ubuntu系统上可以运行）。
+
+**推荐**手动编译。以下编译步骤搬运自：https://wiki.osdev.org/GCC_Cross-Compiler 
+
+**首先安装构建依赖项：**
+```bash
+sudo apt update &&\
+     apt install -y \
+        build-essential \
+        bison\
+        flex\
+        libgmp3-dev\
+        libmpc-dev\
+        libmpfr-dev\
+        texinfo
+```
+
+**开始编译：**
+1. 获取[gcc](https://ftp.gnu.org/gnu/gcc/)和[binutils](https://ftp.gnu.org/gnu/binutils)源码
+2. 解压，并在同级目录为gcc和binutil新建专门的build文件夹
+
+现在假设你的目录结构如下：
+```
++ folder
+  + gcc-src
+  + binutils-src
+  + gcc-build
+  + binutils-build
+```
+
+3. 确定gcc和binutil安装的位置，并设置环境变量：`export PREFIX=<安装路径>` 然后设置PATH： `export PATH="$PREFIX/bin:$PATH"`
+4. 设置目标平台：`export TARGET=i686-elf`
+5. 进入`binutils-build`进行配置
+```bash
+../binutils-src/configure --target="$TARGET" --prefix="$PREFIX" \
+	--with-sysroot --disable-nls --disable-werror
+```
+然后 `make && make install`
+
+6. 确保上述的`binutils`已经正常安装：执行：`which i686-elf-as`，应该会给出一个位于你安装目录下的路径。
+6. 进入`gcc-build`进行配置
+```bash
+../gcc-src/configure --target="$TARGET" --prefix="$PREFIX" \
+	--disable-nls --enable-languages=c,c++ --without-headers
+```
+然后编译安装（取决性能，大约10~20分钟）：
+```bash
+make all-gcc &&\
+ make all-target-libgcc &&\
+ make install-gcc &&\
+ make install-target-libgcc
+```
+8. 验证安装：执行`i686-elf-gcc -dumpmachine`，输出应该为：`i686-elf`
+
+## 附录3：Issue的提交<a id="appendix3"></a>
+
+最好提供：
++ 错误症状描述
++ （如可能）运行截图
++ 错误消息（如果给出）
++ 寄存器状态的dump
++ （如可能）提供错误发生时，EIP附近的指令（精确到函数）。如果使用`make all-debug`，会提供`build/kdump.txt`，你可以在这里面定位。或者也可以直接`objdump`
++ （如可能）虚拟内存映射信息（QEMU下可使用`info mem`查看）。
