@@ -119,4 +119,7 @@ vmm_next_free(uintptr_t start, int options);
 void*
 vmm_vmap(uintptr_t paddr, size_t size, pt_attr attr);
 
+void*
+vmm_v2p(void* va);
+
 #endif /* __LUNAIX_VMM_H */

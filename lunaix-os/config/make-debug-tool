@@ -4,7 +4,10 @@ QEMU_MON_PORT := 45454
 QEMU_OPTIONS := -s -S -m 1G \
 				-rtc base=utc \
 				-no-reboot \
+				-machine q35 \
 				-no-shutdown \
 				-d cpu_reset \
+				-drive id=disk,file="machine/disk0.vdi",if=none \
 				-device ahci,id=ahci \
+				-device ide-hd,drive=disk,bus=ahci.0 \
 				-monitor telnet::$(QEMU_MON_PORT),server,nowait &

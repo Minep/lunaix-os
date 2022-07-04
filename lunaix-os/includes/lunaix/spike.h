@@ -52,4 +52,12 @@ panick(const char* msg);
     while (!(cond))                                                            \
         ;
 
+#define wait_until_expire(cond, max)                                           \
+    ({                                                                         \
+        unsigned int __wcounter__ = (max);                                     \
+        while (!(cond) && __wcounter__-- > 0)                                  \
+            ;                                                                  \
+        __wcounter__;                                                          \
+    })
+
 #endif /* __LUNAIX_SPIKE_H */
