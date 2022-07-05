@@ -32,6 +32,9 @@
 #define HBA_PxCMD_ST (1)
 #define HBA_PxINTR_DMA (1 << 2)
 #define HBA_PxINTR_D2HR (1)
+#define HBA_PxTFD_ERR (1)
+#define HBA_PxTFD_BSY (1 << 7)
+#define HBA_PxTFD_DRQ (1 << 3)
 
 #define HBA_RGHC_ACHI_ENABLE (1 << 31)
 #define HBA_RGHC_INTR_ENABLE (1 << 1)
@@ -82,15 +85,35 @@ struct hba_cmdt
     struct hba_prdte entries[3];
 } __HBA_PACKED__;
 
+#define HBA_DEV_FEXTLBA 1
+#define HBA_DEV_FATAPI (1 << 1)
+
+struct hba_port;
+
 struct hba_device
 {
     char serial_num[20];
     char model[40];
-    uint32_t signature;
-    uint32_t max_lba;
+    uint32_t flags;
+    uint64_t max_lba;
     uint32_t block_size;
-    uint8_t wwn[8];
+    uint64_t wwn;
     uint8_t cbd_size;
+    uint8_t last_error;
+    uint8_t last_status;
+
+    struct
+    {
+        int (*identify)(struct hba_port* port);
+        int (*read_buffer)(struct hba_port* port,
+                           uint64_t lba,
+                           void* buffer,
+                           uint32_t size);
+        int (*write_buffer)(struct hba_port* port,
+                            uint64_t lba,
+                            void* buffer,
+                            uint32_t size);
+    } ops;
 };
 
 struct hba_port
@@ -98,7 +121,7 @@ struct hba_port
     volatile hba_reg_t* regs;
     unsigned int ssts;
     struct hba_cmdh* cmdlst;
-    struct sata_fis_head* fis;
+    void* fis;
     struct hba_device* device;
 };
 
@@ -106,6 +129,7 @@ struct ahci_hba
 {
     volatile hba_reg_t* base;
     unsigned int ports_num;
+    unsigned int ports_bmp;
     unsigned int cmd_slots;
     unsigned int version;
     struct hba_port* ports[32];

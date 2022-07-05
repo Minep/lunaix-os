@@ -13,4 +13,7 @@ ahci_parsestr(char* str, uint16_t* reg_start, int size_word);
 void
 scsi_parse_capacity(struct hba_device* device, uint32_t* parameter);
 
+int
+sata_read_error(struct hba_port* port);
+
 #endif /* __LUNAIX_UTILS_H */

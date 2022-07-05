@@ -1,4 +1,6 @@
+#include <klibc/string.h>
 #include <lunaix/mm/cake.h>
+#include <lunaix/mm/valloc.h>
 
 #define MAX_CLASS 6
 
@@ -64,6 +66,14 @@ valloc(unsigned int size)
     return __valloc(size, &piles);
 }
 
+void*
+vcalloc(unsigned int size)
+{
+    void* ptr = __valloc(size, &piles);
+    memset(ptr, 0, size);
+    return ptr;
+}
+
 void
 vfree(void* ptr)
 {
@@ -74,6 +84,14 @@ void*
 valloc_dma(unsigned int size)
 {
     return __valloc(size, &piles_dma);
+}
+
+void*
+vcalloc_dma(unsigned int size)
+{
+    void* ptr = __valloc(size, &piles_dma);
+    memset(ptr, 0, size);
+    return ptr;
 }
 
 void

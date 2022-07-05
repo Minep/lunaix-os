@@ -12,10 +12,6 @@
 
 #define AHCI_HBA_CLASS 0x10601
 
-#define ATA_IDENTIFY_DEVICE 0xec
-#define ATA_IDENTIFY_PAKCET_DEVICE 0xa1
-#define ATA_PACKET 0xa0
-
 /**
  * @brief 初始化AHCI与HBA
  *
@@ -25,5 +21,11 @@ ahci_init();
 
 void
 ahci_list_device();
+
+unsigned int
+ahci_get_port_usage();
+
+struct hba_port*
+ahci_get_port(unsigned int index);
 
 #endif /* __LUNAIX_AHCI_H */

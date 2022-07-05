@@ -1,5 +1,5 @@
 /**
- * @file valloc.c
+ * @file cake.c
  * @author Lunaixsky (zelong56@gmail.com)
  * @brief A simplified cake(slab) allocator.
  *          P.s. I call it cake as slab sounds more 'ridge' to me. :)
@@ -112,14 +112,9 @@ void*
 cake_grab(struct cake_pile* pile)
 {
     struct cake_s *pos, *n;
-    llist_for_each(pos, n, &pile->partial, cakes)
-    {
-        if (pos->next_free != EO_FREE_PIECE) {
-            goto found;
-        }
-    }
-
-    if (llist_empty(&pile->free)) {
+    if (!llist_empty(&pile->partial)) {
+        pos = list_entry(pile->partial.next, typeof(*pos), cakes);
+    } else if (llist_empty(&pile->free)) {
         pos = __new_cake(pile);
     } else {
         pos = list_entry(pile->free.next, typeof(*pos), cakes);

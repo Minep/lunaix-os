@@ -37,6 +37,24 @@ int
 ahci_init_device(struct hba_port* port);
 
 void
+achi_register_ops(struct hba_port* port);
+
+unsigned int
+ahci_get_port_usage()
+{
+    return hba.ports_bmp;
+}
+
+struct hba_port*
+ahci_get_port(unsigned int index)
+{
+    if (index >= 32) {
+        return 0;
+    }
+    return hba.ports[index];
+}
+
+void
 ahci_init()
 {
     struct pci_device* ahci_dev = pci_get_device_by_class(AHCI_HBA_CLASS);
@@ -70,12 +88,14 @@ ahci_init()
 
     // As per section 3.1.1, this is 0 based value.
     hba_reg_t cap = hba.base[HBA_RCAP];
+    hba_reg_t pmap = hba.base[HBA_RPI];
+
     hba.ports_num = (cap & 0x1f) + 1;  // CAP.PI
     hba.cmd_slots = (cap >> 8) & 0x1f; // CAP.NCS
     hba.version = hba.base[HBA_RVER];
+    hba.ports_bmp = pmap;
 
     /* ------ HBA端口配置 ------ */
-    hba_reg_t pmap = hba.base[HBA_RPI];
     uintptr_t clb_pg_addr, fis_pg_addr, clb_pa, fis_pa;
     for (size_t i = 0, fisp = 0, clbp = 0; i < 32;
          i++, pmap >>= 1, fisp = (fisp + 1) % 16, clbp = (clbp + 1) % 4) {
@@ -176,7 +196,7 @@ ahci_list_device()
         }
         kprintf("\t\t capacity: %d KiB\n",
                 (dev_info->max_lba * dev_info->block_size) >> 10);
-        kprintf("\t\t sector size: %dB\n", dev_info->block_size);
+        kprintf("\t\t block size: %dB\n", dev_info->block_size);
         kprintf("\t\t model: %s\n", &dev_info->model);
         kprintf("\t\t serial: %s\n", &dev_info->serial_num);
     }
@@ -197,8 +217,7 @@ __get_free_slot(struct hba_port* port)
 void
 sata_create_fis(struct sata_reg_fis* cmd_fis,
                 uint8_t command,
-                uint32_t lba_lo,
-                uint32_t lba_hi,
+                uint64_t lba,
                 uint16_t sector_count)
 {
     cmd_fis->head.type = SATA_REG_FIS_H2D;
@@ -206,13 +225,13 @@ sata_create_fis(struct sata_reg_fis* cmd_fis,
     cmd_fis->head.status_cmd = command;
     cmd_fis->dev = 0;
 
-    cmd_fis->lba0 = SATA_LBA_COMPONENT(lba_lo, 0);
-    cmd_fis->lba8 = SATA_LBA_COMPONENT(lba_lo, 8);
-    cmd_fis->lba16 = SATA_LBA_COMPONENT(lba_lo, 16);
-    cmd_fis->lba24 = SATA_LBA_COMPONENT(lba_lo, 24);
+    cmd_fis->lba0 = SATA_LBA_COMPONENT(lba, 0);
+    cmd_fis->lba8 = SATA_LBA_COMPONENT(lba, 8);
+    cmd_fis->lba16 = SATA_LBA_COMPONENT(lba, 16);
+    cmd_fis->lba24 = SATA_LBA_COMPONENT(lba, 24);
 
-    cmd_fis->lba32 = SATA_LBA_COMPONENT(lba_hi, 0);
-    cmd_fis->lba40 = SATA_LBA_COMPONENT(lba_hi, 8);
+    cmd_fis->lba32 = SATA_LBA_COMPONENT(lba, 32);
+    cmd_fis->lba40 = SATA_LBA_COMPONENT(lba, 40);
 
     cmd_fis->count = sector_count;
 }
@@ -234,7 +253,6 @@ hba_alloc_slot(struct hba_port* port,
     memset(cmd_table, 0, sizeof(*cmd_table));
 
     // 将命令表挂到命令头上
-    cmd_header->prdt_len = 1;
     cmd_header->cmd_table_base = vmm_v2p(cmd_table);
     cmd_header->options = HBA_CMDH_FIS_LEN(sizeof(struct sata_reg_fis)) |
                           HBA_CMDH_CLR_BUSY | (header_options & ~0x1f);
@@ -252,12 +270,14 @@ ahci_init_device(struct hba_port* port)
     struct hba_cmdt* cmd_table;
     struct hba_cmdh* cmd_header;
 
+    // 确保端口是空闲的
+    wait_until(!(port->regs[HBA_RPxTFD] & (HBA_PxTFD_BSY)));
+
     int slot = hba_alloc_slot(port, &cmd_table, &cmd_header, 0);
 
     // 清空任何待响应的中断
     port->regs[HBA_RPxIS] = 0;
-    port->device = valloc(sizeof(struct hba_device));
-    port->device->signature = port->regs[HBA_RPxSIG];
+    port->device = vcalloc(sizeof(struct hba_device));
 
     // 预备DMA接收缓存，用于存放HBA传回的数据
     uint16_t* data_in = (uint16_t*)valloc_dma(512);
@@ -271,18 +291,25 @@ ahci_init_device(struct hba_port* port)
     struct sata_reg_fis* cmd_fis = (struct sata_reg_fis*)cmd_table->command_fis;
 
     // 根据设备类型使用合适的命令
-    if (port->device->signature == HBA_DEV_SIG_ATA) {
+    if (port->regs[HBA_RPxSIG] == HBA_DEV_SIG_ATA) {
         // ATA 一般为硬盘
-        sata_create_fis(cmd_fis, ATA_IDENTIFY_DEVICE, 0, 0, 0);
+        sata_create_fis(cmd_fis, ATA_IDENTIFY_DEVICE, 0, 0);
     } else {
         // ATAPI 一般为光驱，软驱，或者磁带机
-        sata_create_fis(cmd_fis, ATA_IDENTIFY_PAKCET_DEVICE, 0, 0, 0);
+        port->device->flags |= HBA_DEV_FATAPI;
+        sata_create_fis(cmd_fis, ATA_IDENTIFY_PAKCET_DEVICE, 0, 0);
     }
 
     // PxCI寄存器置位，告诉HBA这儿有个数据需要发送到SATA端口
     port->regs[HBA_RPxCI] = (1 << slot);
 
     wait_until(!(port->regs[HBA_RPxCI] & (1 << slot)));
+
+    if ((port->regs[HBA_RPxTFD] & HBA_PxTFD_ERR)) {
+        // 有错误
+        sata_read_error(port);
+        goto fail;
+    }
 
     /*
         等待数据到达内存
@@ -292,7 +319,7 @@ ahci_init_device(struct hba_port* port)
     */
     ahci_parse_dev_info(port->device, data_in);
 
-    if (port->device->signature == HBA_DEV_SIG_ATA) {
+    if (!(port->device->flags & HBA_DEV_FATAPI)) {
         goto done;
     }
 
@@ -319,9 +346,11 @@ ahci_init_device(struct hba_port* port)
             * SATA AHCI HBA Spec, Section 5.3.7
             * SCSI Command Reference Manual, Section 3.26
     */
-    sata_create_fis(cmd_fis, ATA_PACKET, 512 << 8, 0, 0);
     struct scsi_cdb16* cdb16 = (struct scsi_cdb16*)cmd_table->atapi_cmd;
-    scsi_create_packet16(cdb16, SCSI_READ_CAPACITY_16, 0, 0, 512);
+
+    sata_create_fis(cmd_fis, ATA_PACKET, 512 << 8, 0);
+    scsi_create_packet16(cdb16, SCSI_READ_CAPACITY_16, 0, 512);
+
     cdb16->misc1 = 0x10; // service action
     cmd_header->transferred_size = 0;
     cmd_header->options |= HBA_CMDH_ATAPI;
@@ -329,13 +358,46 @@ ahci_init_device(struct hba_port* port)
     port->regs[HBA_RPxCI] = (1 << slot);
     wait_until(!(port->regs[HBA_RPxCI] & (1 << slot)));
 
+    if ((port->regs[HBA_RPxTFD] & HBA_PxTFD_ERR)) {
+        // 有错误
+        sata_read_error(port);
+        goto fail;
+    }
+
     scsi_parse_capacity(port->device, (uint32_t*)data_in);
 
 done:
+    achi_register_ops(port);
+
     vfree_dma(data_in);
     vfree_dma(cmd_table);
 
     return 1;
+
+fail:
+    vfree_dma(data_in);
+    vfree_dma(cmd_table);
+
+    return 0;
 }
 
-// TODO: Support ATAPI Device.
+int
+ahci_identify_device(struct hba_port* port)
+{
+    // 用于重新识别设备（比如在热插拔的情况下）
+    vfree(port->device);
+    return ahci_init_device(port);
+}
+
+void
+achi_register_ops(struct hba_port* port)
+{
+    port->device->ops.identify = ahci_identify_device;
+    if (!(port->device->flags & HBA_DEV_FATAPI)) {
+        port->device->ops.read_buffer = sata_read_buffer;
+        port->device->ops.write_buffer = sata_write_buffer;
+    } else {
+        port->device->ops.read_buffer = scsi_read_buffer;
+        port->device->ops.write_buffer = scsi_write_buffer;
+    }
+}
