@@ -44,7 +44,7 @@ all-debug: CFLAGS := -g -std=gnu99 -ffreestanding $(O) $(W) $(ARCH_OPT) -D__LUNA
 all-debug: LDFLAGS := -g -ffreestanding $(O) -nostdlib -lgcc
 all-debug: clean $(BUILD_DIR)/$(OS_ISO)
 	@echo "Dumping the disassembled kernel code to $(BUILD_DIR)/kdump.txt"
-	@${TOOLCHAIN}/i686-elf-objdump -S $(BIN_DIR)/$(OS_BIN) > $(BUILD_DIR)/kdump.txt
+	@i686-elf-objdump -S $(BIN_DIR)/$(OS_BIN) > $(BUILD_DIR)/kdump.txt
 
 clean:
 	@rm -rf $(BUILD_DIR) || exit 1
@@ -56,14 +56,14 @@ run: $(BUILD_DIR)/$(OS_ISO)
 	@telnet 127.0.0.1 $(QEMU_MON_PORT)
 
 debug-qemu: all-debug
-	@${TOOLCHAIN}/i686-elf-objcopy --only-keep-debug $(BIN_DIR)/$(OS_BIN) $(BUILD_DIR)/kernel.dbg
+	@i686-elf-objcopy --only-keep-debug $(BIN_DIR)/$(OS_BIN) $(BUILD_DIR)/kernel.dbg
 	@qemu-system-i386 -cdrom $(BUILD_DIR)/$(OS_ISO) $(QEMU_OPTIONS)
 	@sleep 1
 	@$(QEMU_MON_TERM) -- telnet 127.0.0.1 $(QEMU_MON_PORT)
 	@gdb -s $(BUILD_DIR)/kernel.dbg -ex "target remote localhost:1234"
 
 debug-qemu-vscode: all-debug
-	@${TOOLCHAIN}/i686-elf-objcopy --only-keep-debug $(BIN_DIR)/$(OS_BIN) $(BUILD_DIR)/kernel.dbg
+	@i686-elf-objcopy --only-keep-debug $(BIN_DIR)/$(OS_BIN) $(BUILD_DIR)/kernel.dbg
 	@qemu-system-i386 -cdrom $(BUILD_DIR)/$(OS_ISO) $(QEMU_OPTIONS)
 	@sleep 0.5
 	@telnet 127.0.0.1 $(QEMU_MON_PORT)
