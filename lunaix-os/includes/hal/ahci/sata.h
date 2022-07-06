@@ -11,10 +11,12 @@
 #define ATA_IDENTIFY_DEVICE 0xec
 #define ATA_IDENTIFY_PAKCET_DEVICE 0xa1
 #define ATA_PACKET 0xa0
-#define ATA_READ_DMA_EXT 0xc8
-#define ATA_READ_DMA 0x25
-#define ATA_WRITE_DMA_EXT 0xca
-#define ATA_WRITE_DMA 0x35
+#define ATA_READ_DMA_EXT 0x25
+#define ATA_READ_DMA 0xc8
+#define ATA_WRITE_DMA_EXT 0x35
+#define ATA_WRITE_DMA 0xca
+
+#define MAX_RETRY 2
 
 struct sata_fis_head
 {
@@ -31,7 +33,7 @@ struct sata_reg_fis
     uint8_t lba0, lba8, lba16;
     uint8_t dev;
     uint8_t lba24, lba32, lba40;
-    uint8_t reserved1;
+    uint8_t feature;
 
     uint16_t count;
 

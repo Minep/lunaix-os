@@ -1,6 +1,8 @@
 #ifndef __LUNAIX_AHCI_H
 #define __LUNAIX_AHCI_H
 
+#include "hba.h"
+
 /*
  * Macro naming rule:
  *      HBA_R[xxx]

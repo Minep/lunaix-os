@@ -19,6 +19,8 @@
 #include <hal/ioapic.h>
 #include <hal/pci.h>
 
+#include <klibc/string.h>
+
 LOG_MODULE("PROC0")
 
 extern void
@@ -109,6 +111,39 @@ extern uint8_t __kernel_end;              /* link/linker.ld */
 extern uint8_t __init_hhk_end;            /* link/linker.ld */
 extern multiboot_info_t* _k_init_mb_info; /* k_init.c */
 
+char test_sequence[] = "Once upon a time, in a magical land of Equestria. "
+                       "There were two regal sisters who ruled together "
+                       "and created harmony for all the land.";
+
+void
+__test_disk_io()
+{
+    struct hba_port* port = ahci_get_port(0);
+    char* buffer = valloc_dma(port->device->block_size);
+    strcpy(buffer, test_sequence);
+    kprintf("WRITE: %s\n", buffer);
+    int result;
+
+    // 写入第一扇区
+    result =
+      port->device->ops.write_buffer(port, 1, buffer, port->device->block_size);
+    if (!result) {
+        kprintf(KWARN "fail to write: %x\n", port->device->last_error);
+    }
+
+    memset(buffer, 0, port->device->block_size);
+
+    // 读出我们刚刚写的内容！
+    result =
+      port->device->ops.read_buffer(port, 1, buffer, port->device->block_size);
+    kprintf(KDEBUG "%x, %x\n", port->regs[HBA_RPxIS], port->regs[HBA_RPxTFD]);
+    if (!result) {
+        kprintf(KWARN "fail to read: %x\n", port->device->last_error);
+    } else {
+        kprint_hex(buffer, 256);
+    }
+}
+
 void
 init_platform()
 {
@@ -129,6 +164,8 @@ init_platform()
     pci_init();
     ahci_init();
     ahci_list_device();
+
+    __test_disk_io();
 
     cake_stats();
 

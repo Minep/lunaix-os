@@ -10,7 +10,7 @@ static char piles_names[MAX_CLASS][PILE_NAME_MAXLEN] = {
 };
 
 static char piles_names_dma[MAX_CLASS][PILE_NAME_MAXLEN] = {
-    "valloc_dma_128", "valloc_dma_512", "valloc_dma_512",
+    "valloc_dma_128", "valloc_dma_256", "valloc_dma_512",
     "valloc_dma_1k",  "valloc_dma_2k",  "valloc_dma_4k"
 };
 

@@ -188,7 +188,7 @@ ahci_list_device()
         kprintf("\t Port %d: %s (%x)\n",
                 i,
                 &sata_ifs[device_state],
-                port->regs[HBA_RPxSIG]);
+                port->device->flags);
 
         struct hba_device* dev_info = port->device;
         if (!device_state || !dev_info) {
@@ -247,10 +247,9 @@ hba_alloc_slot(struct hba_port* port,
 
     // 构建命令头（Command Header）和命令表（Command Table）
     struct hba_cmdh* cmd_header = &port->cmdlst[slot];
-    struct hba_cmdt* cmd_table = valloc_dma(sizeof(struct hba_cmdt));
+    struct hba_cmdt* cmd_table = vcalloc_dma(sizeof(struct hba_cmdt));
 
     memset(cmd_header, 0, sizeof(*cmd_header));
-    memset(cmd_table, 0, sizeof(*cmd_table));
 
     // 将命令表挂到命令头上
     cmd_header->cmd_table_base = vmm_v2p(cmd_table);

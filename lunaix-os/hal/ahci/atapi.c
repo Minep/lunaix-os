@@ -4,7 +4,10 @@
 #include <hal/ahci/utils.h>
 
 #include <klibc/string.h>
+#include <lunaix/mm/valloc.h>
+#include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
+#include <lunaix/syslog.h>
 
 void
 scsi_create_packet12(struct scsi_cdb12* cdb,
@@ -15,7 +18,7 @@ scsi_create_packet12(struct scsi_cdb12* cdb,
     memset(cdb, 0, sizeof(*cdb));
     cdb->opcode = opcode;
     cdb->lba_be = SCSI_FLIP(lba);
-    cdb->length = alloc_size;
+    cdb->length = SCSI_FLIP(alloc_size);
 }
 
 void
@@ -26,9 +29,9 @@ scsi_create_packet16(struct scsi_cdb16* cdb,
 {
     memset(cdb, 0, sizeof(*cdb));
     cdb->opcode = opcode;
-    cdb->lba_be_hi = SCSI_FLIP(lba >> 32);
+    cdb->lba_be_hi = SCSI_FLIP((uint32_t)(lba >> 32));
     cdb->lba_be_lo = SCSI_FLIP((uint32_t)lba);
-    cdb->length = alloc_size;
+    cdb->length = SCSI_FLIP(alloc_size);
 }
 
 void
@@ -53,50 +56,52 @@ __scsi_buffer_io(struct hba_port* port,
     int bitmask = 1 << slot;
 
     // 确保端口是空闲的
-    wait_until(!(port->regs[HBA_RPxTFD] & (HBA_PxTFD_BSY)));
+    wait_until(!(port->regs[HBA_RPxTFD] & (HBA_PxTFD_BSY | HBA_PxTFD_DRQ)));
 
     port->regs[HBA_RPxIS] = 0;
 
-    table->entries[0] =
-      (struct hba_prdte){ .byte_count = size - 1, .data_base = buffer };
+    table->entries[0] = (struct hba_prdte){ .byte_count = size - 1,
+                                            .data_base = vmm_v2p(buffer) };
     header->prdt_len = 1;
     header->options |= (HBA_CMDH_WRITE * (write == 1)) | HBA_CMDH_ATAPI;
 
-    uint32_t count = size / port->device->block_size;
-    if (count == 0) {
-        // 对ATAPI设备来说，READ/WRITE (16/12) 没有这个count=0的 special case
-        //  但是对于READ/WRITE (6)，就存在这个special case
-        goto fail;
-    }
+    uint32_t count = ICEIL(size, port->device->block_size);
 
     struct sata_reg_fis* fis = table->command_fis;
     void* cdb = table->atapi_cmd;
-    sata_create_fis(fis, ATA_PACKET, (size << 8) & 0xffffff, 0);
+    sata_create_fis(fis, ATA_PACKET, (size << 8), 0);
+    fis->feature = 1 | ((!write) << 2);
 
     if (port->device->cbd_size == 16) {
         scsi_create_packet16((struct scsi_cdb16*)cdb,
                              write ? SCSI_WRITE_BLOCKS_16 : SCSI_READ_BLOCKS_16,
                              lba,
                              count);
+        ((struct scsi_cdb16*)cdb)->misc1 = 3 << 5; // 禁用保护检查
     } else {
         scsi_create_packet12((struct scsi_cdb12*)cdb,
                              write ? SCSI_WRITE_BLOCKS_12 : SCSI_READ_BLOCKS_12,
                              lba,
                              count);
+        ((struct scsi_cdb12*)cdb)->misc1 = 3 << 5; // 禁用保护检查
     }
 
-    port->regs[HBA_RPxCI] = bitmask;
+    int retries = 0;
 
-    wait_until(!(port->regs[HBA_RPxCI] & bitmask));
+    while (retries < MAX_RETRY) {
+        port->regs[HBA_RPxCI] = bitmask;
 
-    if ((port->regs[HBA_RPxTFD] & HBA_PxTFD_ERR)) {
-        // 有错误
-        sata_read_error(port);
-        goto fail;
+        wait_until(!(port->regs[HBA_RPxCI] & bitmask));
+
+        if ((port->regs[HBA_RPxTFD] & HBA_PxTFD_ERR)) {
+            // 有错误
+            sata_read_error(port);
+            retries++;
+        } else {
+            vfree_dma(table);
+            return 1;
+        }
     }
-
-    vfree_dma(table);
-    return 1;
 
 fail:
     vfree_dma(table);

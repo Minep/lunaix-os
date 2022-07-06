@@ -15,7 +15,7 @@ ahci_parse_dev_info(struct hba_device* dev_info, uint16_t* data)
 {
     dev_info->max_lba = *((uint32_t*)(data + IDDEV_OFFMAXLBA));
     dev_info->block_size = *((uint32_t*)(data + IDDEV_OFFLSECSIZE));
-    dev_info->cbd_size = (*data & 0x3) ? 12 : 16;
+    dev_info->cbd_size = (*data & 0x3) ? 16 : 12;
     dev_info->wwn = *(uint64_t*)(data + IDDEV_OFFWWN);
 
     if (!dev_info->block_size) {
