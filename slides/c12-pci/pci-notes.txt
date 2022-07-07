@@ -1,0 +1,240 @@
+			PCI Local Bus Specification
+			     A Learning Note
+
+			        Lunaixsky
+				2022-6-22
+
+
+Convention:
+	A WORD is 16 bits, 2 bytes
+	DWORD -> Double WORD -> 4 bytes
++++++++++++++++++
+
+
+PCI buses has a hierarchical structure, buses connected together with PCI-to-PCI bridge, in a tree-like manner
+
+		CPU, Memory
+		    |
+		Host Bridge
+		    |
+     ---+-----------+-------+-------  		bus #0
+	|       	    |
+       dev		   P2PB
+			    |
+	        ---+--------+---------+---  	bus #1
+		   |		      |
+		 P2PB		    P2PB
+		   |		      |
+  bus #j   --------+--------	------+-------- bus #i
+
+Where
+	P2PB: PCI-to-PCI Bridge
+
+Note
+	Each P2PB can connect more than one subordinate buses.
+	The bus number that host bridge connected to is always 0.
+
+
+Configuration space
+-------
+
+   Each device has multiple registers and functions
+   Configuration space is a 256 bytes memory region in target device
+     contains config info for the device, 
+     it is comprising a set of read/write registers.
+
+
+C-Space command
+-------
+
+  Type 0:
+       	register num[7::2]
+	function num[10::8]
+	use to select the function and register on current bus
+		(that direct connect to CPU)
+  Type 1:
+	dev num[15::11]
+	bus num[23::16]
+	use to select one of *32* device on local bus identified by bus num.
+
+  Type 0 is claimed by device on current bus
+  Type 1 is checked and forwarded by PCI-to-PCI bridge.
+
+
+
+Software (OS) interaction with PCI:
+=====
+ 
+CONFIG_ADDRESS ([OUT] 32 bits I/O port at 0xcf8)
+    	Specify the:
+		register num[7::2] (0~63, corresponding to each DWORD)
+		function num[10::8] (0~7)
+		dev num[15::11] (0~31)
+		bus num[23::16] (0~255)
+		enable bit[31] - set to start transcation
+
+CONFIG_DATA ([IN/OUT] 32 bits I/O port at 0xcfc)
+	Reference the register specified by CONFIG_ADDRESS
+	any read result available here
+	any data should be write into register must be put here.
+
+The host-to-pci bridge will transfer the CONFIG_ADDRESS into either type0 or type1 commands and start transcation.
+
+
+
+C-space organization
+====
+
+Each c-space has a header at start.
+
+Three types of headers.
+
+The first 16 bytes (0x00-0x0f) are same across headers.
+
+Remaining bytes depends on header type.
+
+The header following little-endian.
+
+header type available at byte 0xe
+	
+	0x0: normal pci target
+	0x1: pci2pci bridge
+	0x2: cardbus bridge
+
+
+PCI-Bus enumeration
+-----
+
+enumerating the device number, bus number, and read the vendor ID (byte 0x0)
+
+for non-existing device, 0xffff will be reported at CONFIG_DATA
+
+
+Device Command Register (0x04)
+-----
+
+see pp. 217, fig. 6-2
+
+
+Device Status Register (0x6)
+-----
+
+see pp. 219, fig. 6-3
+
+
+Interrupt Line
+-----
+
+the irq number on interrupt controller
+
+
+Base Address Registers (BARS)
+-----
+
+Define the base address of device specific registers (ones apart from PCI specified).
+
+Has following format:
+	MMIO [0]
+	  :0 if the registers should be access by I/O port number
+	  :1 if the registers are MMIO.
+
+Thus, the BAR can be divided into two category according to bit 0
+
+Memory Space (MMIO=1)
+	Type [2::1]
+	  :00 base address is 32bits wide
+	Prefechable [3]
+	  If set, then any read in these register will not cause state change
+	   and thus can be prefech and cached by CPU. 
+	  So one can mark such page containing this base address as cachable
+	   to maximize the performance.
+        Base address [31::4]
+          16 bytes aligned
+
+I/O Space (MMIO=0)
+	Base address [31:2]
+
+
+
+Message Signaled Interrupts (MSI)
+======
+
+An alternative to traditional pin-asserted interrupt.
+
+The device request service of kernel by writing a kernel-specified message (a DWORD) to a kernel-specified address (Physical, DWORD-aligned)
+
+Each device that support MSI has MSI capability link-list within c-space
+
+The structure of a typical MSI capability for 32bits is shown below:
+
+31		15	7	0
++---------------+-------+-------+
+|    MSG_CTRL	|  NEXT	| CAPID	|
+|---------------+-------+-------|
+|        Message Address	|
+|---------------+---------------|
+|    Reserved	|   MSG_DATA	|
+|---------------+---------------|
+|      	    Mask Bits		|
+|-------------------------------|
+|	   Pending Bits		|
++-------------------------------+
+
+Where
+    CAP_ID always 0x5
+    MSG_CTRL identify the characteristic of this capability
+	bit[8]
+           1 if this capability support per-vector mask
+	   which meaning Mask Bits and Pending Bits field present.
+	bit[7]
+	   1 if this capability is for 64bits. 
+	   LunaixOS should make sure this bit is clear.
+	bit[6::4]
+	   Enable messages. This is used for multiple message support.
+	   A device may request more than one messages (vectors).
+	   The number of allocated message is aligned at power of 2.
+	   i.e., if bit[6::4] represent value x, the number is 2^x
+	   Max support of 32 vectors
+	bit[3::1]
+	   Requested messages. This tells the kernel how many of vectors
+	   this device is requesting. Format is same as Enable Messsages.
+	bit[0]
+	   1 if MSI enable. default 0
+   Message Data: A 16-bits data
+	Note that the lower x bits are modifiable by device itself for
+	identifying the vector that cause this data to be signaled.
+	Where x is the value represented by bit[6::4] of MSG_CTRL.
+   Mask Bits
+	bit x represent a mask on vector x (LSB is 0, MSB is 31)
+   Pending BIts
+	bit x represent a vector is in pending.
+
+
+Executive Summary
+-------
+
+To initialize MSI:
+	1. Locate the MSI capability by traversing down the capability
+	   list, looking for CAP_ID of 0x5
+	2. Read the MSG_CTRL[3::1] to determine the vectors requested by
+	   device and allocate it (full or subset of it)
+	3. Check the masking capable (MSG_CTRL[8]) and use it optionally
+	4. Allocate a DWORD-aligned address for siganlling message.
+	5. Set the MSG_CTRL[0] for enabling MSI capability.
+
+
+A note on using MSI on x86 arch
+------
+
+In x86, the MSI is integrated with the APIC/IOAPIC ecosystem.
+
+The message register and message data follows the x86 specific layout
+(see Intel Manual Vol 3. section 10.11)
+
+When an MSI is signalled, the message data is written to the message address, which will be intercepted by IOAPIC and the message data as well as address are getting parsed, and deliver to the processor(s) by IOAPIC.
+
+This makes sense if you take a look at the layout, you will found that is really similar to the redirection entry of IRQ in IOAPIC.
+
+
+
+
