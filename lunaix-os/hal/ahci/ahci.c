@@ -26,6 +26,8 @@
 #define HBA_FIS_SIZE 256
 #define HBA_CLB_SIZE 1024
 
+// #define DO_HBA_FULL_RESET
+
 LOG_MODULE("AHCI")
 
 static struct ahci_hba hba;
@@ -55,6 +57,22 @@ ahci_get_port(unsigned int index)
 }
 
 void
+__hba_reset_port(hba_reg_t* port_reg)
+{
+    // 根据：SATA-AHCI spec section 10.4.2 描述的端口重置流程
+    port_reg[HBA_RPxCMD] &= ~HBA_PxCMD_ST;
+    port_reg[HBA_RPxCMD] &= ~HBA_PxCMD_FRE;
+    int cnt = wait_until_expire(!(port_reg[HBA_RPxCMD] & HBA_PxCMD_CR), 500000);
+    if (cnt) {
+        return;
+    }
+    // 如果port未响应，则继续执行重置
+    port_reg[HBA_RPxSCTL] = (port_reg[HBA_RPxSCTL] & ~0xf) | 1;
+    io_delay(100000); //等待至少一毫秒，差不多就行了
+    port_reg[HBA_RPxSCTL] &= ~0xf;
+}
+
+void
 ahci_init()
 {
     struct pci_device* ahci_dev = pci_get_device_by_class(AHCI_HBA_CLASS);
@@ -78,9 +96,11 @@ ahci_init()
 
     hba.base = (hba_reg_t*)ioremap(PCI_BAR_ADDR_MM(bar6), size);
 
+#ifdef DO_HBA_FULL_RESET
     // 重置HBA
     hba.base[HBA_RGHC] |= HBA_RGHC_RESET;
     wait_until(!(hba.base[HBA_RGHC] & HBA_RGHC_RESET));
+#endif
 
     // 启用AHCI工作模式，启用中断
     hba.base[HBA_RGHC] |= HBA_RGHC_ACHI_ENABLE;
@@ -107,6 +127,10 @@ ahci_init()
           (struct hba_port*)valloc(sizeof(struct hba_port));
         hba_reg_t* port_regs =
           (hba_reg_t*)(&hba.base[HBA_RPBASE + i * HBA_RPSIZE]);
+
+#ifndef DO_HBA_FULL_RESET
+        __hba_reset_port(port_regs);
+#endif
 
         if (!clbp) {
             // 每页最多4个命令队列
@@ -136,19 +160,20 @@ ahci_init()
         // 需要通过全部置位去清空这些寄存器（相当的奇怪……）
         port_regs[HBA_RPxSERR] = -1;
 
-        port_regs[HBA_RPxIE] |= (HBA_PxINTR_DMA);
         port_regs[HBA_RPxIE] |= (HBA_PxINTR_D2HR);
 
         hba.ports[i] = port;
 
-        if (HBA_RPxSSTS_IF(port->ssts)) {
-            wait_until(!(port_regs[HBA_RPxCMD] & HBA_PxCMD_CR));
-            port_regs[HBA_RPxCMD] |= HBA_PxCMD_FRE;
-            port_regs[HBA_RPxCMD] |= HBA_PxCMD_ST;
+        if (!HBA_RPxSSTS_IF(port->ssts)) {
+            continue;
+        }
 
-            if (!ahci_init_device(port)) {
-                kprintf(KERROR "fail to init device");
-            }
+        wait_until(!(port_regs[HBA_RPxCMD] & HBA_PxCMD_CR));
+        port_regs[HBA_RPxCMD] |= HBA_PxCMD_FRE;
+        port_regs[HBA_RPxCMD] |= HBA_PxCMD_ST;
+
+        if (!ahci_init_device(port)) {
+            kprintf(KERROR "fail to init device");
         }
     }
 }
@@ -197,6 +222,9 @@ ahci_list_device()
         kprintf("\t\t capacity: %d KiB\n",
                 (dev_info->max_lba * dev_info->block_size) >> 10);
         kprintf("\t\t block size: %dB\n", dev_info->block_size);
+        kprintf("\t\t block/sector: %d\n", dev_info->block_per_sec);
+        kprintf("\t\t alignment: %dB\n", dev_info->alignment_offset);
+        kprintf("\t\t capabilities: %x\n", dev_info->capabilities);
         kprintf("\t\t model: %s\n", &dev_info->model);
         kprintf("\t\t serial: %s\n", &dev_info->serial_num);
     }

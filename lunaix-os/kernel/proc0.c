@@ -119,14 +119,14 @@ void
 __test_disk_io()
 {
     struct hba_port* port = ahci_get_port(0);
-    char* buffer = valloc_dma(port->device->block_size);
+    char* buffer = vcalloc_dma(port->device->block_size);
     strcpy(buffer, test_sequence);
     kprintf("WRITE: %s\n", buffer);
     int result;
 
-    // 写入第一扇区
+    // 写入第一扇区 (LBA=0)
     result =
-      port->device->ops.write_buffer(port, 1, buffer, port->device->block_size);
+      port->device->ops.write_buffer(port, 0, buffer, port->device->block_size);
     if (!result) {
         kprintf(KWARN "fail to write: %x\n", port->device->last_error);
     }
@@ -135,7 +135,7 @@ __test_disk_io()
 
     // 读出我们刚刚写的内容！
     result =
-      port->device->ops.read_buffer(port, 1, buffer, port->device->block_size);
+      port->device->ops.read_buffer(port, 0, buffer, port->device->block_size);
     kprintf(KDEBUG "%x, %x\n", port->regs[HBA_RPxIS], port->regs[HBA_RPxTFD]);
     if (!result) {
         kprintf(KWARN "fail to read: %x\n", port->device->last_error);

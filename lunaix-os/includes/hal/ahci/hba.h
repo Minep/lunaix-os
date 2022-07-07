@@ -101,6 +101,9 @@ struct hba_device
     uint8_t cbd_size;
     uint8_t last_error;
     uint8_t last_status;
+    uint32_t alignment_offset;
+    uint32_t block_per_sec;
+    uint32_t capabilities;
 
     struct
     {

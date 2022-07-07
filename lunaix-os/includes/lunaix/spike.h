@@ -57,7 +57,7 @@ panick(const char* msg);
 #define wait_until_expire(cond, max)                                           \
     ({                                                                         \
         unsigned int __wcounter__ = (max);                                     \
-        while (!(cond) && __wcounter__-- > 0)                                  \
+        while (!(cond) && __wcounter__-- > 1)                                  \
             ;                                                                  \
         __wcounter__;                                                          \
     })

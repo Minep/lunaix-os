@@ -174,7 +174,7 @@ void
 pci_setup_msi(struct pci_device* device, int vector)
 {
     // Dest: APIC#0, Physical Destination, No redirection
-    uint32_t msi_addr = (__APIC_BASE_PADDR | 0x8);
+    uint32_t msi_addr = (__APIC_BASE_PADDR);
 
     // Edge trigger, Fixed delivery
     uint32_t msi_data = vector;
