@@ -139,9 +139,10 @@ struct ahci_hba
 };
 
 int
-hba_alloc_slot(struct hba_port* port,
-               struct hba_cmdt** cmdt,
-               struct hba_cmdh** cmdh,
-               uint16_t header_options);
+hba_prepare_cmd(struct hba_port* port,
+                struct hba_cmdt** cmdt,
+                struct hba_cmdh** cmdh,
+                void* buffer,
+                unsigned int size);
 
 #endif /* __LUNAIX_HBA_H */

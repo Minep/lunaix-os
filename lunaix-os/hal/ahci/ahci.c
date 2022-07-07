@@ -265,13 +265,15 @@ sata_create_fis(struct sata_reg_fis* cmd_fis,
 }
 
 int
-hba_alloc_slot(struct hba_port* port,
-               struct hba_cmdt** cmdt,
-               struct hba_cmdh** cmdh,
-               uint16_t header_options)
+hba_prepare_cmd(struct hba_port* port,
+                struct hba_cmdt** cmdt,
+                struct hba_cmdh** cmdh,
+                void* buffer,
+                unsigned int size)
 {
     int slot = __get_free_slot(port);
     assert_msg(slot >= 0, "HBA: No free slot");
+    assert_msg(size <= 0x400000, "HBA: buffer too big");
 
     // 构建命令头（Command Header）和命令表（Command Table）
     struct hba_cmdh* cmd_header = &port->cmdlst[slot];
@@ -281,8 +283,15 @@ hba_alloc_slot(struct hba_port* port,
 
     // 将命令表挂到命令头上
     cmd_header->cmd_table_base = vmm_v2p(cmd_table);
-    cmd_header->options = HBA_CMDH_FIS_LEN(sizeof(struct sata_reg_fis)) |
-                          HBA_CMDH_CLR_BUSY | (header_options & ~0x1f);
+    cmd_header->options =
+      HBA_CMDH_FIS_LEN(sizeof(struct sata_reg_fis)) | HBA_CMDH_CLR_BUSY;
+
+    if (buffer) {
+        cmd_header->prdt_len = 1;
+        cmd_table->entries[0] =
+          (struct hba_prdte){ .data_base = vmm_v2p(buffer),
+                              .byte_count = size - 1 };
+    }
 
     *cmdh = cmd_header;
     *cmdt = cmd_table;
@@ -300,19 +309,14 @@ ahci_init_device(struct hba_port* port)
     // 确保端口是空闲的
     wait_until(!(port->regs[HBA_RPxTFD] & (HBA_PxTFD_BSY)));
 
-    int slot = hba_alloc_slot(port, &cmd_table, &cmd_header, 0);
+    // 预备DMA接收缓存，用于存放HBA传回的数据
+    uint16_t* data_in = (uint16_t*)valloc_dma(512);
+
+    int slot = hba_prepare_cmd(port, &cmd_table, &cmd_header, data_in, 512);
 
     // 清空任何待响应的中断
     port->regs[HBA_RPxIS] = 0;
     port->device = vcalloc(sizeof(struct hba_device));
-
-    // 预备DMA接收缓存，用于存放HBA传回的数据
-    uint16_t* data_in = (uint16_t*)valloc_dma(512);
-
-    cmd_table->entries[0] =
-      (struct hba_prdte){ .data_base = vmm_v2p(data_in),
-                          .byte_count = 511 }; // byte_count是从0开始算的
-    cmd_header->prdt_len = 1;
 
     // 在命令表中构建命令FIS
     struct sata_reg_fis* cmd_fis = (struct sata_reg_fis*)cmd_table->command_fis;

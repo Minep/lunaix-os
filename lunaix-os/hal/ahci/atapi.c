@@ -52,7 +52,7 @@ __scsi_buffer_io(struct hba_port* port,
 
     struct hba_cmdh* header;
     struct hba_cmdt* table;
-    int slot = hba_alloc_slot(port, &table, &header, 0);
+    int slot = hba_prepare_cmd(port, &table, &header, buffer, size);
     int bitmask = 1 << slot;
 
     // 确保端口是空闲的
@@ -60,9 +60,6 @@ __scsi_buffer_io(struct hba_port* port,
 
     port->regs[HBA_RPxIS] = 0;
 
-    table->entries[0] = (struct hba_prdte){ .byte_count = size - 1,
-                                            .data_base = vmm_v2p(buffer) };
-    header->prdt_len = 1;
     header->options |= (HBA_CMDH_WRITE * (write == 1)) | HBA_CMDH_ATAPI;
 
     uint32_t count = ICEIL(size, port->device->block_size);
@@ -77,14 +74,15 @@ __scsi_buffer_io(struct hba_port* port,
                              write ? SCSI_WRITE_BLOCKS_16 : SCSI_READ_BLOCKS_16,
                              lba,
                              count);
-        ((struct scsi_cdb16*)cdb)->misc1 = 3 << 5; // 禁用保护检查
     } else {
         scsi_create_packet12((struct scsi_cdb12*)cdb,
                              write ? SCSI_WRITE_BLOCKS_12 : SCSI_READ_BLOCKS_12,
                              lba,
                              count);
-        ((struct scsi_cdb12*)cdb)->misc1 = 3 << 5; // 禁用保护检查
     }
+
+    // field: cdb->misc1
+    *((uint8_t*)cdb + 1) = 3 << 5; // RPROTECT=011b 禁用保护检查
 
     int retries = 0;
 

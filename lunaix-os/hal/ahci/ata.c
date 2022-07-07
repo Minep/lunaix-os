@@ -16,7 +16,7 @@ __sata_buffer_io(struct hba_port* port,
 
     struct hba_cmdh* header;
     struct hba_cmdt* table;
-    int slot = hba_alloc_slot(port, &table, &header, 0);
+    int slot = hba_prepare_cmd(port, &table, &header, buffer, size);
     int bitmask = 1 << slot;
 
     // 确保端口是空闲的
@@ -24,9 +24,6 @@ __sata_buffer_io(struct hba_port* port,
 
     port->regs[HBA_RPxIS] = 0;
 
-    table->entries[0] = (struct hba_prdte){ .byte_count = size - 1,
-                                            .data_base = vmm_v2p(buffer) };
-    header->prdt_len = 1;
     header->options |= HBA_CMDH_WRITE * (write == 1);
 
     uint16_t count = ICEIL(size, port->device->block_size);
@@ -95,4 +92,5 @@ sata_read_error(struct hba_port* port)
 {
     uint32_t tfd = port->regs[HBA_RPxTFD];
     port->device->last_error = (tfd >> 8) & 0xff;
+    port->device->last_status = tfd & 0xff;
 }

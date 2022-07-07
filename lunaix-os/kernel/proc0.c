@@ -142,6 +142,8 @@ __test_disk_io()
     } else {
         kprint_hex(buffer, 256);
     }
+
+    vfree_dma(buffer);
 }
 
 void
