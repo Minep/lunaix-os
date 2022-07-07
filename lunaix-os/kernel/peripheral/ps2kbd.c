@@ -124,11 +124,9 @@ ps2_kbd_init()
          *  需要注意：Bochs 和 QEMU 使用的是ACPI v1，而非 v2
          * （virtualbox好像是v4）
          *
-         *  (2022/6/28)
-         *  QEMU似乎在 Q35 + ICH9 支持了 ACPI
-         * v2。但是对于IAPC_BOOT_ARCH的设置还是 停留在ACPI
-         * v1的时代。IAPC_ARCH_8042没有被正确的设置。这是一个今年的bug，好像还未修复
-         *  参考：https://lore.kernel.org/all/20220304115257.1816983-1-ani@anisinha.ca/T/
+         *  (2022/6/29)
+         *  QEMU在7.0.0版本中，修复了FADT::IAPC_BOOT无法正确提供关于i8042的信息的bug
+         *      https://wiki.qemu.org/ChangeLog/7.0#ACPI_.2F_SMBIOS
          *
          *  请看Bochs的bios源码（QEMU的BIOS其实是照抄bochs的，所以也是一个德行。。）：
          *      https://bochs.sourceforge.io/cgi-bin/lxr/source/bios/rombios32.c#L1314

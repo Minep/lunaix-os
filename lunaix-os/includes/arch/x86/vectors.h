@@ -1,6 +1,8 @@
 #ifndef __LUNAIX_VECTORS_H
 #define __LUNAIX_VECTORS_H
 
+// clang-format off
+
 #define FAULT_DIVISION_ERROR            0
 #define FAULT_TRAP_DEBUG_EXCEPTION      1
 #define INT_NMI                         2
@@ -32,6 +34,7 @@
 
 // Keyboard
 #define PC_KBD_IV                       201
+#define AHCI_HBA_IV                     202
 
 #define RTC_TIMER_IV                    210
 
@@ -44,5 +47,7 @@
 
 #define PC_AT_IRQ_RTC                   8
 #define PC_AT_IRQ_KBD                   1
+
+// clang-format on
 
 #endif /* __LUNAIX_VECTORS_H */

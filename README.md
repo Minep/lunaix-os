@@ -27,6 +27,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + 信号机制
 + PCI 3.0
 + PCIe 1.1 (WIP)
++ Serial ATA AHCI (WIP)
 
 ## 目录结构
 
@@ -63,6 +64,23 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 
 ## 运行以及Issue
 
+运行该操作系统需要一个虚拟磁盘镜像，可以使用如下命令快速创建一个：
+
+```bash
+qemu-img create -f vdi machine/disk1.vdi 128M
+```
+
+如果你想要使用别的磁盘镜像，需要修改`configs/make-debug-tool`
+
+找到这一行：
+```
+-drive id=disk,file="machine/disk0.vdi",if=none \
+```
+
+然后把`machine/disk0.vdi`替换成你的磁盘路径。
+
+有很多办法去创建一个虚拟磁盘，比如[qemu-img](https://qemu-project.gitlab.io/qemu/system/images.html)。
+
 在大多数情况下，我都会尽量保证本机运行无误后，push到仓库中。同时，该系统是经过本机测试，能够在Bochs，QEMU (`= 7.0`)，VirtualBox下正常的运行（暂时没试过真机）。如果发现在使用`make all`之后，虚拟机中运行报错，则一般是编译器优化问题。这个问题笔者一般很快就会修复，如果你使用别的版本的gcc（笔者版本11.2），出现了此问题，欢迎提issue。请参考[附录3：Issue的提交](#appendix3)
 
 下面列出一些可能会出现的问题。
@@ -74,6 +92,14 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 #### 问题#2：多进程运行时，偶尔会出现General Protection错误。
 
 这很大概率是出现了竞态条件。虽然是相当不可能的。但如果出现了，还是请提issue。
+
+#### 问题#3：Bochs运行时，提示找不到AHCI控制器
+
+正常，**因为Bochs不支持SATA**。请使用QEMU或VirtualBox。
+
+#### 问题#4：键盘的上下方向键（用于滚屏）在VirtualBox下有时不好使
+
+可以试试`Shift+<方向键>`，这个问题的解决需要重写键盘驱动的状态机。我会找时间去做，毕竟这不是燃眉之急。
 
 ## 参考教程
 
@@ -96,6 +122,10 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + PCI Local Bus Specification, Revision 3.0
 + PCI Express Base Specification, Revision 1.1
 + PCI Firmware Specification, Revision 3.0
++ Serial ATA - Advanced Host Controller Interface (AHCI), Revision 1.3.1
++ Serial ATA: HIgh Speed Serialized AT Attachment, Revision 3.2
++ SCSI Command Reference Manual
++ ATA/ATAPI Command Set - 3 (ACS-3)
 
 **免责声明：PCI相关的标准最终解释权归PCI-SIG所有。此处提供的副本仅供个人学习使用。任何商用目的须向PCI-SIG购买。**
 
@@ -142,7 +172,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 
 ## 附录2：编译gcc作为交叉编译器<a id="appendix2"></a>
 
-注意，gcc需要从源码构建，并配置为交叉编译器，即目标平台为`i686-elf`。你可以使用本项目提供的自动化脚本，这将会涵盖gcc和binutils源码的下载，配置和编译（不能保证全平台可用，目前只试过在Ubuntu系统上可以运行）。
+注意，gcc需要从源码构建，并配置为交叉编译器，即目标平台为`i686-elf`。你可以使用本项目提供的[自动化脚本](slides/c0-workspace/gcc-build.sh)，这将会涵盖gcc和binutils源码的下载，配置和编译（没什么时间去打磨脚本，目前只知道在笔者的Ubuntu系统上可以运行）。
 
 **推荐**手动编译。以下编译步骤搬运自：https://wiki.osdev.org/GCC_Cross-Compiler 
 

@@ -8,7 +8,7 @@
 static uintptr_t start = VMAP_START;
 
 void*
-vmm_vmap(uintptr_t paddr, size_t size, pt_attr attr, pp_attr_t pattr)
+vmm_vmap(uintptr_t paddr, size_t size, pt_attr attr)
 {
     // next fit
     assert_msg((paddr & 0xfff) == 0, "vmap: bad alignment");

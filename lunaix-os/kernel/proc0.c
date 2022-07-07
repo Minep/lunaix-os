@@ -2,7 +2,9 @@
 #include <lunaix/common.h>
 #include <lunaix/lunistd.h>
 #include <lunaix/lxconsole.h>
+#include <lunaix/mm/cake.h>
 #include <lunaix/mm/pmm.h>
+#include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/peripheral/ps2kbd.h>
 #include <lunaix/proc.h>
@@ -12,9 +14,12 @@
 #include <stddef.h>
 
 #include <hal/acpi/acpi.h>
+#include <hal/ahci/ahci.h>
 #include <hal/apic.h>
 #include <hal/ioapic.h>
 #include <hal/pci.h>
+
+#include <klibc/string.h>
 
 LOG_MODULE("PROC0")
 
@@ -106,13 +111,51 @@ extern uint8_t __kernel_end;              /* link/linker.ld */
 extern uint8_t __init_hhk_end;            /* link/linker.ld */
 extern multiboot_info_t* _k_init_mb_info; /* k_init.c */
 
+char test_sequence[] = "Once upon a time, in a magical land of Equestria. "
+                       "There were two regal sisters who ruled together "
+                       "and created harmony for all the land.";
+
+void
+__test_disk_io()
+{
+    struct hba_port* port = ahci_get_port(0);
+    char* buffer = vcalloc_dma(port->device->block_size);
+    strcpy(buffer, test_sequence);
+    kprintf("WRITE: %s\n", buffer);
+    int result;
+
+    // 写入第一扇区 (LBA=0)
+    result =
+      port->device->ops.write_buffer(port, 0, buffer, port->device->block_size);
+    if (!result) {
+        kprintf(KWARN "fail to write: %x\n", port->device->last_error);
+    }
+
+    memset(buffer, 0, port->device->block_size);
+
+    // 读出我们刚刚写的内容！
+    result =
+      port->device->ops.read_buffer(port, 0, buffer, port->device->block_size);
+    kprintf(KDEBUG "%x, %x\n", port->regs[HBA_RPxIS], port->regs[HBA_RPxTFD]);
+    if (!result) {
+        kprintf(KWARN "fail to read: %x\n", port->device->last_error);
+    } else {
+        kprint_hex(buffer, 256);
+    }
+
+    vfree_dma(buffer);
+}
+
 void
 init_platform()
 {
-    assert_msg(kalloc_init(), "Fail to initialize heap");
-
     // 锁定所有系统预留页（内存映射IO，ACPI之类的），并且进行1:1映射
     lock_reserved_memory();
+
+    cake_init();
+
+    assert_msg(kalloc_init(), "Fail to initialize heap");
+    valloc_init();
 
     acpi_init(_k_init_mb_info);
     apic_init();
@@ -121,7 +164,12 @@ init_platform()
     clock_init();
     ps2_kbd_init();
     pci_init();
-    pci_print_device();
+    ahci_init();
+    ahci_list_device();
+
+    __test_disk_io();
+
+    cake_stats();
 
     syscall_install();
 
@@ -172,6 +220,8 @@ __do_reserved_memory(int unlock)
                     break;
                 }
                 vmm_set_mapping(PD_REFERENCED, _pa, _pa, PG_PREM_R, VMAP_NULL);
+                pmm_mark_page_occupied(
+                  KERNEL_PID, _pa >> PG_SIZE_BITS, PP_FGLOCKED);
             }
             // Save the progress for later unmapping.
             mmaps[i].len_low = j * PG_SIZE;
@@ -179,6 +229,9 @@ __do_reserved_memory(int unlock)
             for (; j < pg_num; j++) {
                 uintptr_t _pa = pa + (j << PG_SIZE_BITS);
                 vmm_del_mapping(PD_REFERENCED, _pa);
+                if (mmap.type == MULTIBOOT_MEMORY_ACPI_RECLAIMABLE) {
+                    pmm_mark_page_free(_pa >> PG_SIZE_BITS);
+                }
             }
         }
     }

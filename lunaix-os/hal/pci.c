@@ -1,3 +1,13 @@
+/**
+ * @file pci.c
+ * @author Lunaixsky (zelong56@gmail.com)
+ * @brief A software implementation of PCI Local Bus Specification Revision 3.0
+ * @version 0.1
+ * @date 2022-06-28
+ *
+ * @copyright Copyright (c) 2022
+ *
+ */
 #include <hal/acpi/acpi.h>
 #include <hal/apic.h>
 #include <hal/pci.h>
@@ -156,6 +166,7 @@ pci_bar_sizing(struct pci_device* dev, uint32_t* bar_out, uint32_t bar_num)
         sized = PCI_BAR_ADDR_MM(sized);
     }
     *bar_out = bar;
+    pci_write_cspace(dev->cspace_base, PCI_REG_BAR(bar_num), bar);
     return ~sized + 1;
 }
 
@@ -163,7 +174,7 @@ void
 pci_setup_msi(struct pci_device* device, int vector)
 {
     // Dest: APIC#0, Physical Destination, No redirection
-    uint32_t msi_addr = (__APIC_BASE_PADDR | 0x8);
+    uint32_t msi_addr = (__APIC_BASE_PADDR);
 
     // Edge trigger, Fixed delivery
     uint32_t msi_data = vector;

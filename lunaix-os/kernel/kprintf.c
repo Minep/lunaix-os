@@ -85,3 +85,29 @@ kprint_panic(const char* fmt, ...)
 
     va_end(args);
 }
+
+void
+kprint_hex(const void* buffer, unsigned int size)
+{
+    unsigned char* data = (unsigned char*)buffer;
+    char buf[16];
+    char ch_cache[16];
+    unsigned int ptr = 0;
+    int i;
+
+    ch_cache[0] = '|';
+    ch_cache[1] = ' ';
+    while (size) {
+        snprintf(buf, 64, " %.4p: ", ptr);
+        console_write_str(buf);
+        for (i = 0; i < 8 && size; i++, size--, ptr++) {
+            unsigned char c = *(data + ptr) & 0xff;
+            ch_cache[2 + i] = (32 <= c && c < 127) ? c : '.';
+            snprintf(buf, 64, "%.2x  ", c);
+            console_write_str(buf);
+        }
+        ch_cache[2 + i] = '\0';
+        console_write_str(ch_cache);
+        console_write_char('\n');
+    }
+}

@@ -5,7 +5,7 @@
 void*
 ioremap(uintptr_t paddr, uint32_t size)
 {
-    return vmm_vmap(paddr, size, PG_PREM_RW, PP_FGPERSIST);
+    return vmm_vmap(paddr, size, PG_PREM_RW | PG_DISABLE_CACHE);
 }
 
 void*
