@@ -6,7 +6,7 @@
 #include <lunaix/spike.h>
 
 int
-__sata_buffer_io(struct hba_port* port,
+__sata_buffer_io(struct hba_device* dev,
                  uint64_t lba,
                  void* buffer,
                  uint32_t size,
@@ -14,6 +14,7 @@ __sata_buffer_io(struct hba_port* port,
 {
     assert_msg(((uintptr_t)buffer & 0x3) == 0, "HBA: Bad buffer alignment");
 
+    struct hba_port* port = dev->port;
     struct hba_cmdh* header;
     struct hba_cmdt* table;
     int slot = hba_prepare_cmd(port, &table, &header, buffer, size);
@@ -70,21 +71,21 @@ fail:
 }
 
 int
-sata_read_buffer(struct hba_port* port,
+sata_read_buffer(struct hba_device* dev,
                  uint64_t lba,
                  void* buffer,
                  uint32_t size)
 {
-    return __sata_buffer_io(port, lba, buffer, size, 0);
+    return __sata_buffer_io(dev, lba, buffer, size, 0);
 }
 
 int
-sata_write_buffer(struct hba_port* port,
+sata_write_buffer(struct hba_device* dev,
                   uint64_t lba,
                   void* buffer,
                   uint32_t size)
 {
-    return __sata_buffer_io(port, lba, buffer, size, 1);
+    return __sata_buffer_io(dev, lba, buffer, size, 1);
 }
 
 void

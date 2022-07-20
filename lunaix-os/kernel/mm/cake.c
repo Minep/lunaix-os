@@ -120,7 +120,6 @@ cake_grab(struct cake_pile* pile)
         pos = list_entry(pile->free.next, typeof(*pos), cakes);
     }
 
-found:
     piece_index_t found_index = pos->next_free;
     pos->next_free = pos->free_list[found_index];
     pos->used_pieces++;
@@ -140,7 +139,7 @@ found:
 int
 cake_release(struct cake_pile* pile, void* area)
 {
-    piece_index_t area_index;
+    piece_index_t piece_index;
     struct cake_s *pos, *n;
     struct llist_header* hdrs[2] = { &pile->full, &pile->partial };
 
@@ -150,9 +149,9 @@ cake_release(struct cake_pile* pile, void* area)
             if (pos->first_piece > area) {
                 continue;
             }
-            area_index =
+            piece_index =
               (uintptr_t)(area - pos->first_piece) / pile->piece_size;
-            if (area_index < pile->pieces_per_cake) {
+            if (piece_index < pile->pieces_per_cake) {
                 goto found;
             }
         }
@@ -161,8 +160,8 @@ cake_release(struct cake_pile* pile, void* area)
     return 0;
 
 found:
-    pos->free_list[area_index] = pos->next_free;
-    pos->next_free = area_index;
+    pos->free_list[piece_index] = pos->next_free;
+    pos->next_free = piece_index;
     pos->used_pieces--;
     pile->alloced_pieces--;
 

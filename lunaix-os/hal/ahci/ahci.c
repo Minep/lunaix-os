@@ -316,7 +316,8 @@ ahci_init_device(struct hba_port* port)
 
     // 清空任何待响应的中断
     port->regs[HBA_RPxIS] = 0;
-    port->device = vcalloc(sizeof(struct hba_device));
+    port->device = vzalloc(sizeof(struct hba_device));
+    port->device->port = port;
 
     // 在命令表中构建命令FIS
     struct sata_reg_fis* cmd_fis = (struct sata_reg_fis*)cmd_table->command_fis;

@@ -67,10 +67,23 @@ valloc(unsigned int size)
 }
 
 void*
-vcalloc(unsigned int size)
+vzalloc(unsigned int size)
 {
     void* ptr = __valloc(size, &piles);
     memset(ptr, 0, size);
+    return ptr;
+}
+
+void*
+vcalloc(unsigned int size, unsigned int count)
+{
+    unsigned int alloc_size;
+    if (__builtin_umul_overflow(size, count, &alloc_size)) {
+        return 0;
+    }
+
+    void* ptr = __valloc(alloc_size, &piles);
+    memset(ptr, 0, alloc_size);
     return ptr;
 }
 
@@ -87,7 +100,7 @@ valloc_dma(unsigned int size)
 }
 
 void*
-vcalloc_dma(unsigned int size)
+vzalloc_dma(unsigned int size)
 {
     void* ptr = __valloc(size, &piles_dma);
     memset(ptr, 0, size);

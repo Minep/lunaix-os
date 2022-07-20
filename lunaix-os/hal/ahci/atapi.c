@@ -42,7 +42,7 @@ scsi_parse_capacity(struct hba_device* device, uint32_t* parameter)
 }
 
 void
-__scsi_buffer_io(struct hba_port* port,
+__scsi_buffer_io(struct hba_device* dev,
                  uint64_t lba,
                  void* buffer,
                  uint32_t size,
@@ -50,6 +50,7 @@ __scsi_buffer_io(struct hba_port* port,
 {
     assert_msg(((uintptr_t)buffer & 0x3) == 0, "HBA: Bad buffer alignment");
 
+    struct hba_port* port = dev->port;
     struct hba_cmdh* header;
     struct hba_cmdt* table;
     int slot = hba_prepare_cmd(port, &table, &header, buffer, size);
@@ -107,19 +108,19 @@ fail:
 }
 
 void
-scsi_read_buffer(struct hba_port* port,
+scsi_read_buffer(struct hba_device* dev,
                  uint64_t lba,
                  void* buffer,
                  uint32_t size)
 {
-    __scsi_buffer_io(port, lba, buffer, size, 0);
+    __scsi_buffer_io(dev, lba, buffer, size, 0);
 }
 
 void
-scsi_write_buffer(struct hba_port* port,
+scsi_write_buffer(struct hba_device* dev,
                   uint64_t lba,
                   void* buffer,
                   uint32_t size)
 {
-    __scsi_buffer_io(port, lba, buffer, size, 1);
+    __scsi_buffer_io(dev, lba, buffer, size, 1);
 }

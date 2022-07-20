@@ -119,7 +119,7 @@ void
 __test_disk_io()
 {
     struct hba_port* port = ahci_get_port(0);
-    char* buffer = vcalloc_dma(port->device->block_size);
+    char* buffer = vzalloc_dma(port->device->block_size);
     strcpy(buffer, test_sequence);
     kprintf("WRITE: %s\n", buffer);
     int result;
