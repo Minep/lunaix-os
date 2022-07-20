@@ -30,4 +30,7 @@ strncpy(char* dest, const char* src, size_t n);
 const char*
 strchr(const char* str, int character);
 
+int
+streq(const char* a, const char* b);
+
 #endif /* __LUNAIX_STRING_H */

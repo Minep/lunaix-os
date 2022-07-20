@@ -87,4 +87,27 @@ llist_empty(struct llist_header* elem)
          &pos->member != (head);                                               \
          pos = n, n = list_entry(n->member.next, typeof(*n), member))
 
+struct hlist_node
+{
+    struct hlist_node *next, **pprev;
+};
+
+static inline void
+hlist_del(struct hlist_node* node)
+{
+    *node->pprev = node->next;
+    node->next = 0;
+    node->pprev = 0;
+}
+
+static inline void
+hlist_add(struct hlist_node** head, struct hlist_node* node)
+{
+    node->next = *head;
+    if (*head) {
+        (*head)->pprev = &node->next;
+    }
+    node->pprev = head;
+    *head = node;
+}
 #endif /* __LUNAIX_LLIST_H */
