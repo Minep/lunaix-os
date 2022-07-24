@@ -8,6 +8,32 @@
 #include <lunaix/ds/llist.h>
 
 #define VFS_NAME_MAXLEN 128
+#define VFS_MAX_FD 32
+
+#define VFS_INODE_TYPE_DIR 0x1
+#define VFS_INODE_TYPE_FILE 0x2
+#define VFS_INODE_TYPE_DEVICE 0x4
+
+#define VFS_ETOOLONG -1
+#define VFS_ENOFS -2
+#define VFS_EBADMNT -3
+#define VFS_ENODIR -4
+#define VFS_EENDOFDIR -5
+#define VFS_ENOTFOUND -6
+#define VFS_ENOOPS -7
+#define VFS_EINVLD -8
+#define VFS_EEOF -9
+
+#define VFS_WALK_MKPARENT 0x1
+#define VFS_WALK_FSRELATIVE 0x2
+#define VFS_WALK_MKDIR 0x4
+
+#define VFS_IOBUF_FDIRTY 0x1
+
+#define VFS_VALID_CHAR(chr)                                                    \
+    ('A' <= (chr) && (chr) <= 'Z' || 'a' <= (chr) && (chr) <= 'z' ||           \
+     '0' <= (chr) && (chr) <= '9' || (chr) == '.' || (chr) == '_' ||           \
+     (chr) == '-')
 
 struct v_dnode;
 
@@ -26,6 +52,7 @@ struct v_superblock
     bdev_t dev;
     struct v_dnode* root;
     struct filesystem* fs;
+    uint32_t iobuf_size;
     struct
     {
         uint32_t (*read_capacity)(struct v_superblock* vsb);
@@ -33,27 +60,39 @@ struct v_superblock
     } ops;
 };
 
+struct dir_context
+{
+    int index;
+    void* cb_data;
+    void (*read_complete_callback)(struct dir_context* dctx,
+                                   const char* name,
+                                   const int dtype);
+};
+
+struct v_file_ops
+{
+    int (*write)(struct v_file* file, void* buffer, size_t len);
+    int (*read)(struct v_file* file, void* buffer, size_t len);
+    int (*readdir)(struct v_file* file, struct dir_context* dctx);
+    int (*seek)(struct v_file* file, size_t offset);
+    int (*rename)(struct v_file* file, char* new_name);
+    int (*close)(struct v_file* file);
+    int (*sync)(struct v_file* file);
+};
+
 struct v_file
 {
     struct v_inode* inode;
-    struct
-    {
-        void* data;
-        uint32_t size;
-        uint64_t lb_addr;
-        uint32_t offset;
-        int dirty;
-    } buffer;
-    struct
-    {
-        int (*write)(struct v_file* file, void* data_in, uint32_t size);
-        int (*read)(struct v_file* file, void* data_out, uint32_t size);
-        int (*readdir)(struct v_file* file, int dir_index);
-        int (*seek)(struct v_file* file, size_t offset);
-        int (*rename)(struct v_file* file, char* new_name);
-        int (*close)(struct v_file* file);
-        int (*sync)(struct v_file* file);
-    } ops;
+    struct llist_header* f_list;
+    uint32_t f_pos;
+    void* data; // 允许底层FS绑定他的一些专有数据
+    struct v_file_ops ops;
+};
+
+struct v_fd
+{
+    struct v_file* file;
+    int pos;
 };
 
 struct v_inode
@@ -64,6 +103,7 @@ struct v_inode
     uint64_t lb_addr;
     uint32_t ref_count;
     uint32_t lb_usage;
+    void* data; // 允许底层FS绑定他的一些专有数据
     struct
     {
         int (*open)(struct v_inode* inode, struct v_file* file);
@@ -82,6 +122,15 @@ struct v_dnode
     struct llist_header children;
     struct llist_header siblings;
     struct v_superblock* super_block;
+    struct
+    {
+        void (*destruct)(struct v_dnode* dnode);
+    } ops;
+};
+
+struct v_fdtable
+{
+    struct v_fd* fds[VFS_MAX_FD];
 };
 
 /* --- file system manager --- */
@@ -94,4 +143,53 @@ fsm_register(struct filesystem* fs);
 struct filesystem*
 fsm_get(const char* fs_name);
 
+struct v_dnode*
+vfs_dcache_lookup(struct v_dnode* parent, struct hstr* str);
+
+void
+vfs_dcache_add(struct v_dnode* parent, struct v_dnode* dnode);
+
+int
+vfs_walk(struct v_dnode* start,
+         const char* path,
+         struct v_dnode** dentry,
+         int walk_options);
+
+int
+vfs_mount(const char* fs_name, bdev_t device, struct v_dnode* mnt_point);
+
+int
+vfs_unmount(struct v_dnode* mnt_point);
+
+int
+vfs_mkdir(const char* parent_path,
+          const char* component,
+          struct v_dnode** dentry);
+
+int
+vfs_open(struct v_dnode* dnode, struct v_file** file);
+
+int
+vfs_close(struct v_file* file);
+
+int
+vfs_fsync(struct v_file* file);
+
+struct v_superblock*
+vfs_sb_alloc();
+
+void
+vfs_sb_free(struct v_superblock* sb);
+
+struct v_dnode*
+vfs_d_alloc();
+
+void
+vfs_d_free(struct v_dnode* dnode);
+
+struct v_inode*
+vfs_i_alloc();
+
+void
+vfs_i_free(struct v_inode* inode);
 #endif /* __LUNAIX_VFS_H */

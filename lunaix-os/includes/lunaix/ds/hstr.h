@@ -3,6 +3,8 @@
 
 #include <lib/hash.h>
 
+#define HSTR_FULL_HASH 32
+
 struct hstr
 {
     unsigned int hash;
@@ -13,8 +15,10 @@ struct hstr
 #define HSTR(str, length)                                                      \
     (struct hstr)                                                              \
     {                                                                          \
-        .len = length, .value = str                                            \
+        .len = (length), .value = (str)                                        \
     }
+
+#define HSTR_EQ(str1, str2) ((str1)->hash == (str2)->hash)
 
 inline void
 hstr_rehash(struct hstr* hash_str, unsigned int truncate_to)

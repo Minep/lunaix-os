@@ -17,6 +17,9 @@
 // 获取v最近的最小k倍数
 #define ROUNDDOWN(v, k) ((v) & ~((k)-1))
 
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 #define __USER__ __attribute__((section(".usrtext")))
 
 inline static void

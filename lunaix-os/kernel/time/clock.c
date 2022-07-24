@@ -1,33 +1,35 @@
-#include <lunaix/clock.h>
-#include <lunaix/timer.h>
 #include <hal/rtc.h>
+#include <lunaix/clock.h>
 #include <lunaix/spike.h>
+#include <lunaix/timer.h>
 
 static volatile time_t sys_time;
 
-void clock_systime_counter(void* arg);
+void
+clock_systime_counter(void* arg);
 
 void
-clock_init() {
+clock_init()
+{
     if (!timer_context()) {
         panick("Systimer not initialized");
     }
-    
+
     // 系统计时器每毫秒累加。
     timer_run_ms(1, clock_systime_counter, NULL, TIMER_MODE_PERIODIC);
 }
 
-void clock_systime_counter(void* arg) {
+void
+clock_systime_counter(void* arg)
+{
     sys_time++;
 }
 
 int
-clock_datatime_eq(datetime_t* a, datetime_t* b) {
-    return a->year == b->year &&
-           a->month == b->month &&
-           a->day == b->day &&
-           a->weekday == b->weekday &&
-           a->minute == b->minute &&
+clock_datatime_eq(datetime_t* a, datetime_t* b)
+{
+    return a->year == b->year && a->month == b->month && a->day == b->day &&
+           a->weekday == b->weekday && a->minute == b->minute &&
            a->second == b->second;
 }
 
@@ -35,10 +37,10 @@ void
 clock_walltime(datetime_t* datetime)
 {
     datetime_t current;
-    
-    do
-    {
-        while (rtc_read_reg(RTC_REG_A) & 0x80);
+
+    do {
+        while (rtc_read_reg(RTC_REG_A) & 0x80)
+            ;
         memcpy(&current, datetime, sizeof(datetime_t));
 
         datetime->year = rtc_read_reg(RTC_REG_YRS);
@@ -62,7 +64,6 @@ clock_walltime(datetime_t* datetime)
         datetime->second = bcd2dec(datetime->second);
     }
 
-
     // To 24 hour format
     if (!RTC_24HRS_ENCODED(regbv) && (datetime->hour >> 7)) {
         datetime->hour = (12 + datetime->hour & 0x80);
@@ -71,8 +72,16 @@ clock_walltime(datetime_t* datetime)
     datetime->year += RTC_CURRENT_CENTRY * 100;
 }
 
+time_t
+clock_unixtime()
+{
+    datetime_t dt;
+    clock_walltime(&dt);
+    return clock_tounixtime(&dt);
+}
 
-time_t 
-clock_systime() {
+time_t
+clock_systime()
+{
     return sys_time;
 }
