@@ -114,7 +114,7 @@ __DEFINE_LXSYSCALL2(int, setpgid, pid_t, pid, pid_t, pgid)
     struct proc_info* proc = pid ? get_process(pid) : __current;
 
     if (!proc) {
-        __current->k_status = LXINVL;
+        __current->k_status = EINVAL;
         return -1;
     }
 
@@ -123,7 +123,7 @@ __DEFINE_LXSYSCALL2(int, setpgid, pid_t, pid, pid_t, pgid)
     struct proc_info* gruppenfuhrer = get_process(pgid);
 
     if (!gruppenfuhrer || proc->pgid == proc->pid) {
-        __current->k_status = LXINVL;
+        __current->k_status = EINVAL;
         return -1;
     }
 

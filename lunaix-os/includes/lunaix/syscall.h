@@ -22,9 +22,19 @@
 #define __SYSCALL_sigpending 17
 #define __SYSCALL_sigsuspend 18
 
+#define __SYSCALL_open 19
+#define __SYSCALL_close 20
+#define __SYSCALL_read 21
+#define __SYSCALL_write 22
+#define __SYSCALL_readdir 23
+#define __SYSCALL_mkdir 24
+
 #define __SYSCALL_MAX 0x100
 
 #ifndef __ASM__
+
+#define SYSCALL_ESTATUS(errno) -(errno != 0)
+
 void
 syscall_install();
 

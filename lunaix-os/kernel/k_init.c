@@ -79,6 +79,9 @@ _kernel_init()
 {
     lxconsole_init();
 
+    cake_init();
+    valloc_init();
+
     kprintf(KINFO "[MM] Allocated %d pages for stack start at %p\n",
             KSTACK_SIZE >> PG_SIZE_BITS,
             KSTACK_START);

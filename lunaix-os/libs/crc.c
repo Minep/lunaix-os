@@ -57,8 +57,7 @@ const unsigned int crc32_tab[] = {
 unsigned int
 crc32b(unsigned char* data, unsigned int size)
 {
-    int i = 0;
-    unsigned int crc = (unsigned int)-1;
+    unsigned int crc = (unsigned int)-1, i = 0;
 
     while (i < size) {
         crc = (crc >> 8) ^ crc32_tab[(crc ^ data[i]) & 0xff];

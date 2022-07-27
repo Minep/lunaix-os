@@ -3,6 +3,7 @@
 
 #include <arch/x86/interrupts.h>
 #include <lunaix/clock.h>
+#include <lunaix/fs.h>
 #include <lunaix/mm/mm.h>
 #include <lunaix/signal.h>
 #include <lunaix/timer.h>
@@ -77,6 +78,7 @@ struct proc_info
     sigset_t sig_inprogress;
     int flags;
     void* sig_handler[_SIG_NUM];
+    struct v_fdtable* fdtable;
     pid_t pgid;
 };
 

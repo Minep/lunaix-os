@@ -5,10 +5,17 @@
 #define LXHEAPFULL -(2)
 #define LXINVLDPTR -(2)
 #define LXOUTOFMEM -(3)
-#define LXINVLDPID -(4)
 #define LXSEGFAULT -(5)
-#define LXINVL -(6)
+#define EINVAL -(6)
 
 #define EINTR -(7)
+
+#define EMFILE -8
+#define ENOENT -9
+#define ENAMETOOLONG -10
+#define ENOTDIR -11
+#define EEXIST -12
+#define EBADF -13
+#define ENOTSUP -14
 
 #endif /* __LUNAIX_CODE_H */

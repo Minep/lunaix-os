@@ -6,6 +6,7 @@
 
 #include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/pmm.h>
+#include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
@@ -267,6 +268,7 @@ alloc_process()
     proc->pid = i;
     proc->created = clock_systime();
     proc->pgid = proc->pid;
+    proc->fdtable = vzalloc(sizeof(struct v_fdtable));
 
     llist_init_head(&proc->mm.regions);
     llist_init_head(&proc->children);
@@ -282,7 +284,7 @@ commit_process(struct proc_info* process)
     assert(process == &sched_ctx._procs[process->pid]);
 
     if (process->state != PS_CREATED) {
-        __current->k_status = LXINVL;
+        __current->k_status = EINVAL;
         return;
     }
 
@@ -305,7 +307,7 @@ destroy_process(pid_t pid)
 {
     int index = pid;
     if (index <= 0 || index > sched_ctx.ptable_len) {
-        __current->k_status = LXINVLDPID;
+        __current->k_status = EINVAL;
         return;
     }
     struct proc_info* proc = &sched_ctx._procs[index];

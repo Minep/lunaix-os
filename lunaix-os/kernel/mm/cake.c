@@ -76,10 +76,10 @@ __init_pile(struct cake_pile* pile,
                                   (piece_size + sizeof(piece_index_t)),
                                 .pg_per_cake = pg_per_cake };
 
-    unsigned int overhead_size =
-      sizeof(struct cake_s) + pile->pieces_per_cake * sizeof(piece_index_t);
+    unsigned int free_list_size = pile->pieces_per_cake * sizeof(piece_index_t);
 
-    pile->offset = ROUNDUP(overhead_size, offset);
+    pile->offset = ROUNDUP(sizeof(struct cake_s) + free_list_size, offset);
+    pile->pieces_per_cake -= ICEIL((pile->offset - free_list_size), piece_size);
 
     strncpy(&pile->pile_name, name, PILE_NAME_MAXLEN);
 

@@ -277,7 +277,7 @@ hba_prepare_cmd(struct hba_port* port,
 
     // 构建命令头（Command Header）和命令表（Command Table）
     struct hba_cmdh* cmd_header = &port->cmdlst[slot];
-    struct hba_cmdt* cmd_table = vcalloc_dma(sizeof(struct hba_cmdt));
+    struct hba_cmdt* cmd_table = vzalloc_dma(sizeof(struct hba_cmdt));
 
     memset(cmd_header, 0, sizeof(*cmd_header));
 

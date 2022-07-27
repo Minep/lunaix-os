@@ -6,6 +6,7 @@
 #include <lunaix/ds/hashtable.h>
 #include <lunaix/ds/hstr.h>
 #include <lunaix/ds/llist.h>
+#include <lunaix/status.h>
 
 #define VFS_NAME_MAXLEN 128
 #define VFS_MAX_FD 32
@@ -14,19 +15,17 @@
 #define VFS_INODE_TYPE_FILE 0x2
 #define VFS_INODE_TYPE_DEVICE 0x4
 
-#define VFS_ETOOLONG -1
 #define VFS_ENOFS -2
 #define VFS_EBADMNT -3
-#define VFS_ENODIR -4
+
 #define VFS_EENDOFDIR -5
-#define VFS_ENOTFOUND -6
-#define VFS_ENOOPS -7
+
 #define VFS_EINVLD -8
 #define VFS_EEOF -9
 
 #define VFS_WALK_MKPARENT 0x1
 #define VFS_WALK_FSRELATIVE 0x2
-#define VFS_WALK_MKDIR 0x4
+#define VFS_WALK_PARENT 0x4
 
 #define VFS_IOBUF_FDIRTY 0x1
 
@@ -66,6 +65,7 @@ struct dir_context
     void* cb_data;
     void (*read_complete_callback)(struct dir_context* dctx,
                                    const char* name,
+                                   const int len,
                                    const int dtype);
 };
 
@@ -103,9 +103,11 @@ struct v_inode
     uint64_t lb_addr;
     uint32_t ref_count;
     uint32_t lb_usage;
+    uint32_t fsize;
     void* data; // 允许底层FS绑定他的一些专有数据
     struct
     {
+        int (*create)(struct v_inode* inode, struct v_file* file);
         int (*open)(struct v_inode* inode, struct v_file* file);
         int (*sync)(struct v_inode* inode);
         int (*mkdir)(struct v_inode* inode, struct v_dnode* dnode);
@@ -143,6 +145,9 @@ fsm_register(struct filesystem* fs);
 struct filesystem*
 fsm_get(const char* fs_name);
 
+void
+vfs_init();
+
 struct v_dnode*
 vfs_dcache_lookup(struct v_dnode* parent, struct hstr* str);
 
@@ -153,18 +158,23 @@ int
 vfs_walk(struct v_dnode* start,
          const char* path,
          struct v_dnode** dentry,
+         struct hstr* component,
          int walk_options);
 
 int
-vfs_mount(const char* fs_name, bdev_t device, struct v_dnode* mnt_point);
+vfs_mount(const char* target, const char* fs_name, bdev_t device);
 
 int
-vfs_unmount(struct v_dnode* mnt_point);
+vfs_unmount(const char* target);
 
 int
-vfs_mkdir(const char* parent_path,
-          const char* component,
-          struct v_dnode** dentry);
+vfs_mount_at(const char* fs_name, bdev_t device, struct v_dnode* mnt_point);
+
+int
+vfs_unmount_at(struct v_dnode* mnt_point);
+
+int
+vfs_mkdir(const char* path, struct v_dnode** dentry);
 
 int
 vfs_open(struct v_dnode* dnode, struct v_file** file);

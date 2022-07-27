@@ -26,7 +26,7 @@ fsm_init()
 void
 fsm_register(struct filesystem* fs)
 {
-    hstr_rehash(&fs->fs_name, HASH_BUCKET_BITS);
+    hstr_rehash(&fs->fs_name, HSTR_FULL_HASH);
     hashtable_hash_in(fs_registry, &fs->fs_list, fs->fs_name.hash);
 }
 
@@ -35,7 +35,7 @@ fsm_get(const char* fs_name)
 {
     struct filesystem *pos, *next;
     struct hstr str = HSTR(fs_name, 0);
-    hstr_rehash(&str, HASH_BUCKET_BITS);
+    hstr_rehash(&str, HSTR_FULL_HASH);
 
     hashtable_hash_foreach(fs_registry, str.hash, pos, next, fs_list)
     {

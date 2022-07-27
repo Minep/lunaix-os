@@ -99,7 +99,7 @@ int
 signal_send(pid_t pid, int signum)
 {
     if (signum < 0 || signum >= _SIG_NUM) {
-        __current->k_status = LXINVL;
+        __current->k_status = EINVAL;
         return -1;
     }
 
@@ -116,7 +116,7 @@ signal_send(pid_t pid, int signum)
     } else {
         // TODO: send to all process.
         //  But I don't want to support it yet.
-        __current->k_status = LXINVL;
+        __current->k_status = EINVAL;
         return -1;
     }
 
@@ -130,7 +130,7 @@ send_grp:
 
 send_single:
     if (PROC_TERMINATED(proc->state)) {
-        __current->k_status = LXINVL;
+        __current->k_status = EINVAL;
         return -1;
     }
     __SIGSET(proc->sig_pending, signum);

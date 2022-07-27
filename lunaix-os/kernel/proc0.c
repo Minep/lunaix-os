@@ -1,5 +1,7 @@
 #include <arch/x86/boot/multiboot.h>
 #include <lunaix/common.h>
+#include <lunaix/fs.h>
+#include <lunaix/fs/twifs.h>
 #include <lunaix/lunistd.h>
 #include <lunaix/lxconsole.h>
 #include <lunaix/mm/cake.h>
@@ -119,26 +121,25 @@ void
 __test_disk_io()
 {
     struct hba_port* port = ahci_get_port(0);
+    struct hba_device* dev = port->device;
     char* buffer = vzalloc_dma(port->device->block_size);
     strcpy(buffer, test_sequence);
     kprintf("WRITE: %s\n", buffer);
     int result;
 
     // 写入第一扇区 (LBA=0)
-    result =
-      port->device->ops.write_buffer(port, 0, buffer, port->device->block_size);
+    result = dev->ops.write_buffer(dev, 0, buffer, dev->block_size);
     if (!result) {
-        kprintf(KWARN "fail to write: %x\n", port->device->last_error);
+        kprintf(KWARN "fail to write: %x\n", dev->last_error);
     }
 
-    memset(buffer, 0, port->device->block_size);
+    memset(buffer, 0, dev->block_size);
 
     // 读出我们刚刚写的内容！
-    result =
-      port->device->ops.read_buffer(port, 0, buffer, port->device->block_size);
+    result = dev->ops.read_buffer(dev, 0, buffer, dev->block_size);
     kprintf(KDEBUG "%x, %x\n", port->regs[HBA_RPxIS], port->regs[HBA_RPxTFD]);
     if (!result) {
-        kprintf(KWARN "fail to read: %x\n", port->device->last_error);
+        kprintf(KWARN "fail to read: %x\n", dev->last_error);
     } else {
         kprint_hex(buffer, 256);
     }
@@ -152,10 +153,7 @@ init_platform()
     // 锁定所有系统预留页（内存映射IO，ACPI之类的），并且进行1:1映射
     lock_reserved_memory();
 
-    cake_init();
-
     assert_msg(kalloc_init(), "Fail to initialize heap");
-    valloc_init();
 
     acpi_init(_k_init_mb_info);
     apic_init();
@@ -165,11 +163,17 @@ init_platform()
     ps2_kbd_init();
     pci_init();
     ahci_init();
-    ahci_list_device();
+    // ahci_list_device();
 
-    __test_disk_io();
+    fsm_init();
+    vfs_init();
+    twifs_init();
 
-    cake_stats();
+    vfs_mount("/", "twifs", -1);
+
+    //__test_disk_io();
+
+    // cake_stats();
 
     syscall_install();
 
