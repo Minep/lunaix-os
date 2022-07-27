@@ -80,6 +80,9 @@ __dcache_get_bucket(struct v_dnode* parent, unsigned int hash)
 struct v_dnode*
 vfs_dcache_lookup(struct v_dnode* parent, struct hstr* str)
 {
+    if (!str->len)
+        return parent;
+
     struct hbucket* slot = __dcache_get_bucket(parent, str->hash);
 
     struct v_dnode *pos, *n;
@@ -109,7 +112,7 @@ vfs_walk(struct v_dnode* start,
     int errno = 0;
     int i = 0, j = 0;
 
-    if (path[0] == PATH_DELIM) {
+    if (path[0] == PATH_DELIM || !start) {
         if ((walk_options & VFS_WALK_FSRELATIVE) && start) {
             start = start->super_block->root;
         } else {
@@ -146,6 +149,7 @@ vfs_walk(struct v_dnode* start,
         }
 
         name_content[j] = 0;
+        name.len = j;
         hstr_rehash(&name, HSTR_FULL_HASH);
 
         if (!lookahead && (walk_options & VFS_WALK_PARENT)) {
@@ -381,11 +385,15 @@ __DEFINE_LXSYSCALL2(int, open, const char*, path, int, options)
         return -1;
     }
 
+    vfs_walk(dentry, name.value, &file, NULL, 0);
+
     struct v_file* opened_file = 0;
-    if (!(file = vfs_dcache_lookup(dentry, &name)) && (options & FO_CREATE)) {
-        errno = dentry->inode->ops.create(dentry->inode, opened_file);
-    } else if (!file) {
-        errno = EEXIST;
+    if (!file) {
+        if ((options & FO_CREATE)) {
+            errno = dentry->inode->ops.create(dentry->inode, opened_file);
+        } else {
+            errno = ENOENT;
+        }
     } else {
         errno = vfs_open(file, &opened_file);
     }
@@ -410,6 +418,7 @@ __DEFINE_LXSYSCALL1(int, close, int, fd)
         errno = EBADF;
     } else if (!(errno = vfs_close(fd_s->file))) {
         vfree(fd_s);
+        __current->fdtable->fds[fd] = 0;
     }
 
     __current->k_status = errno;
@@ -424,7 +433,7 @@ __vfs_readdir_callback(struct dir_context* dctx,
                        const int dtype)
 {
     struct dirent* dent = (struct dirent*)dctx->cb_data;
-    strcpy(dent->d_name, name);
+    strncpy(dent->d_name, name, DIRENT_NAME_MAX_LEN);
     dent->d_nlen = len;
     dent->d_type = dtype;
 }
@@ -456,8 +465,7 @@ __DEFINE_LXSYSCALL1(int, mkdir, const char*, path)
 {
     struct v_dnode *parent, *dir;
     struct hstr component = HSTR(valloc(VFS_NAME_MAXLEN), 0);
-    int errno =
-      vfs_walk(root_sb->root, path, &parent, &component, VFS_WALK_PARENT);
+    int errno = vfs_walk(NULL, path, &parent, &component, VFS_WALK_PARENT);
     if (errno) {
         goto done;
     }
@@ -480,4 +488,14 @@ __DEFINE_LXSYSCALL1(int, mkdir, const char*, path)
 done:
     __current->k_status = errno;
     return SYSCALL_ESTATUS(errno);
+}
+
+__DEFINE_LXSYSCALL3(size_t, read, int, fd, void*, buf, size_t, count)
+{
+    // TODO
+}
+
+__DEFINE_LXSYSCALL3(size_t, write, int, fd, void*, buf, size_t, count)
+{
+    // TODO
 }

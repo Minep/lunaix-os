@@ -28,8 +28,8 @@
         .long __lxsys_sigsuspend
         .long __lxsys_open
         .long __lxsys_close
-        // .long __lxsys_read
-        // .long __lxsys_write
+        .long __lxsys_read
+        .long __lxsys_write
         .long __lxsys_readdir
         .long __lxsys_mkdir
         2:

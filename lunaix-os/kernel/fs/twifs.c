@@ -32,6 +32,9 @@ struct v_inode*
 __twifs_create_inode(struct twifs_node* twi_node);
 
 int
+__twifs_iterate_dir(struct v_file* file, struct dir_context* dctx);
+
+int
 __twifs_mount(struct v_superblock* vsb, struct v_dnode* mount_point);
 
 void
@@ -94,6 +97,7 @@ twifs_dir_node(struct twifs_node* parent, const char* name, int name_len)
 {
     struct twifs_node* twi_node = __twifs_new_node(parent, name, name_len);
     twi_node->itype = VFS_INODE_TYPE_DIR;
+    twi_node->fops.readdir = __twifs_iterate_dir;
 
     struct v_inode* twi_inode = __twifs_create_inode(twi_node);
     struct twifs_node* dot = __twifs_new_node(twi_node, ".", 1);
@@ -104,7 +108,7 @@ twifs_dir_node(struct twifs_node* parent, const char* name, int name_len)
 
     twi_node->inode = twi_inode;
     dot->inode = twi_inode;
-    ddot->inode = parent->inode;
+    ddot->inode = parent ? parent->inode : twi_inode;
 
     return twi_node;
 }
@@ -119,6 +123,13 @@ int
 __twifs_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
 {
     mount_point->inode = fs_root->inode;
+    // FIXME: try to mitigate this special case or pull it up to higher level of
+    // abstraction
+    if (mount_point->parent && mount_point->parent->inode) {
+        struct hstr ddot_name = HSTR("..", 2);
+        struct twifs_node* root_ddot = __twifs_get_node(fs_root, &ddot_name);
+        root_ddot->inode = mount_point->parent->inode;
+    }
     return 0;
 }
 
@@ -181,11 +192,11 @@ __twifs_iterate_dir(struct v_file* file, struct dir_context* dctx)
             dctx->index = counter;
             dctx->read_complete_callback(
               dctx, pos->name.value, pos->name.len, pos->itype);
-            return 1;
+            return 0;
         }
     }
 
-    return 0;
+    return 1;
 }
 
 int
@@ -193,6 +204,7 @@ __twifs_openfile(struct v_inode* inode, struct v_file* file)
 {
     struct twifs_node* twi_node = (struct twifs_node*)inode->data;
     if (twi_node) {
+        file->inode = twi_node->inode;
         file->ops = twi_node->fops;
         return 0;
     }

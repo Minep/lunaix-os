@@ -40,8 +40,9 @@ unlock_reserved_memory();
 void
 __do_reserved_memory(int unlock);
 
-//#define USE_DEMO
-#define DEMO_SIGNAL
+#define USE_DEMO
+// #define DEMO_SIGNAL
+#define DEMO_READDIR
 
 extern void
 _pconsole_main();
@@ -51,6 +52,9 @@ _signal_demo_main();
 
 extern void
 _lxinit_main();
+
+extern void
+_readdir_main();
 
 void __USER__
 __proc0_usr()
@@ -65,6 +69,8 @@ __proc0_usr()
         _exit(0);
 #elif defined DEMO_SIGNAL
         _signal_demo_main();
+#elif defined DEMO_READDIR
+        _readdir_main();
 #else
         _lxinit_main();
 #endif
