@@ -1,4 +1,5 @@
 #include <arch/x86/boot/multiboot.h>
+#include <lunaix/block.h>
 #include <lunaix/common.h>
 #include <lunaix/fs.h>
 #include <lunaix/fs/twifs.h>
@@ -42,7 +43,8 @@ __do_reserved_memory(int unlock);
 
 #define USE_DEMO
 // #define DEMO_SIGNAL
-#define DEMO_READDIR
+// #define DEMO_READDIR
+#define DEMO_IOTEST
 
 extern void
 _pconsole_main();
@@ -55,6 +57,9 @@ _lxinit_main();
 
 extern void
 _readdir_main();
+
+extern void
+_iotest_main();
 
 void __USER__
 __proc0_usr()
@@ -71,6 +76,8 @@ __proc0_usr()
         _signal_demo_main();
 #elif defined DEMO_READDIR
         _readdir_main();
+#elif defined DEMO_IOTEST
+        _iotest_main();
 #else
         _lxinit_main();
 #endif
@@ -119,39 +126,8 @@ extern uint8_t __kernel_end;              /* link/linker.ld */
 extern uint8_t __init_hhk_end;            /* link/linker.ld */
 extern multiboot_info_t* _k_init_mb_info; /* k_init.c */
 
-char test_sequence[] = "Once upon a time, in a magical land of Equestria. "
-                       "There were two regal sisters who ruled together "
-                       "and created harmony for all the land.";
-
-void
-__test_disk_io()
-{
-    struct hba_port* port = ahci_get_port(0);
-    struct hba_device* dev = port->device;
-    char* buffer = vzalloc_dma(port->device->block_size);
-    strcpy(buffer, test_sequence);
-    kprintf("WRITE: %s\n", buffer);
-    int result;
-
-    // 写入第一扇区 (LBA=0)
-    result = dev->ops.write_buffer(dev, 0, buffer, dev->block_size);
-    if (!result) {
-        kprintf(KWARN "fail to write: %x\n", dev->last_error);
-    }
-
-    memset(buffer, 0, dev->block_size);
-
-    // 读出我们刚刚写的内容！
-    result = dev->ops.read_buffer(dev, 0, buffer, dev->block_size);
-    kprintf(KDEBUG "%x, %x\n", port->regs[HBA_RPxIS], port->regs[HBA_RPxTFD]);
-    if (!result) {
-        kprintf(KWARN "fail to read: %x\n", dev->last_error);
-    } else {
-        kprint_hex(buffer, 256);
-    }
-
-    vfree_dma(buffer);
-}
+extern void
+block_twifs_create();
 
 void
 init_platform()
@@ -168,12 +144,15 @@ init_platform()
     clock_init();
     ps2_kbd_init();
     pci_init();
+    block_init();
     ahci_init();
     // ahci_list_device();
 
     fsm_init();
     vfs_init();
     twifs_init();
+
+    block_twifs_create();
 
     vfs_mount("/", "twifs", -1);
 

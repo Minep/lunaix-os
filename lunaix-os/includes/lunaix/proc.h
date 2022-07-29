@@ -10,4 +10,6 @@ __LXSYSCALL1(pid_t, wait, int*, status);
 
 __LXSYSCALL3(pid_t, waitpid, pid_t, pid, int*, status, int, options);
 
+__LXSYSCALL(int, geterrno);
+
 #endif /* __LUNAIX_SYS_H */

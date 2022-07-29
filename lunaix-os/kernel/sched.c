@@ -203,6 +203,11 @@ __DEFINE_LXSYSCALL3(pid_t, waitpid, pid_t, pid, int*, status, int, options)
     return _wait(pid, status, options);
 }
 
+__DEFINE_LXSYSCALL(int, geterrno)
+{
+    return __current->k_status;
+}
+
 pid_t
 _wait(pid_t wpid, int* status, int options)
 {

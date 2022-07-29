@@ -7,7 +7,7 @@ LOG_MODULE("RDDIR")
 void
 _readdir_main()
 {
-    int fd = open("/bus/../..", 0);
+    int fd = open("/dev/block", 0);
     if (fd == -1) {
         kprintf(KERROR "fail to open\n");
         return;

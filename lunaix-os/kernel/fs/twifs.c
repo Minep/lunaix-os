@@ -59,18 +59,11 @@ twifs_init()
 struct twifs_node*
 __twifs_new_node(struct twifs_node* parent, const char* name, int name_len)
 {
-    struct hstr hname = HSTR(name, name_len);
-    hstr_rehash(&hname, HSTR_FULL_HASH);
-
-    struct twifs_node* node = __twifs_get_node(parent, &hname);
-    if (node) {
-        return node;
-    }
-
-    node = cake_grab(twi_pile);
+    struct twifs_node* node = cake_grab(twi_pile);
     memset(node, 0, sizeof(*node));
 
-    node->name = hname;
+    node->name = HSTR(name, name_len);
+    hstr_rehash(&node->name, HSTR_FULL_HASH);
     llist_init_head(&node->children);
 
     if (parent) {
@@ -95,6 +88,13 @@ twifs_file_node(struct twifs_node* parent, const char* name, int name_len)
 struct twifs_node*
 twifs_dir_node(struct twifs_node* parent, const char* name, int name_len)
 {
+    struct hstr hname = HSTR(name, name_len);
+    hstr_rehash(&hname, HSTR_FULL_HASH);
+    struct twifs_node* node = __twifs_get_node(parent, &hname);
+    if (node) {
+        return node;
+    }
+
     struct twifs_node* twi_node = __twifs_new_node(parent, name, name_len);
     twi_node->itype = VFS_INODE_TYPE_DIR;
     twi_node->fops.readdir = __twifs_iterate_dir;

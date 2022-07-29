@@ -17,5 +17,6 @@
 #define EEXIST -12
 #define EBADF -13
 #define ENOTSUP -14
+#define ENXIO -15
 
 #endif /* __LUNAIX_CODE_H */

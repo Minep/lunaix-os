@@ -5,12 +5,14 @@
 
 #define LPT_SIG 0x414e554c
 #define PARTITION_NAME_SIZE 48
+#define DEV_ID_SIZE 32
 
 typedef uint64_t partition_t;
 typedef uint32_t bdev_t;
 
 struct block_dev
 {
+    char bdev_id[DEV_ID_SIZE];
     char name[PARTITION_NAME_SIZE];
     struct hba_device* hd_dev;
     uint64_t base_lba;
@@ -33,5 +35,11 @@ struct lpt_header
     uint32_t pt_end_lba;
     uint32_t table_len;
 } __attribute__((packed));
+
+void
+block_init();
+
+int
+block_mount_disk(struct hba_device* hd_dev);
 
 #endif /* __LUNAIX_BLOCK_H */

@@ -27,11 +27,13 @@
         .long __lxsys_sigpending
         .long __lxsys_sigsuspend
         .long __lxsys_open
-        .long __lxsys_close
+        .long __lxsys_close         /* 20 */
         .long __lxsys_read
         .long __lxsys_write
         .long __lxsys_readdir
         .long __lxsys_mkdir
+        .long __lxsys_lseek          /* 25 */
+        .long __lxsys_geterrno
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
             .long 0

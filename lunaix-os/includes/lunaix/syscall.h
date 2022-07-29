@@ -28,6 +28,8 @@
 #define __SYSCALL_write 22
 #define __SYSCALL_readdir 23
 #define __SYSCALL_mkdir 24
+#define __SYSCALL_lseek 25
+#define __SYSCALL_geterrno 26
 
 #define __SYSCALL_MAX 0x100
 

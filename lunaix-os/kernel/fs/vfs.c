@@ -204,6 +204,7 @@ vfs_walk(struct v_dnode* start,
 error:
     vfree(dnode->name.value);
     vfs_d_free(dnode);
+    *dentry = NULL;
     return errno;
 }
 
@@ -403,18 +404,21 @@ __DEFINE_LXSYSCALL2(int, open, const char*, path, int, options)
     if (!errno && !(errno = vfs_alloc_fdslot(&fd))) {
         struct v_fd* fd_s = vzalloc(sizeof(*fd_s));
         fd_s->file = opened_file;
-        fd_s->pos = file->inode->fsize & -((options & FO_APPEND) == 0);
+        fd_s->pos = file->inode->fsize & -((options & FO_APPEND) != 0);
         __current->fdtable->fds[fd] = fd_s;
     }
 
     return SYSCALL_ESTATUS(errno);
 }
 
+#define GET_FD(fd, fd_s)                                                       \
+    (fd >= 0 && fd < VFS_MAX_FD && (fd_s = __current->fdtable->fds[fd]))
+
 __DEFINE_LXSYSCALL1(int, close, int, fd)
 {
     struct v_fd* fd_s;
     int errno;
-    if (fd < 0 || fd >= VFS_MAX_FD || !(fd_s = __current->fdtable->fds[fd])) {
+    if (!GET_FD(fd, fd_s)) {
         errno = EBADF;
     } else if (!(errno = vfs_close(fd_s->file))) {
         vfree(fd_s);
@@ -442,7 +446,7 @@ __DEFINE_LXSYSCALL2(int, readdir, int, fd, struct dirent*, dent)
 {
     struct v_fd* fd_s;
     int errno;
-    if (fd < 0 || fd >= VFS_MAX_FD || !(fd_s = __current->fdtable->fds[fd])) {
+    if (!GET_FD(fd, fd_s)) {
         errno = EBADF;
     } else if (!(fd_s->file->inode->itype & VFS_INODE_TYPE_DIR)) {
         errno = ENOTDIR;
@@ -490,12 +494,67 @@ done:
     return SYSCALL_ESTATUS(errno);
 }
 
-__DEFINE_LXSYSCALL3(size_t, read, int, fd, void*, buf, size_t, count)
+__DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
 {
-    // TODO
+    int errno = 0;
+    struct v_fd* fd_s;
+    if (!GET_FD(fd, fd_s)) {
+        errno = EBADF;
+    } else {
+        struct v_file* file = fd_s->file;
+        file->f_pos = fd_s->pos;
+        if ((errno = file->ops.read(file, buf, count)) >= 0) {
+            fd_s->pos += errno;
+        }
+    }
+
+    __current->k_status = errno;
+    return SYSCALL_ESTATUS(errno);
 }
 
-__DEFINE_LXSYSCALL3(size_t, write, int, fd, void*, buf, size_t, count)
+__DEFINE_LXSYSCALL3(int, write, int, fd, void*, buf, size_t, count)
 {
-    // TODO
+    int errno = 0;
+    struct v_fd* fd_s;
+    if (!GET_FD(fd, fd_s)) {
+        errno = EBADF;
+    } else {
+        struct v_file* file = fd_s->file;
+        file->f_pos = fd_s->pos;
+        if ((errno = file->ops.write(file, buf, count)) >= 0) {
+            fd_s->pos += errno;
+        }
+    }
+
+    __current->k_status = errno;
+    return SYSCALL_ESTATUS(errno);
+}
+
+__DEFINE_LXSYSCALL3(int, lseek, int, fd, int, offset, int, options)
+{
+    int errno = 0;
+    struct v_fd* fd_s;
+    if (!GET_FD(fd, fd_s)) {
+        errno = EBADF;
+    } else {
+        size_t fpos = fd_s->file->f_pos;
+        switch (options) {
+            case FSEEK_CUR:
+                fpos = (size_t)((int)fd_s->file->f_pos + offset);
+                break;
+            case FSEEK_END:
+                fpos = (size_t)((int)fd_s->file->inode->fsize + offset);
+                break;
+            case FSEEK_SET:
+                fpos = offset;
+                break;
+
+            default:
+                break;
+        }
+        fd_s->pos = fpos;
+    }
+
+    __current->k_status = errno;
+    return SYSCALL_ESTATUS(errno);
 }

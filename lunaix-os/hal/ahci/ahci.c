@@ -16,6 +16,7 @@
 
 #include <hal/pci.h>
 #include <klibc/string.h>
+#include <lunaix/block.h>
 #include <lunaix/mm/mmio.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/valloc.h>
@@ -175,6 +176,8 @@ ahci_init()
         if (!ahci_init_device(port)) {
             kprintf(KERROR "fail to init device");
         }
+
+        block_mount_disk(port->device);
     }
 }
 
