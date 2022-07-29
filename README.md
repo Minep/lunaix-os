@@ -22,12 +22,13 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + 内存管理与按需分页（Demand Paging）
 + 键盘输入
 + 多进程
-+ 17个常见的Linux/POSIX系统调用（[附录1](#appendix1)）
++ 二十多个常见的Linux/POSIX系统调用（[附录1](#appendix1)）
 + 用户模式
 + 信号机制
 + PCI 3.0
 + PCIe 1.1 (WIP)
-+ Serial ATA AHCI (WIP)
++ Serial ATA AHCI
++ 文件系统 (WIP)
 
 ## 目录结构
 
@@ -165,10 +166,18 @@ qemu-img create -f vdi machine/disk1.vdi 128M
 1. `kill(2)`
 1. `sigpending(2)`
 1. `sigsuspend(2)`
+2. `read(2)`
+2. `write(2)`
+2. `open(2)`
+2. `close(2)`
+2. `mkdir(2)`
+2. `lseek(2)`
+2. `readdir(2)`
 
 ### LunaixOS自有
 
 1. `yield`
+2. `geterrno`
 
 ## 附录2：编译gcc作为交叉编译器<a id="appendix2"></a>
 
