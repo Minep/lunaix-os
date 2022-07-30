@@ -126,9 +126,6 @@ extern uint8_t __kernel_end;              /* link/linker.ld */
 extern uint8_t __init_hhk_end;            /* link/linker.ld */
 extern multiboot_info_t* _k_init_mb_info; /* k_init.c */
 
-extern void
-block_twifs_create();
-
 void
 init_platform()
 {
@@ -147,17 +144,6 @@ init_platform()
     block_init();
     ahci_init();
     // ahci_list_device();
-
-    fsm_init();
-    vfs_init();
-    twifs_init();
-
-    block_twifs_create();
-
-    vfs_mount("/", "twifs", -1);
-
-    //__test_disk_io();
-
     // cake_stats();
 
     syscall_install();

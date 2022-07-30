@@ -2,6 +2,7 @@
 #define __LUNAIX_BLOCK_H
 
 #include <hal/ahci/hba.h>
+#include <lunaix/device.h>
 
 #define LPT_SIG 0x414e554c
 #define PARTITION_NAME_SIZE 48
@@ -15,6 +16,7 @@ struct block_dev
     char bdev_id[DEV_ID_SIZE];
     char name[PARTITION_NAME_SIZE];
     struct hba_device* hd_dev;
+    struct device* dev;
     uint64_t base_lba;
     uint64_t end_lba;
 };

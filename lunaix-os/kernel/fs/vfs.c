@@ -37,6 +37,9 @@ static struct hbucket* dnode_cache;
 
 static int fs_id = 0;
 
+struct hstr vfs_ddot = HSTR("..", 2);
+struct hstr vfs_dot = HSTR(".", 1);
+
 struct v_dnode*
 vfs_d_alloc();
 
@@ -61,6 +64,9 @@ vfs_init()
       cake_new_pile("sb_cache", sizeof(struct v_superblock), 1, 0);
 
     dnode_cache = vzalloc(DNODE_HASHTABLE_SIZE * sizeof(struct hbucket));
+
+    hstr_rehash(&vfs_ddot, HSTR_FULL_HASH);
+    hstr_rehash(&vfs_dot, HSTR_FULL_HASH);
 
     // 创建一个根superblock，用来蕴含我们的根目录。
     root_sb = vfs_sb_alloc();
@@ -349,7 +355,9 @@ struct v_dnode*
 vfs_d_alloc()
 {
     struct v_dnode* dnode = cake_grab(dnode_pile);
+    memset(dnode, 0, sizeof(*dnode));
     llist_init_head(&dnode->children);
+    return dnode;
 }
 
 void
@@ -376,14 +384,15 @@ vfs_i_free(struct v_inode* inode)
     cake_release(inode_pile, inode);
 }
 
-__DEFINE_LXSYSCALL2(int, open, const char*, path, int, options)
+int
+__vfs_do_open(struct v_file** file_out, const char* path, int options)
 {
     char name_str[VFS_NAME_MAXLEN];
     struct hstr name = HSTR(name_str, 0);
     struct v_dnode *dentry, *file;
-    int errno, fd;
+    int errno;
     if ((errno = vfs_walk(NULL, path, &dentry, &name, VFS_WALK_PARENT))) {
-        return -1;
+        return ENOENT;
     }
 
     vfs_walk(dentry, name.value, &file, NULL, 0);
@@ -399,13 +408,23 @@ __DEFINE_LXSYSCALL2(int, open, const char*, path, int, options)
         errno = vfs_open(file, &opened_file);
     }
 
+    *file_out = opened_file;
+    return errno;
+}
+
+__DEFINE_LXSYSCALL2(int, open, const char*, path, int, options)
+{
+    struct v_file* opened_file;
+    int errno = __vfs_do_open(&opened_file, path, options), fd;
+
     __current->k_status = errno;
 
     if (!errno && !(errno = vfs_alloc_fdslot(&fd))) {
         struct v_fd* fd_s = vzalloc(sizeof(*fd_s));
         fd_s->file = opened_file;
-        fd_s->pos = file->inode->fsize & -((options & FO_APPEND) != 0);
+        fd_s->pos = opened_file->inode->fsize & -((options & FO_APPEND) != 0);
         __current->fdtable->fds[fd] = fd_s;
+        return fd;
     }
 
     return SYSCALL_ESTATUS(errno);
@@ -474,7 +493,9 @@ __DEFINE_LXSYSCALL1(int, mkdir, const char*, path)
         goto done;
     }
 
-    if (!parent->inode->ops.mkdir) {
+    if ((parent->super_block->fs->types & FSTYPE_ROFS)) {
+        errno = ENOTSUP;
+    } else if (!parent->inode->ops.mkdir) {
         errno = ENOTSUP;
     } else if (!(parent->inode->itype & VFS_INODE_TYPE_DIR)) {
         errno = ENOTDIR;

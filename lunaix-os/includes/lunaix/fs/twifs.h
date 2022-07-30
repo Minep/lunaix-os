@@ -26,4 +26,7 @@ twifs_dir_node(struct twifs_node* parent, const char* name, int name_len);
 struct twifs_node*
 twifs_toplevel_node(const char* name, int name_len);
 
+void
+twifs_rm_node(struct twifs_node* node);
+
 #endif /* __LUNAIX_TWIFS_H */

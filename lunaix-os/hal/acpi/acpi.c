@@ -26,8 +26,6 @@ acpi_init(multiboot_info_t* mb_info)
     assert_msg(rsdp, "Fail to locate ACPI_RSDP");
     assert_msg(acpi_rsdp_validate(rsdp), "Invalid ACPI_RSDP (checksum failed)");
 
-    kprintf(KDEBUG "RSDP found at %p, RSDT: %p\n", rsdp, rsdp->rsdt);
-
     acpi_rsdt_t* rsdt = rsdp->rsdt;
 
     ctx = lxcalloc(1, sizeof(acpi_context));
@@ -55,15 +53,7 @@ acpi_init(multiboot_info_t* mb_info)
         }
     }
 
-    kprintf(KINFO "OEM: %s\n", ctx->oem_id);
-
-    for (size_t i = 0; i < 24; i++) {
-        acpi_intso_t* intso = ctx->madt.irq_exception[i];
-        if (!intso)
-            continue;
-
-        kprintf(KDEBUG "IRQ #%u -> GSI #%u\n", intso->source, intso->gsi);
-    }
+    kprintf(KINFO "ACPI: %s\n", ctx->oem_id);
 }
 
 acpi_context*

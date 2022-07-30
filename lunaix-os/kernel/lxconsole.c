@@ -1,4 +1,5 @@
 #include <klibc/string.h>
+#include <lunaix/device.h>
 #include <lunaix/lxconsole.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
@@ -6,6 +7,12 @@
 #include <lunaix/tty/tty.h>
 
 static struct console lx_console;
+
+int
+__tty_write(struct device* dev,
+            void* buf,
+            unsigned int offset,
+            unsigned int len);
 
 void
 lxconsole_init()
@@ -28,6 +35,19 @@ lxconsole_init()
     memset(lx_console.buffer.data, 0, lx_console.buffer.size);
 
     lx_console.flush_timer = NULL;
+
+    struct device* tty_dev = device_add(NULL, &lx_console, "tty");
+    tty_dev->write = __tty_write;
+}
+
+int
+__tty_write(struct device* dev,
+            void* buf,
+            unsigned int offset,
+            unsigned int len)
+{
+    struct console* console = (struct console*)dev->underlay;
+    console_write(console, buf, len);
 }
 
 void

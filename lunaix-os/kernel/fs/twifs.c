@@ -37,6 +37,9 @@ __twifs_iterate_dir(struct v_file* file, struct dir_context* dctx);
 int
 __twifs_mount(struct v_superblock* vsb, struct v_dnode* mount_point);
 
+int
+__twifs_mkdir(struct v_inode* inode, struct v_dnode* dnode);
+
 void
 twifs_init()
 {
@@ -49,11 +52,6 @@ twifs_init()
     fsm_register(twifs);
 
     fs_root = twifs_dir_node(NULL, NULL, 0);
-
-    // 预备一些常用的类别
-    twifs_toplevel_node("kernel", 6);
-    twifs_toplevel_node("dev", 3);
-    twifs_toplevel_node("bus", 3);
 }
 
 struct twifs_node*
@@ -73,6 +71,23 @@ __twifs_new_node(struct twifs_node* parent, const char* name, int name_len)
     return node;
 }
 
+void
+twifs_rm_node(struct twifs_node* node)
+{
+    // TODO recursivly delete any sub-directories.
+    if ((node->itype & VFS_INODE_TYPE_DIR)) {
+        struct twifs_node* dir = __twifs_get_node(node, &vfs_dot);
+        struct twifs_node* dir2 = __twifs_get_node(node, &vfs_ddot);
+        vfs_i_free(dir->inode);
+        vfs_i_free(dir2->inode);
+        cake_release(twi_pile, dir);
+        cake_release(twi_pile, dir2);
+    }
+    llist_delete(&node->siblings);
+    vfs_i_free(node->inode);
+    cake_release(twi_pile, node);
+}
+
 struct twifs_node*
 twifs_file_node(struct twifs_node* parent, const char* name, int name_len)
 {
@@ -82,7 +97,7 @@ twifs_file_node(struct twifs_node* parent, const char* name, int name_len)
     struct v_inode* twi_inode = __twifs_create_inode(twi_node);
     twi_node->inode = twi_inode;
 
-    return twi_inode;
+    return twi_node;
 }
 
 struct twifs_node*
@@ -120,10 +135,24 @@ twifs_toplevel_node(const char* name, int name_len)
 }
 
 int
+__twifs_mkdir(struct v_inode* inode, struct v_dnode* dnode)
+{
+    struct twifs_node* parent_node = (struct twifs_node*)inode->data;
+    if (!(parent_node->itype & VFS_INODE_TYPE_DIR)) {
+        return ENOTDIR;
+    }
+    struct twifs_node* new_node =
+      twifs_dir_node(parent_node, dnode->name.value, dnode->name.len);
+    dnode->inode = new_node->inode;
+
+    return 0;
+}
+
+int
 __twifs_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
 {
     mount_point->inode = fs_root->inode;
-    // FIXME: try to mitigate this special case or pull it up to higher level of
+    // FIXME try to mitigate this special case or pull it up to higher level of
     // abstraction
     if (mount_point->parent && mount_point->parent->inode) {
         struct hstr ddot_name = HSTR("..", 2);
@@ -145,6 +174,7 @@ __twifs_create_inode(struct twifs_node* twi_node)
                                .mtime = 0,
                                .ref_count = 0 };
     inode->ops.dir_lookup = __twifs_dirlookup;
+    inode->ops.mkdir = __twifs_mkdir;
     inode->ops.open = __twifs_openfile;
 
     return inode;
@@ -170,6 +200,10 @@ int
 __twifs_dirlookup(struct v_inode* inode, struct v_dnode* dnode)
 {
     struct twifs_node* twi_node = (struct twifs_node*)inode->data;
+
+    if (!(twi_node->itype & VFS_INODE_TYPE_DIR)) {
+        return ENOTDIR;
+    }
 
     struct twifs_node* child_node = __twifs_get_node(twi_node, &dnode->name);
     if (child_node) {

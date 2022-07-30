@@ -29,10 +29,15 @@
 
 #define VFS_IOBUF_FDIRTY 0x1
 
+#define FSTYPE_ROFS 0x1
+
 #define VFS_VALID_CHAR(chr)                                                    \
     ('A' <= (chr) && (chr) <= 'Z' || 'a' <= (chr) && (chr) <= 'z' ||           \
      '0' <= (chr) && (chr) <= '9' || (chr) == '.' || (chr) == '_' ||           \
      (chr) == '-')
+
+extern struct hstr vfs_ddot;
+extern struct hstr vfs_dot;
 
 struct v_dnode;
 
@@ -40,6 +45,7 @@ struct filesystem
 {
     struct hlist_node fs_list;
     struct hstr fs_name;
+    uint32_t types;
     int (*mount)(struct v_superblock* vsb, struct v_dnode* mount_point);
     int (*unmount)(struct v_superblock* vsb);
 };

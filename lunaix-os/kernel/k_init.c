@@ -2,6 +2,7 @@
 #include <lunaix/tty/tty.h>
 
 #include <lunaix/clock.h>
+#include <lunaix/device.h>
 #include <lunaix/lxconsole.h>
 #include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/page.h>
@@ -77,14 +78,20 @@ _kernel_pre_init()
 void
 _kernel_init()
 {
-    lxconsole_init();
 
     cake_init();
     valloc_init();
 
-    kprintf(KINFO "[MM] Allocated %d pages for stack start at %p\n",
-            KSTACK_SIZE >> PG_SIZE_BITS,
-            KSTACK_START);
+    fsm_init();
+    vfs_init();
+    twifs_init();
+
+    device_init();
+
+    // 挂载 TwiFS 为根目录
+    vfs_mount("/", "twifs", -1);
+
+    lxconsole_init();
 
     sched_init();
 
