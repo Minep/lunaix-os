@@ -39,6 +39,7 @@ static int fs_id = 0;
 
 struct hstr vfs_ddot = HSTR("..", 2);
 struct hstr vfs_dot = HSTR(".", 1);
+struct hstr vfs_empty = HSTR("", 0);
 
 struct v_dnode*
 vfs_d_alloc();
@@ -86,8 +87,12 @@ __dcache_get_bucket(struct v_dnode* parent, unsigned int hash)
 struct v_dnode*
 vfs_dcache_lookup(struct v_dnode* parent, struct hstr* str)
 {
-    if (!str->len)
+    if (!str->len || HSTR_EQ(str, &vfs_dot))
         return parent;
+
+    if (HSTR_EQ(str, &vfs_ddot)) {
+        return parent->parent ? parent->parent : parent;
+    }
 
     struct hbucket* slot = __dcache_get_bucket(parent, str->hash);
 
@@ -288,6 +293,9 @@ vfs_open(struct v_dnode* dnode, struct v_file** file)
     struct v_file* vfile = cake_grab(file_pile);
     memset(vfile, 0, sizeof(*vfile));
 
+    vfile->dnode = dnode;
+    vfile->inode = dnode->inode;
+
     int errno = dnode->inode->ops.open(dnode->inode, vfile);
     if (errno) {
         cake_release(file_pile, vfile);
@@ -357,6 +365,7 @@ vfs_d_alloc()
     struct v_dnode* dnode = cake_grab(dnode_pile);
     memset(dnode, 0, sizeof(*dnode));
     llist_init_head(&dnode->children);
+    dnode->name = vfs_empty;
     return dnode;
 }
 
@@ -417,8 +426,6 @@ __DEFINE_LXSYSCALL2(int, open, const char*, path, int, options)
     struct v_file* opened_file;
     int errno = __vfs_do_open(&opened_file, path, options), fd;
 
-    __current->k_status = errno;
-
     if (!errno && !(errno = vfs_alloc_fdslot(&fd))) {
         struct v_fd* fd_s = vzalloc(sizeof(*fd_s));
         fd_s->file = opened_file;
@@ -427,6 +434,7 @@ __DEFINE_LXSYSCALL2(int, open, const char*, path, int, options)
         return fd;
     }
 
+    __current->k_status = errno;
     return SYSCALL_ESTATUS(errno);
 }
 
@@ -475,11 +483,21 @@ __DEFINE_LXSYSCALL2(int, readdir, int, fd, struct dirent*, dent)
                                 .index = dent->d_offset,
                                 .read_complete_callback =
                                   __vfs_readdir_callback };
-        if (!(errno = fd_s->file->ops.readdir(fd_s->file, &dctx))) {
-            dent->d_offset++;
+        if (dent->d_offset == 0) {
+            __vfs_readdir_callback(&dctx, vfs_dot.value, vfs_dot.len, 0);
+        } else if (dent->d_offset == 1) {
+            __vfs_readdir_callback(&dctx, vfs_ddot.value, vfs_ddot.len, 0);
+        } else {
+            dctx.index -= 2;
+            if ((errno = fd_s->file->ops.readdir(fd_s->file, &dctx))) {
+                goto done;
+            }
         }
+        errno = 0;
+        dent->d_offset++;
     }
 
+done:
     __current->k_status = errno;
     return SYSCALL_ESTATUS(errno);
 }
@@ -574,6 +592,80 @@ __DEFINE_LXSYSCALL3(int, lseek, int, fd, int, offset, int, options)
                 break;
         }
         fd_s->pos = fpos;
+    }
+
+    __current->k_status = errno;
+    return SYSCALL_ESTATUS(errno);
+}
+
+int
+vfs_readlink(struct v_dnode* dnode, char* buf, size_t size, int depth)
+{
+    if (!dnode) {
+        return 0;
+    }
+
+    if (depth > 64) {
+        return ELOOP;
+    }
+
+    size_t len = vfs_readlink(dnode->parent, buf, size, depth + 1);
+
+    if (len >= size) {
+        return len;
+    }
+
+    size_t cpy_size = MIN(dnode->name.len, size - len);
+    strncpy(buf + len, dnode->name.value, cpy_size);
+    len += cpy_size;
+
+    if (len < size) {
+        buf[len++] = PATH_DELIM;
+    }
+
+    return len;
+}
+
+__DEFINE_LXSYSCALL3(int, readlink, const char*, path, char*, buf, size_t, size)
+{
+    int errno;
+    struct v_dnode* dnode;
+    if (!(errno = vfs_walk(NULL, path, &dnode, NULL, 0))) {
+        errno = vfs_readlink(dnode, buf, size, 0);
+    }
+
+    if (errno >= 0) {
+        return errno;
+    }
+
+    __current->k_status = errno;
+    return SYSCALL_ESTATUS(errno);
+}
+
+__DEFINE_LXSYSCALL4(int,
+                    readlinkat,
+                    int,
+                    dirfd,
+                    const char*,
+                    pathname,
+                    char*,
+                    buf,
+                    size_t,
+                    size)
+{
+    int errno;
+    struct v_fd* fd_s;
+    if (!GET_FD(dirfd, fd_s)) {
+        errno = EBADF;
+    } else {
+        struct v_dnode* dnode;
+        if (!(errno = vfs_walk(fd_s->file->dnode, pathname, &dnode, NULL, 0))) {
+            errno = vfs_readlink(fd_s->file->dnode, buf, size, 0);
+        }
+    }
+
+    if (errno >= 0) {
+        return errno;
     }
 
     __current->k_status = errno;

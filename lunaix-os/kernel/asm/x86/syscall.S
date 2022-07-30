@@ -34,6 +34,8 @@
         .long __lxsys_mkdir
         .long __lxsys_lseek          /* 25 */
         .long __lxsys_geterrno
+        .long __lxsys_readlink
+        .long __lxsys_readlinkat
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
             .long 0

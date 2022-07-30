@@ -18,5 +18,6 @@
 #define EBADF -13
 #define ENOTSUP -14
 #define ENXIO -15
+#define ELOOP -16
 
 #endif /* __LUNAIX_CODE_H */

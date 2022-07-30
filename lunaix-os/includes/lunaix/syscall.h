@@ -30,6 +30,8 @@
 #define __SYSCALL_mkdir 24
 #define __SYSCALL_lseek 25
 #define __SYSCALL_geterrno 26
+#define __SYSCALL_readlink 27
+#define __SYSCALL_readlinkat 28
 
 #define __SYSCALL_MAX 0x100
 
@@ -102,7 +104,7 @@ syscall_install();
     }
 
 #define __LXSYSCALL4(rettype, name, t1, p1, t2, p2, t3, p3, t4, p4)            \
-    static rettype name(__PARAM_MAP3(t1, p1, t2, p2, t3, p3, t4, p4))          \
+    static rettype name(__PARAM_MAP4(t1, p1, t2, p2, t3, p3, t4, p4))          \
     {                                                                          \
         asm("\n" ::"b"(p1), "c"(p2), "d"(p3), "D"(p4));                        \
         ___DOINT33(__SYSCALL_##name, rettype)                                  \

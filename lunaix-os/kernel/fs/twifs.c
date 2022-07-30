@@ -74,14 +74,8 @@ __twifs_new_node(struct twifs_node* parent, const char* name, int name_len)
 void
 twifs_rm_node(struct twifs_node* node)
 {
-    // TODO recursivly delete any sub-directories.
     if ((node->itype & VFS_INODE_TYPE_DIR)) {
-        struct twifs_node* dir = __twifs_get_node(node, &vfs_dot);
-        struct twifs_node* dir2 = __twifs_get_node(node, &vfs_ddot);
-        vfs_i_free(dir->inode);
-        vfs_i_free(dir2->inode);
-        cake_release(twi_pile, dir);
-        cake_release(twi_pile, dir2);
+        // TODO recursivly delete any sub-directories.
     }
     llist_delete(&node->siblings);
     vfs_i_free(node->inode);
@@ -112,18 +106,10 @@ twifs_dir_node(struct twifs_node* parent, const char* name, int name_len)
 
     struct twifs_node* twi_node = __twifs_new_node(parent, name, name_len);
     twi_node->itype = VFS_INODE_TYPE_DIR;
-    twi_node->fops.readdir = __twifs_iterate_dir;
 
     struct v_inode* twi_inode = __twifs_create_inode(twi_node);
-    struct twifs_node* dot = __twifs_new_node(twi_node, ".", 1);
-    struct twifs_node* ddot = __twifs_new_node(twi_node, "..", 2);
-
-    dot->itype = VFS_INODE_TYPE_DIR;
-    ddot->itype = VFS_INODE_TYPE_DIR;
-
+    twi_node->fops.readdir = __twifs_iterate_dir;
     twi_node->inode = twi_inode;
-    dot->inode = twi_inode;
-    ddot->inode = parent ? parent->inode : twi_inode;
 
     return twi_node;
 }
@@ -152,13 +138,6 @@ int
 __twifs_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
 {
     mount_point->inode = fs_root->inode;
-    // FIXME try to mitigate this special case or pull it up to higher level of
-    // abstraction
-    if (mount_point->parent && mount_point->parent->inode) {
-        struct hstr ddot_name = HSTR("..", 2);
-        struct twifs_node* root_ddot = __twifs_get_node(fs_root, &ddot_name);
-        root_ddot->inode = mount_point->parent->inode;
-    }
     return 0;
 }
 

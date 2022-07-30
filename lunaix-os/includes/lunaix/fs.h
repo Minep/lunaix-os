@@ -89,6 +89,7 @@ struct v_file_ops
 struct v_file
 {
     struct v_inode* inode;
+    struct v_dnode* dnode;
     struct llist_header* f_list;
     uint32_t f_pos;
     void* data; // 允许底层FS绑定他的一些专有数据
