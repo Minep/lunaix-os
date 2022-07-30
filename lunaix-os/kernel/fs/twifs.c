@@ -48,6 +48,7 @@ twifs_init()
     struct filesystem* twifs = vzalloc(sizeof(struct filesystem));
     twifs->fs_name = HSTR("twifs", 5);
     twifs->mount = __twifs_mount;
+    twifs->types = FSTYPE_ROFS;
 
     fsm_register(twifs);
 
@@ -71,15 +72,16 @@ __twifs_new_node(struct twifs_node* parent, const char* name, int name_len)
     return node;
 }
 
-void
+int
 twifs_rm_node(struct twifs_node* node)
 {
-    if ((node->itype & VFS_INODE_TYPE_DIR)) {
-        // TODO recursivly delete any sub-directories.
+    if ((node->itype & VFS_INODE_TYPE_DIR) && !llist_empty(&node->children)) {
+        return ENOTEMPTY;
     }
     llist_delete(&node->siblings);
     vfs_i_free(node->inode);
     cake_release(twi_pile, node);
+    return 0;
 }
 
 struct twifs_node*
@@ -151,9 +153,11 @@ __twifs_create_inode(struct twifs_node* twi_node)
                                .lb_usage = 0,
                                .data = twi_node,
                                .mtime = 0,
-                               .ref_count = 0 };
+                               .open_count = 0 };
     inode->ops.dir_lookup = __twifs_dirlookup;
     inode->ops.mkdir = __twifs_mkdir;
+    inode->ops.unlink = __twifs_rmstuff;
+    inode->ops.rmdir = __twifs_rmstuff;
     inode->ops.open = __twifs_openfile;
 
     return inode;
@@ -173,6 +177,13 @@ __twifs_get_node(struct twifs_node* parent, struct hstr* name)
         }
     }
     return NULL;
+}
+
+int
+__twifs_rmstuff(struct v_inode* inode)
+{
+    struct twifs_node* twi_node = (struct twifs_node*)inode->data;
+    return twifs_rm_node(twi_node);
 }
 
 int

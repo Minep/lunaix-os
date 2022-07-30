@@ -175,6 +175,9 @@ qemu-img create -f vdi machine/disk1.vdi 128M
 2. `readdir(2)`
 2. `readlink(2)`
 2. `readlinkat(2)`
+2. `rmdir(2)`
+2. `unlink(2)`
+2. `unlinkat(2)`
 
 ### LunaixOS自有
 

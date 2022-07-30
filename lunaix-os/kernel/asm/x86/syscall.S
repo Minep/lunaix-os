@@ -32,10 +32,13 @@
         .long __lxsys_write
         .long __lxsys_readdir
         .long __lxsys_mkdir
-        .long __lxsys_lseek          /* 25 */
+        .long __lxsys_lseek         /* 25 */
         .long __lxsys_geterrno
         .long __lxsys_readlink
         .long __lxsys_readlinkat
+        .long __lxsys_rmdir
+        .long __lxsys_unlink        /* 30 */
+        .long __lxsys_unlinkat
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
             .long 0

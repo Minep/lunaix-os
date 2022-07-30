@@ -13,7 +13,7 @@
 
 #define VFS_INODE_TYPE_DIR 0x1
 #define VFS_INODE_TYPE_FILE 0x2
-#define VFS_INODE_TYPE_DEVICE 0x4
+#define VFS_INODE_TYPE_DEVICE 0x3
 
 #define VFS_ENOFS -2
 #define VFS_EBADMNT -3
@@ -108,7 +108,7 @@ struct v_inode
     uint32_t ctime;
     uint32_t mtime;
     uint64_t lb_addr;
-    uint32_t ref_count;
+    uint32_t open_count;
     uint32_t lb_usage;
     uint32_t fsize;
     void* data; // 允许底层FS绑定他的一些专有数据
@@ -118,6 +118,8 @@ struct v_inode
         int (*open)(struct v_inode* inode, struct v_file* file);
         int (*sync)(struct v_inode* inode);
         int (*mkdir)(struct v_inode* inode, struct v_dnode* dnode);
+        int (*rmdir)(struct v_inode* inode);
+        int (*unlink)(struct v_inode* inode);
         int (*dir_lookup)(struct v_inode* inode, struct v_dnode* dnode);
     } ops;
 };

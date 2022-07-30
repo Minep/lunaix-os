@@ -32,6 +32,9 @@
 #define __SYSCALL_geterrno 26
 #define __SYSCALL_readlink 27
 #define __SYSCALL_readlinkat 28
+#define __SYSCALL_rmdir 29
+#define __SYSCALL_unlink 30
+#define __SYSCALL_unlinkat 31
 
 #define __SYSCALL_MAX 0x100
 

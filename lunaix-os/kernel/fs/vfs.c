@@ -295,6 +295,7 @@ vfs_open(struct v_dnode* dnode, struct v_file** file)
 
     vfile->dnode = dnode;
     vfile->inode = dnode->inode;
+    dnode->inode->open_count++;
 
     int errno = dnode->inode->ops.open(dnode->inode, vfile);
     if (errno) {
@@ -314,6 +315,9 @@ vfs_close(struct v_file* file)
 
     int errno = file->ops.close(file);
     if (!errno) {
+        if (file->inode->open_count) {
+            file->inode->open_count--;
+        }
         cake_release(file_pile, file);
     }
     return errno;
@@ -392,6 +396,8 @@ vfs_i_free(struct v_inode* inode)
 {
     cake_release(inode_pile, inode);
 }
+
+/* ---- System call definition and support ---- */
 
 int
 __vfs_do_open(struct v_file** file_out, const char* path, int options)
@@ -668,6 +674,87 @@ __DEFINE_LXSYSCALL4(int,
         return errno;
     }
 
+    __current->k_status = errno;
+    return SYSCALL_ESTATUS(errno);
+}
+
+__DEFINE_LXSYSCALL1(int, rmdir, const char*, pathname)
+{
+    int errno;
+    struct v_dnode* dnode;
+    if ((errno = vfs_walk(NULL, pathname, &dnode, NULL, 0))) {
+        goto done;
+    }
+    if ((dnode->super_block->fs->types & FSTYPE_ROFS)) {
+        errno = EROFS;
+        goto done;
+    }
+
+    if (dnode->inode->open_count) {
+        errno = EBUSY;
+        goto done;
+    }
+
+    if (dnode->inode->itype == VFS_INODE_TYPE_DIR) {
+        errno = dnode->inode->ops.rmdir(dnode->inode);
+    } else {
+        errno = ENOTDIR;
+    }
+
+done:
+    __current->k_status = errno;
+    return SYSCALL_ESTATUS(errno);
+}
+
+int
+__vfs_do_unlink(struct v_inode* inode)
+{
+    int errno;
+    if (inode->open_count) {
+        errno = EBUSY;
+    } else if (inode->itype != VFS_INODE_TYPE_DIR) {
+        // TODO handle symbolic link and type other than regular file
+        errno = inode->ops.unlink(inode);
+    } else {
+        errno = EISDIR;
+    }
+
+    return errno;
+}
+
+__DEFINE_LXSYSCALL1(int, unlink, const char*, pathname)
+{
+    int errno;
+    struct v_dnode* dnode;
+    if ((errno = vfs_walk(NULL, pathname, &dnode, NULL, 0))) {
+        goto done;
+    }
+    if ((dnode->super_block->fs->types & FSTYPE_ROFS)) {
+        errno = EROFS;
+        goto done;
+    }
+
+    errno = __vfs_do_unlink(dnode->inode);
+
+done:
+    __current->k_status = errno;
+    return SYSCALL_ESTATUS(errno);
+}
+
+__DEFINE_LXSYSCALL2(int, unlinkat, int, fd, const char*, pathname)
+{
+    int errno;
+    struct v_fd* fd_s;
+    if (!GET_FD(fd, fd_s)) {
+        errno = EBADF;
+    } else {
+        struct v_dnode* dnode;
+        if (!(errno = vfs_walk(fd_s->file->dnode, pathname, &dnode, NULL, 0))) {
+            errno = __vfs_do_unlink(dnode->inode);
+        }
+    }
+
+done:
     __current->k_status = errno;
     return SYSCALL_ESTATUS(errno);
 }
