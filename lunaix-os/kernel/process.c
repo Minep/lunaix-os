@@ -184,6 +184,7 @@ dup_proc()
     pcb->intr_ctx = __current->intr_ctx;
     pcb->parent = __current;
 
+    memcpy(pcb->fdtable, __current->fdtable, sizeof(struct v_fdtable));
     region_copy(&__current->mm.regions, &pcb->mm.regions);
 
     setup_proc_mem(pcb, PD_REFERENCED);

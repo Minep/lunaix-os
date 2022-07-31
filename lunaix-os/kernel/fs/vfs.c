@@ -478,9 +478,8 @@ __DEFINE_LXSYSCALL2(int, open, const char*, path, int, options)
 
     return DO_STATUS(errno);
 }
-
-#define GET_FD(fd, fd_s)                                                       \
-    (fd >= 0 && fd < VFS_MAX_FD && (fd_s = __current->fdtable->fds[fd]))
+#define TEST_FD(fd) (fd >= 0 && fd < VFS_MAX_FD)
+#define GET_FD(fd, fd_s) (TEST_FD(fd) && (fd_s = __current->fdtable->fds[fd]))
 
 __DEFINE_LXSYSCALL1(int, close, int, fd)
 {
@@ -811,6 +810,62 @@ __DEFINE_LXSYSCALL1(int, fsync, int, fildes)
         errno = EBADF;
     } else {
         errno = vfs_fsync(fd_s->file);
+    }
+
+    return DO_STATUS(errno);
+}
+
+int
+__vfs_dup_fd(struct v_fd* old, struct v_fd** new)
+{
+    int errno = 0;
+    struct v_file* newopened;
+    if (!(errno = vfs_open(old->file->dnode, &newopened))) {
+        *new = cake_grab(fd_pile);
+        **new = (struct v_fd){ .file = newopened,
+                               .pos = old->pos,
+                               .flags = old->flags };
+    }
+
+    return errno;
+}
+
+__DEFINE_LXSYSCALL2(int, dup2, int, oldfd, int, newfd)
+{
+    if (newfd == oldfd) {
+        return newfd;
+    }
+
+    int errno;
+    struct v_fd *oldfd_s, *newfd_s;
+    if (!GET_FD(oldfd, oldfd_s) || TEST_FD(newfd)) {
+        errno = EBADF;
+        goto done;
+    }
+    newfd_s = __current->fdtable->fds[newfd];
+    if (newfd_s && (errno = vfs_close(newfd_s))) {
+        goto done;
+    }
+
+    if (!(errno = __vfs_dup_fd(oldfd_s, &newfd_s))) {
+        __current->fdtable->fds[newfd] = newfd_s;
+        return newfd;
+    }
+
+done:
+    return DO_STATUS(errno);
+}
+
+__DEFINE_LXSYSCALL1(int, dup, int, oldfd)
+{
+    int errno, newfd;
+    struct v_fd *oldfd_s, *newfd_s;
+    if (!GET_FD(oldfd, oldfd_s)) {
+        errno = EBADF;
+    } else if (!(errno = vfs_alloc_fdslot(&newfd)) &&
+               !(errno = __vfs_dup_fd(oldfd_s, &newfd_s))) {
+        __current->fdtable->fds[newfd] = newfd_s;
+        return newfd;
     }
 
     return DO_STATUS(errno);

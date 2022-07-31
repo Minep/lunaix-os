@@ -41,6 +41,8 @@
         .long __lxsys_unlinkat
         .long __lxsys_link
         .long __lxsys_fsync
+        .long __lxsys_dup
+        .long __lxsys_dup2
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
             .long 0

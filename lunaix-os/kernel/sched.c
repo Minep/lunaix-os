@@ -319,6 +319,14 @@ destroy_process(pid_t pid)
     proc->state = PS_DESTROY;
     llist_delete(&proc->siblings);
 
+    for (size_t i = 0; i < VFS_MAX_FD; i++) {
+        struct v_fd* fd = proc->fdtable->fds[i];
+        if (fd)
+            vfs_close(fd);
+    }
+
+    vfree(proc->fdtable);
+
     struct mm_region *pos, *n;
     llist_for_each(pos, n, &proc->mm.regions.head, head)
     {

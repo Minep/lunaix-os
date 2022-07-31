@@ -13,6 +13,7 @@
 #define __SYSCALL__exit 8
 #define __SYSCALL_wait 9
 #define __SYSCALL_waitpid 10
+
 #define __SYSCALL_sigreturn 11
 #define __SYSCALL_sigprocmask 12
 #define __SYSCALL_signal 13
@@ -21,9 +22,9 @@
 #define __SYSCALL_alarm 16
 #define __SYSCALL_sigpending 17
 #define __SYSCALL_sigsuspend 18
-
 #define __SYSCALL_open 19
 #define __SYSCALL_close 20
+
 #define __SYSCALL_read 21
 #define __SYSCALL_write 22
 #define __SYSCALL_readdir 23
@@ -33,10 +34,13 @@
 #define __SYSCALL_readlink 27
 #define __SYSCALL_readlinkat 28
 #define __SYSCALL_rmdir 29
+
 #define __SYSCALL_unlink 30
 #define __SYSCALL_unlinkat 31
 #define __SYSCALL_link 32
 #define __SYSCALL_fsync 33
+#define __SYSCALL_dup 34
+#define __SYSCALL_dup2 35
 
 #define __SYSCALL_MAX 0x100
 

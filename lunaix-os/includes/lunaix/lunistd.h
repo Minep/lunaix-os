@@ -41,4 +41,10 @@ __LXSYSCALL1(int, unlink, const char*, pathname)
 
 __LXSYSCALL1(int, close, int, fd)
 
+__LXSYSCALL2(int, dup2, int, oldfd, int, newfd)
+
+__LXSYSCALL1(int, dup, int, oldfd)
+
+__LXSYSCALL1(int, fsync, int, fildes)
+
 #endif /* __LUNAIX_UNISTD_H */
