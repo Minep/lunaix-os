@@ -40,6 +40,9 @@ __twifs_mount(struct v_superblock* vsb, struct v_dnode* mount_point);
 int
 __twifs_mkdir(struct v_inode* inode, struct v_dnode* dnode);
 
+int
+__twifs_rmstuff(struct v_inode* inode);
+
 void
 twifs_init()
 {

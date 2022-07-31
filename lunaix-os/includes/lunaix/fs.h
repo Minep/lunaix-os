@@ -13,7 +13,8 @@
 
 #define VFS_INODE_TYPE_DIR 0x1
 #define VFS_INODE_TYPE_FILE 0x2
-#define VFS_INODE_TYPE_DEVICE 0x3
+#define VFS_INODE_TYPE_DEVICE 0x4
+#define VFS_INODE_TYPE_SYMLINK 0x8
 
 #define VFS_ENOFS -2
 #define VFS_EBADMNT -3
@@ -109,18 +110,20 @@ struct v_inode
     uint32_t mtime;
     uint64_t lb_addr;
     uint32_t open_count;
+    uint32_t link_count;
     uint32_t lb_usage;
     uint32_t fsize;
     void* data; // 允许底层FS绑定他的一些专有数据
     struct
     {
-        int (*create)(struct v_inode* inode, struct v_file* file);
-        int (*open)(struct v_inode* inode, struct v_file* file);
-        int (*sync)(struct v_inode* inode);
-        int (*mkdir)(struct v_inode* inode, struct v_dnode* dnode);
-        int (*rmdir)(struct v_inode* inode);
-        int (*unlink)(struct v_inode* inode);
-        int (*dir_lookup)(struct v_inode* inode, struct v_dnode* dnode);
+        int (*create)(struct v_inode* this, struct v_file* file);
+        int (*open)(struct v_inode* this, struct v_file* file);
+        int (*sync)(struct v_inode* this);
+        int (*mkdir)(struct v_inode* this, struct v_dnode* dnode);
+        int (*rmdir)(struct v_inode* this);
+        int (*unlink)(struct v_inode* this);
+        int (*link)(struct v_inode* this, struct v_dnode* new_name);
+        int (*dir_lookup)(struct v_inode* this, struct v_dnode* dnode);
     } ops;
 };
 

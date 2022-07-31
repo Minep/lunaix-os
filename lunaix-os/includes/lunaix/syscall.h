@@ -35,12 +35,14 @@
 #define __SYSCALL_rmdir 29
 #define __SYSCALL_unlink 30
 #define __SYSCALL_unlinkat 31
+#define __SYSCALL_link 32
+#define __SYSCALL_fsync 33
 
 #define __SYSCALL_MAX 0x100
 
 #ifndef __ASM__
 
-#define SYSCALL_ESTATUS(errno) -(errno != 0)
+#define SYSCALL_ESTATUS(errno) -((errno) != 0)
 
 void
 syscall_install();

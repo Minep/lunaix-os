@@ -18,6 +18,12 @@ struct hstr
         .len = (length), .value = (str)                                        \
     }
 
+#define HHSTR(str, length, strhash)                                            \
+    (struct hstr)                                                              \
+    {                                                                          \
+        .len = (length), .value = (str), .hash = (strhash)                     \
+    }
+
 #define HSTR_EQ(str1, str2) ((str1)->hash == (str2)->hash)
 
 inline void

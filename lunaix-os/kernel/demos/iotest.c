@@ -1,5 +1,6 @@
 #include <lunaix/fctrl.h>
 #include <lunaix/foptions.h>
+#include <lunaix/lunistd.h>
 #include <lunaix/proc.h>
 #include <lunaix/syslog.h>
 
