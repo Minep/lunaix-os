@@ -114,11 +114,11 @@ vfs_dcache_add(struct v_dnode* parent, struct v_dnode* dnode)
 }
 
 int
-vfs_walk(struct v_dnode* start,
-         const char* path,
-         struct v_dnode** dentry,
-         struct hstr* component,
-         int walk_options)
+__vfs_walk(struct v_dnode* start,
+           const char* path,
+           struct v_dnode** dentry,
+           struct hstr* component,
+           int walk_options)
 {
     int errno = 0;
     int i = 0, j = 0;
@@ -215,6 +215,45 @@ error:
     vfree(dnode->name.value);
     vfs_d_free(dnode);
     *dentry = NULL;
+    return errno;
+}
+
+#define VFS_MAX_SYMLINK 16
+
+int
+vfs_walk(struct v_dnode* start,
+         const char* path,
+         struct v_dnode** dentry,
+         struct hstr* component,
+         int options)
+{
+    struct v_dnode* interim;
+    char* pathname = path;
+    int errno = __vfs_walk(start, path, &interim, component, options);
+    int counter = 0;
+
+    while (!errno) {
+        if (counter >= VFS_MAX_SYMLINK) {
+            errno = ELOOP;
+            continue;
+        }
+        if ((interim->inode->itype & VFS_INODE_TYPE_SYMLINK) &&
+            !(options & VFS_WALK_NOFOLLOW) &&
+            interim->inode->ops.read_symlink) {
+            errno = interim->inode->ops.read_symlink(interim->inode, &pathname);
+            if (errno) {
+                break;
+            }
+        } else {
+            break;
+        }
+        errno =
+          __vfs_walk_internal(start, pathname, &interim, component, options);
+        counter++;
+    }
+
+    *dentry = errno ? 0 : interim;
+
     return errno;
 }
 
@@ -632,7 +671,7 @@ __DEFINE_LXSYSCALL3(int, lseek, int, fd, int, offset, int, options)
 }
 
 int
-vfs_readlink(struct v_dnode* dnode, char* buf, size_t size, int depth)
+vfs_get_path(struct v_dnode* dnode, char* buf, size_t size, int depth)
 {
     if (!dnode) {
         return 0;
@@ -642,7 +681,7 @@ vfs_readlink(struct v_dnode* dnode, char* buf, size_t size, int depth)
         return ELOOP;
     }
 
-    size_t len = vfs_readlink(dnode->parent, buf, size, depth + 1);
+    size_t len = vfs_get_path(dnode->parent, buf, size, depth + 1);
 
     if (len >= size) {
         return len;
@@ -659,12 +698,42 @@ vfs_readlink(struct v_dnode* dnode, char* buf, size_t size, int depth)
     return len;
 }
 
+int
+vfs_readlink(struct v_dnode* dnode, char* buf, size_t size)
+{
+    char* link;
+    if (dnode->inode->ops.read_symlink) {
+        int errno = dnode->inode->ops.read_symlink(dnode->inode, &link);
+        strncpy(buf, link, size);
+        return errno;
+    }
+    return 0;
+}
+
+__DEFINE_LXSYSCALL3(int, realpathat, int, fd, char*, buf, size_t, size)
+{
+    int errno;
+    struct v_fd* fd_s;
+    if (!GET_FD(fd, fd_s)) {
+        errno = EBADF;
+    } else {
+        struct v_dnode* dnode;
+        errno = vfs_get_path(fd_s->file->dnode, buf, size, 0);
+    }
+
+    if (errno >= 0) {
+        return errno;
+    }
+
+    return DO_STATUS(errno);
+}
+
 __DEFINE_LXSYSCALL3(int, readlink, const char*, path, char*, buf, size_t, size)
 {
     int errno;
     struct v_dnode* dnode;
-    if (!(errno = vfs_walk(NULL, path, &dnode, NULL, 0))) {
-        errno = vfs_readlink(dnode, buf, size, 0);
+    if (!(errno = vfs_walk(NULL, path, &dnode, NULL, VFS_WALK_NOFOLLOW))) {
+        errno = vfs_readlink(dnode, buf, size);
     }
 
     if (errno >= 0) {
@@ -691,8 +760,12 @@ __DEFINE_LXSYSCALL4(int,
         errno = EBADF;
     } else {
         struct v_dnode* dnode;
-        if (!(errno = vfs_walk(fd_s->file->dnode, pathname, &dnode, NULL, 0))) {
-            errno = vfs_readlink(fd_s->file->dnode, buf, size, 0);
+        if (!(errno = vfs_walk(fd_s->file->dnode,
+                               pathname,
+                               &dnode,
+                               NULL,
+                               VFS_WALK_NOFOLLOW))) {
+            errno = vfs_readlink(fd_s->file->dnode, buf, size);
         }
     }
 
@@ -868,5 +941,32 @@ __DEFINE_LXSYSCALL1(int, dup, int, oldfd)
         return newfd;
     }
 
+    return DO_STATUS(errno);
+}
+
+__DEFINE_LXSYSCALL2(int,
+                    symlink,
+                    const char*,
+                    pathname,
+                    const char*,
+                    link_target)
+{
+    int errno;
+    struct v_dnode* dnode;
+    if ((errno = vfs_walk(NULL, pathname, &dnode, NULL, 0))) {
+        goto done;
+    }
+    if ((dnode->super_block->fs->types & FSTYPE_ROFS)) {
+        errno = EROFS;
+        goto done;
+    }
+    if (!dnode->inode->ops.symlink) {
+        errno = ENOTSUP;
+        goto done;
+    }
+
+    errno = dnode->inode->ops.symlink(dnode->inode, link_target);
+
+done:
     return DO_STATUS(errno);
 }

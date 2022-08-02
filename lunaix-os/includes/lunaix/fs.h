@@ -27,6 +27,7 @@
 #define VFS_WALK_MKPARENT 0x1
 #define VFS_WALK_FSRELATIVE 0x2
 #define VFS_WALK_PARENT 0x4
+#define VFS_WALK_NOFOLLOW 0x4
 
 #define VFS_IOBUF_FDIRTY 0x1
 
@@ -124,6 +125,8 @@ struct v_inode
         int (*rmdir)(struct v_inode* this);
         int (*unlink)(struct v_inode* this);
         int (*link)(struct v_inode* this, struct v_dnode* new_name);
+        int (*read_symlink)(struct v_inode* this, const char** path_out);
+        int (*symlink)(struct v_inode* this, const char* target);
         int (*dir_lookup)(struct v_inode* this, struct v_dnode* dnode);
     } ops;
 };

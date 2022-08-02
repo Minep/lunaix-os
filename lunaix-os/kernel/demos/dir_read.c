@@ -16,7 +16,7 @@ _readdir_main()
     }
 
     char path[129];
-    int len = readlinkat(fd, ".", path, 128);
+    int len = realpathat(fd, path, 128);
     if (len < 0) {
         kprintf(KERROR "fail to read (%d)\n", geterrno());
     } else {

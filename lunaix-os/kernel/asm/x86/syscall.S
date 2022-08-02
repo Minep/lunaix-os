@@ -43,6 +43,8 @@
         .long __lxsys_fsync
         .long __lxsys_dup
         .long __lxsys_dup2
+        .long __lxsys_realpathat
+        .long __lxsys_symlink
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
             .long 0

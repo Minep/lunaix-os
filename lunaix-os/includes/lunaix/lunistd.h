@@ -47,4 +47,6 @@ __LXSYSCALL1(int, dup, int, oldfd)
 
 __LXSYSCALL1(int, fsync, int, fildes)
 
+__LXSYSCALL2(int, symlink, const char*, pathname, const char*, link_target)
+
 #endif /* __LUNAIX_UNISTD_H */

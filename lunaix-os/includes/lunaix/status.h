@@ -24,5 +24,6 @@
 #define EISDIR -19
 #define EBUSY -20
 #define EXDEV -21
+#define ELOOP -22
 
 #endif /* __LUNAIX_CODE_H */
