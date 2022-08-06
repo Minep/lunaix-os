@@ -1,6 +1,6 @@
 #include <hal/acpi/acpi.h>
 
-#include <lunaix/mm/kalloc.h>
+#include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 
@@ -28,7 +28,7 @@ acpi_init(multiboot_info_t* mb_info)
 
     acpi_rsdt_t* rsdt = rsdp->rsdt;
 
-    ctx = lxcalloc(1, sizeof(acpi_context));
+    ctx = vzalloc(sizeof(acpi_context));
     assert_msg(ctx, "Fail to create ACPI context");
 
     strncpy(ctx->oem_id, rsdt->header.oem_id, 6);

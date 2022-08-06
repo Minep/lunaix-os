@@ -3,6 +3,7 @@
 
 #include <hal/ahci/hba.h>
 #include <lunaix/block.h>
+#include <lunaix/ds/btrie.h>
 #include <lunaix/ds/hashtable.h>
 #include <lunaix/ds/hstr.h>
 #include <lunaix/ds/llist.h>
@@ -16,20 +17,10 @@
 #define VFS_INODE_TYPE_DEVICE 0x4
 #define VFS_INODE_TYPE_SYMLINK 0x8
 
-#define VFS_ENOFS -2
-#define VFS_EBADMNT -3
-
-#define VFS_EENDOFDIR -5
-
-#define VFS_EINVLD -8
-#define VFS_EEOF -9
-
 #define VFS_WALK_MKPARENT 0x1
 #define VFS_WALK_FSRELATIVE 0x2
 #define VFS_WALK_PARENT 0x4
 #define VFS_WALK_NOFOLLOW 0x4
-
-#define VFS_IOBUF_FDIRTY 0x1
 
 #define FSTYPE_ROFS 0x1
 
@@ -42,6 +33,7 @@ extern struct hstr vfs_ddot;
 extern struct hstr vfs_dot;
 
 struct v_dnode;
+struct pcache;
 
 struct filesystem
 {
@@ -79,8 +71,8 @@ struct dir_context
 
 struct v_file_ops
 {
-    int (*write)(struct v_file* file, void* buffer, size_t len);
-    int (*read)(struct v_file* file, void* buffer, size_t len);
+    int (*write)(struct v_file* file, void* buffer, size_t len, size_t fpos);
+    int (*read)(struct v_file* file, void* buffer, size_t len, size_t fpos);
     int (*readdir)(struct v_file* file, struct dir_context* dctx);
     int (*seek)(struct v_file* file, size_t offset);
     int (*rename)(struct v_file* file, char* new_name);
@@ -94,6 +86,7 @@ struct v_file
     struct v_dnode* dnode;
     struct llist_header* f_list;
     uint32_t f_pos;
+    uint32_t ref_count;
     void* data; // 允许底层FS绑定他的一些专有数据
     struct v_file_ops ops;
 };
@@ -101,7 +94,6 @@ struct v_file
 struct v_fd
 {
     struct v_file* file;
-    int pos;
     int flags;
 };
 
@@ -115,10 +107,11 @@ struct v_inode
     uint32_t link_count;
     uint32_t lb_usage;
     uint32_t fsize;
+    struct pcache* pg_cache;
     void* data; // 允许底层FS绑定他的一些专有数据
     struct
     {
-        int (*create)(struct v_inode* this, struct v_file* file);
+        int (*create)(struct v_inode* this);
         int (*open)(struct v_inode* this, struct v_file* file);
         int (*sync)(struct v_inode* this);
         int (*mkdir)(struct v_inode* this, struct v_dnode* dnode);
@@ -149,6 +142,24 @@ struct v_dnode
 struct v_fdtable
 {
     struct v_fd* fds[VFS_MAX_FD];
+};
+
+struct pcache_pg
+{
+    struct llist_header pg_list;
+    struct llist_header dirty_list;
+    void* pg;
+    uint32_t flags;
+    uint32_t fpos;
+};
+
+struct pcache
+{
+    struct btrie tree;
+    struct llist_header pages;
+    struct llist_header dirty;
+    uint32_t n_dirty;
+    uint32_t n_pages;
 };
 
 /* --- file system manager --- */
@@ -218,4 +229,40 @@ vfs_i_alloc();
 
 void
 vfs_i_free(struct v_inode* inode);
+
+void
+pcache_init(struct pcache* pcache);
+
+void
+pcache_release_page(struct pcache* pcache, struct pcache_pg* page);
+
+struct pcache_pg*
+pcache_new_page(struct pcache* pcache, uint32_t index);
+
+void
+pcache_set_dirty(struct pcache* pcache, struct pcache_pg* pg);
+
+struct pcache_pg*
+pcache_get_page(struct pcache* pcache,
+                uint32_t index,
+                uint32_t* offset,
+                struct pcache_pg** page);
+
+int
+pcache_write(struct v_file* file, void* data, uint32_t len);
+
+int
+pcache_read(struct v_file* file, void* data, uint32_t len);
+
+void
+pcache_release(struct pcache* pcache);
+
+int
+pcache_commit(struct v_file* file, struct pcache_pg* page);
+
+void
+pcache_invalidate(struct v_file* file, struct pcache_pg* page);
+
+void
+pcache_commit_all(struct v_file* file);
 #endif /* __LUNAIX_VFS_H */
