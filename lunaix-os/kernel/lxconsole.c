@@ -36,7 +36,7 @@ lxconsole_init()
 
     lx_console.flush_timer = NULL;
 
-    struct device* tty_dev = device_add(NULL, &lx_console, "tty");
+    struct device* tty_dev = device_addseq(NULL, &lx_console, "tty");
     tty_dev->write = __tty_write;
 }
 
@@ -126,11 +126,18 @@ console_write(struct console* console, uint8_t* data, size_t size)
 
     char c;
     int lines = 0;
+    int j = 0;
     for (size_t i = 0; i < size; i++) {
         c = data[i];
-        buffer[(ptr + i) % console->buffer.size] = c;
+        if (!c) {
+            continue;
+        }
+        buffer[(ptr + j) % console->buffer.size] = c;
         lines += (c == '\n');
+        j++;
     }
+
+    size = j;
 
     uintptr_t new_ptr = (ptr + size) % console->buffer.size;
     console->buffer.wr_pos = new_ptr;

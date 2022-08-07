@@ -72,6 +72,7 @@ vfs_init()
     // 创建一个根superblock，用来蕴含我们的根目录。
     root_sb = vfs_sb_alloc();
     root_sb->root = vfs_d_alloc();
+    root_sb->root->inode = vfs_i_alloc();
 }
 
 inline struct hbucket*
@@ -237,7 +238,7 @@ vfs_walk(struct v_dnode* start,
             errno = ELOOP;
             continue;
         }
-        if ((interim->inode->itype & VFS_INODE_TYPE_SYMLINK) &&
+        if ((interim->inode->itype & VFS_IFSYMLINK) &&
             !(options & VFS_WALK_NOFOLLOW) &&
             interim->inode->ops.read_symlink) {
             errno = interim->inode->ops.read_symlink(interim->inode, &pathname);
@@ -327,22 +328,23 @@ vfs_open(struct v_dnode* dnode, struct v_file** file)
         return ENOTSUP;
     }
 
+    struct v_inode* inode = dnode->inode;
     struct v_file* vfile = cake_grab(file_pile);
     memset(vfile, 0, sizeof(*vfile));
 
     vfile->dnode = dnode;
-    vfile->inode = dnode->inode;
+    vfile->inode = inode;
     vfile->ref_count = 1;
-    dnode->inode->open_count++;
+    vfile->ops = inode->default_fops;
+    inode->open_count++;
 
-    if ((dnode->inode->itype & VFS_INODE_TYPE_FILE) &&
-        !dnode->inode->pg_cache) {
+    if ((inode->itype & VFS_IFFILE) && !inode->pg_cache) {
         struct pcache* pcache = vzalloc(sizeof(struct pcache));
         pcache_init(pcache);
-        dnode->inode->pg_cache = pcache;
+        inode->pg_cache = pcache;
     }
 
-    int errno = dnode->inode->ops.open(dnode->inode, vfile);
+    int errno = inode->ops.open(inode, vfile);
     if (errno) {
         cake_release(file_pile, vfile);
     } else {
@@ -385,6 +387,7 @@ int
 vfs_fsync(struct v_file* file)
 {
     int errno = ENOTSUP;
+    pcache_commit_all(file);
     if (file->ops.sync) {
         errno = file->ops.sync(file);
     }
@@ -459,6 +462,7 @@ vfs_i_free(struct v_inode* inode)
 #define FLOCATE_CREATE_EMPTY 1
 
 #define DO_STATUS(errno) SYSCALL_ESTATUS(__current->k_status = errno)
+#define DO_STATUS_OR_RETURN(errno) ({ errno < 0 ? DO_STATUS(errno) : errno; })
 
 int
 __vfs_try_locate_file(const char* path,
@@ -492,11 +496,17 @@ __vfs_try_locate_file(const char* path,
 }
 
 int
-__vfs_do_open(struct v_file** file_out, const char* path, int options)
+__file_cached_read(struct v_file* file, void* buf, size_t len, size_t fpos)
 {
-    int errno;
+    return pcache_read(file, buf, len, fpos);
+}
+
+int
+vfs_do_open(const char* path, int options)
+{
+    int errno, fd;
     struct v_dnode *dentry, *file;
-    struct v_file* opened_file = 0;
+    struct v_file* ofile = 0;
 
     errno = __vfs_try_locate_file(path, &dentry, &file, 0);
 
@@ -504,31 +514,35 @@ __vfs_do_open(struct v_file** file_out, const char* path, int options)
         errno = dentry->inode->ops.create(dentry->inode);
     }
 
-    if (!errno) {
-        errno = vfs_open(file, &opened_file);
+    if (!errno && (errno = vfs_open(file, &ofile))) {
+        return errno;
     }
 
-    *file_out = opened_file;
-    return errno;
-}
-
-__DEFINE_LXSYSCALL2(int, open, const char*, path, int, options)
-{
-    struct v_file* opened_file;
-    int errno = __vfs_do_open(&opened_file, path, options), fd;
+    struct v_inode* o_inode = ofile->inode;
+    if (!(o_inode->itype & VFS_IFSEQDEV) && !(options & FO_DIRECT)) {
+        // XXX Change here accordingly when signature of pcache_r/w changed.
+        ofile->ops.read = pcache_read;
+        ofile->ops.write = pcache_write;
+    }
 
     if (!errno && !(errno = vfs_alloc_fdslot(&fd))) {
         struct v_fd* fd_s = vzalloc(sizeof(*fd_s));
-        opened_file->f_pos =
-          opened_file->inode->fsize & -((options & FO_APPEND) != 0);
-        fd_s->file = opened_file;
+        ofile->f_pos = ofile->inode->fsize & -((options & FO_APPEND) != 0);
+        fd_s->file = ofile;
         fd_s->flags = options;
         __current->fdtable->fds[fd] = fd_s;
         return fd;
     }
 
-    return DO_STATUS(errno);
+    return errno;
 }
+
+__DEFINE_LXSYSCALL2(int, open, const char*, path, int, options)
+{
+    int errno = vfs_do_open(path, options);
+    return DO_STATUS_OR_RETURN(errno);
+}
+
 #define TEST_FD(fd) (fd >= 0 && fd < VFS_MAX_FD)
 #define GET_FD(fd, fd_s) (TEST_FD(fd) && (fd_s = __current->fdtable->fds[fd]))
 
@@ -572,7 +586,7 @@ __DEFINE_LXSYSCALL2(int, readdir, int, fd, struct dirent*, dent)
     int errno;
     if (!GET_FD(fd, fd_s)) {
         errno = EBADF;
-    } else if (!(fd_s->file->inode->itype & VFS_INODE_TYPE_DIR)) {
+    } else if (!(fd_s->file->inode->itype & VFS_IFDIR)) {
         errno = ENOTDIR;
     } else {
         struct dir_context dctx =
@@ -611,7 +625,7 @@ __DEFINE_LXSYSCALL1(int, mkdir, const char*, path)
         errno = ENOTSUP;
     } else if (!parent->inode->ops.mkdir) {
         errno = ENOTSUP;
-    } else if (!(parent->inode->itype & VFS_INODE_TYPE_DIR)) {
+    } else if (!(parent->inode->itype & VFS_IFDIR)) {
         errno = ENOTDIR;
     } else {
         dir = vfs_d_alloc();
@@ -638,16 +652,12 @@ __DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
     }
 
     struct v_file* file = fd_s->file;
-    if ((file->inode->itype & VFS_INODE_TYPE_DIR)) {
+    if ((file->inode->itype & VFS_IFDIR)) {
         errno = EISDIR;
         goto done;
     }
 
-    if ((fd_s->flags & FO_DIRECT)) {
-        errno = file->ops.read(file, buf, count, file->f_pos);
-    } else {
-        errno = pcache_read(file, buf, count);
-    }
+    errno = file->ops.read(file, buf, count, file->f_pos);
 
     if (errno > 0) {
         file->f_pos += errno;
@@ -668,16 +678,12 @@ __DEFINE_LXSYSCALL3(int, write, int, fd, void*, buf, size_t, count)
     }
 
     struct v_file* file = fd_s->file;
-    if ((file->inode->itype & VFS_INODE_TYPE_DIR)) {
+    if ((file->inode->itype & VFS_IFDIR)) {
         errno = EISDIR;
         goto done;
     }
 
-    if ((fd_s->flags & FO_DIRECT)) {
-        errno = file->ops.write(file, buf, count, file->f_pos);
-    } else {
-        errno = pcache_write(file, buf, count);
-    }
+    errno = file->ops.write(file, buf, count, file->f_pos);
 
     if (errno > 0) {
         file->f_pos += errno;
@@ -839,7 +845,7 @@ __DEFINE_LXSYSCALL1(int, rmdir, const char*, pathname)
         goto done;
     }
 
-    if ((dnode->inode->itype & VFS_INODE_TYPE_DIR)) {
+    if ((dnode->inode->itype & VFS_IFDIR)) {
         errno = dnode->inode->ops.rmdir(dnode->inode);
     } else {
         errno = ENOTDIR;
@@ -855,7 +861,7 @@ __vfs_do_unlink(struct v_inode* inode)
     int errno;
     if (inode->open_count) {
         errno = EBUSY;
-    } else if (!(inode->itype & VFS_INODE_TYPE_DIR)) {
+    } else if (!(inode->itype & VFS_IFDIR)) {
         // TODO handle symbolic link and type other than regular file
         errno = inode->ops.unlink(inode);
         if (!errno) {

@@ -11,20 +11,33 @@ struct twifs_node
     uint32_t itype;
     struct llist_header children;
     struct llist_header siblings;
-    struct v_file_ops fops;
+    struct
+    {
+        int (*write)(struct v_file* file,
+                     void* buffer,
+                     size_t len,
+                     size_t fpos);
+        int (*read)(struct v_file* file, void* buffer, size_t len, size_t fpos);
+    } ops;
 };
 
 void
 twifs_init();
 
 struct twifs_node*
-twifs_file_node(struct twifs_node* parent, const char* name, int name_len);
+twifs_file_node(struct twifs_node* parent,
+                const char* name,
+                int name_len,
+                uint32_t itype);
 
 struct twifs_node*
-twifs_dir_node(struct twifs_node* parent, const char* name, int name_len);
+twifs_dir_node(struct twifs_node* parent,
+               const char* name,
+               int name_len,
+               uint32_t itype);
 
 struct twifs_node*
-twifs_toplevel_node(const char* name, int name_len);
+twifs_toplevel_node(const char* name, int name_len, uint32_t itype);
 
 int
 twifs_rm_node(struct twifs_node* node);

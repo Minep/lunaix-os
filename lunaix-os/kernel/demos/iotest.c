@@ -13,10 +13,15 @@ _iotest_main()
                            "There were two regal sisters who ruled together "
                            "and created harmony for all the land.";
 
-    int fd = open("/dev/sda", 0); // sda 设备 - 硬盘
+    // sda 设备 - 硬盘
+    //  sda设备属于容积设备（Volumetric Device），
+    //  Lunaix会尽可能缓存任何对此设备的上层读写，并使用延迟写入策略。（FO_DIRECT可用于屏蔽该功能）
+    int fd = open("/dev/sda", 0);
 
-    // tty 设备 - 控制台，使用O_DIRECT打开，即所有IO绕过Lunaix内核的缓存机制
-    int tty = open("/dev/tty", FO_DIRECT);
+    // tty 设备 - 控制台。
+    //  tty设备属于序列设备（Sequential Device），该类型设备的上层读写
+    //  无须经过Lunaix的缓存层，而是直接下发到底层驱动。（不受FO_DIRECT的影响）
+    int tty = open("/dev/tty", 0);
 
     if (fd < 0 || tty < 0) {
         kprintf(KERROR "fail to open (%d)\n", geterrno());
@@ -25,7 +30,12 @@ _iotest_main()
 
     // 移动指针至512字节，在大多数情况下，这是第二个逻辑扇区的起始处
     lseek(fd, 512, FSEEK_SET);
-    write(fd, test_sequence, sizeof(test_sequence));
+
+    // 总共写入 64 * 136 字节，会产生3个页作为缓存
+    for (size_t i = 0; i < 64; i++) {
+        write(fd, test_sequence, sizeof(test_sequence));
+    }
+
     lseek(fd, 521, FSEEK_SET);
     write(fd, test_sequence, sizeof(test_sequence));
 
@@ -38,6 +48,7 @@ _iotest_main()
     write(tty, read_out, sizeof(read_out));
     write(tty, "\n", 1);
 
+    // 关闭文件，这同时会将页缓存中的数据下发到底层驱动
     close(fd);
     close(tty);
 

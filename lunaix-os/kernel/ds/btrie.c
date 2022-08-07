@@ -25,7 +25,7 @@ __btrie_traversal(struct btrie* root, uint32_t index, int options)
     struct btrie_node* tree = root->btrie_root;
 
     // Time complexity: O(log_2(log_2(N))) where N is the index to lookup
-    while (lz && tree) {
+    while (bitmask && tree) {
         i = (index & bitmask) >> lz;
         struct btrie_node *subtree = 0, *pos, *n;
 
@@ -61,6 +61,7 @@ btrie_init(struct btrie* btrie, uint32_t trunc_bits)
 {
     btrie->btrie_root = vzalloc(sizeof(struct btrie_node));
     llist_init_head(&btrie->btrie_root->nodes);
+    llist_init_head(&btrie->btrie_root->children);
     btrie->truncated = trunc_bits;
 }
 

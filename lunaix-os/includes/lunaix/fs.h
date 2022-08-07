@@ -3,6 +3,7 @@
 
 #include <hal/ahci/hba.h>
 #include <lunaix/block.h>
+#include <lunaix/clock.h>
 #include <lunaix/ds/btrie.h>
 #include <lunaix/ds/hashtable.h>
 #include <lunaix/ds/hstr.h>
@@ -12,10 +13,11 @@
 #define VFS_NAME_MAXLEN 128
 #define VFS_MAX_FD 32
 
-#define VFS_INODE_TYPE_DIR 0x1
-#define VFS_INODE_TYPE_FILE 0x2
-#define VFS_INODE_TYPE_DEVICE 0x4
-#define VFS_INODE_TYPE_SYMLINK 0x8
+#define VFS_IFDIR 0x1
+#define VFS_IFFILE 0x2
+#define VFS_IFSEQDEV 0x4
+#define VFS_IFVOLDEV 0x8
+#define VFS_IFSYMLINK 0x16
 
 #define VFS_WALK_MKPARENT 0x1
 #define VFS_WALK_FSRELATIVE 0x2
@@ -100,9 +102,10 @@ struct v_fd
 struct v_inode
 {
     uint32_t itype;
-    uint32_t ctime;
-    uint32_t mtime;
-    uint64_t lb_addr;
+    time_t ctime;
+    time_t mtime;
+    time_t atime;
+    lba_t lb_addr;
     uint32_t open_count;
     uint32_t link_count;
     uint32_t lb_usage;
@@ -122,6 +125,7 @@ struct v_inode
         int (*symlink)(struct v_inode* this, const char* target);
         int (*dir_lookup)(struct v_inode* this, struct v_dnode* dnode);
     } ops;
+    struct v_file_ops default_fops;
 };
 
 struct v_dnode
@@ -249,10 +253,10 @@ pcache_get_page(struct pcache* pcache,
                 struct pcache_pg** page);
 
 int
-pcache_write(struct v_file* file, void* data, uint32_t len);
+pcache_write(struct v_file* file, void* data, uint32_t len, uint32_t fpos);
 
 int
-pcache_read(struct v_file* file, void* data, uint32_t len);
+pcache_read(struct v_file* file, void* data, uint32_t len, uint32_t fpos);
 
 void
 pcache_release(struct pcache* pcache);

@@ -28,7 +28,10 @@ void
 device_init();
 
 struct device*
-device_add(struct device* parent, void* underlay, char* name_fmt, ...);
+device_addseq(struct device* parent, void* underlay, char* name_fmt, ...);
+
+struct device*
+device_addvol(struct device* parent, void* underlay, char* name_fmt, ...);
 
 void
 device_remove(struct device* dev);

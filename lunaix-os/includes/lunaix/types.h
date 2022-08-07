@@ -21,5 +21,6 @@
 // TODO: WTERMSIG
 
 typedef int32_t pid_t;
+typedef int64_t lba_t;
 
 #endif /* __LUNAIX_TYPES_H */

@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_CONSOLE_H
 #define __LUNAIX_CONSOLE_H
 
-#include <lunaix/ds/fifobuf.h>
+#include <lunaix/ds/fifo.h>
 #include <lunaix/timer.h>
 
 struct console

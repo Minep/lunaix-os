@@ -322,7 +322,7 @@ destroy_process(pid_t pid)
     for (size_t i = 0; i < VFS_MAX_FD; i++) {
         struct v_fd* fd = proc->fdtable->fds[i];
         if (fd)
-            vfs_close(fd);
+            vfs_close(fd->file);
     }
 
     vfree(proc->fdtable);

@@ -134,7 +134,7 @@ __block_register(struct block_dev* bdev)
         return 0;
     }
 
-    struct device* dev = device_add(NULL, bdev, "sd%c", 'a' + free_slot);
+    struct device* dev = device_addvol(NULL, bdev, "sd%c", 'a' + free_slot);
     dev->write = __block_write;
     dev->read = __block_read;
 

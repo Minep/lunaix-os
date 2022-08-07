@@ -16,18 +16,19 @@ __dev_write(struct v_file* file, void* buffer, size_t len, size_t fpos);
 void
 device_init()
 {
-    dev_root = twifs_toplevel_node("dev", 3);
+    dev_root = twifs_toplevel_node("dev", 3, 0);
 
     llist_init_head(&dev_list);
 }
 
 struct device*
-device_add(struct device* parent, void* underlay, char* name_fmt, ...)
+__device_add(struct device* parent,
+             void* underlay,
+             char* name_fmt,
+             uint32_t type,
+             va_list args)
 {
     struct device* dev = vzalloc(sizeof(struct device));
-
-    va_list args;
-    va_start(args, name_fmt);
 
     size_t strlen =
       __sprintf_internal(dev->name_val, name_fmt, DEVICE_NAME_SIZE, args);
@@ -40,12 +41,37 @@ device_add(struct device* parent, void* underlay, char* name_fmt, ...)
     llist_append(&dev_list, &dev->dev_list);
 
     struct twifs_node* dev_node =
-      twifs_file_node(dev_root, dev->name_val, strlen);
+      twifs_file_node(dev_root, dev->name_val, strlen, type);
     dev_node->data = dev;
-    dev_node->fops.read = __dev_read;
-    dev_node->fops.write = __dev_write;
+    dev_node->ops.read = __dev_read;
+    dev_node->ops.write = __dev_write;
 
     dev->fs_node = dev_node;
+
+    return dev;
+}
+
+struct device*
+device_addseq(struct device* parent, void* underlay, char* name_fmt, ...)
+{
+    va_list args;
+    va_start(args, name_fmt);
+
+    struct device* dev =
+      __device_add(parent, underlay, name_fmt, VFS_IFSEQDEV, args);
+
+    va_end(args);
+    return dev;
+}
+
+struct device*
+device_addvol(struct device* parent, void* underlay, char* name_fmt, ...)
+{
+    va_list args;
+    va_start(args, name_fmt);
+
+    struct device* dev =
+      __device_add(parent, underlay, name_fmt, VFS_IFVOLDEV, args);
 
     va_end(args);
     return dev;

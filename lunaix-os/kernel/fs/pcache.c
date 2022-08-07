@@ -35,7 +35,7 @@ pcache_new_page(struct pcache* pcache, uint32_t index)
 {
     void* pg = pmm_alloc_page(KERNEL_PID, 0);
     void* pg_v = vmm_vmap(pg, PG_SIZE, PG_PREM_URW);
-    struct pcache_pg* ppg = valloc(sizeof(struct pcache_pg));
+    struct pcache_pg* ppg = vzalloc(sizeof(struct pcache_pg));
     ppg->pg = pg_v;
 
     llist_append(&pcache->pages, &ppg->pg_list);
@@ -74,9 +74,9 @@ pcache_get_page(struct pcache* pcache,
 }
 
 int
-pcache_write(struct v_file* file, void* data, uint32_t len)
+pcache_write(struct v_file* file, void* data, uint32_t len, uint32_t fpos)
 {
-    uint32_t pg_off, buf_off = 0, fpos = file->f_pos;
+    uint32_t pg_off, buf_off = 0;
     struct pcache* pcache = file->inode->pg_cache;
     struct pcache_pg* pg;
 
@@ -95,18 +95,19 @@ pcache_write(struct v_file* file, void* data, uint32_t len)
 }
 
 int
-pcache_read(struct v_file* file, void* data, uint32_t len)
+pcache_read(struct v_file* file, void* data, uint32_t len, uint32_t fpos)
 {
-    uint32_t pg_off, buf_off = 0, new_pg = 0, fpos = file->f_pos;
+    uint32_t pg_off, buf_off = 0, new_pg = 0;
     int errno = 0;
     struct pcache* pcache = file->inode->pg_cache;
     struct pcache_pg* pg;
+    struct v_inode* inode = file->inode;
 
     while (buf_off < len) {
         if (pcache_get_page(pcache, fpos, &pg_off, &pg)) {
             // Filling up the page
-            errno = file->ops.read(file, pg->pg, PG_SIZE, pg->fpos);
-            if (errno > 0 && errno < PG_SIZE) {
+            errno = inode->default_fops.read(file, pg->pg, PG_SIZE, pg->fpos);
+            if (errno >= 0 && errno < PG_SIZE) {
                 // EOF
                 len = buf_off + errno;
             } else if (errno < 0) {
@@ -142,7 +143,8 @@ pcache_commit(struct v_file* file, struct pcache_pg* page)
         return;
     }
 
-    int errno = file->ops.write(file, page->pg, PG_SIZE, page->fpos);
+    struct v_inode* inode = file->inode;
+    int errno = inode->default_fops.write(file, page->pg, PG_SIZE, page->fpos);
 
     if (!errno) {
         page->flags &= ~PCACHE_DIRTY;

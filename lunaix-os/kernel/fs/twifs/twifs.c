@@ -43,6 +43,12 @@ __twifs_mkdir(struct v_inode* inode, struct v_dnode* dnode);
 int
 __twifs_rmstuff(struct v_inode* inode);
 
+int
+__twifs_fwrite(struct v_file* file, void* buffer, size_t len, size_t fpos);
+
+int
+__twifs_fread(struct v_file* file, void* buffer, size_t len, size_t fpos);
+
 void
 twifs_init()
 {
@@ -55,16 +61,20 @@ twifs_init()
 
     fsm_register(twifs);
 
-    fs_root = twifs_dir_node(NULL, NULL, 0);
+    fs_root = twifs_dir_node(NULL, NULL, 0, 0);
 }
 
 struct twifs_node*
-__twifs_new_node(struct twifs_node* parent, const char* name, int name_len)
+__twifs_new_node(struct twifs_node* parent,
+                 const char* name,
+                 int name_len,
+                 uint32_t itype)
 {
     struct twifs_node* node = cake_grab(twi_pile);
     memset(node, 0, sizeof(*node));
 
     node->name = HSTR(name, name_len);
+    node->itype = itype;
     hstr_rehash(&node->name, HSTR_FULL_HASH);
     llist_init_head(&node->children);
 
@@ -78,7 +88,7 @@ __twifs_new_node(struct twifs_node* parent, const char* name, int name_len)
 int
 twifs_rm_node(struct twifs_node* node)
 {
-    if ((node->itype & VFS_INODE_TYPE_DIR) && !llist_empty(&node->children)) {
+    if ((node->itype & VFS_IFDIR) && !llist_empty(&node->children)) {
         return ENOTEMPTY;
     }
     llist_delete(&node->siblings);
@@ -88,10 +98,13 @@ twifs_rm_node(struct twifs_node* node)
 }
 
 struct twifs_node*
-twifs_file_node(struct twifs_node* parent, const char* name, int name_len)
+twifs_file_node(struct twifs_node* parent,
+                const char* name,
+                int name_len,
+                uint32_t itype)
 {
-    struct twifs_node* twi_node = __twifs_new_node(parent, name, name_len);
-    twi_node->itype = VFS_INODE_TYPE_FILE;
+    struct twifs_node* twi_node =
+      __twifs_new_node(parent, name, name_len, VFS_IFFILE | itype);
 
     struct v_inode* twi_inode = __twifs_create_inode(twi_node);
     twi_node->inode = twi_inode;
@@ -100,7 +113,10 @@ twifs_file_node(struct twifs_node* parent, const char* name, int name_len)
 }
 
 struct twifs_node*
-twifs_dir_node(struct twifs_node* parent, const char* name, int name_len)
+twifs_dir_node(struct twifs_node* parent,
+               const char* name,
+               int name_len,
+               uint32_t itype)
 {
     struct hstr hname = HSTR(name, name_len);
     hstr_rehash(&hname, HSTR_FULL_HASH);
@@ -109,31 +125,30 @@ twifs_dir_node(struct twifs_node* parent, const char* name, int name_len)
         return node;
     }
 
-    struct twifs_node* twi_node = __twifs_new_node(parent, name, name_len);
-    twi_node->itype = VFS_INODE_TYPE_DIR;
+    struct twifs_node* twi_node =
+      __twifs_new_node(parent, name, name_len, VFS_IFDIR | itype);
 
     struct v_inode* twi_inode = __twifs_create_inode(twi_node);
-    twi_node->fops.readdir = __twifs_iterate_dir;
     twi_node->inode = twi_inode;
 
     return twi_node;
 }
 
 struct twifs_node*
-twifs_toplevel_node(const char* name, int name_len)
+twifs_toplevel_node(const char* name, int name_len, uint32_t itype)
 {
-    return twifs_dir_node(fs_root, name, name_len);
+    return twifs_dir_node(fs_root, name, name_len, itype);
 }
 
 int
 __twifs_mkdir(struct v_inode* inode, struct v_dnode* dnode)
 {
     struct twifs_node* parent_node = (struct twifs_node*)inode->data;
-    if (!(parent_node->itype & VFS_INODE_TYPE_DIR)) {
+    if (!(parent_node->itype & VFS_IFDIR)) {
         return ENOTDIR;
     }
     struct twifs_node* new_node =
-      twifs_dir_node(parent_node, dnode->name.value, dnode->name.len);
+      twifs_dir_node(parent_node, dnode->name.value, dnode->name.len, 0);
     dnode->inode = new_node->inode;
 
     return 0;
@@ -163,7 +178,31 @@ __twifs_create_inode(struct twifs_node* twi_node)
     inode->ops.rmdir = __twifs_rmstuff;
     inode->ops.open = __twifs_openfile;
 
+    inode->default_fops = (struct v_file_ops){ .read = __twifs_fread,
+                                               .write = __twifs_fwrite,
+                                               .readdir = __twifs_iterate_dir };
+
     return inode;
+}
+
+int
+__twifs_fwrite(struct v_file* file, void* buffer, size_t len, size_t fpos)
+{
+    struct twifs_node* twi_node = (struct twifs_node*)file->inode->data;
+    if (!twi_node || !twi_node->ops.write) {
+        return ENOTSUP;
+    }
+    return twi_node->ops.write(file, buffer, len, fpos);
+}
+
+int
+__twifs_fread(struct v_file* file, void* buffer, size_t len, size_t fpos)
+{
+    struct twifs_node* twi_node = (struct twifs_node*)file->inode->data;
+    if (!twi_node || !twi_node->ops.read) {
+        return ENOTSUP;
+    }
+    return twi_node->ops.read(file, buffer, len, fpos);
 }
 
 struct twifs_node*
@@ -194,7 +233,7 @@ __twifs_dirlookup(struct v_inode* inode, struct v_dnode* dnode)
 {
     struct twifs_node* twi_node = (struct twifs_node*)inode->data;
 
-    if (!(twi_node->itype & VFS_INODE_TYPE_DIR)) {
+    if (!(twi_node->itype & VFS_IFDIR)) {
         return ENOTDIR;
     }
 
@@ -231,8 +270,6 @@ __twifs_openfile(struct v_inode* inode, struct v_file* file)
 {
     struct twifs_node* twi_node = (struct twifs_node*)inode->data;
     if (twi_node) {
-        file->inode = twi_node->inode;
-        file->ops = twi_node->fops;
         return 0;
     }
     return ENOTSUP;
