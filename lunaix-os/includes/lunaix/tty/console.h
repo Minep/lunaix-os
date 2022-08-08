@@ -7,7 +7,8 @@
 struct console
 {
     struct lx_timer* flush_timer;
-    struct fifo_buffer buffer;
+    struct fifo_buf output;
+    struct fifo_buf input;
     unsigned int erd_pos;
     unsigned int lines;
 };

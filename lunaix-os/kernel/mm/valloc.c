@@ -1,12 +1,14 @@
 #include <klibc/string.h>
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/valloc.h>
+#include <lunaix/spike.h>
 
 #define CLASS_LEN(class) (sizeof(class) / sizeof(class[0]))
 
 static char piles_names[][PILE_NAME_MAXLEN] = {
-    "valloc_8",   "valloc_16",  "valloc_32", "valloc_64", "valloc_128",
-    "valloc_256", "valloc_512", "valloc_1k", "valloc_2k", "valloc_4k"
+    "valloc_8",   "valloc_16",  "valloc_32",  "valloc_64",
+    "valloc_128", "valloc_256", "valloc_512", "valloc_1k",
+    "valloc_2k",  "valloc_4k",  "valloc_8k"
 };
 
 static char piles_names_dma[][PILE_NAME_MAXLEN] = {
@@ -22,7 +24,7 @@ valloc_init()
 {
     for (size_t i = 0; i < CLASS_LEN(piles_names); i++) {
         int size = 1 << (i + 3);
-        piles[i] = cake_new_pile(&piles_names[i], size, size > 1024 ? 4 : 1, 0);
+        piles[i] = cake_new_pile(&piles_names[i], size, size > 1024 ? 8 : 1, 0);
     }
 
     // DMA 内存保证128字节对齐
@@ -34,18 +36,18 @@ valloc_init()
 }
 
 void*
-__valloc(unsigned int size, struct cake_pile** segregate_list, size_t len)
+__valloc(unsigned int size,
+         struct cake_pile** segregate_list,
+         size_t len,
+         size_t boffset)
 {
-    size_t i = 0;
-    for (; i < len; i++) {
-        if (segregate_list[i]->piece_size >= size) {
-            goto found_class;
-        }
-    }
+    size_t i = ILOG2(size);
+    i += (size - (1 << i) != 0);
+    i -= boffset;
 
-    return NULL;
+    if (i >= len)
+        return NULL;
 
-found_class:
     return cake_grab(segregate_list[i]);
 }
 
@@ -63,13 +65,13 @@ __vfree(void* ptr, struct cake_pile** segregate_list, size_t len)
 void*
 valloc(unsigned int size)
 {
-    return __valloc(size, &piles, CLASS_LEN(piles_names));
+    return __valloc(size, &piles, CLASS_LEN(piles_names), 3);
 }
 
 void*
 vzalloc(unsigned int size)
 {
-    void* ptr = __valloc(size, &piles, CLASS_LEN(piles_names));
+    void* ptr = __valloc(size, &piles, CLASS_LEN(piles_names), 3);
     memset(ptr, 0, size);
     return ptr;
 }
@@ -82,7 +84,7 @@ vcalloc(unsigned int size, unsigned int count)
         return 0;
     }
 
-    void* ptr = __valloc(alloc_size, &piles, CLASS_LEN(piles_names));
+    void* ptr = __valloc(alloc_size, &piles, CLASS_LEN(piles_names), 3);
     memset(ptr, 0, alloc_size);
     return ptr;
 }
@@ -96,13 +98,13 @@ vfree(void* ptr)
 void*
 valloc_dma(unsigned int size)
 {
-    return __valloc(size, &piles_dma, CLASS_LEN(piles_names_dma));
+    return __valloc(size, &piles_dma, CLASS_LEN(piles_names_dma), 7);
 }
 
 void*
 vzalloc_dma(unsigned int size)
 {
-    void* ptr = __valloc(size, &piles_dma, CLASS_LEN(piles_names_dma));
+    void* ptr = __valloc(size, &piles_dma, CLASS_LEN(piles_names_dma), 7);
     memset(ptr, 0, size);
     return ptr;
 }

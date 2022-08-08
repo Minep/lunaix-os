@@ -657,7 +657,9 @@ __DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
         goto done;
     }
 
+    cpu_enable_interrupt();
     errno = file->ops.read(file, buf, count, file->f_pos);
+    cpu_disable_interrupt();
 
     if (errno > 0) {
         file->f_pos += errno;
@@ -683,7 +685,9 @@ __DEFINE_LXSYSCALL3(int, write, int, fd, void*, buf, size_t, count)
         goto done;
     }
 
+    cpu_enable_interrupt();
     errno = file->ops.write(file, buf, count, file->f_pos);
+    cpu_disable_interrupt();
 
     if (errno > 0) {
         file->f_pos += errno;

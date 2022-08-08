@@ -39,8 +39,16 @@ _iotest_main()
     lseek(fd, 521, FSEEK_SET);
     write(fd, test_sequence, sizeof(test_sequence));
 
-    // 读出我们写的内容
     char read_out[256];
+    write(tty, "input: ", 8);
+    int size = read(tty, read_out, 256);
+
+    write(tty, "your input: ", 13);
+    write(tty, read_out, size);
+    write(fd, read_out, size);
+    write(tty, "\n", 1);
+
+    // 读出我们写的内容
     lseek(fd, 512, FSEEK_SET);
     read(fd, read_out, sizeof(read_out));
 
