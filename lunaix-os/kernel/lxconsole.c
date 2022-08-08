@@ -5,6 +5,7 @@
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
+#include <lunaix/sched.h>
 #include <lunaix/tty/console.h>
 #include <lunaix/tty/tty.h>
 
@@ -56,23 +57,41 @@ __tty_read(struct device* dev, void* buf, size_t offset, size_t len)
 {
     struct kdb_keyinfo_pkt keyevent;
     struct console* console = (struct console*)dev->underlay;
-    while (1) {
-        // FIXME keyboard is duplicating the key that user typed
+
+    size_t count = fifo_read(&console->input, buf, len);
+    if (count > 0 && ((char*)buf)[count - 1] == '\n') {
+        return count;
+    }
+
+    while (count < len) {
+        // FIXME RACE!
+        //  Consider two process that is polling the input key simultaneously.
+        //  When a key is arrived, one of the processes will win the race and
+        //  swallow it (advancing the key buffer pointer)
         if (!kbd_recv_key(&keyevent)) {
+            sched_yield();
             continue;
         }
-        if ((keyevent.keycode & 0xff00) <= KEYPAD) {
-            char c = (char)(keyevent.keycode & 0x00ff);
-            if (c == 0x08 && !fifo_backone(&console->input)) {
-                continue;
+        if (!(keyevent.state & KBD_KEY_FPRESSED)) {
+            continue;
+        }
+        if ((keyevent.keycode & 0xff00) > KEYPAD) {
+            continue;
+        }
+
+        char c = (char)(keyevent.keycode & 0x00ff);
+        if (c == 0x08) {
+            if (fifo_backone(&console->input)) {
+                console_write_char(c);
             }
-            // console_write_char(c);
-            if (!fifo_putone(&console->input, c) || c == '\n') {
-                break;
-            }
+            continue;
+        }
+        console_write_char(c);
+        if (!fifo_putone(&console->input, c) || c == '\n') {
+            break;
         }
     }
-    return fifo_read(&console->input, buf, len);
+    return count + fifo_read(&console->input, buf + count, len - count);
 }
 
 void
