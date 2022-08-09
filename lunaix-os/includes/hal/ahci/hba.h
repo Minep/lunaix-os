@@ -31,7 +31,7 @@
 #define HBA_PxCMD_FR (1 << 14)
 #define HBA_PxCMD_ST (1)
 #define HBA_PxINTR_DMA (1 << 2)
-#define HBA_PxINTR_D2HR (1)
+#define HBA_PxINTR_DHR (1)
 #define HBA_PxINTR_DPS (1 << 5)
 #define HBA_PxTFD_ERR (1)
 #define HBA_PxTFD_BSY (1 << 7)
