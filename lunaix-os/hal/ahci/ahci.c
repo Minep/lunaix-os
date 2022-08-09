@@ -160,7 +160,7 @@ ahci_init()
         // 需要通过全部置位去清空这些寄存器（相当的奇怪……）
         port_regs[HBA_RPxSERR] = -1;
 
-        port_regs[HBA_RPxIE] |= (HBA_PxINTR_D2HR);
+        port_regs[HBA_RPxIE] |= (HBA_PxINTR_DPS);
 
         hba.ports[i] = port;
 
@@ -290,7 +290,7 @@ hba_prepare_cmd(struct hba_port* port,
         cmd_header->prdt_len = 1;
         cmd_table->entries[0] =
           (struct hba_prdte){ .data_base = vmm_v2p(buffer),
-                              .byte_count = size - 1 };
+                              .byte_count = (size - 1) | (0x80000000) };
     }
 
     *cmdh = cmd_header;

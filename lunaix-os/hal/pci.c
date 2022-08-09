@@ -181,13 +181,22 @@ pci_setup_msi(struct pci_device* device, int vector)
 
     pci_write_cspace(
       device->cspace_base, PCI_MSI_ADDR(device->msi_loc), msi_addr);
-    pci_write_cspace(
-      device->cspace_base, PCI_MSI_DATA(device->msi_loc), msi_data & 0xffff);
 
     pci_reg_t reg1 = pci_read_cspace(device->cspace_base, device->msi_loc);
+    pci_reg_t msg_ctl = reg1 >> 16;
+
+    int offset = !!(msg_ctl & MSI_CAP_64BIT) * 4;
+    pci_write_cspace(device->cspace_base,
+                     PCI_MSI_DATA(device->msi_loc, offset),
+                     msi_data & 0xffff);
+
+    if ((msg_ctl & MSI_CAP_MASK)) {
+        pci_write_cspace(
+          device->cspace_base, PCI_MSI_MASK(device->msi_loc, offset), 0);
+    }
 
     // manipulate the MSI_CTRL to allow device using MSI to request service.
-    reg1 = ((((reg1 >> 16) & ~0x70) | 0x1) << 16) | (reg1 & 0xffff);
+    reg1 = ((((reg1 >> 16) & ~0x70) | MSI_CAP_ENABLE) << 16) | (reg1 & 0xffff);
     pci_write_cspace(device->cspace_base, device->msi_loc, reg1);
 }
 
