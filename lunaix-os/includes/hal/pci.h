@@ -34,7 +34,12 @@
 #define PCI_BAR_ADDR_IO(x) ((x) & ~0x3)
 
 #define PCI_MSI_ADDR(msi_base) ((msi_base) + 4)
-#define PCI_MSI_DATA(msi_base) ((msi_base) + 8)
+#define PCI_MSI_DATA(msi_base, offset) ((msi_base) + 8 + offset)
+#define PCI_MSI_MASK(msi_base, offset) ((msi_base) + 0xc + offset)
+
+#define MSI_CAP_64BIT 0x80
+#define MSI_CAP_MASK 0x100
+#define MSI_CAP_ENABLE 0x1
 
 #define PCI_RCMD_DISABLE_INTR (1 << 10)
 #define PCI_RCMD_FAST_B2B (1 << 9)
