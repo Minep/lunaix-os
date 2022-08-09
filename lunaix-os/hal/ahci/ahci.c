@@ -160,8 +160,6 @@ ahci_init()
         // 需要通过全部置位去清空这些寄存器（相当的奇怪……）
         port_regs[HBA_RPxSERR] = -1;
 
-        port_regs[HBA_RPxIE] |= (HBA_PxINTR_DPS);
-
         hba.ports[i] = port;
 
         if (!HBA_RPxSSTS_IF(port->ssts)) {
@@ -186,7 +184,8 @@ char sata_ifs[][20] = { "Not detected",
 void
 __ahci_hba_isr(isr_param param)
 {
-    // TODO: hba interrupt
+    // TODO: clear the interrupt status
+    // TODO: I/O-operation scheduler should be here
     kprintf(KDEBUG "HBA INTR\n");
 }
 
@@ -290,7 +289,7 @@ hba_prepare_cmd(struct hba_port* port,
         cmd_header->prdt_len = 1;
         cmd_table->entries[0] =
           (struct hba_prdte){ .data_base = vmm_v2p(buffer),
-                              .byte_count = (size - 1) | (0x80000000) };
+                              .byte_count = size - 1 };
     }
 
     *cmdh = cmd_header;
@@ -305,6 +304,9 @@ ahci_init_device(struct hba_port* port)
     /* 发送ATA命令，参考：SATA AHCI Spec Rev.1.3.1, section 5.5 */
     struct hba_cmdt* cmd_table;
     struct hba_cmdh* cmd_header;
+
+    // mask DHR interrupt
+    port->regs[HBA_RPxIE] &= ~HBA_PxINTR_DHR;
 
     // 确保端口是空闲的
     wait_until(!(port->regs[HBA_RPxTFD] & (HBA_PxTFD_BSY)));
@@ -398,6 +400,9 @@ ahci_init_device(struct hba_port* port)
     scsi_parse_capacity(port->device, (uint32_t*)data_in);
 
 done:
+    // reset interrupt status and unmask D2HR interrupt
+    port->regs[HBA_RPxIS] = -1;
+    port->regs[HBA_RPxIE] |= HBA_PxINTR_DHR;
     achi_register_ops(port);
 
     vfree_dma(data_in);
@@ -406,6 +411,8 @@ done:
     return 1;
 
 fail:
+    port->regs[HBA_RPxIS] = -1;
+    port->regs[HBA_RPxIE] |= HBA_PxINTR_DHR;
     vfree_dma(data_in);
     vfree_dma(cmd_table);
 
