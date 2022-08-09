@@ -234,6 +234,9 @@ vfs_i_alloc();
 void
 vfs_i_free(struct v_inode* inode);
 
+int
+vfs_dup_fd(struct v_fd* old, struct v_fd** new);
+
 void
 pcache_init(struct pcache* pcache);
 

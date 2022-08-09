@@ -3,6 +3,7 @@
 #include <lunaix/common.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/region.h>
+#include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
@@ -176,6 +177,17 @@ __mark_region(uintptr_t start_vpn, uintptr_t end_vpn, int attr)
     }
 }
 
+void
+__copy_fdtable(struct proc_info* pcb)
+{
+    for (size_t i = 0; i < VFS_MAX_FD; i++) {
+        struct v_fd* fd = __current->fdtable->fds[i];
+        if (!fd)
+            continue;
+        vfs_dup_fd(fd, &pcb->fdtable->fds[i]);
+    }
+}
+
 pid_t
 dup_proc()
 {
@@ -184,7 +196,7 @@ dup_proc()
     pcb->intr_ctx = __current->intr_ctx;
     pcb->parent = __current;
 
-    memcpy(pcb->fdtable, __current->fdtable, sizeof(struct v_fdtable));
+    __copy_fdtable(pcb);
     region_copy(&__current->mm.regions, &pcb->mm.regions);
 
     setup_proc_mem(pcb, PD_REFERENCED);

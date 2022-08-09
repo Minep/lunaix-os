@@ -945,7 +945,7 @@ __DEFINE_LXSYSCALL1(int, fsync, int, fildes)
 }
 
 int
-__vfs_dup_fd(struct v_fd* old, struct v_fd** new)
+vfs_dup_fd(struct v_fd* old, struct v_fd** new)
 {
     int errno = 0;
     struct v_fd* copied = cake_grab(fd_pile);
@@ -953,10 +953,13 @@ __vfs_dup_fd(struct v_fd* old, struct v_fd** new)
     memcpy(copied, old, sizeof(struct v_fd));
     old->file->ref_count++;
 
+    *new = copied;
+
     return errno;
 }
 
-__DEFINE_LXSYSCALL2(int, dup2, int, oldfd, int, newfd)
+int
+vfs_dup2(int oldfd, int newfd)
 {
     if (newfd == oldfd) {
         return newfd;
@@ -964,7 +967,7 @@ __DEFINE_LXSYSCALL2(int, dup2, int, oldfd, int, newfd)
 
     int errno;
     struct v_fd *oldfd_s, *newfd_s;
-    if (!GET_FD(oldfd, oldfd_s) || TEST_FD(newfd)) {
+    if (!GET_FD(oldfd, oldfd_s) || !TEST_FD(newfd)) {
         errno = EBADF;
         goto done;
     }
@@ -973,13 +976,18 @@ __DEFINE_LXSYSCALL2(int, dup2, int, oldfd, int, newfd)
         goto done;
     }
 
-    if (!(errno = __vfs_dup_fd(oldfd_s, &newfd_s))) {
+    if (!(errno = vfs_dup_fd(oldfd_s, &newfd_s))) {
         __current->fdtable->fds[newfd] = newfd_s;
         return newfd;
     }
 
 done:
     return DO_STATUS(errno);
+}
+
+__DEFINE_LXSYSCALL2(int, dup2, int, oldfd, int, newfd)
+{
+    return vfs_dup2(oldfd, newfd);
 }
 
 __DEFINE_LXSYSCALL1(int, dup, int, oldfd)
@@ -989,7 +997,7 @@ __DEFINE_LXSYSCALL1(int, dup, int, oldfd)
     if (!GET_FD(oldfd, oldfd_s)) {
         errno = EBADF;
     } else if (!(errno = vfs_alloc_fdslot(&newfd)) &&
-               !(errno = __vfs_dup_fd(oldfd_s, &newfd_s))) {
+               !(errno = vfs_dup_fd(oldfd_s, &newfd_s))) {
         __current->fdtable->fds[newfd] = newfd_s;
         return newfd;
     }

@@ -1,6 +1,7 @@
 #include <arch/x86/boot/multiboot.h>
 #include <lunaix/block.h>
 #include <lunaix/common.h>
+#include <lunaix/fctrl.h>
 #include <lunaix/fs.h>
 #include <lunaix/fs/twifs.h>
 #include <lunaix/lunistd.h>
@@ -64,6 +65,12 @@ _iotest_main();
 void __USER__
 __proc0_usr()
 {
+    // 打开tty设备(控制台)，作为标准输入输出。
+    //  tty设备属于序列设备（Sequential Device），该类型设备的上层读写
+    //  无须经过Lunaix的缓存层，而是直接下发到底层驱动。（不受FO_DIRECT的影响）
+    int stdout = open("/dev/tty", 0);
+    int stdin = dup2(stdout, 1);
+
     pid_t p;
     if (!fork()) {
         _pconsole_main();
