@@ -68,7 +68,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 运行该操作系统需要一个虚拟磁盘镜像，可以使用如下命令快速创建一个：
 
 ```bash
-qemu-img create -f vdi machine/disk1.vdi 128M
+qemu-img create -f vdi machine/disk0.vdi 128M
 ```
 
 如果你想要使用别的磁盘镜像，需要修改`configs/make-debug-tool`
@@ -182,11 +182,16 @@ qemu-img create -f vdi machine/disk1.vdi 128M
 2. `fsync(2)`
 2. `dup(2)`
 2. `dup2(2)`
+2. `symlink(2)`
+2. `chdir(2)`
+2. `fchdir(2)`
+2. `getcwd(2)`
 
 ### LunaixOS自有
 
 1. `yield`
 2. `geterrno`
+3. `realpathat`
 
 ## 附录2：编译gcc作为交叉编译器<a id="appendix2"></a>
 

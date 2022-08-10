@@ -45,6 +45,9 @@
         .long __lxsys_dup2
         .long __lxsys_realpathat
         .long __lxsys_symlink
+        .long __lxsys_chdir
+        .long __lxsys_fchdir
+        .long __lxsys_getcwd
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
             .long 0

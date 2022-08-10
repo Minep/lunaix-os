@@ -43,6 +43,9 @@
 #define __SYSCALL_dup2 35
 #define __SYSCALL_realpathat 36
 #define __SYSCALL_symlink 37
+#define __SYSCALL_chdir 38
+#define __SYSCALL_fchdir 39
+#define __SYSCALL_getcwd 40
 
 #define __SYSCALL_MAX 0x100
 

@@ -263,7 +263,7 @@ vfs_mount(const char* target, const char* fs_name, bdev_t device)
     int errno;
     struct v_dnode* mnt;
 
-    if (!(errno = vfs_walk(NULL, target, &mnt, NULL, 0))) {
+    if (!(errno = vfs_walk(__current->cwd, target, &mnt, NULL, 0))) {
         errno = vfs_mount_at(fs_name, device, mnt);
     }
 
@@ -276,7 +276,7 @@ vfs_unmount(const char* target)
     int errno;
     struct v_dnode* mnt;
 
-    if (!(errno = vfs_walk(NULL, target, &mnt, NULL, 0))) {
+    if (!(errno = vfs_walk(__current->cwd, target, &mnt, NULL, 0))) {
         errno = vfs_unmount_at(mnt);
     }
 
@@ -336,7 +336,6 @@ vfs_open(struct v_dnode* dnode, struct v_file** file)
     vfile->inode = inode;
     vfile->ref_count = 1;
     vfile->ops = inode->default_fops;
-    inode->open_count++;
 
     if ((inode->itype & VFS_IFFILE) && !inode->pg_cache) {
         struct pcache* pcache = vzalloc(sizeof(struct pcache));
@@ -348,8 +347,11 @@ vfs_open(struct v_dnode* dnode, struct v_file** file)
     if (errno) {
         cake_release(file_pile, vfile);
     } else {
+        dnode->ref_count++;
+        inode->open_count++;
         *file = vfile;
     }
+
     return errno;
 }
 
@@ -374,9 +376,8 @@ vfs_close(struct v_file* file)
 {
     int errno = 0;
     if (!file->ops.close || !(errno = file->ops.close(file))) {
-        if (file->inode->open_count) {
-            file->inode->open_count--;
-        }
+        file->dnode->ref_count--;
+        file->inode->open_count--;
         pcache_commit_all(file);
         cake_release(file_pile, file);
     }
@@ -464,6 +465,17 @@ vfs_i_free(struct v_inode* inode)
 #define DO_STATUS(errno) SYSCALL_ESTATUS(__current->k_status = errno)
 #define DO_STATUS_OR_RETURN(errno) ({ errno < 0 ? DO_STATUS(errno) : errno; })
 
+#define TEST_FD(fd) (fd >= 0 && fd < VFS_MAX_FD)
+
+int
+__vfs_getfd(int fd, struct v_fd** fd_s)
+{
+    if (TEST_FD(fd) && (*fd_s = __current->fdtable->fds[fd])) {
+        return 0;
+    }
+    return EBADF;
+}
+
 int
 __vfs_try_locate_file(const char* path,
                       struct v_dnode** fdir,
@@ -473,7 +485,8 @@ __vfs_try_locate_file(const char* path,
     char name_str[VFS_NAME_MAXLEN];
     struct hstr name = HSTR(name_str, 0);
     int errno;
-    if ((errno = vfs_walk(NULL, path, fdir, &name, VFS_WALK_PARENT))) {
+    if ((errno =
+           vfs_walk(__current->cwd, path, fdir, &name, VFS_WALK_PARENT))) {
         return errno;
     }
 
@@ -493,12 +506,6 @@ __vfs_try_locate_file(const char* path,
     }
 
     return errno;
-}
-
-int
-__file_cached_read(struct v_file* file, void* buf, size_t len, size_t fpos)
-{
-    return pcache_read(file, buf, len, fpos);
 }
 
 int
@@ -543,15 +550,11 @@ __DEFINE_LXSYSCALL2(int, open, const char*, path, int, options)
     return DO_STATUS_OR_RETURN(errno);
 }
 
-#define TEST_FD(fd) (fd >= 0 && fd < VFS_MAX_FD)
-#define GET_FD(fd, fd_s) (TEST_FD(fd) && (fd_s = __current->fdtable->fds[fd]))
-
 __DEFINE_LXSYSCALL1(int, close, int, fd)
 {
     struct v_fd* fd_s;
     int errno = 0;
-    if (!GET_FD(fd, fd_s)) {
-        errno = EBADF;
+    if ((errno = __vfs_getfd(fd, &fd_s))) {
         goto done_err;
     }
 
@@ -584,9 +587,12 @@ __DEFINE_LXSYSCALL2(int, readdir, int, fd, struct dirent*, dent)
 {
     struct v_fd* fd_s;
     int errno;
-    if (!GET_FD(fd, fd_s)) {
-        errno = EBADF;
-    } else if (!(fd_s->file->inode->itype & VFS_IFDIR)) {
+
+    if ((errno = __vfs_getfd(fd, &fd_s))) {
+        goto done;
+    }
+
+    if (!(fd_s->file->inode->itype & VFS_IFDIR)) {
         errno = ENOTDIR;
     } else {
         struct dir_context dctx =
@@ -616,7 +622,8 @@ __DEFINE_LXSYSCALL1(int, mkdir, const char*, path)
 {
     struct v_dnode *parent, *dir;
     struct hstr component = HSTR(valloc(VFS_NAME_MAXLEN), 0);
-    int errno = vfs_walk(NULL, path, &parent, &component, VFS_WALK_PARENT);
+    int errno =
+      vfs_walk(__current->cwd, path, &parent, &component, VFS_WALK_PARENT);
     if (errno) {
         goto done;
     }
@@ -646,8 +653,7 @@ __DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
 {
     int errno = 0;
     struct v_fd* fd_s;
-    if (!GET_FD(fd, fd_s)) {
-        errno = EBADF;
+    if ((errno = __vfs_getfd(fd, &fd_s))) {
         goto done;
     }
 
@@ -674,8 +680,7 @@ __DEFINE_LXSYSCALL3(int, write, int, fd, void*, buf, size_t, count)
 {
     int errno = 0;
     struct v_fd* fd_s;
-    if (!GET_FD(fd, fd_s)) {
-        errno = EBADF;
+    if ((errno = __vfs_getfd(fd, &fd_s))) {
         goto done;
     }
 
@@ -702,27 +707,28 @@ __DEFINE_LXSYSCALL3(int, lseek, int, fd, int, offset, int, options)
 {
     int errno = 0;
     struct v_fd* fd_s;
-    if (!GET_FD(fd, fd_s)) {
-        errno = EBADF;
-    } else {
-        struct v_file* file = fd_s->file;
-        size_t fpos = file->f_pos;
-        switch (options) {
-            case FSEEK_CUR:
-                fpos = (size_t)((int)file->f_pos + offset);
-                break;
-            case FSEEK_END:
-                fpos = (size_t)((int)file->inode->fsize + offset);
-                break;
-            case FSEEK_SET:
-                fpos = offset;
-                break;
-        }
-        if (!file->ops.seek || !(errno = file->ops.seek(file, fpos))) {
-            file->f_pos = fpos;
-        }
+    if ((errno = __vfs_getfd(fd, &fd_s))) {
+        goto done;
     }
 
+    struct v_file* file = fd_s->file;
+    size_t fpos = file->f_pos;
+    switch (options) {
+        case FSEEK_CUR:
+            fpos = (size_t)((int)file->f_pos + offset);
+            break;
+        case FSEEK_END:
+            fpos = (size_t)((int)file->inode->fsize + offset);
+            break;
+        case FSEEK_SET:
+            fpos = offset;
+            break;
+    }
+    if (!file->ops.seek || !(errno = file->ops.seek(file, fpos))) {
+        file->f_pos = fpos;
+    }
+
+done:
     return DO_STATUS(errno);
 }
 
@@ -770,17 +776,18 @@ __DEFINE_LXSYSCALL3(int, realpathat, int, fd, char*, buf, size_t, size)
 {
     int errno;
     struct v_fd* fd_s;
-    if (!GET_FD(fd, fd_s)) {
-        errno = EBADF;
-    } else {
-        struct v_dnode* dnode;
-        errno = vfs_get_path(fd_s->file->dnode, buf, size, 0);
+    if ((errno = __vfs_getfd(fd, &fd_s))) {
+        goto done;
     }
+
+    struct v_dnode* dnode;
+    errno = vfs_get_path(fd_s->file->dnode, buf, size, 0);
 
     if (errno >= 0) {
         return errno;
     }
 
+done:
     return DO_STATUS(errno);
 }
 
@@ -788,7 +795,8 @@ __DEFINE_LXSYSCALL3(int, readlink, const char*, path, char*, buf, size_t, size)
 {
     int errno;
     struct v_dnode* dnode;
-    if (!(errno = vfs_walk(NULL, path, &dnode, NULL, VFS_WALK_NOFOLLOW))) {
+    if (!(errno =
+            vfs_walk(__current->cwd, path, &dnode, NULL, VFS_WALK_NOFOLLOW))) {
         errno = vfs_readlink(dnode, buf, size);
     }
 
@@ -812,23 +820,21 @@ __DEFINE_LXSYSCALL4(int,
 {
     int errno;
     struct v_fd* fd_s;
-    if (!GET_FD(dirfd, fd_s)) {
-        errno = EBADF;
-    } else {
-        struct v_dnode* dnode;
-        if (!(errno = vfs_walk(fd_s->file->dnode,
-                               pathname,
-                               &dnode,
-                               NULL,
-                               VFS_WALK_NOFOLLOW))) {
-            errno = vfs_readlink(fd_s->file->dnode, buf, size);
-        }
+    if ((errno = __vfs_getfd(dirfd, &fd_s))) {
+        goto done;
+    }
+
+    struct v_dnode* dnode;
+    if (!(errno = vfs_walk(
+            fd_s->file->dnode, pathname, &dnode, NULL, VFS_WALK_NOFOLLOW))) {
+        errno = vfs_readlink(fd_s->file->dnode, buf, size);
     }
 
     if (errno >= 0) {
         return errno;
     }
 
+done:
     return DO_STATUS(errno);
 }
 
@@ -836,7 +842,7 @@ __DEFINE_LXSYSCALL1(int, rmdir, const char*, pathname)
 {
     int errno;
     struct v_dnode* dnode;
-    if ((errno = vfs_walk(NULL, pathname, &dnode, NULL, 0))) {
+    if ((errno = vfs_walk(__current->cwd, pathname, &dnode, NULL, 0))) {
         goto done;
     }
     if ((dnode->super_block->fs->types & FSTYPE_ROFS)) {
@@ -882,7 +888,7 @@ __DEFINE_LXSYSCALL1(int, unlink, const char*, pathname)
 {
     int errno;
     struct v_dnode* dnode;
-    if ((errno = vfs_walk(NULL, pathname, &dnode, NULL, 0))) {
+    if ((errno = vfs_walk(__current->cwd, pathname, &dnode, NULL, 0))) {
         goto done;
     }
     if ((dnode->super_block->fs->types & FSTYPE_ROFS)) {
@@ -900,13 +906,13 @@ __DEFINE_LXSYSCALL2(int, unlinkat, int, fd, const char*, pathname)
 {
     int errno;
     struct v_fd* fd_s;
-    if (!GET_FD(fd, fd_s)) {
-        errno = EBADF;
-    } else {
-        struct v_dnode* dnode;
-        if (!(errno = vfs_walk(fd_s->file->dnode, pathname, &dnode, NULL, 0))) {
-            errno = __vfs_do_unlink(dnode->inode);
-        }
+    if ((errno = __vfs_getfd(fd, &fd_s))) {
+        goto done;
+    }
+
+    struct v_dnode* dnode;
+    if (!(errno = vfs_walk(fd_s->file->dnode, pathname, &dnode, NULL, 0))) {
+        errno = __vfs_do_unlink(dnode->inode);
     }
 
 done:
@@ -935,9 +941,7 @@ __DEFINE_LXSYSCALL1(int, fsync, int, fildes)
 {
     int errno;
     struct v_fd* fd_s;
-    if (!GET_FD(fildes, fd_s)) {
-        errno = EBADF;
-    } else {
+    if (!(errno = __vfs_getfd(fildes, &fd_s))) {
         errno = vfs_fsync(fd_s->file);
     }
 
@@ -967,10 +971,15 @@ vfs_dup2(int oldfd, int newfd)
 
     int errno;
     struct v_fd *oldfd_s, *newfd_s;
-    if (!GET_FD(oldfd, oldfd_s) || !TEST_FD(newfd)) {
+    if ((errno = __vfs_getfd(oldfd, &oldfd_s))) {
+        goto done;
+    }
+
+    if (!TEST_FD(newfd)) {
         errno = EBADF;
         goto done;
     }
+
     newfd_s = __current->fdtable->fds[newfd];
     if (newfd_s && (errno = vfs_close(newfd_s))) {
         goto done;
@@ -994,14 +1003,17 @@ __DEFINE_LXSYSCALL1(int, dup, int, oldfd)
 {
     int errno, newfd;
     struct v_fd *oldfd_s, *newfd_s;
-    if (!GET_FD(oldfd, oldfd_s)) {
-        errno = EBADF;
-    } else if (!(errno = vfs_alloc_fdslot(&newfd)) &&
-               !(errno = vfs_dup_fd(oldfd_s, &newfd_s))) {
+    if ((errno = __vfs_getfd(oldfd, &oldfd_s))) {
+        goto done;
+    }
+
+    if (!(errno = vfs_alloc_fdslot(&newfd)) &&
+        !(errno = vfs_dup_fd(oldfd_s, &newfd_s))) {
         __current->fdtable->fds[newfd] = newfd_s;
         return newfd;
     }
 
+done:
     return DO_STATUS(errno);
 }
 
@@ -1014,7 +1026,7 @@ __DEFINE_LXSYSCALL2(int,
 {
     int errno;
     struct v_dnode* dnode;
-    if ((errno = vfs_walk(NULL, pathname, &dnode, NULL, 0))) {
+    if ((errno = vfs_walk(__current->cwd, pathname, &dnode, NULL, 0))) {
         goto done;
     }
     if ((dnode->super_block->fs->types & FSTYPE_ROFS)) {
@@ -1030,4 +1042,83 @@ __DEFINE_LXSYSCALL2(int,
 
 done:
     return DO_STATUS(errno);
+}
+
+int
+__vfs_do_chdir(struct v_dnode* dnode)
+{
+    int errno = 0;
+    if (!(dnode->inode->itype & VFS_IFDIR)) {
+        errno = ENOTDIR;
+        goto done;
+    }
+
+    if (__current->cwd) {
+        __current->cwd->ref_count--;
+    }
+
+    dnode->ref_count++;
+    __current->cwd = dnode;
+
+done:
+    return errno;
+}
+
+__DEFINE_LXSYSCALL1(int, chdir, const char*, path)
+{
+    struct v_dnode* dnode;
+    int errno = 0;
+
+    if ((errno = vfs_walk(__current->cwd, path, &dnode, NULL, 0))) {
+        goto done;
+    }
+
+    errno = __vfs_do_chdir(dnode);
+
+done:
+    return DO_STATUS(errno);
+}
+
+__DEFINE_LXSYSCALL1(int, fchdir, int, fd)
+{
+    struct v_fd* fd_s;
+    int errno = 0;
+
+    if ((errno = __vfs_getfd(fd, &fd_s))) {
+        goto done;
+    }
+
+    errno = __vfs_do_chdir(fd_s->file->dnode);
+
+done:
+    return DO_STATUS(errno);
+}
+
+__DEFINE_LXSYSCALL2(char*, getcwd, char*, buf, size_t, size)
+{
+    int errno = 0;
+    char* ret_ptr = 0;
+    if (size < 2) {
+        errno = ERANGE;
+        goto done;
+    }
+
+    if (!__current->cwd) {
+        *buf = PATH_DELIM;
+        goto done;
+    }
+
+    size_t len = vfs_get_path(__current->cwd, buf, size, 0);
+    if (len == size) {
+        errno = ERANGE;
+        goto done;
+    }
+
+    buf[len + 1] = '\0';
+
+    ret_ptr = buf;
+
+done:
+    __current->k_status = errno;
+    return ret_ptr;
 }

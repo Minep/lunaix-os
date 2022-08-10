@@ -26,5 +26,6 @@
 #define EXDEV -21
 #define ELOOP -22
 #define ENODEV -23
+#define ERANGE -24
 
 #endif /* __LUNAIX_CODE_H */

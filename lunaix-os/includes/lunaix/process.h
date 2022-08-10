@@ -79,6 +79,7 @@ struct proc_info
     int flags;
     void* sig_handler[_SIG_NUM];
     struct v_fdtable* fdtable;
+    struct v_dnode* cwd;
     pid_t pgid;
 };
 

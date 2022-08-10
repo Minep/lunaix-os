@@ -49,4 +49,10 @@ __LXSYSCALL1(int, fsync, int, fildes)
 
 __LXSYSCALL2(int, symlink, const char*, pathname, const char*, link_target)
 
+__LXSYSCALL1(int, chdir, const char*, path)
+
+__LXSYSCALL1(int, fchdir, int, fd)
+
+__LXSYSCALL2(char*, getcwd, char*, buf, size_t, size)
+
 #endif /* __LUNAIX_UNISTD_H */

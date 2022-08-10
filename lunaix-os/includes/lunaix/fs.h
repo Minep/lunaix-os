@@ -137,6 +137,7 @@ struct v_dnode
     struct llist_header children;
     struct llist_header siblings;
     struct v_superblock* super_block;
+    uint32_t ref_count;
     struct
     {
         void (*destruct)(struct v_dnode* dnode);
