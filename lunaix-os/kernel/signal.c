@@ -188,11 +188,10 @@ __do_pause()
 {
     __current->flags |= PROC_FINPAUSE;
 
-    __SYSCALL_INTERRUPTIBLE({
-        while ((__current->flags & PROC_FINPAUSE)) {
-            sched_yield();
-        }
-    })
+    while ((__current->flags & PROC_FINPAUSE)) {
+        sched_yieldk();
+    }
+
     __current->k_status = EINTR;
 }
 

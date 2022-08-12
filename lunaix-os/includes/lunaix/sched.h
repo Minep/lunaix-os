@@ -17,6 +17,6 @@ void
 schedule();
 
 void
-sched_yield();
+sched_yieldk();
 
 #endif /* __LUNAIX_SCHEDULER_H */

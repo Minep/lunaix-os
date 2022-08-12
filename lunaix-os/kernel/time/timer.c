@@ -213,12 +213,6 @@ timer_update(const isr_param* param)
     }
 }
 
-void
-sched_yield()
-{
-    sched_ticks_counter = sched_ticks;
-}
-
 static void
 temp_intr_routine_rtc_tick(const isr_param* param)
 {

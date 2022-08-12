@@ -69,7 +69,7 @@ __tty_read(struct device* dev, void* buf, size_t offset, size_t len)
         //  When a key is arrived, one of the processes will win the race and
         //  swallow it (advancing the key buffer pointer)
         if (!kbd_recv_key(&keyevent)) {
-            sched_yield();
+            sched_yieldk();
             continue;
         }
         if (!(keyevent.state & KBD_KEY_FPRESSED)) {

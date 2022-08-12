@@ -36,6 +36,7 @@
 
     isr_template LUNAIX_SYS_PANIC
     isr_template LUNAIX_SYS_CALL
+    isr_template LUNAIX_SCHED
 
     isr_template APIC_ERROR_IV
     isr_template APIC_LINT0_IV

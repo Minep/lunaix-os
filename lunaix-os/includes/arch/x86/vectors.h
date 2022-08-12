@@ -29,6 +29,7 @@
 // LunaixOS related
 #define LUNAIX_SYS_PANIC                32
 #define LUNAIX_SYS_CALL                 33
+#define LUNAIX_SCHED                    34
 
 #define EX_INTERRUPT_BEGIN              200
 

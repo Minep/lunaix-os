@@ -145,6 +145,12 @@ redo:
     run(next);
 }
 
+void
+sched_yieldk()
+{
+    cpu_int(LUNAIX_SCHED);
+}
+
 __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
 {
     if (!seconds) {
@@ -219,7 +225,6 @@ _wait(pid_t wpid, int* status, int options)
     }
 
     wpid = wpid ? wpid : -__current->pgid;
-    cpu_enable_interrupt();
 repeat:
     llist_for_each(proc, n, &__current->children, siblings)
     {
@@ -238,11 +243,10 @@ repeat:
         return 0;
     }
     // 放弃当前的运行机会
-    sched_yield();
+    sched_yieldk();
     goto repeat;
 
 done:
-    cpu_disable_interrupt();
     status_flags |= PEXITSIG * (proc->sig_inprogress != 0);
     if (status) {
         *status = proc->exit_code | status_flags;
@@ -330,7 +334,7 @@ destroy_process(pid_t pid)
     struct mm_region *pos, *n;
     llist_for_each(pos, n, &proc->mm.regions.head, head)
     {
-        lxfree(pos);
+        vfree(pos);
     }
 
     vmm_mount_pd(PD_MOUNT_1, proc->page_table);

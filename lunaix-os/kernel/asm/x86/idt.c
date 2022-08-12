@@ -63,4 +63,6 @@ _init_idt()
     // We make this a non-trap entry, and enable interrupt
     // only when needed!
     _set_idt_intr_entry(LUNAIX_SYS_CALL, 0x08, _asm_isr33, 3);
+
+    _set_idt_intr_entry(LUNAIX_SCHED, 0x08, _asm_isr34, 0);
 }
