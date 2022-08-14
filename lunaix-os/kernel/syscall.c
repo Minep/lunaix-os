@@ -7,7 +7,7 @@
 LOG_MODULE("SYSCALL")
 
 extern void
-syscall_hndlr(isr_param* param);
+syscall_hndlr(const isr_param* param);
 
 void
 syscall_install()

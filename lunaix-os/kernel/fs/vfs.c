@@ -229,7 +229,7 @@ vfs_walk(struct v_dnode* start,
          int options)
 {
     struct v_dnode* interim;
-    char* pathname = path;
+    const char* pathname = path;
     int errno = __vfs_walk(start, path, &interim, component, options);
     int counter = 0;
 
@@ -340,6 +340,7 @@ vfs_open(struct v_dnode* dnode, struct v_file** file)
     if ((inode->itype & VFS_IFFILE) && !inode->pg_cache) {
         struct pcache* pcache = vzalloc(sizeof(struct pcache));
         pcache_init(pcache);
+        pcache->master = inode;
         inode->pg_cache = pcache;
     }
 
@@ -378,7 +379,7 @@ vfs_close(struct v_file* file)
     if (!file->ops.close || !(errno = file->ops.close(file))) {
         file->dnode->ref_count--;
         file->inode->open_count--;
-        pcache_commit_all(file);
+        pcache_commit_all(file->inode);
         cake_release(file_pile, file);
     }
     return errno;
@@ -388,12 +389,9 @@ int
 vfs_fsync(struct v_file* file)
 {
     int errno = ENOTSUP;
-    pcache_commit_all(file);
+    pcache_commit_all(file->inode);
     if (file->ops.sync) {
-        errno = file->ops.sync(file);
-    }
-    if (!errno && file->inode->ops.sync) {
-        return file->inode->ops.sync(file->inode);
+        errno = file->ops.sync(file->inode);
     }
     return errno;
 }
@@ -606,7 +604,7 @@ __DEFINE_LXSYSCALL2(int, readdir, int, fd, struct dirent*, dent)
             __vfs_readdir_callback(&dctx, vfs_ddot.value, vfs_ddot.len, 0);
         } else {
             dctx.index -= 2;
-            if ((errno = fd_s->file->ops.readdir(fd_s->file, &dctx))) {
+            if ((errno = fd_s->file->ops.readdir(fd_s->file->inode, &dctx))) {
                 goto done;
             }
         }
@@ -664,7 +662,7 @@ __DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
     }
 
     __SYSCALL_INTERRUPTIBLE(
-      { errno = file->ops.read(file, buf, count, file->f_pos); })
+      { errno = file->ops.read(file->inode, buf, count, file->f_pos); })
 
     if (errno > 0) {
         file->f_pos += errno;
@@ -690,7 +688,7 @@ __DEFINE_LXSYSCALL3(int, write, int, fd, void*, buf, size_t, count)
     }
 
     __SYSCALL_INTERRUPTIBLE(
-      { errno = file->ops.write(file, buf, count, file->f_pos); })
+      { errno = file->ops.write(file->inode, buf, count, file->f_pos); })
 
     if (errno > 0) {
         file->f_pos += errno;
@@ -722,7 +720,7 @@ __DEFINE_LXSYSCALL3(int, lseek, int, fd, int, offset, int, options)
             fpos = offset;
             break;
     }
-    if (!file->ops.seek || !(errno = file->ops.seek(file, fpos))) {
+    if (!file->ops.seek || !(errno = file->ops.seek(file->inode, fpos))) {
         file->f_pos = fpos;
     }
 
@@ -761,7 +759,7 @@ vfs_get_path(struct v_dnode* dnode, char* buf, size_t size, int depth)
 int
 vfs_readlink(struct v_dnode* dnode, char* buf, size_t size)
 {
-    char* link;
+    const char* link;
     if (dnode->inode->ops.read_symlink) {
         int errno = dnode->inode->ops.read_symlink(dnode->inode, &link);
         strncpy(buf, link, size);
@@ -979,7 +977,7 @@ vfs_dup2(int oldfd, int newfd)
     }
 
     newfd_s = __current->fdtable->fds[newfd];
-    if (newfd_s && (errno = vfs_close(newfd_s))) {
+    if (newfd_s && (errno = vfs_close(newfd_s->file))) {
         goto done;
     }
 

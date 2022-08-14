@@ -126,7 +126,7 @@ pci_print_device()
                 PCI_INTR_IRQ(pos->intr_info),
                 PCI_INTR_PIN(pos->intr_info));
 #ifdef PCI_PRINT_BAR_LISTING
-        pci_reg_t bar;
+        uint32_t bar;
         for (size_t i = 1; i <= 6; i++) {
             size_t size = pci_bar_sizing(pos, &bar, i);
             if (!bar)

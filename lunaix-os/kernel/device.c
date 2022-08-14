@@ -8,10 +8,10 @@ struct llist_header dev_list;
 static struct twifs_node* dev_root;
 
 int
-__dev_read(struct v_file* file, void* buffer, size_t len, size_t fpos);
+__dev_read(struct v_inode* inode, void* buffer, size_t len, size_t fpos);
 
 int
-__dev_write(struct v_file* file, void* buffer, size_t len, size_t fpos);
+__dev_write(struct v_inode* inode, void* buffer, size_t len, size_t fpos);
 
 void
 device_init()
@@ -78,9 +78,9 @@ device_addvol(struct device* parent, void* underlay, char* name_fmt, ...)
 }
 
 int
-__dev_read(struct v_file* file, void* buffer, size_t len, size_t fpos)
+__dev_read(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 {
-    struct twifs_node* dev_node = (struct twifs_node*)file->inode->data;
+    struct twifs_node* dev_node = (struct twifs_node*)inode->data;
     struct device* dev = (struct device*)dev_node->data;
 
     if (!dev->read) {
@@ -90,9 +90,9 @@ __dev_read(struct v_file* file, void* buffer, size_t len, size_t fpos)
 }
 
 int
-__dev_write(struct v_file* file, void* buffer, size_t len, size_t fpos)
+__dev_write(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 {
-    struct twifs_node* dev_node = (struct twifs_node*)file->inode->data;
+    struct twifs_node* dev_node = (struct twifs_node*)inode->data;
     struct device* dev = (struct device*)dev_node->data;
 
     if (!dev->write) {

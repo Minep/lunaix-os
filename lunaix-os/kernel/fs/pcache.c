@@ -9,19 +9,21 @@
 
 #define PCACHE_DIRTY 0x1
 
+static struct lru_zone* pcache_zone;
+
 void
 pcache_init(struct pcache* pcache)
 {
     btrie_init(&pcache->tree, PG_SIZE_BITS);
     llist_init_head(&pcache->dirty);
     llist_init_head(&pcache->pages);
+    pcache_zone = lru_new_zone();
 }
 
 void
 pcache_release_page(struct pcache* pcache, struct pcache_pg* page)
 {
-    pmm_free_page(KERNEL_PID, page->pg);
-    vmm_del_mapping(PD_REFERENCED, page->pg);
+    vfree(page->pg);
 
     llist_delete(&page->pg_list);
 
@@ -30,13 +32,36 @@ pcache_release_page(struct pcache* pcache, struct pcache_pg* page)
     pcache->n_pages--;
 }
 
+void
+pcache_evict(struct pcache* pcache)
+{
+    struct pcache_pg* page =
+      container_of(lru_evict_one(pcache_zone), struct pcache_pg, lru);
+
+    if (!page)
+        return;
+
+    pcache_invalidate(pcache, page);
+}
+
 struct pcache_pg*
 pcache_new_page(struct pcache* pcache, uint32_t index)
 {
-    void* pg = pmm_alloc_page(KERNEL_PID, 0);
-    void* pg_v = vmm_vmap(pg, PG_SIZE, PG_PREM_URW);
     struct pcache_pg* ppg = vzalloc(sizeof(struct pcache_pg));
-    ppg->pg = pg_v;
+    void* pg = valloc(PG_SIZE);
+
+    if (!ppg || !pg) {
+        pcache_evict(pcache);
+        if (!ppg && !(ppg = vzalloc(sizeof(struct pcache_pg)))) {
+            return NULL;
+        }
+
+        if (!pg && !(pg = valloc(PG_SIZE))) {
+            return NULL;
+        }
+    }
+
+    ppg->pg = pg;
 
     llist_append(&pcache->pages, &ppg->pg_list);
     btrie_set(&pcache->tree, index, ppg);
@@ -63,25 +88,30 @@ pcache_get_page(struct pcache* pcache,
     struct pcache_pg* pg = btrie_get(&pcache->tree, index);
     int is_new = 0;
     *offset = index & ((1 << pcache->tree.truncated) - 1);
-    if (!pg) {
-        pg = pcache_new_page(pcache, index);
+    if (!pg && (pg = pcache_new_page(pcache, index))) {
         pg->fpos = index - *offset;
         pcache->n_pages++;
         is_new = 1;
     }
+    if (pg)
+        lru_use_one(pcache_zone, &pg->lru);
     *page = pg;
     return is_new;
 }
 
 int
-pcache_write(struct v_file* file, void* data, uint32_t len, uint32_t fpos)
+pcache_write(struct v_inode* inode, void* data, uint32_t len, uint32_t fpos)
 {
     uint32_t pg_off, buf_off = 0;
-    struct pcache* pcache = file->inode->pg_cache;
+    struct pcache* pcache = inode->pg_cache;
     struct pcache_pg* pg;
 
     while (buf_off < len) {
         pcache_get_page(pcache, fpos, &pg_off, &pg);
+        if (!pg) {
+            return ENOMEM;
+        }
+
         uint32_t wr_bytes = MIN(PG_SIZE - pg_off, len - buf_off);
         memcpy(pg->pg + pg_off, (data + buf_off), wr_bytes);
 
@@ -95,18 +125,22 @@ pcache_write(struct v_file* file, void* data, uint32_t len, uint32_t fpos)
 }
 
 int
-pcache_read(struct v_file* file, void* data, uint32_t len, uint32_t fpos)
+pcache_read(struct v_inode* inode, void* data, uint32_t len, uint32_t fpos)
 {
     uint32_t pg_off, buf_off = 0, new_pg = 0;
     int errno = 0;
-    struct pcache* pcache = file->inode->pg_cache;
+    struct pcache* pcache = inode->pg_cache;
     struct pcache_pg* pg;
-    struct v_inode* inode = file->inode;
 
     while (buf_off < len) {
         if (pcache_get_page(pcache, fpos, &pg_off, &pg)) {
+
+            if (!pg) {
+                return ENOMEM;
+            }
+
             // Filling up the page
-            errno = inode->default_fops.read(file, pg->pg, PG_SIZE, pg->fpos);
+            errno = inode->default_fops.read(inode, pg->pg, PG_SIZE, pg->fpos);
             if (errno >= 0 && errno < PG_SIZE) {
                 // EOF
                 len = buf_off + errno;
@@ -130,6 +164,7 @@ pcache_release(struct pcache* pcache)
     struct pcache_pg *pos, *n;
     llist_for_each(pos, n, &pcache->pages, pg_list)
     {
+        lru_remove(&pos->lru);
         vfree(pos);
     }
 
@@ -137,38 +172,38 @@ pcache_release(struct pcache* pcache)
 }
 
 int
-pcache_commit(struct v_file* file, struct pcache_pg* page)
+pcache_commit(struct v_inode* inode, struct pcache_pg* page)
 {
     if (!(page->flags & PCACHE_DIRTY)) {
         return;
     }
 
-    struct v_inode* inode = file->inode;
-    int errno = inode->default_fops.write(file, page->pg, PG_SIZE, page->fpos);
+    int errno = inode->default_fops.write(inode, page->pg, PG_SIZE, page->fpos);
 
     if (!errno) {
         page->flags &= ~PCACHE_DIRTY;
         llist_delete(&page->dirty_list);
-        file->inode->pg_cache->n_dirty--;
+        inode->pg_cache->n_dirty--;
     }
 
     return errno;
 }
 
 void
-pcache_commit_all(struct v_file* file)
+pcache_commit_all(struct v_inode* inode)
 {
-    struct pcache* cache = file->inode->pg_cache;
+    struct pcache* cache = inode->pg_cache;
     struct pcache_pg *pos, *n;
+
     llist_for_each(pos, n, &cache->dirty, dirty_list)
     {
-        pcache_commit(file, pos);
+        pcache_commit(inode, pos);
     }
 }
 
 void
-pcache_invalidate(struct v_file* file, struct pcache_pg* page)
+pcache_invalidate(struct pcache* pcache, struct pcache_pg* page)
 {
-    pcache_commit(file, page);
-    pcache_release_page(&file->inode->pg_cache, page);
+    pcache_commit(pcache->master, page);
+    pcache_release_page(pcache, page);
 }

@@ -5,6 +5,14 @@
 #include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
 
+void
+sata_read_error(struct hba_port* port)
+{
+    uint32_t tfd = port->regs[HBA_RPxTFD];
+    port->device->last_error = (tfd >> 8) & 0xff;
+    port->device->last_status = tfd & 0xff;
+}
+
 int
 __sata_buffer_io(struct hba_device* dev,
                  uint64_t lba,
@@ -28,7 +36,7 @@ __sata_buffer_io(struct hba_device* dev,
     header->options |= HBA_CMDH_WRITE * (write == 1);
 
     uint16_t count = ICEIL(size, port->device->block_size);
-    struct sata_reg_fis* fis = table->command_fis;
+    struct sata_reg_fis* fis = (struct sata_reg_fis*)table->command_fis;
 
     if ((port->device->flags & HBA_DEV_FEXTLBA)) {
         // 如果该设备支持48位LBA寻址
@@ -86,12 +94,4 @@ sata_write_buffer(struct hba_device* dev,
                   uint32_t size)
 {
     return __sata_buffer_io(dev, lba, buffer, size, 1);
-}
-
-void
-sata_read_error(struct hba_port* port)
-{
-    uint32_t tfd = port->regs[HBA_RPxTFD];
-    port->device->last_error = (tfd >> 8) & 0xff;
-    port->device->last_status = tfd & 0xff;
 }

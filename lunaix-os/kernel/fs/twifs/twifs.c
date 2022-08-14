@@ -32,7 +32,7 @@ struct v_inode*
 __twifs_create_inode(struct twifs_node* twi_node);
 
 int
-__twifs_iterate_dir(struct v_file* file, struct dir_context* dctx);
+__twifs_iterate_dir(struct v_inode* inode, struct dir_context* dctx);
 
 int
 __twifs_mount(struct v_superblock* vsb, struct v_dnode* mount_point);
@@ -44,10 +44,10 @@ int
 __twifs_rmstuff(struct v_inode* inode);
 
 int
-__twifs_fwrite(struct v_file* file, void* buffer, size_t len, size_t fpos);
+__twifs_fwrite(struct v_inode* inode, void* buffer, size_t len, size_t fpos);
 
 int
-__twifs_fread(struct v_file* file, void* buffer, size_t len, size_t fpos);
+__twifs_fread(struct v_inode* inode, void* buffer, size_t len, size_t fpos);
 
 void
 twifs_init()
@@ -186,23 +186,23 @@ __twifs_create_inode(struct twifs_node* twi_node)
 }
 
 int
-__twifs_fwrite(struct v_file* file, void* buffer, size_t len, size_t fpos)
+__twifs_fwrite(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 {
-    struct twifs_node* twi_node = (struct twifs_node*)file->inode->data;
+    struct twifs_node* twi_node = (struct twifs_node*)inode->data;
     if (!twi_node || !twi_node->ops.write) {
         return ENOTSUP;
     }
-    return twi_node->ops.write(file, buffer, len, fpos);
+    return twi_node->ops.write(inode, buffer, len, fpos);
 }
 
 int
-__twifs_fread(struct v_file* file, void* buffer, size_t len, size_t fpos)
+__twifs_fread(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 {
-    struct twifs_node* twi_node = (struct twifs_node*)file->inode->data;
+    struct twifs_node* twi_node = (struct twifs_node*)inode->data;
     if (!twi_node || !twi_node->ops.read) {
         return ENOTSUP;
     }
-    return twi_node->ops.read(file, buffer, len, fpos);
+    return twi_node->ops.read(inode, buffer, len, fpos);
 }
 
 struct twifs_node*
@@ -246,9 +246,9 @@ __twifs_dirlookup(struct v_inode* inode, struct v_dnode* dnode)
 }
 
 int
-__twifs_iterate_dir(struct v_file* file, struct dir_context* dctx)
+__twifs_iterate_dir(struct v_inode* inode, struct dir_context* dctx)
 {
-    struct twifs_node* twi_node = (struct twifs_node*)(file->inode->data);
+    struct twifs_node* twi_node = (struct twifs_node*)(inode->data);
     int counter = 0;
     struct twifs_node *pos, *n;
 

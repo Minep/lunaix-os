@@ -279,7 +279,7 @@ alloc_process()
     proc->pgid = proc->pid;
     proc->fdtable = vzalloc(sizeof(struct v_fdtable));
 
-    llist_init_head(&proc->mm.regions);
+    llist_init_head(&proc->mm.regions.head);
     llist_init_head(&proc->children);
     llist_init_head(&proc->grp_member);
     llist_init_head(&proc->sleep.sleepers);

@@ -36,7 +36,8 @@ acpi_init(multiboot_info_t* mb_info)
 
     size_t entry_n = (rsdt->header.length - sizeof(acpi_sdthdr_t)) >> 2;
     for (size_t i = 0; i < entry_n; i++) {
-        acpi_sdthdr_t* sdthdr = ((acpi_apic_t**)&(rsdt->entry))[i];
+        acpi_sdthdr_t* sdthdr =
+          (acpi_sdthdr_t*)((acpi_apic_t**)&(rsdt->entry))[i];
         switch (sdthdr->signature) {
             case ACPI_MADT_SIG:
                 madt_parse((acpi_madt_t*)sdthdr, ctx);

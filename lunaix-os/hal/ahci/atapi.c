@@ -41,7 +41,7 @@ scsi_parse_capacity(struct hba_device* device, uint32_t* parameter)
     device->block_size = SCSI_FLIP(*(parameter + 2));
 }
 
-void
+int
 __scsi_buffer_io(struct hba_device* dev,
                  uint64_t lba,
                  void* buffer,
@@ -65,7 +65,7 @@ __scsi_buffer_io(struct hba_device* dev,
 
     uint32_t count = ICEIL(size, port->device->block_size);
 
-    struct sata_reg_fis* fis = table->command_fis;
+    struct sata_reg_fis* fis = (struct sata_reg_fis*)table->command_fis;
     void* cdb = table->atapi_cmd;
     sata_create_fis(fis, ATA_PACKET, (size << 8), 0);
     fis->feature = 1 | ((!write) << 2);
@@ -107,20 +107,20 @@ fail:
     return 0;
 }
 
-void
+int
 scsi_read_buffer(struct hba_device* dev,
                  uint64_t lba,
                  void* buffer,
                  uint32_t size)
 {
-    __scsi_buffer_io(dev, lba, buffer, size, 0);
+    return __scsi_buffer_io(dev, lba, buffer, size, 0);
 }
 
-void
+int
 scsi_write_buffer(struct hba_device* dev,
                   uint64_t lba,
                   void* buffer,
                   uint32_t size)
 {
-    __scsi_buffer_io(dev, lba, buffer, size, 1);
+    return __scsi_buffer_io(dev, lba, buffer, size, 1);
 }

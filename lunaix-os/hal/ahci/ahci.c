@@ -34,7 +34,7 @@ LOG_MODULE("AHCI")
 static struct ahci_hba hba;
 
 void
-__ahci_hba_isr(isr_param param);
+__ahci_hba_isr(const isr_param* param);
 
 int
 ahci_init_device(struct hba_port* port);
@@ -185,7 +185,7 @@ char sata_ifs[][20] = { "Not detected",
                         "SATA III (6.0Gbps)" };
 
 void
-__ahci_hba_isr(isr_param param)
+__ahci_hba_isr(const isr_param* param)
 {
     // TODO: clear the interrupt status
     // TODO: I/O-operation scheduler should be here
@@ -424,11 +424,11 @@ fail:
 }
 
 int
-ahci_identify_device(struct hba_port* port)
+ahci_identify_device(struct hba_device* device)
 {
     // 用于重新识别设备（比如在热插拔的情况下）
-    vfree(port->device);
-    return ahci_init_device(port);
+    vfree(device);
+    return ahci_init_device(device->port);
 }
 
 void

@@ -13,11 +13,14 @@ struct twifs_node
     struct llist_header siblings;
     struct
     {
-        int (*write)(struct v_file* file,
+        int (*write)(struct v_inode* inode,
                      void* buffer,
                      size_t len,
                      size_t fpos);
-        int (*read)(struct v_file* file, void* buffer, size_t len, size_t fpos);
+        int (*read)(struct v_inode* inode,
+                    void* buffer,
+                    size_t len,
+                    size_t fpos);
     } ops;
 };
 

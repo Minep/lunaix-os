@@ -29,6 +29,9 @@ void*
 __alloc_cake(unsigned int cake_pg)
 {
     uintptr_t pa = pmm_alloc_cpage(KERNEL_PID, cake_pg, 0);
+    if (!pa) {
+        return NULL;
+    }
     return vmm_vmap(pa, cake_pg * PG_SIZE, PG_PREM_RW);
 }
 
@@ -37,12 +40,16 @@ __new_cake(struct cake_pile* pile)
 {
     struct cake_s* cake = __alloc_cake(pile->pg_per_cake);
 
+    if (!cake) {
+        return NULL;
+    }
+
     int max_piece = pile->pieces_per_cake;
 
     cake->first_piece = (void*)((uintptr_t)cake + pile->offset);
     cake->next_free = 0;
 
-    piece_index_t* free_list = &cake->free_list;
+    piece_index_t* free_list = cake->free_list;
     for (size_t i = 0; i < max_piece - 1; i++) {
         free_list[i] = i + 1;
     }
@@ -60,6 +67,10 @@ __init_pile(struct cake_pile* pile,
             unsigned int pg_per_cake,
             int options)
 {
+    if (!pile) {
+        return;
+    }
+
     unsigned int offset = sizeof(long);
 
     // 默认每块儿蛋糕对齐到地址总线宽度
@@ -81,7 +92,7 @@ __init_pile(struct cake_pile* pile,
     pile->offset = ROUNDUP(sizeof(struct cake_s) + free_list_size, offset);
     pile->pieces_per_cake -= ICEIL((pile->offset - free_list_size), piece_size);
 
-    strncpy(&pile->pile_name, name, PILE_NAME_MAXLEN);
+    strncpy(pile->pile_name, name, PILE_NAME_MAXLEN);
 
     llist_init_head(&pile->free);
     llist_init_head(&pile->full);
@@ -119,6 +130,9 @@ cake_grab(struct cake_pile* pile)
     } else {
         pos = list_entry(pile->free.next, typeof(*pos), cakes);
     }
+
+    if (!pos)
+        return NULL;
 
     piece_index_t found_index = pos->next_free;
     pos->next_free = pos->free_list[found_index];
@@ -165,7 +179,7 @@ found:
     pos->used_pieces--;
     pile->alloced_pieces--;
 
-    llist_delete(pos);
+    llist_delete(&pos->cakes);
     if (!pos->used_pieces) {
         llist_append(&pile->free, &pos->cakes);
     } else {

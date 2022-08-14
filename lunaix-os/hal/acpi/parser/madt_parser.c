@@ -12,7 +12,8 @@ madt_parse(acpi_madt_t* madt, acpi_context* toc)
 
     // Cosidering only one IOAPIC present (max 24 pins)
     // FIXME: use hash table instead
-    toc->madt.irq_exception = (acpi_intso_t*)vcalloc(24, sizeof(acpi_intso_t*));
+    toc->madt.irq_exception =
+      (acpi_intso_t**)vcalloc(24, sizeof(acpi_intso_t*));
 
     size_t so_idx = 0;
     while (ics_start < ics_end) {

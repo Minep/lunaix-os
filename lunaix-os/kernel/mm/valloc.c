@@ -24,14 +24,14 @@ valloc_init()
 {
     for (size_t i = 0; i < CLASS_LEN(piles_names); i++) {
         int size = 1 << (i + 3);
-        piles[i] = cake_new_pile(&piles_names[i], size, size > 1024 ? 8 : 1, 0);
+        piles[i] = cake_new_pile(piles_names[i], size, size > 1024 ? 8 : 1, 0);
     }
 
     // DMA 内存保证128字节对齐
     for (size_t i = 0; i < CLASS_LEN(piles_names_dma); i++) {
         int size = 1 << (i + 7);
         piles_dma[i] = cake_new_pile(
-          &piles_names_dma[i], size, size > 1024 ? 4 : 1, PILE_CACHELINE);
+          piles_names_dma[i], size, size > 1024 ? 4 : 1, PILE_CACHELINE);
     }
 }
 
@@ -65,13 +65,13 @@ __vfree(void* ptr, struct cake_pile** segregate_list, size_t len)
 void*
 valloc(unsigned int size)
 {
-    return __valloc(size, &piles, CLASS_LEN(piles_names), 3);
+    return __valloc(size, piles, CLASS_LEN(piles_names), 3);
 }
 
 void*
 vzalloc(unsigned int size)
 {
-    void* ptr = __valloc(size, &piles, CLASS_LEN(piles_names), 3);
+    void* ptr = __valloc(size, piles, CLASS_LEN(piles_names), 3);
     memset(ptr, 0, size);
     return ptr;
 }
@@ -84,7 +84,7 @@ vcalloc(unsigned int size, unsigned int count)
         return 0;
     }
 
-    void* ptr = __valloc(alloc_size, &piles, CLASS_LEN(piles_names), 3);
+    void* ptr = __valloc(alloc_size, piles, CLASS_LEN(piles_names), 3);
     memset(ptr, 0, alloc_size);
     return ptr;
 }
@@ -92,19 +92,19 @@ vcalloc(unsigned int size, unsigned int count)
 void
 vfree(void* ptr)
 {
-    __vfree(ptr, &piles, CLASS_LEN(piles_names));
+    __vfree(ptr, piles, CLASS_LEN(piles_names));
 }
 
 void*
 valloc_dma(unsigned int size)
 {
-    return __valloc(size, &piles_dma, CLASS_LEN(piles_names_dma), 7);
+    return __valloc(size, piles_dma, CLASS_LEN(piles_names_dma), 7);
 }
 
 void*
 vzalloc_dma(unsigned int size)
 {
-    void* ptr = __valloc(size, &piles_dma, CLASS_LEN(piles_names_dma), 7);
+    void* ptr = __valloc(size, piles_dma, CLASS_LEN(piles_names_dma), 7);
     memset(ptr, 0, size);
     return ptr;
 }
@@ -112,5 +112,5 @@ vzalloc_dma(unsigned int size)
 void
 vfree_dma(void* ptr)
 {
-    __vfree(ptr, &piles_dma, CLASS_LEN(piles_names_dma));
+    __vfree(ptr, piles_dma, CLASS_LEN(piles_names_dma));
 }

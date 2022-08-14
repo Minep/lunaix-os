@@ -57,7 +57,7 @@ timer_init_context()
     assert_msg(timer_ctx, "Fail to initialize timer contex");
 
     timer_ctx->active_timers = (struct lx_timer*)cake_grab(timer_pile);
-    llist_init_head(timer_ctx->active_timers);
+    llist_init_head(&timer_ctx->active_timers->link);
 }
 
 void
@@ -178,7 +178,7 @@ timer_run(ticks_t ticks, void (*callback)(void*), void* payload, uint8_t flags)
     timer->payload = payload;
     timer->flags = flags;
 
-    llist_append(timer_ctx->active_timers, &timer->link);
+    llist_append(&timer_ctx->active_timers->link, &timer->link);
 
     return timer;
 }

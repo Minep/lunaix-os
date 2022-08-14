@@ -83,15 +83,16 @@ btrie_set(struct btrie* root, uint32_t index, void* data)
 }
 
 void
-__btrie_remove(struct btrie_node* node)
+__btrie_rm_recursive(struct btrie_node* node)
 {
     struct btrie_node* parent = node->parent;
+
     if (parent) {
         llist_delete(&node->siblings);
         llist_delete(&node->nodes);
         vfree(node);
-        if (llist_empty(&parent->children)) {
-            __btrie_remove(parent);
+        if (llist_empty(&parent->children) && !parent->data) {
+            __btrie_rm_recursive(parent);
         }
     }
 }
@@ -104,7 +105,11 @@ btrie_remove(struct btrie* root, uint32_t index)
         return 0;
     }
     void* data = node->data;
-    __btrie_remove(node);
+    if (!llist_empty(&node->children)) {
+        node->data = NULL;
+    } else {
+        __btrie_rm_recursive(node);
+    }
     return data;
 }
 

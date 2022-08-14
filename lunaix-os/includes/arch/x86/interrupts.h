@@ -32,7 +32,7 @@ typedef struct
     unsigned int ss;
 } __attribute__((packed)) isr_param;
 
-typedef void (*int_subscriber)(isr_param*);
+typedef void (*int_subscriber)(const isr_param*);
 
 #pragma region ISR_DECLARATION
 

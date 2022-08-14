@@ -8,6 +8,7 @@
 #include <lunaix/ds/hashtable.h>
 #include <lunaix/ds/hstr.h>
 #include <lunaix/ds/llist.h>
+#include <lunaix/ds/lru.h>
 #include <lunaix/status.h>
 
 #define VFS_NAME_MAXLEN 128
@@ -27,14 +28,18 @@
 #define FSTYPE_ROFS 0x1
 
 #define VFS_VALID_CHAR(chr)                                                    \
-    ('A' <= (chr) && (chr) <= 'Z' || 'a' <= (chr) && (chr) <= 'z' ||           \
-     '0' <= (chr) && (chr) <= '9' || (chr) == '.' || (chr) == '_' ||           \
+    (('A' <= (chr) && (chr) <= 'Z') || ('a' <= (chr) && (chr) <= 'z') ||       \
+     ('0' <= (chr) && (chr) <= '9') || (chr) == '.' || (chr) == '_' ||         \
      (chr) == '-')
 
 extern struct hstr vfs_ddot;
 extern struct hstr vfs_dot;
 
 struct v_dnode;
+struct v_inode;
+struct v_superblock;
+struct v_file;
+struct v_fd;
 struct pcache;
 
 struct filesystem
@@ -73,13 +78,13 @@ struct dir_context
 
 struct v_file_ops
 {
-    int (*write)(struct v_file* file, void* buffer, size_t len, size_t fpos);
-    int (*read)(struct v_file* file, void* buffer, size_t len, size_t fpos);
-    int (*readdir)(struct v_file* file, struct dir_context* dctx);
-    int (*seek)(struct v_file* file, size_t offset);
-    int (*rename)(struct v_file* file, char* new_name);
+    int (*write)(struct v_inode* inode, void* buffer, size_t len, size_t fpos);
+    int (*read)(struct v_inode* inode, void* buffer, size_t len, size_t fpos);
+    int (*readdir)(struct v_inode* inode, struct dir_context* dctx);
+    int (*seek)(struct v_inode* inode, size_t offset);
+    int (*rename)(struct v_inode* inode, char* new_name);
     int (*close)(struct v_file* file);
-    int (*sync)(struct v_file* file);
+    int (*sync)(struct v_inode* inode);
 };
 
 struct v_file
@@ -89,7 +94,6 @@ struct v_file
     struct llist_header* f_list;
     uint32_t f_pos;
     uint32_t ref_count;
-    void* data; // 允许底层FS绑定他的一些专有数据
     struct v_file_ops ops;
 };
 
@@ -153,6 +157,7 @@ struct pcache_pg
 {
     struct llist_header pg_list;
     struct llist_header dirty_list;
+    struct lru_node lru;
     void* pg;
     uint32_t flags;
     uint32_t fpos;
@@ -160,6 +165,7 @@ struct pcache_pg
 
 struct pcache
 {
+    struct v_inode* master;
     struct btrie tree;
     struct llist_header pages;
     struct llist_header dirty;
@@ -257,20 +263,20 @@ pcache_get_page(struct pcache* pcache,
                 struct pcache_pg** page);
 
 int
-pcache_write(struct v_file* file, void* data, uint32_t len, uint32_t fpos);
+pcache_write(struct v_inode* inode, void* data, uint32_t len, uint32_t fpos);
 
 int
-pcache_read(struct v_file* file, void* data, uint32_t len, uint32_t fpos);
+pcache_read(struct v_inode* inode, void* data, uint32_t len, uint32_t fpos);
 
 void
 pcache_release(struct pcache* pcache);
 
 int
-pcache_commit(struct v_file* file, struct pcache_pg* page);
+pcache_commit(struct v_inode* inode, struct pcache_pg* page);
 
 void
-pcache_invalidate(struct v_file* file, struct pcache_pg* page);
+pcache_commit_all(struct v_inode* inode);
 
 void
-pcache_commit_all(struct v_file* file);
+pcache_invalidate(struct pcache* pcache, struct pcache_pg* page);
 #endif /* __LUNAIX_VFS_H */

@@ -69,14 +69,14 @@ struct pci_device
 // PCI Configuration Space (C-Space) r/w:
 //      Refer to "PCI Local Bus Specification, Rev.3, Section 3.2.2.3.2"
 
-inline pci_reg_t
+static inline pci_reg_t
 pci_read_cspace(uint32_t base, int offset)
 {
     io_outl(PCI_CONFIG_ADDR, base | (offset & ~0x3));
     return io_inl(PCI_CONFIG_DATA);
 }
 
-inline void
+static inline void
 pci_write_cspace(uint32_t base, int offset, pci_reg_t data)
 {
     io_outl(PCI_CONFIG_ADDR, base | (offset & ~0x3));

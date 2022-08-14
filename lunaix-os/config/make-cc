@@ -4,6 +4,12 @@ AS := i686-elf-as
 
 ARCH_OPT := -D__ARCH_IA32
 O := -O2
-W := -Wall -Wextra -Wno-unknown-pragmas
+W := -Wall -Wextra -Wno-unknown-pragmas \
+		-Wno-unused-function \
+		-Wno-unused-but-set-variable \
+		-Wno-unused-parameter \
+		-Wno-unused-variable\
+		-Werror=incompatible-pointer-types
+		
 CFLAGS := -std=gnu99 -ffreestanding $(O) $(W) $(ARCH_OPT)
 LDFLAGS := -ffreestanding $(O) -nostdlib -lgcc

@@ -39,10 +39,7 @@ block_init()
 }
 
 int
-__block_read(struct device* dev,
-             void* buf,
-             unsigned int offset,
-             unsigned int len)
+__block_read(struct device* dev, void* buf, size_t offset, size_t len)
 {
     int errno;
     struct block_dev* bdev = (struct block_dev*)dev->underlay;
@@ -72,10 +69,7 @@ error:
 }
 
 int
-__block_write(struct device* dev,
-              void* buf,
-              unsigned int offset,
-              unsigned int len)
+__block_write(struct device* dev, void* buf, size_t offset, size_t len)
 {
     int errno;
     struct block_dev* bdev = (struct block_dev*)dev->underlay;

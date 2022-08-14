@@ -41,13 +41,13 @@ llist_init_head(struct llist_header* head)
 static inline void
 llist_append(struct llist_header* head, struct llist_header* elem)
 {
-    __llist_add(elem, head, head->next);
+    __llist_add(elem, head->prev, head);
 }
 
 static inline void
 llist_prepend(struct llist_header* head, struct llist_header* elem)
 {
-    __llist_add(elem, head->prev, head);
+    __llist_add(elem, head, head->next);
 }
 
 static inline void

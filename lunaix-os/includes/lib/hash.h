@@ -6,7 +6,7 @@
 #define HASH_SIZE_BITS 32
 
 uint32_t
-strhash_32(unsigned char* str, uint32_t truncate_to);
+strhash_32(char* str, uint32_t truncate_to);
 
 /**
  * @brief Simple generic hash function

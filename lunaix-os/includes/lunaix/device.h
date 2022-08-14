@@ -14,14 +14,8 @@ struct device
     char name_val[DEVICE_NAME_SIZE];
     void* underlay;
     void* fs_node;
-    int (*read)(struct device* dev,
-                void* buf,
-                unsigned int offset,
-                unsigned int len);
-    int (*write)(struct device* dev,
-                 void* buf,
-                 unsigned int offset,
-                 unsigned int len);
+    int (*read)(struct device* dev, void* buf, size_t offset, size_t len);
+    int (*write)(struct device* dev, void* buf, size_t offset, size_t len);
 };
 
 void

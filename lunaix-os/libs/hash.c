@@ -9,7 +9,7 @@
  * @return unsigned int
  */
 uint32_t
-strhash_32(unsigned char* str, uint32_t truncate_to)
+strhash_32(char* str, uint32_t truncate_to)
 {
     if (!str)
         return 0;
