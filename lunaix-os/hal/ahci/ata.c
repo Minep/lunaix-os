@@ -5,8 +5,16 @@
 #include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
 
+void
+sata_read_error(struct hba_port* port)
+{
+    uint32_t tfd = port->regs[HBA_RPxTFD];
+    port->device->last_error = (tfd >> 8) & 0xff;
+    port->device->last_status = tfd & 0xff;
+}
+
 int
-__sata_buffer_io(struct hba_port* port,
+__sata_buffer_io(struct hba_device* dev,
                  uint64_t lba,
                  void* buffer,
                  uint32_t size,
@@ -14,6 +22,7 @@ __sata_buffer_io(struct hba_port* port,
 {
     assert_msg(((uintptr_t)buffer & 0x3) == 0, "HBA: Bad buffer alignment");
 
+    struct hba_port* port = dev->port;
     struct hba_cmdh* header;
     struct hba_cmdt* table;
     int slot = hba_prepare_cmd(port, &table, &header, buffer, size);
@@ -27,7 +36,7 @@ __sata_buffer_io(struct hba_port* port,
     header->options |= HBA_CMDH_WRITE * (write == 1);
 
     uint16_t count = ICEIL(size, port->device->block_size);
-    struct sata_reg_fis* fis = table->command_fis;
+    struct sata_reg_fis* fis = (struct sata_reg_fis*)table->command_fis;
 
     if ((port->device->flags & HBA_DEV_FEXTLBA)) {
         // 如果该设备支持48位LBA寻址
@@ -70,27 +79,19 @@ fail:
 }
 
 int
-sata_read_buffer(struct hba_port* port,
+sata_read_buffer(struct hba_device* dev,
                  uint64_t lba,
                  void* buffer,
                  uint32_t size)
 {
-    return __sata_buffer_io(port, lba, buffer, size, 0);
+    return __sata_buffer_io(dev, lba, buffer, size, 0);
 }
 
 int
-sata_write_buffer(struct hba_port* port,
+sata_write_buffer(struct hba_device* dev,
                   uint64_t lba,
                   void* buffer,
                   uint32_t size)
 {
-    return __sata_buffer_io(port, lba, buffer, size, 1);
-}
-
-void
-sata_read_error(struct hba_port* port)
-{
-    uint32_t tfd = port->regs[HBA_RPxTFD];
-    port->device->last_error = (tfd >> 8) & 0xff;
-    port->device->last_status = tfd & 0xff;
+    return __sata_buffer_io(dev, lba, buffer, size, 1);
 }

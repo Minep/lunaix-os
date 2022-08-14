@@ -1,6 +1,6 @@
 #include "lunaix/syslog.h"
 #include "parser.h"
-#include <lunaix/mm/kalloc.h>
+#include <lunaix/mm/valloc.h>
 
 LOG_MODULE("MCFG")
 
@@ -13,8 +13,7 @@ mcfg_parse(acpi_sdthdr_t* mcfg, acpi_context* toc)
       (struct acpi_mcfg_alloc*)((uintptr_t)mcfg + (sizeof(acpi_sdthdr_t) + 8));
 
     toc->mcfg.alloc_num = alloc_num;
-    toc->mcfg.allocations =
-      lxmalloc(sizeof(struct mcfg_alloc_info) * alloc_num);
+    toc->mcfg.allocations = valloc(sizeof(struct mcfg_alloc_info) * alloc_num);
 
     for (size_t i = 0; i < alloc_num; i++) {
         toc->mcfg.allocations[i] = (struct mcfg_alloc_info){

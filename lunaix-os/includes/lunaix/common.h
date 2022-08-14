@@ -32,8 +32,6 @@
 #define USTACK_END (0x9fffffff - USTACK_SIZE + 1)
 #define UMMAP_AREA 0x4D000000
 
-#define SYS_TIMER_FREQUENCY_HZ 2048
-
 #ifndef __ASM__
 #include <stddef.h>
 // From Linux kernel v2.6.0 <kernel.h:194>
@@ -48,7 +46,7 @@
 #define container_of(ptr, type, member)                                        \
     ({                                                                         \
         const typeof(((type*)0)->member)* __mptr = (ptr);                      \
-        (type*)((char*)__mptr - offsetof(type, member));                       \
+        (ptr) ? (type*)((char*)__mptr - offsetof(type, member)) : 0;           \
     })
 
 #endif

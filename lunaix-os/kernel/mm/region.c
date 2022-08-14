@@ -1,5 +1,5 @@
-#include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/region.h>
+#include <lunaix/mm/valloc.h>
 
 void
 region_add(struct mm_region* regions,
@@ -7,7 +7,7 @@ region_add(struct mm_region* regions,
            unsigned long end,
            unsigned int attr)
 {
-    struct mm_region* region = lxmalloc(sizeof(struct mm_region));
+    struct mm_region* region = valloc(sizeof(struct mm_region));
 
     *region = (struct mm_region){ .attr = attr, .end = end, .start = start };
 

@@ -48,7 +48,7 @@ all-debug: clean $(BUILD_DIR)/$(OS_ISO)
 
 clean:
 	@rm -rf $(BUILD_DIR) || exit 1
-	@sleep 2
+	@sleep 1
 
 run: $(BUILD_DIR)/$(OS_ISO)
 	@qemu-system-i386 -cdrom $(BUILD_DIR)/$(OS_ISO) $(QEMU_OPTIONS)

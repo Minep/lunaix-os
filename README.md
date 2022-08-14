@@ -22,12 +22,13 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + 内存管理与按需分页（Demand Paging）
 + 键盘输入
 + 多进程
-+ 17个常见的Linux/POSIX系统调用（[附录1](#appendix1)）
++ 33个常见的Linux/POSIX系统调用（[附录1](#appendix1)）
 + 用户模式
 + 信号机制
 + PCI 3.0
 + PCIe 1.1 (WIP)
-+ Serial ATA AHCI (WIP)
++ Serial ATA AHCI
++ 文件系统 (WIP)
 
 ## 目录结构
 
@@ -67,7 +68,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 运行该操作系统需要一个虚拟磁盘镜像，可以使用如下命令快速创建一个：
 
 ```bash
-qemu-img create -f vdi machine/disk1.vdi 128M
+qemu-img create -f vdi machine/disk0.vdi 128M
 ```
 
 如果你想要使用别的磁盘镜像，需要修改`configs/make-debug-tool`
@@ -165,10 +166,32 @@ qemu-img create -f vdi machine/disk1.vdi 128M
 1. `kill(2)`
 1. `sigpending(2)`
 1. `sigsuspend(2)`
+2. `read(2)`
+2. `write(2)`
+2. `open(2)`
+2. `close(2)`
+2. `mkdir(2)`
+2. `lseek(2)`
+2. `readdir(2)`
+2. `readlink(2)`
+2. `readlinkat(2)`
+2. `rmdir(2)`
+2. `unlink(2)`
+2. `unlinkat(2)`
+2. `link(2)`
+2. `fsync(2)`
+2. `dup(2)`
+2. `dup2(2)`
+2. `symlink(2)`
+2. `chdir(2)`
+2. `fchdir(2)`
+2. `getcwd(2)`
 
 ### LunaixOS自有
 
 1. `yield`
+2. `geterrno`
+3. `realpathat`
 
 ## 附录2：编译gcc作为交叉编译器<a id="appendix2"></a>
 

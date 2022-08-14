@@ -33,8 +33,8 @@ ahci_parse_dev_info(struct hba_device* dev_info, uint16_t* data)
         dev_info->flags |= HBA_DEV_FEXTLBA;
     }
 
-    ahci_parsestr(&dev_info->serial_num, data + IDDEV_OFFSERIALNUM, 10);
-    ahci_parsestr(&dev_info->model, data + IDDEV_OFFMODELNUM, 20);
+    ahci_parsestr(dev_info->serial_num, data + IDDEV_OFFSERIALNUM, 10);
+    ahci_parsestr(dev_info->model, data + IDDEV_OFFMODELNUM, 20);
 }
 
 void

@@ -117,6 +117,12 @@ cpu_invtlb()
         : "r"(interm));
 }
 
+static inline void
+cpu_int(int vect)
+{
+    asm("int %0" ::"i"(vect));
+}
+
 void
 cpu_rdmsr(uint32_t msr_idx, uint32_t* reg_high, uint32_t* reg_low);
 

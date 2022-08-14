@@ -13,7 +13,8 @@
 #include <hal/apic.h>
 #include <hal/rtc.h>
 
-#include <lunaix/mm/kalloc.h>
+#include <lunaix/mm/cake.h>
+#include <lunaix/mm/valloc.h>
 #include <lunaix/sched.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
@@ -42,19 +43,21 @@ static volatile uint8_t apic_timer_done = 0;
 static volatile uint32_t sched_ticks = 0;
 static volatile uint32_t sched_ticks_counter = 0;
 
+static struct cake_pile* timer_pile;
+
 #define APIC_CALIBRATION_CONST 0x100000
 
 void
 timer_init_context()
 {
+    timer_pile = cake_new_pile("timer", sizeof(struct lx_timer), 1, 0);
     timer_ctx =
-      (struct lx_timer_context*)lxmalloc(sizeof(struct lx_timer_context));
+      (struct lx_timer_context*)valloc(sizeof(struct lx_timer_context));
 
     assert_msg(timer_ctx, "Fail to initialize timer contex");
 
-    timer_ctx->active_timers =
-      (struct lx_timer*)lxmalloc(sizeof(struct lx_timer));
-    llist_init_head(timer_ctx->active_timers);
+    timer_ctx->active_timers = (struct lx_timer*)cake_grab(timer_pile);
+    llist_init_head(&timer_ctx->active_timers->link);
 }
 
 void
@@ -164,8 +167,7 @@ timer_run_ms(uint32_t millisecond,
 struct lx_timer*
 timer_run(ticks_t ticks, void (*callback)(void*), void* payload, uint8_t flags)
 {
-    struct lx_timer* timer =
-      (struct lx_timer*)lxmalloc(sizeof(struct lx_timer));
+    struct lx_timer* timer = (struct lx_timer*)cake_grab(timer_pile);
 
     if (!timer)
         return NULL;
@@ -176,7 +178,7 @@ timer_run(ticks_t ticks, void (*callback)(void*), void* payload, uint8_t flags)
     timer->payload = payload;
     timer->flags = flags;
 
-    llist_append(timer_ctx->active_timers, &timer->link);
+    llist_append(&timer_ctx->active_timers->link, &timer->link);
 
     return timer;
 }
@@ -199,7 +201,7 @@ timer_update(const isr_param* param)
             pos->counter = pos->deadline;
         } else {
             llist_delete(&pos->link);
-            lxfree(pos);
+            cake_release(timer_pile, pos);
         }
     }
 
@@ -209,12 +211,6 @@ timer_update(const isr_param* param)
         sched_ticks_counter = 0;
         schedule();
     }
-}
-
-void
-sched_yield()
-{
-    sched_ticks_counter = sched_ticks;
 }
 
 static void

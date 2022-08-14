@@ -6,6 +6,7 @@
 
 #include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/pmm.h>
+#include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
@@ -144,6 +145,12 @@ redo:
     run(next);
 }
 
+void
+sched_yieldk()
+{
+    cpu_int(LUNAIX_SCHED);
+}
+
 __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
 {
     if (!seconds) {
@@ -202,6 +209,11 @@ __DEFINE_LXSYSCALL3(pid_t, waitpid, pid_t, pid, int*, status, int, options)
     return _wait(pid, status, options);
 }
 
+__DEFINE_LXSYSCALL(int, geterrno)
+{
+    return __current->k_status;
+}
+
 pid_t
 _wait(pid_t wpid, int* status, int options)
 {
@@ -213,7 +225,6 @@ _wait(pid_t wpid, int* status, int options)
     }
 
     wpid = wpid ? wpid : -__current->pgid;
-    cpu_enable_interrupt();
 repeat:
     llist_for_each(proc, n, &__current->children, siblings)
     {
@@ -232,11 +243,10 @@ repeat:
         return 0;
     }
     // 放弃当前的运行机会
-    sched_yield();
+    sched_yieldk();
     goto repeat;
 
 done:
-    cpu_disable_interrupt();
     status_flags |= PEXITSIG * (proc->sig_inprogress != 0);
     if (status) {
         *status = proc->exit_code | status_flags;
@@ -267,8 +277,9 @@ alloc_process()
     proc->pid = i;
     proc->created = clock_systime();
     proc->pgid = proc->pid;
+    proc->fdtable = vzalloc(sizeof(struct v_fdtable));
 
-    llist_init_head(&proc->mm.regions);
+    llist_init_head(&proc->mm.regions.head);
     llist_init_head(&proc->children);
     llist_init_head(&proc->grp_member);
     llist_init_head(&proc->sleep.sleepers);
@@ -282,7 +293,7 @@ commit_process(struct proc_info* process)
     assert(process == &sched_ctx._procs[process->pid]);
 
     if (process->state != PS_CREATED) {
-        __current->k_status = LXINVL;
+        __current->k_status = EINVAL;
         return;
     }
 
@@ -305,17 +316,25 @@ destroy_process(pid_t pid)
 {
     int index = pid;
     if (index <= 0 || index > sched_ctx.ptable_len) {
-        __current->k_status = LXINVLDPID;
+        __current->k_status = EINVAL;
         return;
     }
     struct proc_info* proc = &sched_ctx._procs[index];
     proc->state = PS_DESTROY;
     llist_delete(&proc->siblings);
 
+    for (size_t i = 0; i < VFS_MAX_FD; i++) {
+        struct v_fd* fd = proc->fdtable->fds[i];
+        if (fd)
+            vfs_close(fd->file);
+    }
+
+    vfree(proc->fdtable);
+
     struct mm_region *pos, *n;
     llist_for_each(pos, n, &proc->mm.regions.head, head)
     {
-        lxfree(pos);
+        vfree(pos);
     }
 
     vmm_mount_pd(PD_MOUNT_1, proc->page_table);

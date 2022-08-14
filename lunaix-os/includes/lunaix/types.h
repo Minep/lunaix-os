@@ -1,6 +1,7 @@
 #ifndef __LUNAIX_TYPES_H
 #define __LUNAIX_TYPES_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #define PEXITTERM 0x100
@@ -20,5 +21,6 @@
 // TODO: WTERMSIG
 
 typedef int32_t pid_t;
+typedef int64_t lba_t;
 
 #endif /* __LUNAIX_TYPES_H */

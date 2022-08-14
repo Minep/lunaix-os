@@ -11,7 +11,7 @@
 #include <hal/acpi/acpi.h>
 #include <hal/apic.h>
 #include <hal/pci.h>
-#include <lunaix/mm/kalloc.h>
+#include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 
@@ -55,7 +55,7 @@ pci_probe_device(int bus, int dev, int funct)
     pci_reg_t intr = pci_read_cspace(base, 0x3c);
     pci_reg_t class = pci_read_cspace(base, 0x8);
 
-    struct pci_device* device = lxmalloc(sizeof(struct pci_device));
+    struct pci_device* device = valloc(sizeof(struct pci_device));
     *device = (struct pci_device){ .cspace_base = base,
                                    .class_info = class,
                                    .device_info = reg1,
@@ -126,7 +126,7 @@ pci_print_device()
                 PCI_INTR_IRQ(pos->intr_info),
                 PCI_INTR_PIN(pos->intr_info));
 #ifdef PCI_PRINT_BAR_LISTING
-        pci_reg_t bar;
+        uint32_t bar;
         for (size_t i = 1; i <= 6; i++) {
             size_t size = pci_bar_sizing(pos, &bar, i);
             if (!bar)
@@ -196,7 +196,7 @@ pci_setup_msi(struct pci_device* device, int vector)
     }
 
     // manipulate the MSI_CTRL to allow device using MSI to request service.
-    reg1 = ((((reg1 >> 16) & ~0x70) | MSI_CAP_ENABLE) << 16) | (reg1 & 0xffff);
+    reg1 = (reg1 & 0xff8fffff) | 0x10000;
     pci_write_cspace(device->cspace_base, device->msi_loc, reg1);
 }
 

@@ -47,14 +47,14 @@ scsi_create_packet16(struct scsi_cdb16* cdb,
                      uint64_t lba,
                      uint32_t alloc_size);
 
-void
-scsi_read_buffer(struct hba_port* port,
+int
+scsi_read_buffer(struct hba_device* dev,
                  uint64_t lba,
                  void* buffer,
                  uint32_t size);
 
-void
-scsi_write_buffer(struct hba_port* port,
+int
+scsi_write_buffer(struct hba_device* dev,
                   uint64_t lba,
                   void* buffer,
                   uint32_t size);

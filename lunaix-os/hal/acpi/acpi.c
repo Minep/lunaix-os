@@ -1,6 +1,6 @@
 #include <hal/acpi/acpi.h>
 
-#include <lunaix/mm/kalloc.h>
+#include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 
@@ -26,11 +26,9 @@ acpi_init(multiboot_info_t* mb_info)
     assert_msg(rsdp, "Fail to locate ACPI_RSDP");
     assert_msg(acpi_rsdp_validate(rsdp), "Invalid ACPI_RSDP (checksum failed)");
 
-    kprintf(KDEBUG "RSDP found at %p, RSDT: %p\n", rsdp, rsdp->rsdt);
-
     acpi_rsdt_t* rsdt = rsdp->rsdt;
 
-    ctx = lxcalloc(1, sizeof(acpi_context));
+    ctx = vzalloc(sizeof(acpi_context));
     assert_msg(ctx, "Fail to create ACPI context");
 
     strncpy(ctx->oem_id, rsdt->header.oem_id, 6);
@@ -38,7 +36,8 @@ acpi_init(multiboot_info_t* mb_info)
 
     size_t entry_n = (rsdt->header.length - sizeof(acpi_sdthdr_t)) >> 2;
     for (size_t i = 0; i < entry_n; i++) {
-        acpi_sdthdr_t* sdthdr = ((acpi_apic_t**)&(rsdt->entry))[i];
+        acpi_sdthdr_t* sdthdr =
+          (acpi_sdthdr_t*)((acpi_apic_t**)&(rsdt->entry))[i];
         switch (sdthdr->signature) {
             case ACPI_MADT_SIG:
                 madt_parse((acpi_madt_t*)sdthdr, ctx);
@@ -55,15 +54,7 @@ acpi_init(multiboot_info_t* mb_info)
         }
     }
 
-    kprintf(KINFO "OEM: %s\n", ctx->oem_id);
-
-    for (size_t i = 0; i < 24; i++) {
-        acpi_intso_t* intso = ctx->madt.irq_exception[i];
-        if (!intso)
-            continue;
-
-        kprintf(KDEBUG "IRQ #%u -> GSI #%u\n", intso->source, intso->gsi);
-    }
+    kprintf(KINFO "ACPI: %s\n", ctx->oem_id);
 }
 
 acpi_context*

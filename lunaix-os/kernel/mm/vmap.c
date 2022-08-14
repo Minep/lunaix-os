@@ -27,7 +27,7 @@ vmm_vmap(uintptr_t paddr, size_t size, pt_attr attr)
         } else {
             x86_page_table* ptd = (x86_page_table*)(L2_VADDR(l1inx));
             size_t i = L2_INDEX(current_addr);
-            for (; i < 1024 && examed_size < size; i++) {
+            for (; i < PG_MAX_ENTRIES && examed_size < size; i++) {
                 if (!ptd->entry[i]) {
                     examed_size += PG_SIZE;
                 } else if (examed_size) {

@@ -16,6 +16,7 @@
 
 #include <hal/pci.h>
 #include <klibc/string.h>
+#include <lunaix/block.h>
 #include <lunaix/mm/mmio.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/valloc.h>
@@ -33,7 +34,7 @@ LOG_MODULE("AHCI")
 static struct ahci_hba hba;
 
 void
-__ahci_hba_isr(isr_param param);
+__ahci_hba_isr(const isr_param* param);
 
 int
 ahci_init_device(struct hba_port* port);
@@ -173,6 +174,8 @@ ahci_init()
         if (!ahci_init_device(port)) {
             kprintf(KERROR "fail to init device");
         }
+
+        block_mount_disk(port->device);
     }
 }
 
@@ -182,7 +185,7 @@ char sata_ifs[][20] = { "Not detected",
                         "SATA III (6.0Gbps)" };
 
 void
-__ahci_hba_isr(isr_param param)
+__ahci_hba_isr(const isr_param* param)
 {
     // TODO: clear the interrupt status
     // TODO: I/O-operation scheduler should be here
@@ -276,7 +279,7 @@ hba_prepare_cmd(struct hba_port* port,
 
     // 构建命令头（Command Header）和命令表（Command Table）
     struct hba_cmdh* cmd_header = &port->cmdlst[slot];
-    struct hba_cmdt* cmd_table = vcalloc_dma(sizeof(struct hba_cmdt));
+    struct hba_cmdt* cmd_table = vzalloc_dma(sizeof(struct hba_cmdt));
 
     memset(cmd_header, 0, sizeof(*cmd_header));
 
@@ -318,7 +321,8 @@ ahci_init_device(struct hba_port* port)
 
     // 清空任何待响应的中断
     port->regs[HBA_RPxIS] = 0;
-    port->device = vcalloc(sizeof(struct hba_device));
+    port->device = vzalloc(sizeof(struct hba_device));
+    port->device->port = port;
 
     // 在命令表中构建命令FIS
     struct sata_reg_fis* cmd_fis = (struct sata_reg_fis*)cmd_table->command_fis;
@@ -420,11 +424,11 @@ fail:
 }
 
 int
-ahci_identify_device(struct hba_port* port)
+ahci_identify_device(struct hba_device* device)
 {
     // 用于重新识别设备（比如在热插拔的情况下）
-    vfree(port->device);
-    return ahci_init_device(port);
+    vfree(device);
+    return ahci_init_device(device->port);
 }
 
 void

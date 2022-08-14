@@ -29,6 +29,9 @@ void*
 __alloc_cake(unsigned int cake_pg)
 {
     uintptr_t pa = pmm_alloc_cpage(KERNEL_PID, cake_pg, 0);
+    if (!pa) {
+        return NULL;
+    }
     return vmm_vmap(pa, cake_pg * PG_SIZE, PG_PREM_RW);
 }
 
@@ -37,12 +40,16 @@ __new_cake(struct cake_pile* pile)
 {
     struct cake_s* cake = __alloc_cake(pile->pg_per_cake);
 
+    if (!cake) {
+        return NULL;
+    }
+
     int max_piece = pile->pieces_per_cake;
 
     cake->first_piece = (void*)((uintptr_t)cake + pile->offset);
     cake->next_free = 0;
 
-    piece_index_t* free_list = &cake->free_list;
+    piece_index_t* free_list = cake->free_list;
     for (size_t i = 0; i < max_piece - 1; i++) {
         free_list[i] = i + 1;
     }
@@ -60,6 +67,10 @@ __init_pile(struct cake_pile* pile,
             unsigned int pg_per_cake,
             int options)
 {
+    if (!pile) {
+        return;
+    }
+
     unsigned int offset = sizeof(long);
 
     // 默认每块儿蛋糕对齐到地址总线宽度
@@ -76,12 +87,12 @@ __init_pile(struct cake_pile* pile,
                                   (piece_size + sizeof(piece_index_t)),
                                 .pg_per_cake = pg_per_cake };
 
-    unsigned int overhead_size =
-      sizeof(struct cake_s) + pile->pieces_per_cake * sizeof(piece_index_t);
+    unsigned int free_list_size = pile->pieces_per_cake * sizeof(piece_index_t);
 
-    pile->offset = ROUNDUP(overhead_size, offset);
+    pile->offset = ROUNDUP(sizeof(struct cake_s) + free_list_size, offset);
+    pile->pieces_per_cake -= ICEIL((pile->offset - free_list_size), piece_size);
 
-    strncpy(&pile->pile_name, name, PILE_NAME_MAXLEN);
+    strncpy(pile->pile_name, name, PILE_NAME_MAXLEN);
 
     llist_init_head(&pile->free);
     llist_init_head(&pile->full);
@@ -120,7 +131,9 @@ cake_grab(struct cake_pile* pile)
         pos = list_entry(pile->free.next, typeof(*pos), cakes);
     }
 
-found:
+    if (!pos)
+        return NULL;
+
     piece_index_t found_index = pos->next_free;
     pos->next_free = pos->free_list[found_index];
     pos->used_pieces++;
@@ -140,7 +153,7 @@ found:
 int
 cake_release(struct cake_pile* pile, void* area)
 {
-    piece_index_t area_index;
+    piece_index_t piece_index;
     struct cake_s *pos, *n;
     struct llist_header* hdrs[2] = { &pile->full, &pile->partial };
 
@@ -150,9 +163,9 @@ cake_release(struct cake_pile* pile, void* area)
             if (pos->first_piece > area) {
                 continue;
             }
-            area_index =
+            piece_index =
               (uintptr_t)(area - pos->first_piece) / pile->piece_size;
-            if (area_index < pile->pieces_per_cake) {
+            if (piece_index < pile->pieces_per_cake) {
                 goto found;
             }
         }
@@ -161,12 +174,12 @@ cake_release(struct cake_pile* pile, void* area)
     return 0;
 
 found:
-    pos->free_list[area_index] = pos->next_free;
-    pos->next_free = area_index;
+    pos->free_list[piece_index] = pos->next_free;
+    pos->next_free = piece_index;
     pos->used_pieces--;
     pile->alloced_pieces--;
 
-    llist_delete(pos);
+    llist_delete(&pos->cakes);
     if (!pos->used_pieces) {
         llist_append(&pile->free, &pos->cakes);
     } else {

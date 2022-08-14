@@ -1,6 +1,7 @@
 #include <arch/x86/interrupts.h>
 #include <lunaix/lxconsole.h>
 #include <lunaix/process.h>
+#include <lunaix/sched.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 #include <lunaix/tty/tty.h>
@@ -85,13 +86,22 @@ intr_routine_apic_error(const isr_param* param)
 }
 
 void
+intr_routine_sched(const isr_param* param)
+{
+    schedule();
+}
+
+void
 intr_routine_init()
 {
     intr_subscribe(FAULT_DIVISION_ERROR, intr_routine_divide_zero);
     intr_subscribe(FAULT_GENERAL_PROTECTION, intr_routine_general_protection);
     intr_subscribe(FAULT_PAGE_FAULT, intr_routine_page_fault);
     intr_subscribe(FAULT_STACK_SEG_FAULT, intr_routine_page_fault);
+
     intr_subscribe(LUNAIX_SYS_PANIC, intr_routine_sys_panic);
+    intr_subscribe(LUNAIX_SCHED, intr_routine_sched);
+
     intr_subscribe(APIC_SPIV_IV, intr_routine_apic_spi);
     intr_subscribe(APIC_ERROR_IV, intr_routine_apic_error);
 

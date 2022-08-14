@@ -1,5 +1,9 @@
 #include <arch/x86/boot/multiboot.h>
+#include <lunaix/block.h>
 #include <lunaix/common.h>
+#include <lunaix/fctrl.h>
+#include <lunaix/fs.h>
+#include <lunaix/fs/twifs.h>
 #include <lunaix/lunistd.h>
 #include <lunaix/lxconsole.h>
 #include <lunaix/mm/cake.h>
@@ -38,8 +42,10 @@ unlock_reserved_memory();
 void
 __do_reserved_memory(int unlock);
 
-//#define USE_DEMO
-#define DEMO_SIGNAL
+#define USE_DEMO
+// #define DEMO_SIGNAL
+// #define DEMO_READDIR
+#define DEMO_IOTEST
 
 extern void
 _pconsole_main();
@@ -50,9 +56,21 @@ _signal_demo_main();
 extern void
 _lxinit_main();
 
+extern void
+_readdir_main();
+
+extern void
+_iotest_main();
+
 void __USER__
 __proc0_usr()
 {
+    // 打开tty设备(控制台)，作为标准输入输出。
+    //  tty设备属于序列设备（Sequential Device），该类型设备的上层读写
+    //  无须经过Lunaix的缓存层，而是直接下发到底层驱动。（不受FO_DIRECT的影响）
+    int stdout = open("/dev/tty", 0);
+    int stdin = dup2(stdout, 1);
+
     pid_t p;
     if (!fork()) {
         _pconsole_main();
@@ -63,6 +81,10 @@ __proc0_usr()
         _exit(0);
 #elif defined DEMO_SIGNAL
         _signal_demo_main();
+#elif defined DEMO_READDIR
+        _readdir_main();
+#elif defined DEMO_IOTEST
+        _iotest_main();
 #else
         _lxinit_main();
 #endif
@@ -111,51 +133,13 @@ extern uint8_t __kernel_end;              /* link/linker.ld */
 extern uint8_t __init_hhk_end;            /* link/linker.ld */
 extern multiboot_info_t* _k_init_mb_info; /* k_init.c */
 
-char test_sequence[] = "Once upon a time, in a magical land of Equestria. "
-                       "There were two regal sisters who ruled together "
-                       "and created harmony for all the land.";
-
-void
-__test_disk_io()
-{
-    struct hba_port* port = ahci_get_port(0);
-    char* buffer = vcalloc_dma(port->device->block_size);
-    strcpy(buffer, test_sequence);
-    kprintf("WRITE: %s\n", buffer);
-    int result;
-
-    // 写入第一扇区 (LBA=0)
-    result =
-      port->device->ops.write_buffer(port, 0, buffer, port->device->block_size);
-    if (!result) {
-        kprintf(KWARN "fail to write: %x\n", port->device->last_error);
-    }
-
-    memset(buffer, 0, port->device->block_size);
-
-    // 读出我们刚刚写的内容！
-    result =
-      port->device->ops.read_buffer(port, 0, buffer, port->device->block_size);
-    kprintf(KDEBUG "%x, %x\n", port->regs[HBA_RPxIS], port->regs[HBA_RPxTFD]);
-    if (!result) {
-        kprintf(KWARN "fail to read: %x\n", port->device->last_error);
-    } else {
-        kprint_hex(buffer, 256);
-    }
-
-    vfree_dma(buffer);
-}
-
 void
 init_platform()
 {
     // 锁定所有系统预留页（内存映射IO，ACPI之类的），并且进行1:1映射
     lock_reserved_memory();
 
-    cake_init();
-
     assert_msg(kalloc_init(), "Fail to initialize heap");
-    valloc_init();
 
     acpi_init(_k_init_mb_info);
     apic_init();
@@ -164,12 +148,10 @@ init_platform()
     clock_init();
     ps2_kbd_init();
     pci_init();
+    block_init();
     ahci_init();
-    ahci_list_device();
-
-    __test_disk_io();
-
-    cake_stats();
+    // ahci_list_device();
+    // cake_stats();
 
     syscall_install();
 

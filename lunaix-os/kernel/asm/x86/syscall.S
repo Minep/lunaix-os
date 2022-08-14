@@ -26,6 +26,28 @@
         .long __lxsys_alarm
         .long __lxsys_sigpending
         .long __lxsys_sigsuspend
+        .long __lxsys_open
+        .long __lxsys_close         /* 20 */
+        .long __lxsys_read
+        .long __lxsys_write
+        .long __lxsys_readdir
+        .long __lxsys_mkdir
+        .long __lxsys_lseek         /* 25 */
+        .long __lxsys_geterrno
+        .long __lxsys_readlink
+        .long __lxsys_readlinkat
+        .long __lxsys_rmdir
+        .long __lxsys_unlink        /* 30 */
+        .long __lxsys_unlinkat
+        .long __lxsys_link
+        .long __lxsys_fsync
+        .long __lxsys_dup
+        .long __lxsys_dup2
+        .long __lxsys_realpathat
+        .long __lxsys_symlink
+        .long __lxsys_chdir
+        .long __lxsys_fchdir
+        .long __lxsys_getcwd
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
             .long 0

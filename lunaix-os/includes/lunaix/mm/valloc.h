@@ -5,7 +5,10 @@ void*
 valloc(unsigned int size);
 
 void*
-vcalloc(unsigned int size);
+vzalloc(unsigned int size);
+
+void*
+vcalloc(unsigned int size, unsigned int count);
 
 void
 vfree(void* ptr);
@@ -14,7 +17,7 @@ void*
 valloc_dma(unsigned int size);
 
 void*
-vcalloc_dma(unsigned int size);
+vzalloc_dma(unsigned int size);
 
 void
 vfree_dma(void* ptr);

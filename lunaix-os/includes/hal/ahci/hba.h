@@ -105,15 +105,16 @@ struct hba_device
     uint32_t alignment_offset;
     uint32_t block_per_sec;
     uint32_t capabilities;
+    struct hba_port* port;
 
     struct
     {
-        int (*identify)(struct hba_port* port);
-        int (*read_buffer)(struct hba_port* port,
+        int (*identify)(struct hba_device* dev);
+        int (*read_buffer)(struct hba_device* dev,
                            uint64_t lba,
                            void* buffer,
                            uint32_t size);
-        int (*write_buffer)(struct hba_port* port,
+        int (*write_buffer)(struct hba_device* dev,
                             uint64_t lba,
                             void* buffer,
                             uint32_t size);

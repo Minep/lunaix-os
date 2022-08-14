@@ -427,11 +427,9 @@ kbd_recv_key(struct kdb_keyinfo_pkt* key_event)
     if (!key_buf.buffered_len) {
         return 0;
     }
+
     mutex_lock(&key_buf.mutex);
-
-    struct kdb_keyinfo_pkt* pkt_current = &key_buf.buffer[key_buf.read_ptr];
-
-    *key_event = *pkt_current;
+    *key_event = key_buf.buffer[key_buf.read_ptr];
     key_buf.buffered_len--;
     key_buf.read_ptr = (key_buf.read_ptr + 1) % PS2_KBD_RECV_BUFFER_SIZE;
 

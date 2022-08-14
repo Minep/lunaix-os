@@ -41,8 +41,8 @@ scsi_parse_capacity(struct hba_device* device, uint32_t* parameter)
     device->block_size = SCSI_FLIP(*(parameter + 2));
 }
 
-void
-__scsi_buffer_io(struct hba_port* port,
+int
+__scsi_buffer_io(struct hba_device* dev,
                  uint64_t lba,
                  void* buffer,
                  uint32_t size,
@@ -50,6 +50,7 @@ __scsi_buffer_io(struct hba_port* port,
 {
     assert_msg(((uintptr_t)buffer & 0x3) == 0, "HBA: Bad buffer alignment");
 
+    struct hba_port* port = dev->port;
     struct hba_cmdh* header;
     struct hba_cmdt* table;
     int slot = hba_prepare_cmd(port, &table, &header, buffer, size);
@@ -64,7 +65,7 @@ __scsi_buffer_io(struct hba_port* port,
 
     uint32_t count = ICEIL(size, port->device->block_size);
 
-    struct sata_reg_fis* fis = table->command_fis;
+    struct sata_reg_fis* fis = (struct sata_reg_fis*)table->command_fis;
     void* cdb = table->atapi_cmd;
     sata_create_fis(fis, ATA_PACKET, (size << 8), 0);
     fis->feature = 1 | ((!write) << 2);
@@ -106,20 +107,20 @@ fail:
     return 0;
 }
 
-void
-scsi_read_buffer(struct hba_port* port,
+int
+scsi_read_buffer(struct hba_device* dev,
                  uint64_t lba,
                  void* buffer,
                  uint32_t size)
 {
-    __scsi_buffer_io(port, lba, buffer, size, 0);
+    return __scsi_buffer_io(dev, lba, buffer, size, 0);
 }
 
-void
-scsi_write_buffer(struct hba_port* port,
+int
+scsi_write_buffer(struct hba_device* dev,
                   uint64_t lba,
                   void* buffer,
                   uint32_t size)
 {
-    __scsi_buffer_io(port, lba, buffer, size, 1);
+    return __scsi_buffer_io(dev, lba, buffer, size, 1);
 }
