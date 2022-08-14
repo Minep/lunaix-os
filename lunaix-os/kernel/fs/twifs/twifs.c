@@ -165,13 +165,13 @@ struct v_inode*
 __twifs_create_inode(struct twifs_node* twi_node)
 {
     struct v_inode* inode = vfs_i_alloc();
-    *inode = (struct v_inode){ .ctime = 0,
-                               .itype = twi_node->itype,
-                               .lb_addr = 0,
-                               .lb_usage = 0,
-                               .data = twi_node,
-                               .mtime = 0,
-                               .open_count = 0 };
+    inode->itype = twi_node->itype;
+    inode->data = twi_node;
+
+    inode->ctime = clock_unixtime();
+    inode->atime = inode->ctime;
+    inode->mtime = inode->ctime;
+
     inode->ops.dir_lookup = __twifs_dirlookup;
     inode->ops.mkdir = __twifs_mkdir;
     inode->ops.unlink = __twifs_rmstuff;

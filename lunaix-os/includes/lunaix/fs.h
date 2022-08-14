@@ -9,7 +9,9 @@
 #include <lunaix/ds/hstr.h>
 #include <lunaix/ds/llist.h>
 #include <lunaix/ds/lru.h>
+#include <lunaix/ds/mutex.h>
 #include <lunaix/status.h>
+#include <stdatomic.h>
 
 #define VFS_NAME_MAXLEN 128
 #define VFS_MAX_FD 32
@@ -93,7 +95,7 @@ struct v_file
     struct v_dnode* dnode;
     struct llist_header* f_list;
     uint32_t f_pos;
-    uint32_t ref_count;
+    atomic_ulong ref_count;
     struct v_file_ops ops;
 };
 
@@ -105,6 +107,7 @@ struct v_fd
 
 struct v_inode
 {
+    mutex_t lock;
     uint32_t itype;
     time_t ctime;
     time_t mtime;
@@ -118,7 +121,7 @@ struct v_inode
     void* data; // 允许底层FS绑定他的一些专有数据
     struct
     {
-        int (*create)(struct v_inode* this);
+        int (*create)(struct v_inode* this, struct v_dnode* dnode);
         int (*open)(struct v_inode* this, struct v_file* file);
         int (*sync)(struct v_inode* this);
         int (*mkdir)(struct v_inode* this, struct v_dnode* dnode);
@@ -134,6 +137,7 @@ struct v_inode
 
 struct v_dnode
 {
+    mutex_t lock; // sync the path walking
     struct hstr name;
     struct v_inode* inode;
     struct v_dnode* parent;
@@ -141,7 +145,7 @@ struct v_dnode
     struct llist_header children;
     struct llist_header siblings;
     struct v_superblock* super_block;
-    uint32_t ref_count;
+    atomic_ulong ref_count;
     struct
     {
         void (*destruct)(struct v_dnode* dnode);
