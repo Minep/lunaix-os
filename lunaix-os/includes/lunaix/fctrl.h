@@ -25,4 +25,15 @@ __LXSYSCALL4(int,
 
 __LXSYSCALL3(int, realpathat, int, fd, char*, buf, size_t, size)
 
+__LXSYSCALL3(int,
+             mount,
+             const char*,
+             source,
+             const char*,
+             target,
+             const char*,
+             fstype)
+
+__LXSYSCALL1(int, unmount, const char*, target)
+
 #endif /* __LUNAIX_FCTRL_H */

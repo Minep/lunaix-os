@@ -20,6 +20,8 @@
 #include <lunaix/spike.h>
 #include <lunaix/syscall.h>
 
+#include <lunaix/fs/twifs.h>
+
 #define PATH_DELIM '/'
 #define DNODE_HASHTABLE_BITS 10
 #define DNODE_HASHTABLE_SIZE (1 << DNODE_HASHTABLE_BITS)
@@ -82,13 +84,15 @@ vfs_init()
 }
 
 inline struct hbucket*
-__dcache_get_bucket(struct v_dnode* parent, unsigned int hash)
+__dcache_hash(struct v_dnode* parent, uint32_t* hash)
 {
+    uint32_t _hash = *hash;
     // 与parent的指针值做加法，来减小碰撞的可能性。
-    hash += (uint32_t)parent;
+    _hash += (uint32_t)parent;
     // 确保低位更加随机
-    hash = hash ^ (hash >> DNODE_HASHBITS);
-    return &dnode_cache[hash & DNODE_HASH_MASK];
+    _hash = _hash ^ (_hash >> DNODE_HASHBITS);
+    *hash = _hash;
+    return &dnode_cache[_hash & DNODE_HASH_MASK];
 }
 
 struct v_dnode*
@@ -101,12 +105,13 @@ vfs_dcache_lookup(struct v_dnode* parent, struct hstr* str)
         return parent->parent ? parent->parent : parent;
     }
 
-    struct hbucket* slot = __dcache_get_bucket(parent, str->hash);
+    uint32_t hash = str->hash;
+    struct hbucket* slot = __dcache_hash(parent, &hash);
 
     struct v_dnode *pos, *n;
     hashtable_bucket_foreach(slot, pos, n, hash_list)
     {
-        if (pos->name.hash == str->hash) {
+        if (pos->name.hash == hash) {
             return pos;
         }
     }
@@ -116,8 +121,16 @@ vfs_dcache_lookup(struct v_dnode* parent, struct hstr* str)
 void
 vfs_dcache_add(struct v_dnode* parent, struct v_dnode* dnode)
 {
-    struct hbucket* bucket = __dcache_get_bucket(parent, dnode->name.hash);
+    struct hbucket* bucket = __dcache_hash(parent, &dnode->name.hash);
     hlist_add(&bucket->head, &dnode->hash_list);
+}
+
+void
+vfs_dcache_rehash(struct v_dnode* parent, struct v_dnode* dnode)
+{
+    hlist_delete(&dnode->hash_list);
+    hstr_rehash(&dnode->name, HSTR_FULL_HASH);
+    vfs_dcache_add(parent, dnode);
 }
 
 int
@@ -186,9 +199,8 @@ __vfs_walk(struct v_dnode* start,
 
         if (!dnode) {
             dnode = vfs_d_alloc();
-            dnode->name = HHSTR(valloc(VFS_NAME_MAXLEN), j, name.hash);
 
-            strcpy(dnode->name.value, name_content);
+            hstrcpy(&dnode->name, &name);
 
             lock_inode(current_level->inode);
 
@@ -230,7 +242,6 @@ __vfs_walk(struct v_dnode* start,
     return 0;
 
 error:
-    vfree(dnode->name.value);
     vfs_d_free(dnode);
     *dentry = NULL;
     return errno;
@@ -275,7 +286,7 @@ vfs_walk(struct v_dnode* start,
 }
 
 int
-vfs_mount(const char* target, const char* fs_name, bdev_t device)
+vfs_mount(const char* target, const char* fs_name, struct device* device)
 {
     int errno;
     struct v_dnode* mnt;
@@ -301,11 +312,19 @@ vfs_unmount(const char* target)
 }
 
 int
-vfs_mount_at(const char* fs_name, bdev_t device, struct v_dnode* mnt_point)
+vfs_mount_at(const char* fs_name,
+             struct device* device,
+             struct v_dnode* mnt_point)
 {
+    if (!(mnt_point->inode->itype & VFS_IFDIR)) {
+        return ENOTDIR;
+    }
+
     struct filesystem* fs = fsm_get(fs_name);
-    if (!fs)
+    if (!fs) {
         return ENODEV;
+    }
+
     struct v_superblock* sb = vfs_sb_alloc();
     sb->dev = device;
     sb->fs_id = fs_id++;
@@ -324,6 +343,7 @@ vfs_mount_at(const char* fs_name, bdev_t device, struct v_dnode* mnt_point)
 int
 vfs_unmount_at(struct v_dnode* mnt_point)
 {
+    // FIXME mnt point check & deal with the detached dcache subtree
     int errno = 0;
     struct v_superblock* sb = mnt_point->super_block;
     if (!sb) {
@@ -333,7 +353,9 @@ vfs_unmount_at(struct v_dnode* mnt_point)
         struct v_dnode* fs_root = sb->root;
         llist_delete(&fs_root->siblings);
         llist_delete(&sb->sb_list);
+        hlist_delete(&fs_root->hash_list);
         vfs_sb_free(sb);
+        vfs_d_free(fs_root);
     }
     return errno;
 }
@@ -456,20 +478,22 @@ vfs_d_alloc()
     struct v_dnode* dnode = cake_grab(dnode_pile);
     memset(dnode, 0, sizeof(*dnode));
     llist_init_head(&dnode->children);
+    llist_init_head(&dnode->siblings);
     mutex_init(&dnode->lock);
 
     dnode->ref_count = ATOMIC_VAR_INIT(0);
+    dnode->name = HHSTR(vzalloc(VFS_NAME_MAXLEN), 0, 0);
 
-    dnode->name = vfs_empty;
     return dnode;
 }
 
 void
 vfs_d_free(struct v_dnode* dnode)
 {
-    if (dnode->ops.destruct) {
-        dnode->ops.destruct(dnode);
+    if (dnode->inode && dnode->inode->link_count) {
+        dnode->inode->link_count--;
     }
+    vfree(dnode->name.value);
     cake_release(dnode_pile, dnode);
 }
 
@@ -478,6 +502,7 @@ vfs_i_alloc()
 {
     struct v_inode* inode = cake_grab(inode_pile);
     memset(inode, 0, sizeof(*inode));
+    inode->link_count = 1;
     mutex_init(&inode->lock);
 
     return inode;
@@ -528,8 +553,7 @@ __vfs_try_locate_file(const char* path,
 
     struct v_dnode* parent = *fdir;
     struct v_dnode* file_new = vfs_d_alloc();
-    file_new->name = HHSTR(valloc(VFS_NAME_MAXLEN), name.len, name.hash);
-    strcpy(file_new->name.value, name_str);
+    hstrcpy(&file_new->name, &name);
 
     if (!(errno = parent->inode->ops.create(parent->inode, file_new))) {
         *file = file_new;
@@ -537,7 +561,6 @@ __vfs_try_locate_file(const char* path,
         vfs_dcache_add(parent, file_new);
         llist_append(&parent->children, &file_new->siblings);
     } else {
-        vfree(file_new->name.value);
         vfs_d_free(file_new);
     }
 
@@ -907,7 +930,14 @@ __DEFINE_LXSYSCALL1(int, rmdir, const char*, pathname)
 
     if ((dnode->inode->itype & VFS_IFDIR)) {
         errno = dnode->inode->ops.rmdir(dnode->inode);
-        // FIXME remove the dnode from cache & parent.
+        if (!errno) {
+            llist_delete(&dnode->siblings);
+            hlist_delete(&dnode->hash_list);
+            unlock_inode(dnode->inode);
+            vfs_d_free(dnode);
+
+            goto done;
+        }
     } else {
         errno = ENOTDIR;
     }
@@ -923,10 +953,9 @@ done:
 
 __DEFINE_LXSYSCALL1(int, mkdir, const char*, path)
 {
-    struct v_dnode *parent, *dir;
-    struct hstr component = HSTR(valloc(VFS_NAME_MAXLEN), 0);
+    struct v_dnode *parent, *dir = vfs_d_alloc();
     int errno =
-      vfs_walk(__current->cwd, path, &parent, &component, VFS_WALK_PARENT);
+      vfs_walk(__current->cwd, path, &parent, &dir->name, VFS_WALK_PARENT);
     if (errno) {
         goto done;
     }
@@ -940,20 +969,16 @@ __DEFINE_LXSYSCALL1(int, mkdir, const char*, path)
         errno = ENOTSUP;
     } else if (!(parent->inode->itype & VFS_IFDIR)) {
         errno = ENOTDIR;
-    } else {
-        dir = vfs_d_alloc();
-        dir->name = component;
-        if (!(errno = parent->inode->ops.mkdir(parent->inode, dir))) {
-            llist_append(&parent->children, &dir->siblings);
-        } else {
-            vfs_d_free(dir);
-            vfree(component.value);
-        }
+    } else if (!(errno = parent->inode->ops.mkdir(parent->inode, dir))) {
+        llist_append(&parent->children, &dir->siblings);
+        goto cleanup;
     }
 
+    vfs_d_free(dir);
+
+cleanup:
     unlock_inode(parent->inode);
     unlock_dnode(parent);
-
 done:
     return DO_STATUS(errno);
 }
@@ -978,7 +1003,9 @@ __vfs_do_unlink(struct v_dnode* dnode)
         errno = inode->ops.unlink(inode);
         if (!errno) {
             inode->link_count--;
-            // FIXME remove the dnode from cache & parent
+            llist_delete(&dnode->siblings);
+            hlist_delete(&dnode->hash_list);
+            vfs_d_free(dnode);
         }
     } else {
         errno = EISDIR;
@@ -1240,4 +1267,136 @@ done:
     return ret_ptr;
 }
 
-// TODO rename syscall
+int
+vfs_do_rename(struct v_dnode* current, struct v_dnode* target)
+{
+    if (current->inode->id == target->inode->id) {
+        // hard link
+        return 0;
+    }
+
+    if (current->ref_count || target->ref_count) {
+        return EBUSY;
+    }
+
+    if (current->super_block != target->super_block) {
+        return EXDEV;
+    }
+
+    int errno = 0;
+
+    struct v_dnode* oldparent = current->parent;
+    struct v_dnode* newparent = target->parent;
+
+    lock_dnode(current);
+    lock_dnode(target);
+    if (oldparent)
+        lock_dnode(oldparent);
+    if (newparent)
+        lock_dnode(newparent);
+
+    if (!llist_empty(&target->children)) {
+        errno = ENOTEMPTY;
+        unlock_dnode(target);
+        goto cleanup;
+    }
+
+    if ((errno = current->inode->ops.rename(current->inode, current, target))) {
+        unlock_dnode(target);
+        goto cleanup;
+    }
+
+    // re-position current
+    current->parent = newparent;
+    hstrcpy(&current->name, &target->name);
+    llist_delete(&current->siblings);
+    llist_append(&newparent->children, &current->siblings);
+    vfs_dcache_rehash(newparent, current);
+
+    // detach target
+    llist_delete(&target->siblings);
+    hlist_delete(&target->hash_list);
+
+    unlock_dnode(target);
+
+cleanup:
+    unlock_dnode(current);
+    if (oldparent)
+        unlock_dnode(oldparent);
+    if (newparent)
+        unlock_dnode(newparent);
+
+    return errno;
+}
+
+__DEFINE_LXSYSCALL2(int, rename, const char*, oldpath, const char*, newpath)
+{
+    struct v_dnode *cur, *target_parent, *target;
+    struct hstr name = HSTR(valloc(VFS_NAME_MAXLEN), 0);
+    int errno = 0;
+
+    if ((errno = vfs_walk(__current->cwd, oldpath, &cur, NULL, 0))) {
+        goto done;
+    }
+
+    if ((errno = vfs_walk(
+           __current->cwd, newpath, &target_parent, &name, VFS_WALK_PARENT))) {
+        goto done;
+    }
+
+    errno = vfs_walk(target_parent, name.value, &target, NULL, 0);
+    if (errno == ENOENT) {
+        target = vfs_d_alloc();
+        hstrcpy(&target->name, &name);
+    } else if (errno) {
+        goto done;
+    }
+
+    if (!(errno = vfs_do_rename(cur, target))) {
+        vfs_d_free(target);
+    }
+
+done:
+    vfree(name.value);
+    return DO_STATUS(errno);
+}
+
+__DEFINE_LXSYSCALL3(int,
+                    mount,
+                    const char*,
+                    source,
+                    const char*,
+                    target,
+                    const char*,
+                    fstype)
+{
+    struct v_dnode *dev, *mnt;
+    int errno = 0;
+
+    if ((errno = vfs_walk(__current->cwd, source, &dev, NULL, 0))) {
+        goto done;
+    }
+
+    if ((errno = vfs_walk(__current->cwd, target, &mnt, NULL, 0))) {
+        goto done;
+    }
+
+    if (!(dev->inode->itype & VFS_IFVOLDEV)) {
+        errno = ENOTDEV;
+        goto done;
+    }
+
+    // FIXME should not touch the underlying fs!
+    struct device* device =
+      (struct device*)((struct twifs_node*)dev->inode->data)->data;
+
+    errno = vfs_mount_at(fstype, device, mnt);
+
+done:
+    return DO_STATUS(errno);
+}
+
+__DEFINE_LXSYSCALL1(int, unmount, const char*, target)
+{
+    return vfs_unmount(target);
+}

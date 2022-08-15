@@ -1,9 +1,8 @@
 #ifndef __LUNAIX_VFS_H
 #define __LUNAIX_VFS_H
 
-#include <hal/ahci/hba.h>
-#include <lunaix/block.h>
 #include <lunaix/clock.h>
+#include <lunaix/device.h>
 #include <lunaix/ds/btrie.h>
 #include <lunaix/ds/hashtable.h>
 #include <lunaix/ds/hstr.h>
@@ -57,7 +56,7 @@ struct v_superblock
 {
     struct llist_header sb_list;
     int fs_id;
-    bdev_t dev;
+    struct device* dev;
     struct v_dnode* root;
     struct filesystem* fs;
     uint32_t iobuf_size;
@@ -84,7 +83,6 @@ struct v_file_ops
     int (*read)(struct v_inode* inode, void* buffer, size_t len, size_t fpos);
     int (*readdir)(struct v_inode* inode, struct dir_context* dctx);
     int (*seek)(struct v_inode* inode, size_t offset);
-    int (*rename)(struct v_inode* inode, char* new_name);
     int (*close)(struct v_file* file);
     int (*sync)(struct v_inode* inode);
 };
@@ -107,6 +105,7 @@ struct v_fd
 
 struct v_inode
 {
+    uint32_t id;
     mutex_t lock;
     uint32_t itype;
     time_t ctime;
@@ -131,6 +130,9 @@ struct v_inode
         int (*read_symlink)(struct v_inode* this, const char** path_out);
         int (*symlink)(struct v_inode* this, const char* target);
         int (*dir_lookup)(struct v_inode* this, struct v_dnode* dnode);
+        int (*rename)(struct v_inode* from_inode,
+                      struct v_dnode* from_dnode,
+                      struct v_dnode* to_dnode);
     } ops;
     struct v_file_ops default_fops;
 };
@@ -146,10 +148,6 @@ struct v_dnode
     struct llist_header siblings;
     struct v_superblock* super_block;
     atomic_ulong ref_count;
-    struct
-    {
-        void (*destruct)(struct v_dnode* dnode);
-    } ops;
 };
 
 struct v_fdtable
@@ -204,13 +202,15 @@ vfs_walk(struct v_dnode* start,
          int walk_options);
 
 int
-vfs_mount(const char* target, const char* fs_name, bdev_t device);
+vfs_mount(const char* target, const char* fs_name, struct device* device);
 
 int
 vfs_unmount(const char* target);
 
 int
-vfs_mount_at(const char* fs_name, bdev_t device, struct v_dnode* mnt_point);
+vfs_mount_at(const char* fs_name,
+             struct device* device,
+             struct v_dnode* mnt_point);
 
 int
 vfs_unmount_at(struct v_dnode* mnt_point);

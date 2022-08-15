@@ -1,20 +1,15 @@
 #include <lunaix/common.h>
 #include <lunaix/tty/tty.h>
 
-#include <lunaix/clock.h>
 #include <lunaix/device.h>
 #include <lunaix/lxconsole.h>
-#include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/spike.h>
-#include <lunaix/syslog.h>
-#include <lunaix/timer.h>
-
-#include <hal/rtc.h>
+#include <lunaix/types.h>
 
 #include <arch/x86/boot/multiboot.h>
 #include <arch/x86/idt.h>
@@ -22,9 +17,6 @@
 
 #include <klibc/stdio.h>
 #include <klibc/string.h>
-
-#include <stddef.h>
-#include <stdint.h>
 
 extern uint8_t __kernel_start;
 extern uint8_t __kernel_end;
@@ -38,8 +30,6 @@ multiboot_info_t* _k_init_mb_info;
 x86_page_table* __kernel_ptd;
 
 struct proc_info tmp;
-
-LOG_MODULE("BOOT");
 
 extern void
 __proc0(); /* proc0.c */
@@ -58,7 +48,6 @@ _kernel_pre_init()
 
     pmm_init(MEM_1MB + (_k_init_mb_info->mem_upper << 10));
     vmm_init();
-    rtc_init();
 
     unsigned int map_size =
       _k_init_mb_info->mmap_length / sizeof(multiboot_memory_map_t);
@@ -89,7 +78,7 @@ _kernel_init()
     device_init();
 
     // 挂载 TwiFS 为根目录
-    vfs_mount("/", "twifs", -1);
+    vfs_mount("/", "twifs", NULL);
 
     lxconsole_init();
 

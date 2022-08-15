@@ -28,5 +28,6 @@
 #define ENODEV -23
 #define ERANGE -24
 #define ENOMEM LXOUTOFMEM
+#define ENOTDEV -25
 
 #endif /* __LUNAIX_CODE_H */

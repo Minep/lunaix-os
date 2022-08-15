@@ -7,8 +7,8 @@
 
 struct hstr
 {
-    unsigned int hash;
-    unsigned int len;
+    uint32_t hash;
+    uint32_t len;
     char* value;
 };
 
@@ -27,9 +27,12 @@ struct hstr
 #define HSTR_EQ(str1, str2) ((str1)->hash == (str2)->hash)
 
 inline void
-hstr_rehash(struct hstr* hash_str, unsigned int truncate_to)
+hstr_rehash(struct hstr* hash_str, uint32_t truncate_to)
 {
     hash_str->hash = strhash_32(hash_str->value, truncate_to);
 }
+
+void
+hstrcpy(struct hstr* dest, struct hstr* src);
 
 #endif /* __LUNAIX_HSTR_H */

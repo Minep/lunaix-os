@@ -1,4 +1,3 @@
-#include <arch/x86/boot/multiboot.h>
 #include <lunaix/block.h>
 #include <lunaix/common.h>
 #include <lunaix/fctrl.h>
@@ -15,13 +14,16 @@
 #include <lunaix/spike.h>
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
-#include <stddef.h>
+#include <lunaix/types.h>
 
 #include <hal/acpi/acpi.h>
 #include <hal/ahci/ahci.h>
 #include <hal/apic.h>
 #include <hal/ioapic.h>
 #include <hal/pci.h>
+#include <hal/rtc.h>
+
+#include <arch/x86/boot/multiboot.h>
 
 #include <klibc/string.h>
 
@@ -139,8 +141,10 @@ init_platform()
     // 锁定所有系统预留页（内存映射IO，ACPI之类的），并且进行1:1映射
     lock_reserved_memory();
 
-    assert_msg(kalloc_init(), "Fail to initialize heap");
+    // we are using no kalloc!
+    // assert_msg(kalloc_init(), "Fail to initialize heap");
 
+    rtc_init();
     acpi_init(_k_init_mb_info);
     apic_init();
     ioapic_init();

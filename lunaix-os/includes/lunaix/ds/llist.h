@@ -93,8 +93,10 @@ struct hlist_node
 };
 
 static inline void
-hlist_del(struct hlist_node* node)
+hlist_delete(struct hlist_node* node)
 {
+    if (!node->pprev)
+        return;
     *node->pprev = node->next;
     node->next = 0;
     node->pprev = 0;

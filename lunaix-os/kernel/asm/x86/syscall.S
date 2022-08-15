@@ -42,12 +42,15 @@
         .long __lxsys_link
         .long __lxsys_fsync
         .long __lxsys_dup
-        .long __lxsys_dup2
+        .long __lxsys_dup2          /* 35 */
         .long __lxsys_realpathat
         .long __lxsys_symlink
         .long __lxsys_chdir
         .long __lxsys_fchdir
-        .long __lxsys_getcwd
+        .long __lxsys_getcwd        /* 40 */
+        .long __lxsys_rename
+        .long __lxsys_mount
+        .long __lxsys_unmount
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
             .long 0

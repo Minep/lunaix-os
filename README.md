@@ -22,7 +22,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + 内存管理与按需分页（Demand Paging）
 + 键盘输入
 + 多进程
-+ 33个常见的Linux/POSIX系统调用（[附录1](#appendix1)）
++ 40个常见的Linux/POSIX系统调用（[附录1](#appendix1)）
 + 用户模式
 + 信号机制
 + PCI 3.0
@@ -186,6 +186,9 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 2. `chdir(2)`
 2. `fchdir(2)`
 2. `getcwd(2)`
+2. `rename(2)`
+2. `mount(2)`
+2. `unmount` (a.k.a `umount(2)`)
 
 ### LunaixOS自有
 

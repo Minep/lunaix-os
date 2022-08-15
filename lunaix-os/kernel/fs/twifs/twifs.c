@@ -19,6 +19,8 @@ static struct twifs_node* fs_root;
 
 static struct cake_pile* twi_pile;
 
+static volatile int32_t inode_id = 0;
+
 int
 __twifs_dirlookup(struct v_inode* inode, struct v_dnode* dnode);
 
@@ -168,6 +170,7 @@ __twifs_create_inode(struct twifs_node* twi_node)
     inode->itype = twi_node->itype;
     inode->data = twi_node;
 
+    inode->id = inode_id++;
     inode->ctime = clock_unixtime();
     inode->atime = inode->ctime;
     inode->mtime = inode->ctime;

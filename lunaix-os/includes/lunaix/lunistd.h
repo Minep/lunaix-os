@@ -55,4 +55,6 @@ __LXSYSCALL1(int, fchdir, int, fd)
 
 __LXSYSCALL2(char*, getcwd, char*, buf, size_t, size)
 
+__LXSYSCALL2(int, rename, const char*, oldpath, const char*, newpath)
+
 #endif /* __LUNAIX_UNISTD_H */
