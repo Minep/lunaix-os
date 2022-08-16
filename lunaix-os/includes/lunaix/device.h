@@ -6,11 +6,14 @@
 #include <lunaix/ds/hstr.h>
 #include <lunaix/ds/llist.h>
 
+typedef unsigned int dev_t;
+
 struct device
 {
     struct llist_header dev_list;
     struct device* parent;
     struct hstr name;
+    dev_t dev_id;
     char name_val[DEVICE_NAME_SIZE];
     void* underlay;
     void* fs_node;

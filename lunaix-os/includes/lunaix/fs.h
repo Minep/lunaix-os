@@ -48,6 +48,7 @@ struct filesystem
     struct hlist_node fs_list;
     struct hstr fs_name;
     uint32_t types;
+    int fs_id; // can be used to detect fs type on partition
     int (*mount)(struct v_superblock* vsb, struct v_dnode* mount_point);
     int (*unmount)(struct v_superblock* vsb);
 };
@@ -116,6 +117,7 @@ struct v_inode
     uint32_t link_count;
     uint32_t lb_usage;
     uint32_t fsize;
+    struct hlist_node hash_list;
     struct pcache* pg_cache;
     void* data; // 允许底层FS绑定他的一些专有数据
     struct
@@ -240,7 +242,7 @@ void
 vfs_d_free(struct v_dnode* dnode);
 
 struct v_inode*
-vfs_i_alloc();
+vfs_i_alloc(dev_t device_id, uint32_t inode_id);
 
 void
 vfs_i_free(struct v_inode* inode);

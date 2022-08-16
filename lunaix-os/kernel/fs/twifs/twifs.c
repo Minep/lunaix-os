@@ -60,6 +60,7 @@ twifs_init()
     twifs->fs_name = HSTR("twifs", 5);
     twifs->mount = __twifs_mount;
     twifs->types = FSTYPE_ROFS;
+    twifs->fs_id = 0;
 
     fsm_register(twifs);
 
@@ -166,11 +167,10 @@ __twifs_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
 struct v_inode*
 __twifs_create_inode(struct twifs_node* twi_node)
 {
-    struct v_inode* inode = vfs_i_alloc();
+    struct v_inode* inode = vfs_i_alloc(1, inode_id++);
     inode->itype = twi_node->itype;
     inode->data = twi_node;
 
-    inode->id = inode_id++;
     inode->ctime = clock_unixtime();
     inode->atime = inode->ctime;
     inode->mtime = inode->ctime;
