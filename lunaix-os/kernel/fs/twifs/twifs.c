@@ -43,7 +43,7 @@ int
 __twifs_mkdir(struct v_inode* inode, struct v_dnode* dnode);
 
 int
-__twifs_rmstuff(struct v_inode* inode);
+__twifs_rmstuff(struct v_inode* inode, struct v_dnode* dir);
 
 int
 __twifs_fwrite(struct v_inode* inode, void* buffer, size_t len, size_t fpos);
@@ -95,7 +95,6 @@ twifs_rm_node(struct twifs_node* node)
         return ENOTEMPTY;
     }
     llist_delete(&node->siblings);
-    vfs_i_free(node->inode);
     cake_release(twi_pile, node);
     return 0;
 }
@@ -146,21 +145,13 @@ twifs_toplevel_node(const char* name, int name_len, uint32_t itype)
 int
 __twifs_mkdir(struct v_inode* inode, struct v_dnode* dnode)
 {
-    struct twifs_node* parent_node = (struct twifs_node*)inode->data;
-    if (!(parent_node->itype & VFS_IFDIR)) {
-        return ENOTDIR;
-    }
-    struct twifs_node* new_node =
-      twifs_dir_node(parent_node, dnode->name.value, dnode->name.len, 0);
-    dnode->inode = new_node->inode;
-
-    return 0;
+    return ENOTSUP;
 }
 
 int
 __twifs_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
 {
-    mount_point->inode = fs_root->inode;
+    vfs_assign_inode(mount_point, fs_root->inode);
     return 0;
 }
 
@@ -177,7 +168,6 @@ __twifs_create_inode(struct twifs_node* twi_node)
 
     inode->ops.dir_lookup = __twifs_dirlookup;
     inode->ops.mkdir = __twifs_mkdir;
-    inode->ops.unlink = __twifs_rmstuff;
     inode->ops.rmdir = __twifs_rmstuff;
     inode->ops.open = __twifs_openfile;
 
@@ -225,10 +215,9 @@ __twifs_get_node(struct twifs_node* parent, struct hstr* name)
 }
 
 int
-__twifs_rmstuff(struct v_inode* inode)
+__twifs_rmstuff(struct v_inode* inode, struct v_dnode* dir)
 {
-    struct twifs_node* twi_node = (struct twifs_node*)inode->data;
-    return twifs_rm_node(twi_node);
+    return ENOTSUP;
 }
 
 int
@@ -242,7 +231,7 @@ __twifs_dirlookup(struct v_inode* inode, struct v_dnode* dnode)
 
     struct twifs_node* child_node = __twifs_get_node(twi_node, &dnode->name);
     if (child_node) {
-        dnode->inode = child_node->inode;
+        vfs_assign_inode(dnode, child_node->inode);
         return 0;
     }
     return ENOENT;

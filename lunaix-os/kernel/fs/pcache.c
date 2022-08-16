@@ -11,13 +11,21 @@
 
 static struct lru_zone* pcache_zone;
 
+static int
+__pcache_try_evict(struct lru_node* obj)
+{
+    struct pcache_pg* page = container_of(obj, struct pcache_pg, lru);
+    pcache_invalidate(page->holder, page);
+    return 1;
+}
+
 void
 pcache_init(struct pcache* pcache)
 {
     btrie_init(&pcache->tree, PG_SIZE_BITS);
     llist_init_head(&pcache->dirty);
     llist_init_head(&pcache->pages);
-    pcache_zone = lru_new_zone();
+    pcache_zone = lru_new_zone(__pcache_try_evict);
 }
 
 void
@@ -32,18 +40,6 @@ pcache_release_page(struct pcache* pcache, struct pcache_pg* page)
     pcache->n_pages--;
 }
 
-void
-pcache_evict(struct pcache* pcache)
-{
-    struct pcache_pg* page =
-      container_of(lru_evict_one(pcache_zone), struct pcache_pg, lru);
-
-    if (!page)
-        return;
-
-    pcache_invalidate(pcache, page);
-}
-
 struct pcache_pg*
 pcache_new_page(struct pcache* pcache, uint32_t index)
 {
@@ -51,7 +47,7 @@ pcache_new_page(struct pcache* pcache, uint32_t index)
     void* pg = valloc(PG_SIZE);
 
     if (!ppg || !pg) {
-        pcache_evict(pcache);
+        lru_evict_one(pcache_zone);
         if (!ppg && !(ppg = vzalloc(sizeof(struct pcache_pg)))) {
             return NULL;
         }
@@ -62,6 +58,7 @@ pcache_new_page(struct pcache* pcache, uint32_t index)
     }
 
     ppg->pg = pg;
+    ppg->holder = pcache;
 
     llist_append(&pcache->pages, &ppg->pg_list);
     btrie_set(&pcache->tree, index, ppg);
@@ -164,7 +161,7 @@ pcache_release(struct pcache* pcache)
     struct pcache_pg *pos, *n;
     llist_for_each(pos, n, &pcache->pages, pg_list)
     {
-        lru_remove(&pos->lru);
+        lru_remove(pcache_zone, &pos->lru);
         vfree(pos);
     }
 

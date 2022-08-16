@@ -49,7 +49,8 @@ vmm_vmap(uintptr_t paddr, size_t size, pt_attr attr)
             current_addr = VMAP_START;
         }
     }
-    panick("vmm: out of memory");
+
+    return NULL;
 
 done:
     uintptr_t alloc_begin = current_addr - examed_size;

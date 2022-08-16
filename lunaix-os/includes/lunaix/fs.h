@@ -118,6 +118,7 @@ struct v_inode
     uint32_t lb_usage;
     uint32_t fsize;
     struct hlist_node hash_list;
+    struct lru_node lru;
     struct pcache* pg_cache;
     void* data; // 允许底层FS绑定他的一些专有数据
     struct
@@ -126,11 +127,11 @@ struct v_inode
         int (*open)(struct v_inode* this, struct v_file* file);
         int (*sync)(struct v_inode* this);
         int (*mkdir)(struct v_inode* this, struct v_dnode* dnode);
-        int (*rmdir)(struct v_inode* this);
+        int (*rmdir)(struct v_inode* this, struct v_dnode* dir);
         int (*unlink)(struct v_inode* this);
         int (*link)(struct v_inode* this, struct v_dnode* new_name);
         int (*read_symlink)(struct v_inode* this, const char** path_out);
-        int (*symlink)(struct v_inode* this, const char* target);
+        int (*set_symlink)(struct v_inode* this, const char* target);
         int (*dir_lookup)(struct v_inode* this, struct v_dnode* dnode);
         int (*rename)(struct v_inode* from_inode,
                       struct v_dnode* from_dnode,
@@ -142,6 +143,7 @@ struct v_inode
 struct v_dnode
 {
     mutex_t lock; // sync the path walking
+    struct lru_node lru;
     struct hstr name;
     struct v_inode* inode;
     struct v_dnode* parent;
@@ -157,16 +159,6 @@ struct v_fdtable
     struct v_fd* fds[VFS_MAX_FD];
 };
 
-struct pcache_pg
-{
-    struct llist_header pg_list;
-    struct llist_header dirty_list;
-    struct lru_node lru;
-    void* pg;
-    uint32_t flags;
-    uint32_t fpos;
-};
-
 struct pcache
 {
     struct v_inode* master;
@@ -177,6 +169,16 @@ struct pcache
     uint32_t n_pages;
 };
 
+struct pcache_pg
+{
+    struct llist_header pg_list;
+    struct llist_header dirty_list;
+    struct lru_node lru;
+    struct pcache* holder;
+    void* pg;
+    uint32_t flags;
+    uint32_t fpos;
+};
 /* --- file system manager --- */
 void
 fsm_init();
@@ -228,6 +230,9 @@ vfs_close(struct v_file* file);
 
 int
 vfs_fsync(struct v_file* file);
+
+void
+vfs_assign_inode(struct v_dnode* assign_to, struct v_inode* inode);
 
 struct v_superblock*
 vfs_sb_alloc();
