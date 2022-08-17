@@ -31,7 +31,7 @@ struct twifs_node*
 __twifs_get_node(struct twifs_node* parent, struct hstr* name);
 
 struct v_inode*
-__twifs_create_inode(struct twifs_node* twi_node);
+__twifs_get_inode(struct twifs_node* twi_node);
 
 int
 __twifs_iterate_dir(struct v_inode* inode, struct dir_context* dctx);
@@ -78,6 +78,7 @@ __twifs_new_node(struct twifs_node* parent,
 
     node->name = HSTR(name, name_len);
     node->itype = itype;
+    node->ino_id = inode_id++;
     hstr_rehash(&node->name, HSTR_FULL_HASH);
     llist_init_head(&node->children);
 
@@ -108,9 +109,6 @@ twifs_file_node(struct twifs_node* parent,
     struct twifs_node* twi_node =
       __twifs_new_node(parent, name, name_len, VFS_IFFILE | itype);
 
-    struct v_inode* twi_inode = __twifs_create_inode(twi_node);
-    twi_node->inode = twi_inode;
-
     return twi_node;
 }
 
@@ -130,9 +128,6 @@ twifs_dir_node(struct twifs_node* parent,
     struct twifs_node* twi_node =
       __twifs_new_node(parent, name, name_len, VFS_IFDIR | itype);
 
-    struct v_inode* twi_inode = __twifs_create_inode(twi_node);
-    twi_node->inode = twi_inode;
-
     return twi_node;
 }
 
@@ -148,17 +143,11 @@ __twifs_mkdir(struct v_inode* inode, struct v_dnode* dnode)
     return ENOTSUP;
 }
 
-int
-__twifs_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
+void
+__twifs_init_inode(struct v_inode* inode, void* data)
 {
-    vfs_assign_inode(mount_point, fs_root->inode);
-    return 0;
-}
+    struct twifs_node* twi_node = (struct twifs_node*)data;
 
-struct v_inode*
-__twifs_create_inode(struct twifs_node* twi_node)
-{
-    struct v_inode* inode = vfs_i_alloc(1, inode_id++);
     inode->itype = twi_node->itype;
     inode->data = twi_node;
 
@@ -176,6 +165,19 @@ __twifs_create_inode(struct twifs_node* twi_node)
                                                .readdir = __twifs_iterate_dir };
 
     return inode;
+}
+
+int
+__twifs_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
+{
+    vsb->dev = 1;
+    struct v_inode* inode =
+      vfs_i_alloc(vsb, fs_root->ino_id, __twifs_init_inode, fs_root);
+    if (!inode) {
+        return ENOMEM;
+    }
+    vfs_assign_inode(mount_point, inode);
+    return 0;
 }
 
 int
@@ -231,7 +233,16 @@ __twifs_dirlookup(struct v_inode* inode, struct v_dnode* dnode)
 
     struct twifs_node* child_node = __twifs_get_node(twi_node, &dnode->name);
     if (child_node) {
-        vfs_assign_inode(dnode, child_node->inode);
+        struct v_inode* inode = vfs_i_alloc(dnode->super_block,
+                                            child_node->ino_id,
+                                            __twifs_init_inode,
+                                            child_node);
+        if (!inode) {
+            return ENOENT;
+        }
+
+        dnode->data = twi_node->data;
+        vfs_assign_inode(dnode, inode);
         return 0;
     }
     return ENOENT;

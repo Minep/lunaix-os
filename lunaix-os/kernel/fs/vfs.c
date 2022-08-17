@@ -25,15 +25,16 @@
             maybe a unified mount_point structure that maintain a referencing
             counter on any dnodes within the subtree? Such a counter will only
             increament if a file is opened or a dnode is being used as working
-            directory and decreamenting conversely.
+            directory and decreamenting conversely. (CHECKED)
  6. (mount) Ability to track all mount points (including sub-mounts)
-            so we can be confident to clean up everything when we unmount.
+            so we can be confident to clean up everything when we
+            unmount. (CHECKED)
  7. (mount) Figure out a way to acquire the device represented by a dnode.
             so it can be used to mount. (e.g. we wish to get `struct device*`
             out of the dnode at /dev/sda)
             [tip] we should pay attention at twifs and add a private_data field
-            under struct v_dnode?
- 8. (mount) Then, we should refactor on mount/unmount mechanism.
+            under struct v_dnode? (CHECKED)
+ 8. (mount) Then, we should refactor on mount/unmount mechanism. (CHECKED)
  9. (mount) (future) Ability to mount any thing? e.g. Linux can mount a disk
                     image file using a so called "loopback" pseudo device. Maybe
                     we can do similar thing in Lunaix? A block device emulation
@@ -56,10 +57,6 @@
 #include <lunaix/fs/twifs.h>
 
 #define PATH_DELIM '/'
-#define HASHTABLE_BITS 10
-#define HASHTABLE_SIZE (1 << HASHTABLE_BITS)
-#define HASH_MASK (HASHTABLE_SIZE - 1)
-#define HASHBITS (32 - HASHTABLE_BITS)
 
 #define unlock_inode(inode) mutex_unlock(&inode->lock)
 #define lock_inode(inode)                                                      \
@@ -81,8 +78,8 @@ static struct cake_pile* file_pile;
 static struct cake_pile* superblock_pile;
 static struct cake_pile* fd_pile;
 
-static struct v_superblock* root_sb;
-static struct hbucket *dnode_cache, *inode_cache;
+static struct v_dnode* sysroot;
+static struct hbucket* dnode_cache;
 
 static struct lru_zone *dnode_lru, *inode_lru;
 
@@ -113,8 +110,7 @@ vfs_init()
     superblock_pile =
       cake_new_pile("sb_cache", sizeof(struct v_superblock), 1, 0);
 
-    dnode_cache = vzalloc(HASHTABLE_SIZE * sizeof(struct hbucket));
-    inode_cache = vzalloc(HASHTABLE_SIZE * sizeof(struct hbucket));
+    dnode_cache = vzalloc(VFS_HASHTABLE_SIZE * sizeof(struct hbucket));
 
     dnode_lru = lru_new_zone(__vfs_try_evict_dnode);
     inode_lru = lru_new_zone(__vfs_try_evict_inode);
@@ -122,9 +118,9 @@ vfs_init()
     hstr_rehash(&vfs_ddot, HSTR_FULL_HASH);
     hstr_rehash(&vfs_dot, HSTR_FULL_HASH);
 
-    // 创建一个根superblock，用来蕴含我们的根目录。
-    root_sb = vfs_sb_alloc();
-    root_sb->root = vfs_d_alloc();
+    // 创建一个根dnode。
+    sysroot = vfs_d_alloc(NULL, &vfs_empty);
+    atomic_fetch_add(&sysroot->ref_count, 1);
 }
 
 inline struct hbucket*
@@ -134,9 +130,9 @@ __dcache_hash(struct v_dnode* parent, uint32_t* hash)
     // 与parent的指针值做加法，来减小碰撞的可能性。
     _hash += (uint32_t)parent;
     // 确保低位更加随机
-    _hash = _hash ^ (_hash >> HASHBITS);
+    _hash = _hash ^ (_hash >> VFS_HASHBITS);
     *hash = _hash;
-    return &dnode_cache[_hash & HASH_MASK];
+    return &dnode_cache[_hash & VFS_HASH_MASK];
 }
 
 struct v_dnode*
@@ -168,6 +164,7 @@ vfs_dcache_add(struct v_dnode* parent, struct v_dnode* dnode)
     atomic_fetch_add(&dnode->ref_count, 1);
     dnode->parent = parent;
     llist_append(&parent->children, &dnode->siblings);
+
     struct hbucket* bucket = __dcache_hash(parent, &dnode->name.hash);
     hlist_add(&bucket->head, &dnode->hash_list);
 }
@@ -206,7 +203,7 @@ __vfs_walk(struct v_dnode* start,
         if ((walk_options & VFS_WALK_FSRELATIVE) && start) {
             start = start->super_block->root;
         } else {
-            start = root_sb->root;
+            start = sysroot;
         }
         i++;
     }
@@ -218,7 +215,7 @@ __vfs_walk(struct v_dnode* start,
     struct hstr name = HSTR(name_content, 0);
 
     char current = path[i++], lookahead;
-    while (current) {
+    while (current && current_level) {
         lookahead = path[i++];
         if (current != PATH_DELIM) {
             if (j >= VFS_NAME_MAXLEN - 1) {
@@ -257,14 +254,12 @@ __vfs_walk(struct v_dnode* start,
         dnode = vfs_dcache_lookup(current_level, &name);
 
         if (!dnode) {
-            dnode = vfs_d_alloc();
+            dnode = vfs_d_alloc(current_level, &name);
 
             if (!dnode) {
                 errno = ENOMEM;
                 goto error;
             }
-
-            hstrcpy(&dnode->name, &name);
 
             lock_inode(current_level->inode);
 
@@ -280,15 +275,13 @@ __vfs_walk(struct v_dnode* start,
                 }
             }
 
+            vfs_dcache_add(current_level, dnode);
             unlock_inode(current_level->inode);
 
             if (errno) {
                 unlock_dnode(current_level);
-                vfree(dnode->name.value);
                 goto cleanup;
             }
-
-            vfs_dcache_add(current_level, dnode);
         }
 
         unlock_dnode(current_level);
@@ -351,86 +344,6 @@ vfs_walk(struct v_dnode* start,
 }
 
 int
-vfs_mount(const char* target, const char* fs_name, struct device* device)
-{
-    int errno;
-    struct v_dnode* mnt;
-
-    if (!(errno = vfs_walk(__current->cwd, target, &mnt, NULL, 0))) {
-        errno = vfs_mount_at(fs_name, device, mnt);
-    }
-
-    return errno;
-}
-
-int
-vfs_unmount(const char* target)
-{
-    int errno;
-    struct v_dnode* mnt;
-
-    if (!(errno = vfs_walk(__current->cwd, target, &mnt, NULL, 0))) {
-        errno = vfs_unmount_at(mnt);
-    }
-
-    return errno;
-}
-
-int
-vfs_mount_at(const char* fs_name,
-             struct device* device,
-             struct v_dnode* mnt_point)
-{
-    if (mnt_point->inode && !(mnt_point->inode->itype & VFS_IFDIR)) {
-        return ENOTDIR;
-    }
-
-    struct filesystem* fs = fsm_get(fs_name);
-    if (!fs) {
-        return ENODEV;
-    }
-
-    struct v_superblock* sb = vfs_sb_alloc();
-    sb->dev = device;
-    sb->fs_id = fs->fs_id;
-
-    int errno = 0;
-    if (!(errno = fs->mount(sb, mnt_point))) {
-        sb->fs = fs;
-        sb->root = mnt_point;
-        mnt_point->super_block = sb;
-        llist_append(&root_sb->sb_list, &sb->sb_list);
-    }
-
-    return errno;
-}
-
-int
-vfs_unmount_at(struct v_dnode* mnt_point)
-{
-    // FIXME deal with the detached dcache subtree
-    int errno = 0;
-    struct v_superblock* sb = mnt_point->super_block;
-    if (!sb) {
-        return EINVAL;
-    }
-
-    if (sb->root != mnt_point) {
-        return EINVAL;
-    }
-
-    if (!(errno = sb->fs->unmount(sb))) {
-        struct v_dnode* fs_root = sb->root;
-        vfs_dcache_remove(fs_root);
-
-        llist_delete(&sb->sb_list);
-        vfs_sb_free(sb);
-        vfs_d_free(fs_root);
-    }
-    return errno;
-}
-
-int
 vfs_open(struct v_dnode* dnode, struct v_file** file)
 {
     if (!dnode->inode || !dnode->inode->ops.open) {
@@ -438,6 +351,9 @@ vfs_open(struct v_dnode* dnode, struct v_file** file)
     }
 
     struct v_inode* inode = dnode->inode;
+
+    lock_inode(inode);
+
     struct v_file* vfile = cake_grab(file_pile);
     memset(vfile, 0, sizeof(*vfile));
 
@@ -459,9 +375,12 @@ vfs_open(struct v_dnode* dnode, struct v_file** file)
     } else {
         atomic_fetch_add(&dnode->ref_count, 1);
         inode->open_count++;
+        mnt_mkbusy(dnode->mnt);
 
         *file = vfile;
     }
+
+    unlock_inode(inode);
 
     return errno;
 }
@@ -501,6 +420,7 @@ vfs_close(struct v_file* file)
     if (!file->ops.close || !(errno = file->ops.close(file))) {
         atomic_fetch_sub(&file->dnode->ref_count, 1);
         file->inode->open_count--;
+        mnt_chillax(file->dnode->mnt);
 
         pcache_commit_all(file->inode);
         cake_release(file_pile, file);
@@ -542,12 +462,14 @@ vfs_sb_alloc()
     struct v_superblock* sb = cake_grab(superblock_pile);
     memset(sb, 0, sizeof(*sb));
     llist_init_head(&sb->sb_list);
+    sb->i_cache = vzalloc(VFS_HASHTABLE_SIZE * sizeof(struct hbucket));
     return sb;
 }
 
 void
 vfs_sb_free(struct v_superblock* sb)
 {
+    vfree(sb->i_cache);
     cake_release(superblock_pile, sb);
 }
 
@@ -576,7 +498,7 @@ __vfs_try_evict_inode(struct lru_node* obj)
 }
 
 struct v_dnode*
-vfs_d_alloc()
+vfs_d_alloc(struct v_dnode* parent, struct hstr* name)
 {
     struct v_dnode* dnode = cake_grab(dnode_pile);
     if (!dnode) {
@@ -595,6 +517,12 @@ vfs_d_alloc()
     dnode->ref_count = ATOMIC_VAR_INIT(0);
     dnode->name = HHSTR(vzalloc(VFS_NAME_MAXLEN), 0, 0);
 
+    hstrcpy(&dnode->name, name);
+
+    if (parent) {
+        dnode->super_block = parent->super_block;
+    }
+
     lru_use_one(dnode_lru, &dnode->lru);
 
     return dnode;
@@ -603,13 +531,14 @@ vfs_d_alloc()
 void
 vfs_d_free(struct v_dnode* dnode)
 {
-    assert(dnode->ref_count == 0);
+    assert(dnode->ref_count == 1);
 
     if (dnode->inode) {
         assert(dnode->inode->link_count > 0);
         dnode->inode->link_count--;
     }
 
+    vfs_dcache_remove(dnode);
     // Make sure the children de-referencing their parent.
     // With lru presented, the eviction will be propagated over the entire
     // detached subtree eventually
@@ -624,17 +553,14 @@ vfs_d_free(struct v_dnode* dnode)
 }
 
 struct v_inode*
-vfs_i_alloc(dev_t device_id, uint32_t inode_id)
+vfs_i_alloc(struct v_superblock* sb,
+            uint32_t inode_id,
+            void (*init)(struct v_inode* inode, void* data),
+            void* data)
 {
-    // 我们这里假设每个文件系统与设备是一一对应（毕竟一个分区不可能有两个不同的文件系统）
-    // 而每个文件系统所产生的 v_inode 缓存必须要和其他文件系统产生的区分开来。
-    // 这也就是说，每个 v_inode 的 id
-    // 必须要由设备ID，和该虚拟inode缓存所对应的物理inode
-    // 相对于其所在的文件系统的id，进行组成！
-    inode_id = hash_32(inode_id ^ (-device_id), HASH_SIZE_BITS);
-    inode_id = (inode_id >> HASHBITS) ^ inode_id;
-
-    struct hbucket* slot = &inode_cache[inode_id & HASH_MASK];
+    // 每个超级块儿维护一个inode缓存哈希表。
+    // 他们的hash value自然就是inode id了。
+    struct hbucket* slot = &sb->i_cache[inode_id & VFS_HASH_MASK];
     struct v_inode *pos, *n;
     hashtable_bucket_foreach(slot, pos, n, hash_list)
     {
@@ -656,6 +582,8 @@ vfs_i_alloc(dev_t device_id, uint32_t inode_id)
 
     mutex_init(&pos->lock);
 
+    init(pos, data);
+
     hlist_add(&slot->head, &pos->hash_list);
 
 done:
@@ -666,6 +594,11 @@ done:
 void
 vfs_i_free(struct v_inode* inode)
 {
+    if (inode->pg_cache) {
+        pcache_release(inode->pg_cache);
+        vfree(inode->pg_cache);
+    }
+    inode->ops.sync(inode);
     hlist_delete(&inode->hash_list);
     cake_release(inode_pile, inode);
 }
@@ -708,21 +641,17 @@ __vfs_try_locate_file(const char* path,
     }
 
     struct v_dnode* parent = *fdir;
-    struct v_dnode* file_new = vfs_d_alloc();
+    struct v_dnode* file_new = vfs_d_alloc(parent, &name);
 
     if (!file_new) {
         return ENOMEM;
     }
 
-    hstrcpy(&file_new->name, &name);
-
     lock_dnode(parent);
 
     if (!(errno = parent->inode->ops.create(parent->inode, file_new))) {
-        *file = file_new;
-
         vfs_dcache_add(parent, file_new);
-        llist_append(&parent->children, &file_new->siblings);
+        *file = file_new;
     } else {
         vfs_d_free(file_new);
     }
@@ -1120,17 +1049,21 @@ done:
 __DEFINE_LXSYSCALL1(int, mkdir, const char*, path)
 {
     int errno = 0;
-    struct v_dnode *parent, *dir = vfs_d_alloc();
+    struct v_dnode *parent, *dir;
+    char name_value[VFS_NAME_MAXLEN];
+    struct hstr name = HHSTR(name_value, 0, 0);
 
     if (!dir) {
         errno = ENOMEM;
         goto done;
     }
 
-    if ((errno = vfs_walk(
-           __current->cwd, path, &parent, &dir->name, VFS_WALK_PARENT))) {
+    if ((errno =
+           vfs_walk(__current->cwd, path, &parent, &name, VFS_WALK_PARENT))) {
         goto done;
     }
+
+    dir = vfs_d_alloc(parent, &name);
 
     lock_dnode(parent);
     lock_inode(parent->inode);
@@ -1142,7 +1075,7 @@ __DEFINE_LXSYSCALL1(int, mkdir, const char*, path)
     } else if (!(parent->inode->itype & VFS_IFDIR)) {
         errno = ENOTDIR;
     } else if (!(errno = parent->inode->ops.mkdir(parent->inode, dir))) {
-        llist_append(&parent->children, &dir->siblings);
+        vfs_dcache_add(parent, dir);
         goto cleanup;
     }
 
@@ -1174,7 +1107,6 @@ __vfs_do_unlink(struct v_dnode* dnode)
         //  symlink case
         errno = inode->ops.unlink(inode);
         if (!errno) {
-            vfs_dcache_remove(dnode);
             vfs_d_free(dnode);
         }
     } else {
@@ -1364,10 +1296,12 @@ __vfs_do_chdir(struct v_dnode* dnode)
     }
 
     if (__current->cwd) {
-        atomic_fetch_add(&__current->cwd->ref_count, 1);
+        atomic_fetch_sub(&__current->cwd->ref_count, 1);
+        mnt_chillax(__current->cwd->mnt);
     }
 
-    atomic_fetch_sub(&dnode->ref_count, 1);
+    atomic_fetch_add(&dnode->ref_count, 1);
+    mnt_mkbusy(dnode->mnt);
     __current->cwd = dnode;
 
     unlock_dnode(dnode);
@@ -1481,7 +1415,7 @@ vfs_do_rename(struct v_dnode* current, struct v_dnode* target)
     vfs_dcache_rehash(newparent, current);
 
     // detach target
-    vfs_dcache_remove(target);
+    vfs_d_free(target);
 
     unlock_dnode(target);
 
@@ -1512,7 +1446,8 @@ __DEFINE_LXSYSCALL2(int, rename, const char*, oldpath, const char*, newpath)
 
     errno = vfs_walk(target_parent, name.value, &target, NULL, 0);
     if (errno == ENOENT) {
-        target = vfs_d_alloc();
+        target = vfs_d_alloc(target_parent, &name);
+        vfs_dcache_add(target_parent, target);
     } else if (errno) {
         goto done;
     }
@@ -1522,11 +1457,7 @@ __DEFINE_LXSYSCALL2(int, rename, const char*, oldpath, const char*, newpath)
         goto done;
     }
 
-    hstrcpy(&target->name, &name);
-
-    if (!(errno = vfs_do_rename(cur, target))) {
-        vfs_d_free(target);
-    }
+    errno = vfs_do_rename(cur, target);
 
 done:
     vfree(name.value);
@@ -1553,19 +1484,19 @@ __DEFINE_LXSYSCALL3(int,
         goto done;
     }
 
-    if (!(dev->inode->itype & VFS_IFVOLDEV)) {
-        errno = ENOTDEV;
-        goto done;
-    }
-
     if (mnt->ref_count > 1) {
         errno = EBUSY;
         goto done;
     }
 
-    // FIXME should not touch the underlying fs!
-    struct device* device =
-      (struct device*)((struct twifs_node*)dev->inode->data)->data;
+    // By our convention.
+    // XXX could we do better?
+    struct device* device = (struct device*)dev->data;
+
+    if (!(dev->inode->itype & VFS_IFVOLDEV) || !device) {
+        errno = ENOTDEV;
+        goto done;
+    }
 
     errno = vfs_mount_at(fstype, device, mnt);
 

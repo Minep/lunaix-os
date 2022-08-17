@@ -26,6 +26,11 @@
 #define VFS_WALK_PARENT 0x4
 #define VFS_WALK_NOFOLLOW 0x4
 
+#define VFS_HASHTABLE_BITS 10
+#define VFS_HASHTABLE_SIZE (1 << VFS_HASHTABLE_BITS)
+#define VFS_HASH_MASK (VFS_HASHTABLE_SIZE - 1)
+#define VFS_HASHBITS (32 - VFS_HASHTABLE_BITS)
+
 #define FSTYPE_ROFS 0x1
 
 #define VFS_VALID_CHAR(chr)                                                    \
@@ -35,6 +40,8 @@
 
 extern struct hstr vfs_ddot;
 extern struct hstr vfs_dot;
+
+typedef uint32_t inode_t;
 
 struct v_dnode;
 struct v_inode;
@@ -56,11 +63,11 @@ struct filesystem
 struct v_superblock
 {
     struct llist_header sb_list;
-    int fs_id;
     struct device* dev;
     struct v_dnode* root;
     struct filesystem* fs;
     uint32_t iobuf_size;
+    struct hbucket* i_cache;
     struct
     {
         uint32_t (*read_capacity)(struct v_superblock* vsb);
@@ -106,7 +113,7 @@ struct v_fd
 
 struct v_inode
 {
-    uint32_t id;
+    inode_t id;
     mutex_t lock;
     uint32_t itype;
     time_t ctime;
@@ -140,6 +147,18 @@ struct v_inode
     struct v_file_ops default_fops;
 };
 
+struct v_mount
+{
+    mutex_t lock;
+    struct llist_header list;
+    struct llist_header submnts;
+    struct llist_header sibmnts;
+    struct v_mount* parent;
+    struct v_dnode* mnt_point;
+    struct v_superblock* super_block;
+    uint32_t busy_counter;
+};
+
 struct v_dnode
 {
     mutex_t lock; // sync the path walking
@@ -151,7 +170,10 @@ struct v_dnode
     struct llist_header children;
     struct llist_header siblings;
     struct v_superblock* super_block;
+    struct v_mount* mnt;
     atomic_ulong ref_count;
+
+    void* data;
 };
 
 struct v_fdtable
@@ -247,7 +269,10 @@ void
 vfs_d_free(struct v_dnode* dnode);
 
 struct v_inode*
-vfs_i_alloc(dev_t device_id, uint32_t inode_id);
+vfs_i_alloc(struct v_superblock* sb,
+            uint32_t inode_id,
+            void (*init)(struct v_inode* inode, void* data),
+            void* data);
 
 void
 vfs_i_free(struct v_inode* inode);
@@ -290,4 +315,23 @@ pcache_commit_all(struct v_inode* inode);
 
 void
 pcache_invalidate(struct pcache* pcache, struct pcache_pg* page);
+
+/**
+ * @brief 将挂载点标记为繁忙
+ *
+ * @param mnt
+ */
+void
+mnt_mkbusy(struct v_mount* mnt);
+
+/**
+ * @brief 将挂载点标记为清闲
+ *
+ * @param mnt
+ */
+void
+mnt_chillax(struct v_mount* mnt);
+
+struct v_mount*
+vfs_create_mount(struct v_mount* parent, struct v_dnode* mnt_point);
 #endif /* __LUNAIX_VFS_H */

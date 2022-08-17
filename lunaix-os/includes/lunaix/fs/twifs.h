@@ -5,8 +5,8 @@
 
 struct twifs_node
 {
-    struct v_inode* inode;
     struct hstr name;
+    inode_t ino_id;
     void* data;
     uint32_t itype;
     struct llist_header children;
