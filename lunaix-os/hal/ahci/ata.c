@@ -1,3 +1,4 @@
+#include <hal/ahci/ahci.h>
 #include <hal/ahci/hba.h>
 #include <hal/ahci/sata.h>
 
@@ -27,12 +28,6 @@ __sata_buffer_io(struct hba_device* dev,
     struct hba_cmdh* header;
     struct hba_cmdt* table;
     int slot = hba_prepare_cmd(port, &table, &header, buffer, size);
-    int bitmask = 1 << slot;
-
-    // 确保端口是空闲的
-    wait_until(!(port->regs[HBA_RPxTFD] & (HBA_PxTFD_BSY | HBA_PxTFD_DRQ)));
-
-    port->regs[HBA_RPxIS] = 0;
 
     header->options |= HBA_CMDH_WRITE * (write == 1);
 
@@ -57,26 +52,10 @@ __sata_buffer_io(struct hba_device* dev,
     */
     fis->dev = (1 << 6);
 
-    int retries = 0;
+    int is_ok = ahci_try_send(port, slot);
 
-    while (retries < MAX_RETRY) {
-        port->regs[HBA_RPxCI] = bitmask;
-
-        wait_until(!(port->regs[HBA_RPxCI] & bitmask));
-
-        if ((port->regs[HBA_RPxTFD] & HBA_PxTFD_ERR)) {
-            // 有错误
-            sata_read_error(port);
-            retries++;
-        } else {
-            vfree_dma(table);
-            return 1;
-        }
-    }
-
-fail:
     vfree_dma(table);
-    return 0;
+    return is_ok;
 }
 
 int

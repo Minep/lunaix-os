@@ -1,7 +1,7 @@
+#include <hal/ahci/ahci.h>
 #include <hal/ahci/hba.h>
 #include <hal/ahci/sata.h>
 #include <hal/ahci/scsi.h>
-#include <hal/ahci/utils.h>
 
 #include <klibc/string.h>
 #include <lunaix/mm/valloc.h>
@@ -61,12 +61,6 @@ __scsi_buffer_io(struct hba_device* dev,
     struct hba_cmdh* header;
     struct hba_cmdt* table;
     int slot = hba_prepare_cmd(port, &table, &header, buffer, size);
-    int bitmask = 1 << slot;
-
-    // 确保端口是空闲的
-    wait_until(!(port->regs[HBA_RPxTFD] & (HBA_PxTFD_BSY | HBA_PxTFD_DRQ)));
-
-    port->regs[HBA_RPxIS] = 0;
 
     header->options |= (HBA_CMDH_WRITE * (write == 1)) | HBA_CMDH_ATAPI;
 
@@ -77,7 +71,7 @@ __scsi_buffer_io(struct hba_device* dev,
     sata_create_fis(fis, ATA_PACKET, (size << 8), 0);
     fis->feature = 1 | ((!write) << 2);
 
-    if (port->device->cbd_size == 16) {
+    if (port->device->cbd_size == SCSI_CDB16) {
         scsi_create_packet16((struct scsi_cdb16*)cdb,
                              write ? SCSI_WRITE_BLOCKS_16 : SCSI_READ_BLOCKS_16,
                              lba,
@@ -92,26 +86,10 @@ __scsi_buffer_io(struct hba_device* dev,
     // field: cdb->misc1
     *((uint8_t*)cdb + 1) = 3 << 5; // RPROTECT=011b 禁用保护检查
 
-    int retries = 0;
-
-    while (retries < MAX_RETRY) {
-        port->regs[HBA_RPxCI] = bitmask;
-
-        wait_until_expire(!(port->regs[HBA_RPxCI] & bitmask), 1000000);
-
-        if ((port->regs[HBA_RPxTFD] & HBA_PxTFD_ERR)) {
-            // 有错误
-            sata_read_error(port);
-            retries++;
-        } else {
-            vfree_dma(table);
-            return 1;
-        }
-    }
-
-fail:
+    int is_ok = ahci_try_send(port, slot);
     vfree_dma(table);
-    return 0;
+
+    return is_ok;
 }
 
 int

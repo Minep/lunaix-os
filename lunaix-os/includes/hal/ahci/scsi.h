@@ -62,4 +62,7 @@ scsi_write_buffer(struct hba_device* dev,
                   void* buffer,
                   uint32_t size);
 
+void
+scsi_parse_capacity(struct hba_device* device, uint32_t* parameter);
+
 #endif /* __LUNAIX_ATAPI_H */

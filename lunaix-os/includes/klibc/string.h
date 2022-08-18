@@ -33,4 +33,10 @@ strchr(const char* str, int character);
 int
 streq(const char* a, const char* b);
 
+void
+strrtrim(char* str);
+
+void*
+strltrim_safe(char* str);
+
 #endif /* __LUNAIX_STRING_H */

@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_SATA_H
 #define __LUNAIX_SATA_H
 
-#include <stdint.h>
+#include <hal/ahci/hba.h>
 
 #define SATA_REG_FIS_D2H 0x34
 #define SATA_REG_FIS_H2D 0x27
@@ -65,4 +65,6 @@ sata_write_buffer(struct hba_device* dev,
                   void* buffer,
                   uint32_t size);
 
+void
+sata_read_error(struct hba_port* port);
 #endif /* __LUNAIX_SATA_H */

@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_HBA_H
 #define __LUNAIX_HBA_H
 
-#include <stdint.h>
+#include <lunaix/types.h>
 
 #define HBA_RCAP 0
 #define HBA_RGHC 1
@@ -46,6 +46,8 @@
 #define HBA_RPxSSTS_PWR(x) (((x) >> 8) & 0xf)
 #define HBA_RPxSSTS_IF(x) (((x) >> 4) & 0xf)
 #define HBA_RPxSSTS_PHYSTATE(x) ((x)&0xf)
+
+#define hba_clear_reg(reg) (reg) = -1
 
 #define HBA_DEV_SIG_ATAPI 0xeb140101
 #define HBA_DEV_SIG_ATA 0x00000101

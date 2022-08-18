@@ -12,7 +12,6 @@
 #include <hal/ahci/hba.h>
 #include <hal/ahci/sata.h>
 #include <hal/ahci/scsi.h>
-#include <hal/ahci/utils.h>
 
 #include <hal/pci.h>
 #include <klibc/string.h>
@@ -158,8 +157,7 @@ ahci_init()
         /* 初始化端口，并置于就绪状态 */
         port_regs[HBA_RPxCI] = 0;
 
-        // 需要通过全部置位去清空这些寄存器（相当的奇怪……）
-        port_regs[HBA_RPxSERR] = -1;
+        hba_clear_reg(port_regs[HBA_RPxSERR]);
 
         hba.ports[i] = port;
 
@@ -175,6 +173,11 @@ ahci_init()
             kprintf(KERROR "init fail: 0x%x@p%d\n", port->regs[HBA_RPxSIG], i);
             continue;
         }
+
+        kprintf(KINFO "sata%d: %s (%s)\n",
+                i,
+                port->device->model,
+                port->device->serial_num);
 
         block_mount_disk(port->device);
     }
@@ -312,16 +315,11 @@ ahci_init_device(struct hba_port* port)
     // mask DHR interrupt
     port->regs[HBA_RPxIE] &= ~HBA_PxINTR_DHR;
 
-    // 确保端口是空闲的
-    wait_until(!(port->regs[HBA_RPxTFD] & (HBA_PxTFD_BSY)));
-
     // 预备DMA接收缓存，用于存放HBA传回的数据
     uint16_t* data_in = (uint16_t*)valloc_dma(512);
 
     int slot = hba_prepare_cmd(port, &cmd_table, &cmd_header, data_in, 512);
 
-    // 清空任何待响应的中断
-    port->regs[HBA_RPxIS] = 0;
     port->device = vzalloc(sizeof(struct hba_device));
     port->device->port = port;
 
@@ -338,14 +336,7 @@ ahci_init_device(struct hba_port* port)
         sata_create_fis(cmd_fis, ATA_IDENTIFY_PAKCET_DEVICE, 0, 0);
     }
 
-    // PxCI寄存器置位，告诉HBA这儿有个数据需要发送到SATA端口
-    port->regs[HBA_RPxCI] = (1 << slot);
-
-    wait_until(!(port->regs[HBA_RPxCI] & (1 << slot)));
-
-    if ((port->regs[HBA_RPxTFD] & HBA_PxTFD_ERR)) {
-        // 有错误
-        sata_read_error(port);
+    if (!ahci_try_send(port, slot)) {
         goto fail;
     }
 
@@ -388,7 +379,7 @@ ahci_init_device(struct hba_port* port)
     sata_create_fis(cmd_fis, ATA_PACKET, 512 << 8, 0);
 
     // for dev use 12 bytes cdb, READ_CAPACITY must use the 10 bytes variation.
-    if (port->device->cbd_size == 12) {
+    if (port->device->cbd_size == SCSI_CDB12) {
         struct scsi_cdb12* cdb12 = (struct scsi_cdb12*)cmd_table->atapi_cmd;
         // ugly tricks to construct 10 byte cdb from 12 byte cdb
         scsi_create_packet12(cdb12, SCSI_READ_CAPACITY_10, 0, 512 << 8);
@@ -401,12 +392,7 @@ ahci_init_device(struct hba_port* port)
     cmd_header->transferred_size = 0;
     cmd_header->options |= HBA_CMDH_ATAPI;
 
-    port->regs[HBA_RPxCI] = (1 << slot);
-    wait_until(!(port->regs[HBA_RPxCI] & (1 << slot)));
-
-    if ((port->regs[HBA_RPxTFD] & HBA_PxTFD_ERR)) {
-        // 有错误
-        sata_read_error(port);
+    if (!ahci_try_send(port, slot)) {
         goto fail;
     }
 
@@ -414,7 +400,6 @@ ahci_init_device(struct hba_port* port)
 
 done:
     // reset interrupt status and unmask D2HR interrupt
-    port->regs[HBA_RPxIS] = -1;
     port->regs[HBA_RPxIE] |= HBA_PxINTR_DHR;
     achi_register_ops(port);
 
@@ -424,7 +409,6 @@ done:
     return 1;
 
 fail:
-    port->regs[HBA_RPxIS] = -1;
     port->regs[HBA_RPxIE] |= HBA_PxINTR_DHR;
     vfree_dma(data_in);
     vfree_dma(cmd_table);

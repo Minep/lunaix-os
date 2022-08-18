@@ -30,4 +30,13 @@ ahci_get_port_usage();
 struct hba_port*
 ahci_get_port(unsigned int index);
 
+void
+ahci_parse_dev_info(struct hba_device* dev_info, uint16_t* data);
+
+void
+ahci_parsestr(char* str, uint16_t* reg_start, int size_word);
+
+int
+ahci_try_send(struct hba_port* port, int slot);
+
 #endif /* __LUNAIX_AHCI_H */
