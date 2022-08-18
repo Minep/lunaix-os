@@ -172,7 +172,8 @@ ahci_init()
         port_regs[HBA_RPxCMD] |= HBA_PxCMD_ST;
 
         if (!ahci_init_device(port)) {
-            kprintf(KERROR "fail to init device");
+            kprintf(KERROR "init fail: 0x%x@p%d\n", port->regs[HBA_RPxSIG], i);
+            continue;
         }
 
         block_mount_disk(port->device);
@@ -383,12 +384,20 @@ ahci_init_device(struct hba_port* port)
             * SATA AHCI HBA Spec, Section 5.3.7
             * SCSI Command Reference Manual, Section 3.26
     */
-    struct scsi_cdb16* cdb16 = (struct scsi_cdb16*)cmd_table->atapi_cmd;
 
     sata_create_fis(cmd_fis, ATA_PACKET, 512 << 8, 0);
-    scsi_create_packet16(cdb16, SCSI_READ_CAPACITY_16, 0, 512);
 
-    cdb16->misc1 = 0x10; // service action
+    // for dev use 12 bytes cdb, READ_CAPACITY must use the 10 bytes variation.
+    if (port->device->cbd_size == 12) {
+        struct scsi_cdb12* cdb12 = (struct scsi_cdb12*)cmd_table->atapi_cmd;
+        // ugly tricks to construct 10 byte cdb from 12 byte cdb
+        scsi_create_packet12(cdb12, SCSI_READ_CAPACITY_10, 0, 512 << 8);
+    } else {
+        struct scsi_cdb16* cdb16 = (struct scsi_cdb16*)cmd_table->atapi_cmd;
+        scsi_create_packet16(cdb16, SCSI_READ_CAPACITY_16, 0, 512);
+        cdb16->misc1 = 0x10; // service action
+    }
+
     cmd_header->transferred_size = 0;
     cmd_header->options |= HBA_CMDH_ATAPI;
 

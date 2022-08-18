@@ -33,6 +33,8 @@
 #define HBA_PxINTR_DMA (1 << 2)
 #define HBA_PxINTR_DHR (1)
 #define HBA_PxINTR_DPS (1 << 5)
+#define HBA_PxINTR_TFEE (1 << 30)
+#define HBA_PxINTR_IFE (1 << 27)
 #define HBA_PxTFD_ERR (1)
 #define HBA_PxTFD_BSY (1 << 7)
 #define HBA_PxTFD_DRQ (1 << 3)
@@ -100,8 +102,13 @@ struct hba_device
     uint32_t block_size;
     uint64_t wwn;
     uint8_t cbd_size;
-    uint8_t last_error;
-    uint8_t last_status;
+    struct
+    {
+        uint8_t sense_key;
+        uint8_t error;
+        uint8_t status;
+        uint8_t reserve;
+    } last_result;
     uint32_t alignment_offset;
     uint32_t block_per_sec;
     uint32_t capabilities;

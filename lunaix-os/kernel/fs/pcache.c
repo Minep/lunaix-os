@@ -189,6 +189,10 @@ pcache_commit(struct v_inode* inode, struct pcache_pg* page)
 void
 pcache_commit_all(struct v_inode* inode)
 {
+    if (!inode->pg_cache) {
+        return;
+    }
+
     struct pcache* cache = inode->pg_cache;
     struct pcache_pg *pos, *n;
 

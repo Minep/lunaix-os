@@ -37,8 +37,15 @@ scsi_create_packet16(struct scsi_cdb16* cdb,
 void
 scsi_parse_capacity(struct hba_device* device, uint32_t* parameter)
 {
-    device->max_lba = SCSI_FLIP(*(parameter + 1));
-    device->block_size = SCSI_FLIP(*(parameter + 2));
+    if (device->cbd_size == SCSI_CDB16) {
+        device->max_lba =
+          SCSI_FLIP(*(parameter + 1)) | (SCSI_FLIP(*parameter) << 32);
+        device->block_size = SCSI_FLIP(*(parameter + 2));
+    } else {
+        // for READ_CAPACITY(10)
+        device->max_lba = SCSI_FLIP(*(parameter));
+        device->block_size = SCSI_FLIP(*(parameter + 1));
+    }
 }
 
 int
@@ -90,7 +97,7 @@ __scsi_buffer_io(struct hba_device* dev,
     while (retries < MAX_RETRY) {
         port->regs[HBA_RPxCI] = bitmask;
 
-        wait_until(!(port->regs[HBA_RPxCI] & bitmask));
+        wait_until_expire(!(port->regs[HBA_RPxCI] & bitmask), 1000000);
 
         if ((port->regs[HBA_RPxTFD] & HBA_PxTFD_ERR)) {
             // 有错误

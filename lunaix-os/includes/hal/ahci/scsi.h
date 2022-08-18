@@ -14,6 +14,9 @@
 #define SCSI_WRITE_BLOCKS_16 0x8a
 #define SCSI_WRITE_BLOCKS_12 0xaa
 
+#define SCSI_CDB16 16
+#define SCSI_CDB12 12
+
 struct scsi_cdb12
 {
     uint8_t opcode;
