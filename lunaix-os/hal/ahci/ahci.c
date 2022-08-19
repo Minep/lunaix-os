@@ -174,10 +174,11 @@ ahci_init()
             continue;
         }
 
-        kprintf(KINFO "sata%d: %s (%s)\n",
+        kprintf(KINFO "sata%d: %s, sector_size=%dB, sector=%d\n",
                 i,
                 port->device->model,
-                port->device->serial_num);
+                port->device->block_size,
+                (uint32_t)port->device->max_lba);
 
         block_mount_disk(port->device);
     }

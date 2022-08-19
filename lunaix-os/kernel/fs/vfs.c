@@ -161,6 +161,8 @@ vfs_dcache_lookup(struct v_dnode* parent, struct hstr* str)
 void
 vfs_dcache_add(struct v_dnode* parent, struct v_dnode* dnode)
 {
+    assert(parent);
+
     atomic_fetch_add(&dnode->ref_count, 1);
     dnode->parent = parent;
     llist_append(&parent->children, &dnode->siblings);
@@ -172,6 +174,7 @@ vfs_dcache_add(struct v_dnode* parent, struct v_dnode* dnode)
 void
 vfs_dcache_remove(struct v_dnode* dnode)
 {
+    assert(dnode);
     assert(dnode->ref_count == 1);
 
     llist_delete(&dnode->siblings);
@@ -184,20 +187,30 @@ vfs_dcache_remove(struct v_dnode* dnode)
 void
 vfs_dcache_rehash(struct v_dnode* new_parent, struct v_dnode* dnode)
 {
+    assert(new_parent);
+
     hstr_rehash(&dnode->name, HSTR_FULL_HASH);
     vfs_dcache_remove(dnode);
     vfs_dcache_add(new_parent, dnode);
 }
+
+#define VFS_SYMLINK_DEPTH 16
 
 int
 __vfs_walk(struct v_dnode* start,
            const char* path,
            struct v_dnode** dentry,
            struct hstr* component,
-           int walk_options)
+           int walk_options,
+           size_t depth,
+           char* fname_buffer)
 {
     int errno = 0;
     int i = 0, j = 0;
+
+    if (depth >= VFS_SYMLINK_DEPTH) {
+        return ENAMETOOLONG;
+    }
 
     if (path[0] == PATH_DELIM || !start) {
         if ((walk_options & VFS_WALK_FSRELATIVE) && start) {
@@ -212,10 +225,10 @@ __vfs_walk(struct v_dnode* start,
     }
 
     struct v_dnode* dnode;
+    struct v_inode* current_inode;
     struct v_dnode* current_level = start;
 
-    char name_content[VFS_NAME_MAXLEN];
-    struct hstr name = HSTR(name_content, 0);
+    struct hstr name = HSTR(fname_buffer, 0);
 
     char current = path[i++], lookahead;
     while (current && current_level) {
@@ -227,7 +240,7 @@ __vfs_walk(struct v_dnode* start,
             if (!VFS_VALID_CHAR(current)) {
                 return EINVAL;
             }
-            name_content[j++] = current;
+            fname_buffer[j++] = current;
             if (lookahead) {
                 goto cont;
             }
@@ -238,9 +251,7 @@ __vfs_walk(struct v_dnode* start,
             goto cont;
         }
 
-        lock_dnode(current_level);
-
-        name_content[j] = 0;
+        fname_buffer[j] = 0;
         name.len = j;
         hstr_rehash(&name, HSTR_FULL_HASH);
 
@@ -248,11 +259,43 @@ __vfs_walk(struct v_dnode* start,
             if (component) {
                 component->hash = name.hash;
                 component->len = j;
-                strcpy(component->value, name_content);
+                strcpy(component->value, fname_buffer);
             }
-            unlock_dnode(current_level);
             break;
         }
+
+        current_inode = current_level->inode;
+
+        if ((current_inode->itype & VFS_IFSYMLINK)) {
+            const char* link;
+
+            lock_inode(current_inode);
+            if ((errno =
+                   current_inode->ops->read_symlink(current_inode, &link))) {
+                unlock_inode(current_inode);
+                goto error;
+            }
+            unlock_inode(current_inode);
+
+            errno = __vfs_walk(current_level->parent,
+                               link,
+                               &dnode,
+                               NULL,
+                               0,
+                               depth + 1,
+                               fname_buffer + name.len + 1);
+
+            if (errno) {
+                goto error;
+            }
+
+            // reposition the resolved subtree pointed by symlink
+            vfs_dcache_rehash(current_level->parent, dnode);
+            current_level = dnode;
+            current_inode = dnode->inode;
+        }
+
+        lock_dnode(current_level);
 
         dnode = vfs_dcache_lookup(current_level, &name);
 
@@ -263,8 +306,6 @@ __vfs_walk(struct v_dnode* start,
                 errno = ENOMEM;
                 goto error;
             }
-
-            struct v_inode* current_inode = current_level->inode;
 
             lock_inode(current_inode);
 
@@ -305,8 +346,6 @@ error:
     return errno;
 }
 
-#define VFS_MAX_SYMLINK 16
-
 int
 vfs_walk(struct v_dnode* start,
          const char* path,
@@ -314,37 +353,14 @@ vfs_walk(struct v_dnode* start,
          struct hstr* component,
          int options)
 {
-    struct v_dnode* interim;
-    const char* pathname = path;
-    int errno = __vfs_walk(start, path, &interim, component, options);
-    int counter = 0;
+    // allocate a file name stack for path walking and recursion to resolve
+    // symlink
+    char* name_buffer = valloc(2048);
 
-    // FIXME This is NOT a correct way to resolve symlink!
-    while (!errno && interim->inode && (options & VFS_WALK_NOFOLLOW)) {
-        if (counter >= VFS_MAX_SYMLINK) {
-            errno = ELOOP;
-            continue;
-        }
-        if ((interim->inode->itype & VFS_IFSYMLINK) &&
-            interim->inode->ops->read_symlink) {
+    int errno =
+      __vfs_walk(start, path, dentry, component, options, 0, name_buffer);
 
-            lock_inode(interim->inode);
-            errno =
-              interim->inode->ops->read_symlink(interim->inode, &pathname);
-            unlock_inode(interim->inode);
-
-            if (errno) {
-                break;
-            }
-        } else {
-            break;
-        }
-        errno = __vfs_walk(start, pathname, &interim, component, options);
-        counter++;
-    }
-
-    *dentry = errno ? 0 : interim;
-
+    vfree(name_buffer);
     return errno;
 }
 

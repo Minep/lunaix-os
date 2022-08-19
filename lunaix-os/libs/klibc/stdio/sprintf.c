@@ -19,8 +19,6 @@ static const char flag_chars[] = "#0- +";
 #define FLAG_ALT2 (1 << 8)
 #define FLAG_CAPS (1 << 9)
 
-// FIXME: use something like IO_FILE to abstract this into a more flexible,
-// stream based, vprintf
 size_t
 __sprintf_internal(char* buffer, char* fmt, size_t max_len, va_list vargs)
 {
