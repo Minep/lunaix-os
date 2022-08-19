@@ -92,6 +92,9 @@ __assert_fail(const char* expr, const char* file, unsigned int line)
 void
 panick(const char* msg);
 
+void
+panickf(const char* fmt, ...);
+
 #define wait_until(cond)                                                       \
     while (!(cond))                                                            \
         ;

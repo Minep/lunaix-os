@@ -26,7 +26,7 @@ _readdir_main()
 
     struct dirent ent = { .d_offset = 0 };
 
-    while (!readdir(fd, &ent)) {
+    while (readdir(fd, &ent) == 1) {
         kprintf(KINFO "%s\n", ent.d_name);
     }
 

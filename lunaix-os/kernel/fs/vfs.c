@@ -78,7 +78,7 @@ static struct cake_pile* file_pile;
 static struct cake_pile* superblock_pile;
 static struct cake_pile* fd_pile;
 
-static struct v_dnode* sysroot;
+struct v_dnode* vfs_sysroot;
 static struct hbucket* dnode_cache;
 
 static struct lru_zone *dnode_lru, *inode_lru;
@@ -119,8 +119,8 @@ vfs_init()
     hstr_rehash(&vfs_dot, HSTR_FULL_HASH);
 
     // 创建一个根dnode。
-    sysroot = vfs_d_alloc(NULL, &vfs_empty);
-    atomic_fetch_add(&sysroot->ref_count, 1);
+    vfs_sysroot = vfs_d_alloc(NULL, &vfs_empty);
+    atomic_fetch_add(&vfs_sysroot->ref_count, 1);
 }
 
 inline struct hbucket*
@@ -203,7 +203,10 @@ __vfs_walk(struct v_dnode* start,
         if ((walk_options & VFS_WALK_FSRELATIVE) && start) {
             start = start->super_block->root;
         } else {
-            start = sysroot;
+            start = vfs_sysroot;
+            if (!vfs_sysroot->mnt) {
+                panick("vfs: no root");
+            }
         }
         i++;
     }
@@ -261,22 +264,22 @@ __vfs_walk(struct v_dnode* start,
                 goto error;
             }
 
-            lock_inode(current_level->inode);
+            struct v_inode* current_inode = current_level->inode;
 
-            errno =
-              current_level->inode->ops.dir_lookup(current_level->inode, dnode);
+            lock_inode(current_inode);
+
+            errno = current_inode->ops->dir_lookup(current_inode, dnode);
 
             if (errno == ENOENT && (walk_options & VFS_WALK_MKPARENT)) {
-                if (!current_level->inode->ops.mkdir) {
+                if (!current_inode->ops->mkdir) {
                     errno = ENOTSUP;
                 } else {
-                    errno = current_level->inode->ops.mkdir(
-                      current_level->inode, dnode);
+                    errno = current_inode->ops->mkdir(current_inode, dnode);
                 }
             }
 
             vfs_dcache_add(current_level, dnode);
-            unlock_inode(current_level->inode);
+            unlock_inode(current_inode);
 
             if (errno) {
                 unlock_dnode(current_level);
@@ -316,16 +319,18 @@ vfs_walk(struct v_dnode* start,
     int errno = __vfs_walk(start, path, &interim, component, options);
     int counter = 0;
 
+    // FIXME This is NOT a correct way to resolve symlink!
     while (!errno && interim->inode && (options & VFS_WALK_NOFOLLOW)) {
         if (counter >= VFS_MAX_SYMLINK) {
             errno = ELOOP;
             continue;
         }
         if ((interim->inode->itype & VFS_IFSYMLINK) &&
-            interim->inode->ops.read_symlink) {
+            interim->inode->ops->read_symlink) {
 
             lock_inode(interim->inode);
-            errno = interim->inode->ops.read_symlink(interim->inode, &pathname);
+            errno =
+              interim->inode->ops->read_symlink(interim->inode, &pathname);
             unlock_inode(interim->inode);
 
             if (errno) {
@@ -346,7 +351,7 @@ vfs_walk(struct v_dnode* start,
 int
 vfs_open(struct v_dnode* dnode, struct v_file** file)
 {
-    if (!dnode->inode || !dnode->inode->ops.open) {
+    if (!dnode->inode || !dnode->inode->ops->open) {
         return ENOTSUP;
     }
 
@@ -369,7 +374,7 @@ vfs_open(struct v_dnode* dnode, struct v_file** file)
         inode->pg_cache = pcache;
     }
 
-    int errno = inode->ops.open(inode, vfile);
+    int errno = inode->ops->open(inode, vfile);
     if (errno) {
         cake_release(file_pile, vfile);
     } else {
@@ -403,9 +408,9 @@ vfs_link(struct v_dnode* to_link, struct v_dnode* name)
     lock_inode(to_link->inode);
     if (to_link->super_block->root != name->super_block->root) {
         errno = EXDEV;
-    } else if (!to_link->inode->ops.link) {
+    } else if (!to_link->inode->ops->link) {
         errno = ENOTSUP;
-    } else if (!(errno = to_link->inode->ops.link(to_link->inode, name))) {
+    } else if (!(errno = to_link->inode->ops->link(to_link->inode, name))) {
         vfs_assign_inode(name, to_link->inode);
     }
     unlock_inode(to_link->inode);
@@ -417,7 +422,7 @@ int
 vfs_close(struct v_file* file)
 {
     int errno = 0;
-    if (!file->ops.close || !(errno = file->ops.close(file))) {
+    if (!(errno = file->ops->close(file))) {
         atomic_fetch_sub(&file->dnode->ref_count, 1);
         file->inode->open_count--;
         mnt_chillax(file->dnode->mnt);
@@ -435,8 +440,9 @@ vfs_fsync(struct v_file* file)
 
     int errno = ENOTSUP;
     pcache_commit_all(file->inode);
-    if (file->ops.sync) {
-        errno = file->ops.sync(file->inode);
+
+    if (file->ops->sync) {
+        errno = file->ops->sync(file);
     }
 
     unlock_inode(file->inode);
@@ -553,42 +559,56 @@ vfs_d_free(struct v_dnode* dnode)
 }
 
 struct v_inode*
-vfs_i_alloc(struct v_superblock* sb,
-            uint32_t inode_id,
-            void (*init)(struct v_inode* inode, void* data),
-            void* data)
+vfs_i_find(struct v_superblock* sb, uint32_t i_id)
 {
-    // 每个超级块儿维护一个inode缓存哈希表。
-    // 他们的hash value自然就是inode id了。
-    struct hbucket* slot = &sb->i_cache[inode_id & VFS_HASH_MASK];
+    struct hbucket* slot = &sb->i_cache[i_id & VFS_HASH_MASK];
     struct v_inode *pos, *n;
     hashtable_bucket_foreach(slot, pos, n, hash_list)
     {
-        if (pos->id == inode_id) {
-            goto done;
+        if (pos->id == i_id) {
+            lru_use_one(inode_lru, &pos->lru);
+            return pos;
         }
     }
 
-    if (!(pos = cake_grab(inode_pile))) {
+    return NULL;
+}
+
+void
+vfs_i_addhash(struct v_inode* inode)
+{
+    struct hbucket* slot = &inode->sb->i_cache[inode->id & VFS_HASH_MASK];
+
+    hlist_delete(&inode->hash_list);
+    hlist_add(&slot->head, &inode->hash_list);
+}
+
+struct v_inode*
+vfs_i_alloc(struct v_superblock* sb)
+{
+    assert(sb->ops.init_inode);
+
+    struct v_inode* inode;
+    if (!(inode = cake_grab(inode_pile))) {
         lru_evict_half(inode_lru);
-        if (!(pos = cake_grab(inode_pile))) {
+        if (!(inode = cake_grab(inode_pile))) {
             return NULL;
         }
     }
 
-    memset(pos, 0, sizeof(*pos));
+    memset(inode, 0, sizeof(*inode));
+    mutex_init(&inode->lock);
 
-    pos->id = inode_id;
+    sb->ops.init_inode(sb, inode);
 
-    mutex_init(&pos->lock);
-
-    init(pos, data);
-
-    hlist_add(&slot->head, &pos->hash_list);
+    inode->sb = sb;
+    inode->ctime = clock_unixtime();
+    inode->atime = inode->ctime;
+    inode->mtime = inode->ctime;
 
 done:
-    lru_use_one(inode_lru, &pos->lru);
-    return pos;
+    lru_use_one(inode_lru, &inode->lru);
+    return inode;
 }
 
 void
@@ -598,7 +618,7 @@ vfs_i_free(struct v_inode* inode)
         pcache_release(inode->pg_cache);
         vfree(inode->pg_cache);
     }
-    inode->ops.sync(inode);
+    inode->ops->sync(inode);
     hlist_delete(&inode->hash_list);
     cake_release(inode_pile, inode);
 }
@@ -606,11 +626,6 @@ vfs_i_free(struct v_inode* inode)
 /* ---- System call definition and support ---- */
 
 #define FLOCATE_CREATE_EMPTY 1
-
-#define DO_STATUS(errno) SYSCALL_ESTATUS(__current->k_status = errno)
-#define DO_STATUS_OR_RETURN(errno) ({ errno < 0 ? DO_STATUS(errno) : errno; })
-
-#define TEST_FD(fd) (fd >= 0 && fd < VFS_MAX_FD)
 
 int
 __vfs_getfd(int fd, struct v_fd** fd_s)
@@ -649,7 +664,7 @@ __vfs_try_locate_file(const char* path,
 
     lock_dnode(parent);
 
-    if (!(errno = parent->inode->ops.create(parent->inode, file_new))) {
+    if (!(errno = parent->inode->ops->create(parent->inode, file_new))) {
         vfs_dcache_add(parent, file_new);
         *file = file_new;
     } else {
@@ -676,11 +691,6 @@ vfs_do_open(const char* path, int options)
     }
 
     struct v_inode* o_inode = ofile->inode;
-    if (!(o_inode->itype & VFS_IFSEQDEV) && !(options & FO_DIRECT)) {
-        // XXX Change here accordingly when signature of pcache_r/w changed.
-        ofile->ops.read = pcache_read;
-        ofile->ops.write = pcache_write;
-    }
 
     if (!errno && !(errno = vfs_alloc_fdslot(&fd))) {
         struct v_fd* fd_s = vzalloc(sizeof(*fd_s));
@@ -746,7 +756,7 @@ __DEFINE_LXSYSCALL2(int, readdir, int, fd, struct dirent*, dent)
 
     lock_inode(inode);
 
-    if (!(fd_s->file->inode->itype & VFS_IFDIR)) {
+    if (!(inode->itype & VFS_IFDIR)) {
         errno = ENOTDIR;
     } else {
         struct dir_context dctx =
@@ -754,25 +764,25 @@ __DEFINE_LXSYSCALL2(int, readdir, int, fd, struct dirent*, dent)
                                 .index = dent->d_offset,
                                 .read_complete_callback =
                                   __vfs_readdir_callback };
+        errno = 1;
         if (dent->d_offset == 0) {
             __vfs_readdir_callback(&dctx, vfs_dot.value, vfs_dot.len, 0);
         } else if (dent->d_offset == 1) {
             __vfs_readdir_callback(&dctx, vfs_ddot.value, vfs_ddot.len, 0);
         } else {
             dctx.index -= 2;
-            if ((errno = fd_s->file->ops.readdir(inode, &dctx))) {
+            if ((errno = fd_s->file->ops->readdir(fd_s->file, &dctx)) != 1) {
                 unlock_inode(inode);
                 goto done;
             }
         }
-        errno = 0;
         dent->d_offset++;
     }
 
     unlock_inode(inode);
 
 done:
-    return DO_STATUS(errno);
+    return DO_STATUS_OR_RETURN(errno);
 }
 
 __DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
@@ -793,8 +803,13 @@ __DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
 
     file->inode->atime = clock_unixtime();
 
-    __SYSCALL_INTERRUPTIBLE(
-      { errno = file->ops.read(file->inode, buf, count, file->f_pos); })
+    __SYSCALL_INTERRUPTIBLE({
+        if ((file->inode->itype & VFS_IFSEQDEV) || (fd_s->flags & FO_DIRECT)) {
+            errno = file->ops->read(file->inode, buf, count, file->f_pos);
+        } else {
+            errno = pcache_read(file->inode, buf, count, file->f_pos);
+        }
+    })
 
     if (errno > 0) {
         file->f_pos += errno;
@@ -826,8 +841,13 @@ __DEFINE_LXSYSCALL3(int, write, int, fd, void*, buf, size_t, count)
 
     file->inode->mtime = clock_unixtime();
 
-    __SYSCALL_INTERRUPTIBLE(
-      { errno = file->ops.write(file->inode, buf, count, file->f_pos); })
+    __SYSCALL_INTERRUPTIBLE({
+        if ((file->inode->itype & VFS_IFSEQDEV) || (fd_s->flags & FO_DIRECT)) {
+            errno = file->ops->write(file->inode, buf, count, file->f_pos);
+        } else {
+            errno = pcache_write(file->inode, buf, count, file->f_pos);
+        }
+    })
 
     if (errno > 0) {
         file->f_pos += errno;
@@ -865,7 +885,7 @@ __DEFINE_LXSYSCALL3(int, lseek, int, fd, int, offset, int, options)
             fpos = offset;
             break;
     }
-    if (!file->ops.seek || !(errno = file->ops.seek(file->inode, fpos))) {
+    if (!(errno = file->ops->seek(file->inode, fpos))) {
         file->f_pos = fpos;
     }
 
@@ -908,10 +928,10 @@ vfs_readlink(struct v_dnode* dnode, char* buf, size_t size)
 {
     const char* link;
     struct v_inode* inode = dnode->inode;
-    if (inode->ops.read_symlink) {
+    if (inode->ops->read_symlink) {
         lock_inode(inode);
 
-        int errno = inode->ops.read_symlink(inode, &link);
+        int errno = inode->ops->read_symlink(inode, &link);
         strncpy(buf, link, size);
 
         unlock_inode(inode);
@@ -1030,7 +1050,7 @@ __DEFINE_LXSYSCALL1(int, rmdir, const char*, pathname)
     lock_inode(parent->inode);
 
     if ((dnode->inode->itype & VFS_IFDIR)) {
-        errno = parent->inode->ops.rmdir(parent->inode, dnode);
+        errno = parent->inode->ops->rmdir(parent->inode, dnode);
         if (!errno) {
             vfs_dcache_remove(dnode);
         }
@@ -1070,11 +1090,11 @@ __DEFINE_LXSYSCALL1(int, mkdir, const char*, path)
 
     if ((parent->super_block->fs->types & FSTYPE_ROFS)) {
         errno = ENOTSUP;
-    } else if (!parent->inode->ops.mkdir) {
+    } else if (!parent->inode->ops->mkdir) {
         errno = ENOTSUP;
     } else if (!(parent->inode->itype & VFS_IFDIR)) {
         errno = ENOTDIR;
-    } else if (!(errno = parent->inode->ops.mkdir(parent->inode, dir))) {
+    } else if (!(errno = parent->inode->ops->mkdir(parent->inode, dir))) {
         vfs_dcache_add(parent, dir);
         goto cleanup;
     }
@@ -1105,7 +1125,7 @@ __vfs_do_unlink(struct v_dnode* dnode)
     } else if (!(inode->itype & VFS_IFDIR)) {
         // The underlying unlink implementation should handle
         //  symlink case
-        errno = inode->ops.unlink(inode);
+        errno = inode->ops->unlink(inode);
         if (!errno) {
             vfs_d_free(dnode);
         }
@@ -1268,14 +1288,14 @@ __DEFINE_LXSYSCALL2(int,
         errno = EROFS;
         goto done;
     }
-    if (!dnode->inode->ops.set_symlink) {
+    if (!dnode->inode->ops->set_symlink) {
         errno = ENOTSUP;
         goto done;
     }
 
     lock_inode(dnode->inode);
 
-    errno = dnode->inode->ops.set_symlink(dnode->inode, link_target);
+    errno = dnode->inode->ops->set_symlink(dnode->inode, link_target);
 
     unlock_inode(dnode->inode);
 
@@ -1405,7 +1425,8 @@ vfs_do_rename(struct v_dnode* current, struct v_dnode* target)
         goto cleanup;
     }
 
-    if ((errno = current->inode->ops.rename(current->inode, current, target))) {
+    if ((errno =
+           current->inode->ops->rename(current->inode, current, target))) {
         unlock_dnode(target);
         goto cleanup;
     }
@@ -1462,49 +1483,4 @@ __DEFINE_LXSYSCALL2(int, rename, const char*, oldpath, const char*, newpath)
 done:
     vfree(name.value);
     return DO_STATUS(errno);
-}
-
-__DEFINE_LXSYSCALL3(int,
-                    mount,
-                    const char*,
-                    source,
-                    const char*,
-                    target,
-                    const char*,
-                    fstype)
-{
-    struct v_dnode *dev, *mnt;
-    int errno = 0;
-
-    if ((errno = vfs_walk(__current->cwd, source, &dev, NULL, 0))) {
-        goto done;
-    }
-
-    if ((errno = vfs_walk(__current->cwd, target, &mnt, NULL, 0))) {
-        goto done;
-    }
-
-    if (mnt->ref_count > 1) {
-        errno = EBUSY;
-        goto done;
-    }
-
-    // By our convention.
-    // XXX could we do better?
-    struct device* device = (struct device*)dev->data;
-
-    if (!(dev->inode->itype & VFS_IFVOLDEV) || !device) {
-        errno = ENOTDEV;
-        goto done;
-    }
-
-    errno = vfs_mount_at(fstype, device, mnt);
-
-done:
-    return DO_STATUS(errno);
-}
-
-__DEFINE_LXSYSCALL1(int, unmount, const char*, target)
-{
-    return vfs_unmount(target);
 }

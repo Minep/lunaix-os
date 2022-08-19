@@ -89,12 +89,23 @@ mnt_chillax(struct v_mount* mnt)
 }
 
 int
+vfs_mount_root(const char* fs_name, struct device* device)
+{
+    int errno = 0;
+    if (vfs_sysroot->mnt && (errno = vfs_unmount_at(vfs_sysroot))) {
+        return errno;
+    }
+    return vfs_mount_at(fs_name, device, vfs_sysroot);
+}
+
+int
 vfs_mount(const char* target, const char* fs_name, struct device* device)
 {
     int errno;
     struct v_dnode* mnt;
 
-    if (!(errno = vfs_walk(__current->cwd, target, &mnt, NULL, 0))) {
+    if (!(errno =
+            vfs_walk(__current->cwd, target, &mnt, NULL, VFS_WALK_MKPARENT))) {
         errno = vfs_mount_at(fs_name, device, mnt);
     }
 
@@ -134,16 +145,22 @@ vfs_mount_at(const char* fs_name,
 
     int errno = 0;
     if (!(errno = fs->mount(sb, mnt_point))) {
+        mnt_point->super_block = sb;
         sb->fs = fs;
         sb->root = mnt_point;
-        mnt_point->super_block = sb;
 
         if (!(mnt_point->mnt = vfs_create_mount(parent_mnt, mnt_point))) {
             errno = ENOMEM;
-            vfs_sb_free(sb);
+            goto cleanup;
         }
+    } else {
+        goto cleanup;
     }
 
+    return errno;
+
+cleanup:
+    vfs_sb_free(sb);
     return errno;
 }
 
@@ -169,4 +186,49 @@ vfs_unmount_at(struct v_dnode* mnt_point)
     }
 
     return errno;
+}
+
+__DEFINE_LXSYSCALL3(int,
+                    mount,
+                    const char*,
+                    source,
+                    const char*,
+                    target,
+                    const char*,
+                    fstype)
+{
+    struct v_dnode *dev, *mnt;
+    int errno = 0;
+
+    if ((errno = vfs_walk(__current->cwd, source, &dev, NULL, 0))) {
+        goto done;
+    }
+
+    if ((errno = vfs_walk(__current->cwd, target, &mnt, NULL, 0))) {
+        goto done;
+    }
+
+    if (mnt->ref_count > 1) {
+        errno = EBUSY;
+        goto done;
+    }
+
+    // By our convention.
+    // XXX could we do better?
+    struct device* device = (struct device*)dev->data;
+
+    if (!(dev->inode->itype & VFS_IFVOLDEV) || !device) {
+        errno = ENOTDEV;
+        goto done;
+    }
+
+    errno = vfs_mount_at(fstype, device, mnt);
+
+done:
+    return DO_STATUS(errno);
+}
+
+__DEFINE_LXSYSCALL1(int, unmount, const char*, target)
+{
+    return vfs_unmount(target);
 }

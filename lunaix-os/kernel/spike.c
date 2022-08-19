@@ -24,3 +24,15 @@ panick(const char* msg)
     asm("int %0" ::"i"(LUNAIX_SYS_PANIC), "D"(msg));
     spin();
 }
+
+void
+panickf(const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    __sprintf_internal(buffer, fmt, 1024, args);
+    va_end(args);
+
+    asm("int %0" ::"i"(LUNAIX_SYS_PANIC), "D"(buffer));
+    spin();
+}

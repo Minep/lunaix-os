@@ -67,18 +67,21 @@ _kernel_pre_init()
 void
 _kernel_init()
 {
-
+    int errno = 0;
     cake_init();
     valloc_init();
 
-    fsm_init();
     vfs_init();
-    twifs_init();
+    fsm_init();
 
     device_init();
 
-    // 挂载 TwiFS 为根目录
-    vfs_mount("/", "twifs", NULL);
+    if ((errno = vfs_mount_root("ramfs", NULL))) {
+        panickf("Fail to mount root. (errno=%d)", errno);
+    }
+
+    // FIXME replace with more specific fs for device.
+    vfs_mount("/dev", "twifs", NULL);
 
     lxconsole_init();
 
