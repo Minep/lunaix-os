@@ -56,22 +56,6 @@
 
 #include <lunaix/fs/twifs.h>
 
-#define PATH_DELIM '/'
-
-#define unlock_inode(inode) mutex_unlock(&inode->lock)
-#define lock_inode(inode)                                                      \
-    ({                                                                         \
-        mutex_lock(&inode->lock);                                              \
-        lru_use_one(inode_lru, &inode->lru);                                   \
-    })
-
-#define unlock_dnode(dnode) mutex_unlock(&dnode->lock)
-#define lock_dnode(dnode)                                                      \
-    ({                                                                         \
-        mutex_lock(&dnode->lock);                                              \
-        lru_use_one(dnode_lru, &dnode->lru);                                   \
-    })
-
 static struct cake_pile* dnode_pile;
 static struct cake_pile* inode_pile;
 static struct cake_pile* file_pile;
@@ -81,7 +65,7 @@ static struct cake_pile* fd_pile;
 struct v_dnode* vfs_sysroot;
 static struct hbucket* dnode_cache;
 
-static struct lru_zone *dnode_lru, *inode_lru;
+struct lru_zone *dnode_lru, *inode_lru;
 
 struct hstr vfs_ddot = HSTR("..", 2);
 struct hstr vfs_dot = HSTR(".", 1);
@@ -192,176 +176,6 @@ vfs_dcache_rehash(struct v_dnode* new_parent, struct v_dnode* dnode)
     hstr_rehash(&dnode->name, HSTR_FULL_HASH);
     vfs_dcache_remove(dnode);
     vfs_dcache_add(new_parent, dnode);
-}
-
-#define VFS_SYMLINK_DEPTH 16
-
-int
-__vfs_walk(struct v_dnode* start,
-           const char* path,
-           struct v_dnode** dentry,
-           struct hstr* component,
-           int walk_options,
-           size_t depth,
-           char* fname_buffer)
-{
-    int errno = 0;
-    int i = 0, j = 0;
-
-    if (depth >= VFS_SYMLINK_DEPTH) {
-        return ENAMETOOLONG;
-    }
-
-    if (path[0] == PATH_DELIM || !start) {
-        if ((walk_options & VFS_WALK_FSRELATIVE) && start) {
-            start = start->super_block->root;
-        } else {
-            start = vfs_sysroot;
-            if (!vfs_sysroot->mnt) {
-                panick("vfs: no root");
-            }
-        }
-        i++;
-    }
-
-    struct v_dnode* dnode;
-    struct v_inode* current_inode;
-    struct v_dnode* current_level = start;
-
-    struct hstr name = HSTR(fname_buffer, 0);
-
-    char current = path[i++], lookahead;
-    while (current && current_level) {
-        lookahead = path[i++];
-        if (current != PATH_DELIM) {
-            if (j >= VFS_NAME_MAXLEN - 1) {
-                return ENAMETOOLONG;
-            }
-            if (!VFS_VALID_CHAR(current)) {
-                return EINVAL;
-            }
-            fname_buffer[j++] = current;
-            if (lookahead) {
-                goto cont;
-            }
-        }
-
-        // handling cases like /^.*(\/+).*$/
-        if (lookahead == PATH_DELIM) {
-            goto cont;
-        }
-
-        fname_buffer[j] = 0;
-        name.len = j;
-        hstr_rehash(&name, HSTR_FULL_HASH);
-
-        if (!lookahead && (walk_options & VFS_WALK_PARENT)) {
-            if (component) {
-                component->hash = name.hash;
-                component->len = j;
-                strcpy(component->value, fname_buffer);
-            }
-            break;
-        }
-
-        current_inode = current_level->inode;
-
-        if ((current_inode->itype & VFS_IFSYMLINK)) {
-            const char* link;
-
-            lock_inode(current_inode);
-            if ((errno =
-                   current_inode->ops->read_symlink(current_inode, &link))) {
-                unlock_inode(current_inode);
-                goto error;
-            }
-            unlock_inode(current_inode);
-
-            errno = __vfs_walk(current_level->parent,
-                               link,
-                               &dnode,
-                               NULL,
-                               0,
-                               depth + 1,
-                               fname_buffer + name.len + 1);
-
-            if (errno) {
-                goto error;
-            }
-
-            // reposition the resolved subtree pointed by symlink
-            vfs_dcache_rehash(current_level->parent, dnode);
-            current_level = dnode;
-            current_inode = dnode->inode;
-        }
-
-        lock_dnode(current_level);
-
-        dnode = vfs_dcache_lookup(current_level, &name);
-
-        if (!dnode) {
-            dnode = vfs_d_alloc(current_level, &name);
-
-            if (!dnode) {
-                errno = ENOMEM;
-                goto error;
-            }
-
-            lock_inode(current_inode);
-
-            errno = current_inode->ops->dir_lookup(current_inode, dnode);
-
-            if (errno == ENOENT && (walk_options & VFS_WALK_MKPARENT)) {
-                if (!current_inode->ops->mkdir) {
-                    errno = ENOTSUP;
-                } else {
-                    errno = current_inode->ops->mkdir(current_inode, dnode);
-                }
-            }
-
-            vfs_dcache_add(current_level, dnode);
-            unlock_inode(current_inode);
-
-            if (errno) {
-                unlock_dnode(current_level);
-                goto cleanup;
-            }
-        }
-
-        unlock_dnode(current_level);
-
-        j = 0;
-        current_level = dnode;
-    cont:
-        current = lookahead;
-    };
-
-    *dentry = current_level;
-    return 0;
-
-cleanup:
-    vfs_d_free(dnode);
-error:
-    *dentry = NULL;
-    return errno;
-}
-
-int
-vfs_walk(struct v_dnode* start,
-         const char* path,
-         struct v_dnode** dentry,
-         struct hstr* component,
-         int options)
-{
-    // allocate a file name stack for path walking and recursion to resolve
-    // symlink
-    char* name_buffer = valloc(2048);
-
-    int errno =
-      __vfs_walk(start, path, dentry, component, options, 0, name_buffer);
-
-    vfree(name_buffer);
-    return errno;
 }
 
 int
@@ -614,6 +428,7 @@ vfs_i_alloc(struct v_superblock* sb)
 
     memset(inode, 0, sizeof(*inode));
     mutex_init(&inode->lock);
+    llist_init_head(&inode->xattrs);
 
     sb->ops.init_inode(sb, inode);
 
@@ -644,7 +459,7 @@ vfs_i_free(struct v_inode* inode)
 #define FLOCATE_CREATE_EMPTY 1
 
 int
-__vfs_getfd(int fd, struct v_fd** fd_s)
+vfs_getfd(int fd, struct v_fd** fd_s)
 {
     if (TEST_FD(fd) && (*fd_s = __current->fdtable->fds[fd])) {
         return 0;
@@ -730,7 +545,7 @@ __DEFINE_LXSYSCALL1(int, close, int, fd)
 {
     struct v_fd* fd_s;
     int errno = 0;
-    if ((errno = __vfs_getfd(fd, &fd_s))) {
+    if ((errno = vfs_getfd(fd, &fd_s))) {
         goto done_err;
     }
 
@@ -764,7 +579,7 @@ __DEFINE_LXSYSCALL2(int, readdir, int, fd, struct dirent*, dent)
     struct v_fd* fd_s;
     int errno;
 
-    if ((errno = __vfs_getfd(fd, &fd_s))) {
+    if ((errno = vfs_getfd(fd, &fd_s))) {
         goto done;
     }
 
@@ -805,7 +620,7 @@ __DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
 {
     int errno = 0;
     struct v_fd* fd_s;
-    if ((errno = __vfs_getfd(fd, &fd_s))) {
+    if ((errno = vfs_getfd(fd, &fd_s))) {
         goto done;
     }
 
@@ -843,7 +658,7 @@ __DEFINE_LXSYSCALL3(int, write, int, fd, void*, buf, size_t, count)
 {
     int errno = 0;
     struct v_fd* fd_s;
-    if ((errno = __vfs_getfd(fd, &fd_s))) {
+    if ((errno = vfs_getfd(fd, &fd_s))) {
         goto done;
     }
 
@@ -881,7 +696,7 @@ __DEFINE_LXSYSCALL3(int, lseek, int, fd, int, offset, int, options)
 {
     int errno = 0;
     struct v_fd* fd_s;
-    if ((errno = __vfs_getfd(fd, &fd_s))) {
+    if ((errno = vfs_getfd(fd, &fd_s))) {
         goto done;
     }
 
@@ -933,7 +748,7 @@ vfs_get_path(struct v_dnode* dnode, char* buf, size_t size, int depth)
     len += cpy_size;
 
     if (len < size) {
-        buf[len++] = PATH_DELIM;
+        buf[len++] = VFS_PATH_DELIM;
     }
 
     return len;
@@ -960,7 +775,7 @@ __DEFINE_LXSYSCALL3(int, realpathat, int, fd, char*, buf, size_t, size)
 {
     int errno;
     struct v_fd* fd_s;
-    if ((errno = __vfs_getfd(fd, &fd_s))) {
+    if ((errno = vfs_getfd(fd, &fd_s))) {
         goto done;
     }
 
@@ -1004,7 +819,7 @@ __DEFINE_LXSYSCALL4(int,
 {
     int errno;
     struct v_fd* fd_s;
-    if ((errno = __vfs_getfd(dirfd, &fd_s))) {
+    if ((errno = vfs_getfd(dirfd, &fd_s))) {
         goto done;
     }
 
@@ -1176,7 +991,7 @@ __DEFINE_LXSYSCALL2(int, unlinkat, int, fd, const char*, pathname)
 {
     int errno;
     struct v_fd* fd_s;
-    if ((errno = __vfs_getfd(fd, &fd_s))) {
+    if ((errno = vfs_getfd(fd, &fd_s))) {
         goto done;
     }
 
@@ -1211,7 +1026,7 @@ __DEFINE_LXSYSCALL1(int, fsync, int, fildes)
 {
     int errno;
     struct v_fd* fd_s;
-    if (!(errno = __vfs_getfd(fildes, &fd_s))) {
+    if (!(errno = vfs_getfd(fildes, &fd_s))) {
         errno = vfs_fsync(fd_s->file);
     }
 
@@ -1242,7 +1057,7 @@ vfs_dup2(int oldfd, int newfd)
 
     int errno;
     struct v_fd *oldfd_s, *newfd_s;
-    if ((errno = __vfs_getfd(oldfd, &oldfd_s))) {
+    if ((errno = vfs_getfd(oldfd, &oldfd_s))) {
         goto done;
     }
 
@@ -1274,7 +1089,7 @@ __DEFINE_LXSYSCALL1(int, dup, int, oldfd)
 {
     int errno, newfd;
     struct v_fd *oldfd_s, *newfd_s;
-    if ((errno = __vfs_getfd(oldfd, &oldfd_s))) {
+    if ((errno = vfs_getfd(oldfd, &oldfd_s))) {
         goto done;
     }
 
@@ -1366,7 +1181,7 @@ __DEFINE_LXSYSCALL1(int, fchdir, int, fd)
     struct v_fd* fd_s;
     int errno = 0;
 
-    if ((errno = __vfs_getfd(fd, &fd_s))) {
+    if ((errno = vfs_getfd(fd, &fd_s))) {
         goto done;
     }
 
@@ -1388,7 +1203,7 @@ __DEFINE_LXSYSCALL2(char*, getcwd, char*, buf, size_t, size)
     size_t len = 0;
 
     if (!__current->cwd) {
-        *buf = PATH_DELIM;
+        *buf = VFS_PATH_DELIM;
         len = 1;
     } else {
         len = vfs_get_path(__current->cwd, buf, size, 0);

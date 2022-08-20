@@ -22,7 +22,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + 内存管理与按需分页（Demand Paging）
 + 键盘输入
 + 多进程
-+ 40个常见的Linux/POSIX系统调用（[附录1](#appendix1)）
++ 44个常见的Linux/POSIX系统调用（[附录1](#appendix1)）
 + 用户模式
 + 信号机制
 + PCI 3.0
@@ -148,7 +148,7 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 
 ## 附录1：支持的系统调用<a id="appendix1"></a>
 
-### Unix/Linux/POSIX
+**Unix/Linux/POSIX**
 1. `sleep(3)`
 1. `wait(2)`
 1. `waitpid(2)`
@@ -170,31 +170,37 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 2. `write(2)`
 2. `open(2)`
 2. `close(2)`
-2. `mkdir(2)`
+2. `mkdir(2)`※
 2. `lseek(2)`
 2. `readdir(2)`
-2. `readlink(2)`
-2. `readlinkat(2)`
-2. `rmdir(2)`
-2. `unlink(2)`
-2. `unlinkat(2)`
-2. `link(2)`
-2. `fsync(2)`
+2. `readlink(2)`※
+2. `readlinkat(2)`※
+2. `rmdir(2)`※
+2. `unlink(2)`※
+2. `unlinkat(2)`※
+2. `link(2)`※
+2. `fsync(2)`※
 2. `dup(2)`
 2. `dup2(2)`
-2. `symlink(2)`
+2. `symlink(2)`※
 2. `chdir(2)`
 2. `fchdir(2)`
 2. `getcwd(2)`
-2. `rename(2)`
+2. `rename(2)`※
 2. `mount(2)`
-2. `unmount` (a.k.a `umount(2)`)
+2. `unmount` (a.k.a `umount(2)`)※
+2. `getxattr(2)`※
+2. `setxattr(2)`※
+2. `fgetxattr(2)`※
+2. `fsetxattr(2)`※
 
-### LunaixOS自有
+**LunaixOS自有**
 
 1. `yield`
 2. `geterrno`
 3. `realpathat`
+
+( **※**：该系统调用暂未经过测试 )
 
 ## 附录2：编译gcc作为交叉编译器<a id="appendix2"></a>
 

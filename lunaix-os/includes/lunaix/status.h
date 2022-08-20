@@ -24,10 +24,9 @@
 #define EISDIR -19
 #define EBUSY -20
 #define EXDEV -21
-#define ELOOP -22
-#define ENODEV -23
-#define ERANGE -24
+#define ENODEV -22
+#define ERANGE -23
 #define ENOMEM LXOUTOFMEM
-#define ENOTDEV -25
+#define ENOTDEV -24
 
 #endif /* __LUNAIX_CODE_H */

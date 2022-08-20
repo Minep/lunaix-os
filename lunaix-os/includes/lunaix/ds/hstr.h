@@ -9,7 +9,7 @@ struct hstr
 {
     uint32_t hash;
     uint32_t len;
-    char* value;
+    const char* value;
 };
 
 #define HSTR(str, length)                                                      \

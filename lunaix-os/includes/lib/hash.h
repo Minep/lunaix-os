@@ -6,7 +6,7 @@
 #define HASH_SIZE_BITS 32
 
 uint32_t
-strhash_32(char* str, uint32_t truncate_to);
+strhash_32(const char* str, uint32_t truncate_to);
 
 /**
  * @brief Simple generic hash function
@@ -18,7 +18,7 @@ strhash_32(char* str, uint32_t truncate_to);
  * @return uint32_t
  */
 inline uint32_t
-hash_32(uint32_t val, uint32_t truncate_to)
+hash_32(const uint32_t val, uint32_t truncate_to)
 {
     return (val * 0x61C88647u) >> (HASH_SIZE_BITS - truncate_to);
 }

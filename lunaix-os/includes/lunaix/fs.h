@@ -9,6 +9,7 @@
 #include <lunaix/ds/llist.h>
 #include <lunaix/ds/lru.h>
 #include <lunaix/ds/mutex.h>
+#include <lunaix/process.h>
 #include <lunaix/status.h>
 #include <stdatomic.h>
 
@@ -31,6 +32,8 @@
 #define VFS_HASH_MASK (VFS_HASHTABLE_SIZE - 1)
 #define VFS_HASHBITS (32 - VFS_HASHTABLE_BITS)
 
+#define VFS_PATH_DELIM '/'
+
 #define FSTYPE_ROFS 0x1
 
 #define DO_STATUS(errno) SYSCALL_ESTATUS(__current->k_status = errno)
@@ -43,6 +46,20 @@
      ('0' <= (chr) && (chr) <= '9') || (chr) == '.' || (chr) == '_' ||         \
      (chr) == '-')
 
+#define unlock_inode(inode) mutex_unlock(&inode->lock)
+#define lock_inode(inode)                                                      \
+    ({                                                                         \
+        mutex_lock(&inode->lock);                                              \
+        lru_use_one(inode_lru, &inode->lru);                                   \
+    })
+
+#define unlock_dnode(dnode) mutex_unlock(&dnode->lock)
+#define lock_dnode(dnode)                                                      \
+    ({                                                                         \
+        mutex_lock(&dnode->lock);                                              \
+        lru_use_one(dnode_lru, &dnode->lru);                                   \
+    })
+
 typedef uint32_t inode_t;
 
 struct v_dnode;
@@ -53,6 +70,7 @@ struct v_file_ops;
 struct v_inode_ops;
 struct v_fd;
 struct pcache;
+struct v_xattr_entry;
 
 extern struct v_file_ops default_file_ops;
 extern struct v_inode_ops default_inode_ops;
@@ -122,6 +140,17 @@ struct v_inode_ops
     int (*rename)(struct v_inode* from_inode,
                   struct v_dnode* from_dnode,
                   struct v_dnode* to_dnode);
+    int (*getxattr)(struct v_inode* this, struct v_xattr_entry* entry);
+    int (*setxattr)(struct v_inode* this, struct v_xattr_entry* entry);
+    int (*delxattr)(struct v_inode* this, struct v_xattr_entry* entry);
+};
+
+struct v_xattr_entry
+{
+    struct llist_header entries;
+    struct hstr name;
+    const void* value;
+    size_t len;
 };
 
 struct v_file
@@ -153,6 +182,7 @@ struct v_inode
     uint32_t link_count;
     uint32_t lb_usage;
     uint32_t fsize;
+    struct llist_header xattrs;
     struct v_superblock* sb;
     struct hlist_node hash_list;
     struct lru_node lru;
@@ -241,12 +271,24 @@ vfs_dcache_lookup(struct v_dnode* parent, struct hstr* str);
 void
 vfs_dcache_add(struct v_dnode* parent, struct v_dnode* dnode);
 
+void
+vfs_dcache_rehash(struct v_dnode* new_parent, struct v_dnode* dnode);
+
+void
+vfs_dcache_remove(struct v_dnode* dnode);
+
 int
 vfs_walk(struct v_dnode* start,
          const char* path,
          struct v_dnode** dentry,
          struct hstr* component,
          int walk_options);
+
+int
+vfs_walk_proc(const char* path,
+              struct v_dnode** dentry,
+              struct hstr* component,
+              int options);
 
 int
 vfs_mount(const char* target, const char* fs_name, struct device* device);
@@ -303,6 +345,9 @@ vfs_i_free(struct v_inode* inode);
 
 int
 vfs_dup_fd(struct v_fd* old, struct v_fd** new);
+
+int
+vfs_getfd(int fd, struct v_fd** fd_s);
 
 void
 pcache_init(struct pcache* pcache);
@@ -396,5 +441,14 @@ default_inode_rmdir(struct v_inode* this, struct v_dnode* dir);
 
 int
 default_inode_mkdir(struct v_inode* this, struct v_dnode* dir);
+
+struct v_xattr_entry*
+xattr_new(struct hstr* name);
+
+struct v_xattr_entry*
+xattr_getcache(struct v_inode* inode, struct hstr* name);
+
+void
+xattr_addcache(struct v_inode* inode, struct v_xattr_entry* xattr);
 
 #endif /* __LUNAIX_VFS_H */

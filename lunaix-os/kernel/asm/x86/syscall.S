@@ -51,6 +51,10 @@
         .long __lxsys_rename
         .long __lxsys_mount
         .long __lxsys_unmount
+        .long __lxsys_getxattr
+        .long __lxsys_setxattr      /* 45 */
+        .long __lxsys_fgetxattr
+        .long __lxsys_fsetxattr
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
             .long 0

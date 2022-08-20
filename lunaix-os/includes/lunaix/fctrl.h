@@ -36,4 +36,48 @@ __LXSYSCALL3(int,
 
 __LXSYSCALL1(int, unmount, const char*, target)
 
+__LXSYSCALL4(int,
+             getxattr,
+             const char*,
+             path,
+             const char*,
+             name,
+             void*,
+             value,
+             size_t,
+             len)
+
+__LXSYSCALL4(int,
+             setxattr,
+             const char*,
+             path,
+             const char*,
+             name,
+             void*,
+             value,
+             size_t,
+             len)
+
+__LXSYSCALL4(int,
+             fgetxattr,
+             int,
+             fd,
+             const char*,
+             name,
+             void*,
+             value,
+             size_t,
+             len)
+
+__LXSYSCALL4(int,
+             fsetxattr,
+             int,
+             fd,
+             const char*,
+             name,
+             void*,
+             value,
+             size_t,
+             len)
+
 #endif /* __LUNAIX_FCTRL_H */

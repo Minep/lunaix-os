@@ -49,6 +49,10 @@
 #define __SYSCALL_rename 41
 #define __SYSCALL_mount 42
 #define __SYSCALL_unmount 43
+#define __SYSCALL_getxattr 44
+#define __SYSCALL_setxattr 45
+#define __SYSCALL_fgetxattr 46
+#define __SYSCALL_fsetxattr 47
 
 #define __SYSCALL_MAX 0x100
 
