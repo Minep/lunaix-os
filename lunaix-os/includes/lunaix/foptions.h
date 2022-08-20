@@ -9,4 +9,6 @@
 #define FSEEK_CUR 0x2
 #define FSEEK_END 0x3
 
+#define MNT_RO 0x1
+
 #endif /* __LUNAIX_FOPTIONS_H */

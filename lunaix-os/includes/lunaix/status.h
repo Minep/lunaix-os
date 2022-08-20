@@ -28,5 +28,6 @@
 #define ERANGE -23
 #define ENOMEM LXOUTOFMEM
 #define ENOTDEV -24
+#define EOVERFLOW -25
 
 #endif /* __LUNAIX_CODE_H */

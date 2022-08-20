@@ -25,14 +25,16 @@ __LXSYSCALL4(int,
 
 __LXSYSCALL3(int, realpathat, int, fd, char*, buf, size_t, size)
 
-__LXSYSCALL3(int,
+__LXSYSCALL4(int,
              mount,
              const char*,
              source,
              const char*,
              target,
              const char*,
-             fstype)
+             fstype,
+             int,
+             options)
 
 __LXSYSCALL1(int, unmount, const char*, target)
 

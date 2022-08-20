@@ -104,6 +104,7 @@ vfs_init()
 
     // 创建一个根dnode。
     vfs_sysroot = vfs_d_alloc(NULL, &vfs_empty);
+    vfs_sysroot->parent = vfs_sysroot;
     atomic_fetch_add(&vfs_sysroot->ref_count, 1);
 }
 
@@ -126,7 +127,7 @@ vfs_dcache_lookup(struct v_dnode* parent, struct hstr* str)
         return parent;
 
     if (HSTR_EQ(str, &vfs_ddot)) {
-        return parent->parent ? parent->parent : parent;
+        return parent->parent;
     }
 
     uint32_t hash = str->hash;
@@ -235,6 +236,10 @@ vfs_link(struct v_dnode* to_link, struct v_dnode* name)
 {
     int errno;
 
+    if ((errno = vfs_check_writable(to_link))) {
+        return errno;
+    }
+
     lock_inode(to_link->inode);
     if (to_link->super_block->root != name->super_block->root) {
         errno = EXDEV;
@@ -266,11 +271,16 @@ vfs_close(struct v_file* file)
 int
 vfs_fsync(struct v_file* file)
 {
+    int errno;
+    if ((errno = vfs_check_writable(file->dnode))) {
+        return errno;
+    }
+
     lock_inode(file->inode);
 
-    int errno = ENOTSUP;
     pcache_commit_all(file->inode);
 
+    errno = ENOTSUP;
     if (file->ops->sync) {
         errno = file->ops->sync(file);
     }
@@ -476,8 +486,7 @@ __vfs_try_locate_file(const char* path,
     char name_str[VFS_NAME_MAXLEN];
     struct hstr name = HSTR(name_str, 0);
     int errno;
-    if ((errno =
-           vfs_walk(__current->cwd, path, fdir, &name, VFS_WALK_PARENT))) {
+    if ((errno = vfs_walk_proc(path, fdir, &name, VFS_WALK_PARENT))) {
         return errno;
     }
 
@@ -663,6 +672,11 @@ __DEFINE_LXSYSCALL3(int, write, int, fd, void*, buf, size_t, count)
     }
 
     struct v_file* file = fd_s->file;
+
+    if ((errno = vfs_check_writable(file->dnode))) {
+        goto done;
+    }
+
     if ((file->inode->itype & VFS_IFDIR)) {
         errno = EISDIR;
         goto done;
@@ -702,21 +716,30 @@ __DEFINE_LXSYSCALL3(int, lseek, int, fd, int, offset, int, options)
 
     struct v_file* file = fd_s->file;
 
+    if (!file->ops->seek) {
+        errno = ENOTSUP;
+        goto done;
+    }
+
     lock_inode(file->inode);
 
-    size_t fpos = file->f_pos;
+    int overflow = 0;
+    int fpos = file->f_pos;
     switch (options) {
         case FSEEK_CUR:
-            fpos = (size_t)((int)file->f_pos + offset);
+            overflow = __builtin_sadd_overflow((int)file->f_pos, offset, &fpos);
             break;
         case FSEEK_END:
-            fpos = (size_t)((int)file->inode->fsize + offset);
+            overflow =
+              __builtin_sadd_overflow((int)file->inode->fsize, offset, &fpos);
             break;
         case FSEEK_SET:
             fpos = offset;
             break;
     }
-    if (!(errno = file->ops->seek(file->inode, fpos))) {
+    if (overflow) {
+        errno = EOVERFLOW;
+    } else if (!(errno = file->ops->seek(file->inode, fpos))) {
         file->f_pos = fpos;
     }
 
@@ -729,12 +752,12 @@ done:
 int
 vfs_get_path(struct v_dnode* dnode, char* buf, size_t size, int depth)
 {
-    if (!dnode) {
+    if (!dnode || dnode->parent == dnode) {
         return 0;
     }
 
     if (depth > 64) {
-        return ELOOP;
+        return ENAMETOOLONG;
     }
 
     size_t len = vfs_get_path(dnode->parent, buf, size, depth + 1);
@@ -743,13 +766,11 @@ vfs_get_path(struct v_dnode* dnode, char* buf, size_t size, int depth)
         return len;
     }
 
+    buf[len++] = VFS_PATH_DELIM;
+
     size_t cpy_size = MIN(dnode->name.len, size - len);
     strncpy(buf + len, dnode->name.value, cpy_size);
     len += cpy_size;
-
-    if (len < size) {
-        buf[len++] = VFS_PATH_DELIM;
-    }
 
     return len;
 }
@@ -794,8 +815,7 @@ __DEFINE_LXSYSCALL3(int, readlink, const char*, path, char*, buf, size_t, size)
 {
     int errno;
     struct v_dnode* dnode;
-    if (!(errno =
-            vfs_walk(__current->cwd, path, &dnode, NULL, VFS_WALK_NOFOLLOW))) {
+    if (!(errno = vfs_walk_proc(path, &dnode, NULL, VFS_WALK_NOFOLLOW))) {
         errno = vfs_readlink(dnode, buf, size);
     }
 
@@ -849,11 +869,15 @@ __DEFINE_LXSYSCALL1(int, rmdir, const char*, pathname)
 {
     int errno;
     struct v_dnode* dnode;
-    if ((errno = vfs_walk(__current->cwd, pathname, &dnode, NULL, 0))) {
+    if ((errno = vfs_walk_proc(pathname, &dnode, NULL, 0))) {
         return DO_STATUS(errno);
     }
 
     lock_dnode(dnode);
+
+    if ((errno = vfs_check_writable(dnode))) {
+        goto done;
+    }
 
     if ((dnode->super_block->fs->types & FSTYPE_ROFS)) {
         errno = EROFS;
@@ -904,17 +928,18 @@ __DEFINE_LXSYSCALL1(int, mkdir, const char*, path)
     char name_value[VFS_NAME_MAXLEN];
     struct hstr name = HHSTR(name_value, 0, 0);
 
-    if (!dir) {
+    if ((errno = vfs_walk_proc(path, &parent, &name, VFS_WALK_PARENT))) {
+        goto done;
+    }
+
+    if ((errno = vfs_check_writable(parent))) {
+        goto done;
+    }
+
+    if (!(dir = vfs_d_alloc(parent, &name))) {
         errno = ENOMEM;
         goto done;
     }
-
-    if ((errno =
-           vfs_walk(__current->cwd, path, &parent, &name, VFS_WALK_PARENT))) {
-        goto done;
-    }
-
-    dir = vfs_d_alloc(parent, &name);
 
     lock_dnode(parent);
     lock_inode(parent->inode);
@@ -942,15 +967,19 @@ done:
 int
 __vfs_do_unlink(struct v_dnode* dnode)
 {
+    int errno;
     struct v_inode* inode = dnode->inode;
 
     if (dnode->ref_count > 1) {
         return EBUSY;
     }
 
+    if ((errno = vfs_check_writable(dnode))) {
+        return errno;
+    }
+
     lock_inode(inode);
 
-    int errno;
     if (inode->open_count) {
         errno = EBUSY;
     } else if (!(inode->itype & VFS_IFDIR)) {
@@ -973,11 +1002,7 @@ __DEFINE_LXSYSCALL1(int, unlink, const char*, pathname)
 {
     int errno;
     struct v_dnode* dnode;
-    if ((errno = vfs_walk(__current->cwd, pathname, &dnode, NULL, 0))) {
-        goto done;
-    }
-    if ((dnode->super_block->fs->types & FSTYPE_ROFS)) {
-        errno = EROFS;
+    if ((errno = vfs_walk_proc(pathname, &dnode, NULL, 0))) {
         goto done;
     }
 
@@ -1026,6 +1051,7 @@ __DEFINE_LXSYSCALL1(int, fsync, int, fildes)
 {
     int errno;
     struct v_fd* fd_s;
+
     if (!(errno = vfs_getfd(fildes, &fd_s))) {
         errno = vfs_fsync(fd_s->file);
     }
@@ -1112,13 +1138,14 @@ __DEFINE_LXSYSCALL2(int,
 {
     int errno;
     struct v_dnode* dnode;
-    if ((errno = vfs_walk(__current->cwd, pathname, &dnode, NULL, 0))) {
+    if ((errno = vfs_walk_proc(pathname, &dnode, NULL, 0))) {
         goto done;
     }
-    if ((dnode->super_block->fs->types & FSTYPE_ROFS)) {
-        errno = EROFS;
+
+    if (errno = vfs_check_writable(dnode)) {
         goto done;
     }
+
     if (!dnode->inode->ops->set_symlink) {
         errno = ENOTSUP;
         goto done;
@@ -1166,7 +1193,7 @@ __DEFINE_LXSYSCALL1(int, chdir, const char*, path)
     struct v_dnode* dnode;
     int errno = 0;
 
-    if ((errno = vfs_walk(__current->cwd, path, &dnode, NULL, 0))) {
+    if ((errno = vfs_walk_proc(path, &dnode, NULL, 0))) {
         goto done;
     }
 
@@ -1225,9 +1252,14 @@ done:
 int
 vfs_do_rename(struct v_dnode* current, struct v_dnode* target)
 {
+    int errno = 0;
     if (current->inode->id == target->inode->id) {
         // hard link
         return 0;
+    }
+
+    if (errno = vfs_check_writable(current)) {
+        return errno;
     }
 
     if (current->ref_count > 1 || target->ref_count > 1) {
@@ -1237,8 +1269,6 @@ vfs_do_rename(struct v_dnode* current, struct v_dnode* target)
     if (current->super_block != target->super_block) {
         return EXDEV;
     }
-
-    int errno = 0;
 
     struct v_dnode* oldparent = current->parent;
     struct v_dnode* newparent = target->parent;
@@ -1287,7 +1317,7 @@ __DEFINE_LXSYSCALL2(int, rename, const char*, oldpath, const char*, newpath)
     struct hstr name = HSTR(valloc(VFS_NAME_MAXLEN), 0);
     int errno = 0;
 
-    if ((errno = vfs_walk(__current->cwd, oldpath, &cur, NULL, 0))) {
+    if ((errno = vfs_walk_proc(oldpath, &cur, NULL, 0))) {
         goto done;
     }
 

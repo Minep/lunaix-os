@@ -1,3 +1,4 @@
+#include <lunaix/foptions.h>
 #include <lunaix/fs.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/process.h>
@@ -95,18 +96,21 @@ vfs_mount_root(const char* fs_name, struct device* device)
     if (vfs_sysroot->mnt && (errno = vfs_unmount_at(vfs_sysroot))) {
         return errno;
     }
-    return vfs_mount_at(fs_name, device, vfs_sysroot);
+    return vfs_mount_at(fs_name, device, vfs_sysroot, 0);
 }
 
 int
-vfs_mount(const char* target, const char* fs_name, struct device* device)
+vfs_mount(const char* target,
+          const char* fs_name,
+          struct device* device,
+          int options)
 {
     int errno;
     struct v_dnode* mnt;
 
     if (!(errno =
             vfs_walk(__current->cwd, target, &mnt, NULL, VFS_WALK_MKPARENT))) {
-        errno = vfs_mount_at(fs_name, device, mnt);
+        errno = vfs_mount_at(fs_name, device, mnt, options);
     }
 
     return errno;
@@ -128,7 +132,8 @@ vfs_unmount(const char* target)
 int
 vfs_mount_at(const char* fs_name,
              struct device* device,
-             struct v_dnode* mnt_point)
+             struct v_dnode* mnt_point,
+             int options)
 {
     if (mnt_point->inode && !(mnt_point->inode->itype & VFS_IFDIR)) {
         return ENOTDIR;
@@ -153,6 +158,8 @@ vfs_mount_at(const char* fs_name,
             errno = ENOMEM;
             goto cleanup;
         }
+
+        mnt_point->mnt->flags = options;
     } else {
         goto cleanup;
     }
@@ -188,14 +195,25 @@ vfs_unmount_at(struct v_dnode* mnt_point)
     return errno;
 }
 
-__DEFINE_LXSYSCALL3(int,
+int
+vfs_check_writable(struct v_dnode* dnode)
+{
+    if ((dnode->mnt->flags & MNT_RO)) {
+        return EROFS;
+    }
+    return 0;
+}
+
+__DEFINE_LXSYSCALL4(int,
                     mount,
                     const char*,
                     source,
                     const char*,
                     target,
                     const char*,
-                    fstype)
+                    fstype,
+                    int,
+                    options)
 {
     struct v_dnode *dev, *mnt;
     int errno = 0;
@@ -222,7 +240,7 @@ __DEFINE_LXSYSCALL3(int,
         goto done;
     }
 
-    errno = vfs_mount_at(fstype, device, mnt);
+    errno = vfs_mount_at(fstype, device, mnt, options);
 
 done:
     return DO_STATUS(errno);

@@ -2,6 +2,7 @@
 #include <lunaix/tty/tty.h>
 
 #include <lunaix/device.h>
+#include <lunaix/foptions.h>
 #include <lunaix/lxconsole.h>
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/pmm.h>
@@ -81,7 +82,7 @@ _kernel_init()
     }
 
     // FIXME replace with more specific fs for device.
-    vfs_mount("/dev", "twifs", NULL);
+    vfs_mount("/dev", "twifs", NULL, MNT_RO);
 
     lxconsole_init();
 

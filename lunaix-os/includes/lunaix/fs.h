@@ -120,7 +120,7 @@ struct v_file_ops
     int (*write)(struct v_inode* inode, void* buffer, size_t len, size_t fpos);
     int (*read)(struct v_inode* inode, void* buffer, size_t len, size_t fpos);
     int (*readdir)(struct v_file* file, struct dir_context* dctx);
-    int (*seek)(struct v_inode* inode, size_t offset);
+    int (*seek)(struct v_inode* inode, size_t offset); // optional
     int (*close)(struct v_file* file);
     int (*sync)(struct v_file* file);
 };
@@ -140,9 +140,12 @@ struct v_inode_ops
     int (*rename)(struct v_inode* from_inode,
                   struct v_dnode* from_dnode,
                   struct v_dnode* to_dnode);
-    int (*getxattr)(struct v_inode* this, struct v_xattr_entry* entry);
-    int (*setxattr)(struct v_inode* this, struct v_xattr_entry* entry);
-    int (*delxattr)(struct v_inode* this, struct v_xattr_entry* entry);
+    int (*getxattr)(struct v_inode* this,
+                    struct v_xattr_entry* entry); // optional
+    int (*setxattr)(struct v_inode* this,
+                    struct v_xattr_entry* entry); // optional
+    int (*delxattr)(struct v_inode* this,
+                    struct v_xattr_entry* entry); // optional
 };
 
 struct v_xattr_entry
@@ -202,6 +205,7 @@ struct v_mount
     struct v_dnode* mnt_point;
     struct v_superblock* super_block;
     uint32_t busy_counter;
+    int flags;
 };
 
 struct v_dnode
@@ -291,7 +295,10 @@ vfs_walk_proc(const char* path,
               int options);
 
 int
-vfs_mount(const char* target, const char* fs_name, struct device* device);
+vfs_mount(const char* target,
+          const char* fs_name,
+          struct device* device,
+          int options);
 
 int
 vfs_unmount(const char* target);
@@ -299,7 +306,8 @@ vfs_unmount(const char* target);
 int
 vfs_mount_at(const char* fs_name,
              struct device* device,
-             struct v_dnode* mnt_point);
+             struct v_dnode* mnt_point,
+             int options);
 
 int
 vfs_unmount_at(struct v_dnode* mnt_point);
@@ -406,6 +414,9 @@ vfs_mount_root(const char* fs_name, struct device* device);
 
 struct v_mount*
 vfs_create_mount(struct v_mount* parent, struct v_dnode* mnt_point);
+
+int
+vfs_check_writable(struct v_dnode* dnode);
 
 int
 default_file_read(struct v_inode* inode, void* buffer, size_t len, size_t fpos);

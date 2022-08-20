@@ -21,7 +21,7 @@ __vfs_walk(struct v_dnode* start,
     int i = 0, j = 0;
 
     if (depth >= VFS_SYMLINK_DEPTH) {
-        return ENAMETOOLONG;
+        return ELOOP;
     }
 
     if (path[0] == VFS_PATH_DELIM || !start) {
@@ -36,6 +36,8 @@ __vfs_walk(struct v_dnode* start,
         i++;
     }
 
+    assert(start);
+
     struct v_dnode* dnode;
     struct v_inode* current_inode;
     struct v_dnode* current_level = start;
@@ -43,7 +45,7 @@ __vfs_walk(struct v_dnode* start,
     struct hstr name = HSTR(fname_buffer, 0);
 
     char current = path[i++], lookahead;
-    while (current && current_level) {
+    while (current) {
         lookahead = path[i++];
         if (current != VFS_PATH_DELIM) {
             if (j >= VFS_NAME_MAXLEN - 1) {
