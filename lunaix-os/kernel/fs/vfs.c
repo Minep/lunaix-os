@@ -367,6 +367,7 @@ vfs_d_alloc(struct v_dnode* parent, struct hstr* name)
 
     if (parent) {
         dnode->super_block = parent->super_block;
+        dnode->mnt = parent->mnt;
     }
 
     lru_use_one(dnode_lru, &dnode->lru);

@@ -233,7 +233,7 @@ __DEFINE_LXSYSCALL4(int,
 
     // By our convention.
     // XXX could we do better?
-    struct device* device = (struct device*)dev->data;
+    struct device* device = (struct device*)dev->inode->data;
 
     if (!(dev->inode->itype & VFS_IFVOLDEV) || !device) {
         errno = ENOTDEV;

@@ -1,4 +1,5 @@
 #include <lunaix/fs.h>
+#include <lunaix/fs/devfs.h>
 #include <lunaix/fs/ramfs.h>
 #include <lunaix/fs/twifs.h>
 
@@ -7,5 +8,7 @@ fsm_register_all()
 {
     ramfs_init();
     twifs_init();
-    // Add more fs implementation
+    devfs_init();
+
+    // ... more fs implementation
 }

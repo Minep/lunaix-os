@@ -46,8 +46,8 @@ __do_reserved_memory(int unlock);
 
 #define USE_DEMO
 // #define DEMO_SIGNAL
-#define DEMO_READDIR
-//#define DEMO_IOTEST
+//#define DEMO_READDIR
+#define DEMO_IOTEST
 
 extern void
 _pconsole_main();
@@ -90,6 +90,7 @@ __proc0_usr()
 #else
         _lxinit_main();
 #endif
+        _exit(0);
     }
 
     waitpid(p, 0, 0);

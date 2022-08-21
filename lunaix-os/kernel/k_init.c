@@ -72,19 +72,17 @@ _kernel_init()
     cake_init();
     valloc_init();
 
+    lxconsole_init();
+
     vfs_init();
     fsm_init();
-
-    device_init();
 
     if ((errno = vfs_mount_root("ramfs", NULL))) {
         panickf("Fail to mount root. (errno=%d)", errno);
     }
 
-    // FIXME replace with more specific fs for device.
-    vfs_mount("/dev", "twifs", NULL, MNT_RO);
-
-    lxconsole_init();
+    vfs_mount("/dev", "devfs", NULL, 0);
+    vfs_mount("/sys", "twifs", NULL, MNT_RO);
 
     sched_init();
 
