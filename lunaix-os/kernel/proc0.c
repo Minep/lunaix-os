@@ -46,8 +46,9 @@ __do_reserved_memory(int unlock);
 
 #define USE_DEMO
 // #define DEMO_SIGNAL
-//#define DEMO_READDIR
-#define DEMO_IOTEST
+// #define DEMO_READDIR
+// #define DEMO_IOTEST
+#define DEMO_INPUT_TEST
 
 extern void
 _pconsole_main();
@@ -64,6 +65,9 @@ _readdir_main();
 extern void
 _iotest_main();
 
+extern void
+input_test();
+
 void __USER__
 __proc0_usr()
 {
@@ -74,9 +78,9 @@ __proc0_usr()
     int stdin = dup2(stdout, 1);
 
     pid_t p;
-    if (!fork()) {
-        _pconsole_main();
-    }
+    // if (!fork()) {
+    //     _pconsole_main();
+    // }
 
     if (!(p = fork())) {
 #ifndef USE_DEMO
@@ -87,6 +91,8 @@ __proc0_usr()
         _readdir_main();
 #elif defined DEMO_IOTEST
         _iotest_main();
+#elif defined DEMO_INPUT_TEST
+        input_test();
 #else
         _lxinit_main();
 #endif

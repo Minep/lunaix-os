@@ -2,6 +2,7 @@
 #include <hal/ioapic.h>
 #include <lunaix/clock.h>
 #include <lunaix/common.h>
+#include <lunaix/input.h>
 #include <lunaix/peripheral/ps2kbd.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
@@ -17,7 +18,6 @@
 LOG_MODULE("PS2KBD");
 
 static struct ps2_cmd_queue cmd_q;
-static struct ps2_key_buffer key_buf;
 static struct ps2_kbd_state kbd_state;
 
 #define KEY_NUM(x) (x + 0x30)
@@ -69,6 +69,8 @@ static kbd_keycode_t scancode_set2_shift[] = {
 
 // clang-format on
 
+static struct input_device* kbd_idev;
+
 #define KBD_STATE_KWAIT 0x00
 #define KBD_STATE_KSPECIAL 0x01
 #define KBD_STATE_KRELEASED 0x02
@@ -79,8 +81,6 @@ static kbd_keycode_t scancode_set2_shift[] = {
 
 void
 intr_ps2_kbd_handler(const isr_param* param);
-static struct kdb_keyinfo_pkt*
-ps2_keybuffer_next_write();
 
 void
 ps2_device_post_cmd(char cmd, char arg)
@@ -107,14 +107,14 @@ ps2_kbd_init()
 {
 
     memset(&cmd_q, 0, sizeof(cmd_q));
-    memset(&key_buf, 0, sizeof(key_buf));
     memset(&kbd_state, 0, sizeof(kbd_state));
 
     mutex_init(&cmd_q.mutex);
-    mutex_init(&key_buf.mutex);
 
     kbd_state.translation_table = scancode_set2;
     kbd_state.state = KBD_STATE_KWAIT;
+
+    kbd_idev = input_add_device("i8042-kbd");
 
     acpi_context* acpi_ctx = acpi_get_context();
     if (acpi_ctx->fadt.header.rev > 1) {
@@ -132,13 +132,13 @@ ps2_kbd_init()
          *      https://bochs.sourceforge.io/cgi-bin/lxr/source/bios/rombios32.c#L1314
          */
         if (!(acpi_ctx->fadt.boot_arch & IAPC_ARCH_8042)) {
-            kprintf(KERROR "No PS/2 controller detected.\n");
+            kprintf(KERROR "i8042: not found\n");
             // FUTURE: Some alternative fallback on this? Check PCI bus for USB
             // controller instead?
             return;
         }
     } else {
-        kprintf(KWARN "Outdated FADT used, assuming 8042 always exist.\n");
+        kprintf(KWARN "i8042: outdated FADT used, assuming exists.\n");
     }
 
     char result;
@@ -271,14 +271,13 @@ kbd_buffer_key_event(kbd_keycode_t key, uint8_t scancode, kbd_kstate_t state)
         key = key & (0xffdf |
                      -('a' > key || key > 'z' || !(state & KBD_KEY_FCAPSLKED)));
 
-        if (!mutex_on_hold(&key_buf.mutex)) {
-            struct kdb_keyinfo_pkt* keyevent_pkt = ps2_keybuffer_next_write();
-            *keyevent_pkt =
-              (struct kdb_keyinfo_pkt){ .keycode = key,
-                                        .scancode = scancode,
-                                        .state = state,
-                                        .timestamp = clock_systime() };
-        }
+        struct input_evt_pkt ipkt = {
+            .pkt_type = (state & KBD_KEY_FPRESSED) ? PKT_PRESS : PKT_RELEASE,
+            .scan_code = scancode,
+            .sys_code = key,
+        };
+
+        input_fire_event(kbd_idev, &ipkt);
 
         return;
     }
@@ -419,37 +418,4 @@ ps2_issue_dev_cmd(char cmd, uint16_t arg)
         ;
 
     return io_inb(PS2_PORT_ENC_CMDREG);
-}
-
-int
-kbd_recv_key(struct kdb_keyinfo_pkt* key_event)
-{
-    if (!key_buf.buffered_len) {
-        return 0;
-    }
-
-    mutex_lock(&key_buf.mutex);
-    *key_event = key_buf.buffer[key_buf.read_ptr];
-    key_buf.buffered_len--;
-    key_buf.read_ptr = (key_buf.read_ptr + 1) % PS2_KBD_RECV_BUFFER_SIZE;
-
-    mutex_unlock(&key_buf.mutex);
-    return 1;
-}
-
-static struct kdb_keyinfo_pkt*
-ps2_keybuffer_next_write()
-{
-    int index =
-      (key_buf.read_ptr + key_buf.buffered_len) % PS2_KBD_RECV_BUFFER_SIZE;
-    if (index == key_buf.read_ptr && key_buf.buffered_len) {
-        // the reader is lagged so much such that the buffer is full.
-        // It is suggested to read from beginning for nearly up-to-date
-        // readings.
-        key_buf.read_ptr = 0;
-        key_buf.buffered_len = index;
-    } else {
-        key_buf.buffered_len++;
-    }
-    return &key_buf.buffer[index];
 }

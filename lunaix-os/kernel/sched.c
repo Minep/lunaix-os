@@ -94,7 +94,7 @@ check_sleepers()
 
         if (wtime && now >= wtime) {
             pos->sleep.wakeup_time = 0;
-            pos->state = PS_STOPPED;
+            pos->state = PS_READY;
         }
 
         if (atime && now >= atime) {
@@ -123,7 +123,7 @@ schedule()
     int ptr = prev_ptr;
 
     if (!(__current->state & ~PS_RUNNING)) {
-        __current->state = PS_STOPPED;
+        __current->state = PS_READY;
     }
 
     check_sleepers();
@@ -133,7 +133,7 @@ redo:
     do {
         ptr = (ptr + 1) % sched_ctx.ptable_len;
         next = &sched_ctx._procs[ptr];
-    } while (next->state != PS_STOPPED && ptr != prev_ptr);
+    } while (next->state != PS_READY && ptr != prev_ptr);
 
     sched_ctx.procs_index = ptr;
 
@@ -148,6 +148,7 @@ redo:
 void
 sched_yieldk()
 {
+    cpu_enable_interrupt();
     cpu_int(LUNAIX_SCHED);
 }
 
@@ -233,7 +234,7 @@ repeat:
                 status_flags |= PEXITTERM;
                 goto done;
             }
-            if (proc->state == PS_STOPPED && (options & WUNTRACED)) {
+            if (proc->state == PS_READY && (options & WUNTRACED)) {
                 status_flags |= PEXITSTOP;
                 goto done;
             }
@@ -283,6 +284,7 @@ alloc_process()
     llist_init_head(&proc->children);
     llist_init_head(&proc->grp_member);
     llist_init_head(&proc->sleep.sleepers);
+    waitq_init(&proc->waitqueue);
 
     return proc;
 }
@@ -304,7 +306,7 @@ commit_process(struct proc_info* process)
 
     llist_append(&process->parent->children, &process->siblings);
 
-    process->state = PS_STOPPED;
+    process->state = PS_READY;
 }
 
 // from <kernel/process.c>

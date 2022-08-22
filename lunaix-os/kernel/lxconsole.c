@@ -1,5 +1,6 @@
 #include <klibc/string.h>
 #include <lunaix/device.h>
+#include <lunaix/input.h>
 #include <lunaix/keyboard.h>
 #include <lunaix/lxconsole.h>
 #include <lunaix/mm/pmm.h>
@@ -16,6 +17,34 @@ __tty_write(struct device* dev, void* buf, size_t offset, size_t len);
 
 int
 __tty_read(struct device* dev, void* buf, size_t offset, size_t len);
+
+static waitq_t lx_reader;
+static volatile char key;
+
+int
+__lxconsole_listener(struct input_device* dev)
+{
+    uint32_t keycode = dev->current_pkt.sys_code;
+    uint32_t type = dev->current_pkt.pkt_type;
+    if (type == PKT_PRESS) {
+        if (keycode == KEY_UP) {
+            console_view_up();
+        } else if (keycode == KEY_DOWN) {
+            console_view_down();
+        }
+        goto done;
+    }
+    if ((keycode & 0xff00) > KEYPAD) {
+        goto done;
+    }
+
+    key = (char)(keycode & 0x00ff);
+
+    pwake_all(&lx_reader);
+
+done:
+    return INPUT_EVT_NEXT;
+}
 
 void
 lxconsole_init()
@@ -43,6 +72,9 @@ lxconsole_init()
     struct device* tty_dev = device_addseq(NULL, &lx_console, "tty");
     tty_dev->write = __tty_write;
     tty_dev->read = __tty_read;
+
+    waitq_init(&lx_reader);
+    input_add_listener(__lxconsole_listener);
 }
 
 int
@@ -55,7 +87,6 @@ __tty_write(struct device* dev, void* buf, size_t offset, size_t len)
 int
 __tty_read(struct device* dev, void* buf, size_t offset, size_t len)
 {
-    struct kdb_keyinfo_pkt keyevent;
     struct console* console = (struct console*)dev->underlay;
 
     size_t count = fifo_read(&console->input, buf, len);
@@ -64,30 +95,16 @@ __tty_read(struct device* dev, void* buf, size_t offset, size_t len)
     }
 
     while (count < len) {
-        // FIXME RACE!
-        //  Consider two process that is polling the input key simultaneously.
-        //  When a key is arrived, one of the processes will win the race and
-        //  swallow it (advancing the key buffer pointer)
-        if (!kbd_recv_key(&keyevent)) {
-            sched_yieldk();
-            continue;
-        }
-        if (!(keyevent.state & KBD_KEY_FPRESSED)) {
-            continue;
-        }
-        if ((keyevent.keycode & 0xff00) > KEYPAD) {
-            continue;
-        }
+        pwait(&lx_reader);
 
-        char c = (char)(keyevent.keycode & 0x00ff);
-        if (c == 0x08) {
+        if (key == 0x08) {
             if (fifo_backone(&console->input)) {
-                console_write_char(c);
+                console_write_char(key);
             }
             continue;
         }
-        console_write_char(c);
-        if (!fifo_putone(&console->input, c) || c == '\n') {
+        console_write_char(key);
+        if (!fifo_putone(&console->input, key) || key == '\n') {
             break;
         }
     }

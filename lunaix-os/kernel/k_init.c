@@ -3,6 +3,7 @@
 
 #include <lunaix/device.h>
 #include <lunaix/foptions.h>
+#include <lunaix/input.h>
 #include <lunaix/lxconsole.h>
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/pmm.h>
@@ -72,10 +73,9 @@ _kernel_init()
     cake_init();
     valloc_init();
 
-    lxconsole_init();
-
     vfs_init();
     fsm_init();
+    input_init();
 
     if ((errno = vfs_mount_root("ramfs", NULL))) {
         panickf("Fail to mount root. (errno=%d)", errno);
@@ -83,6 +83,8 @@ _kernel_init()
 
     vfs_mount("/dev", "devfs", NULL, 0);
     vfs_mount("/sys", "twifs", NULL, MNT_RO);
+
+    lxconsole_init();
 
     sched_init();
 

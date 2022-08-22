@@ -5,6 +5,7 @@
 
 #include <lunaix/ds/hstr.h>
 #include <lunaix/ds/llist.h>
+#include <lunaix/types.h>
 
 #define DEV_MSKIF 0x00000003
 
@@ -28,6 +29,13 @@ struct device
 };
 
 struct device*
+device_add(struct device* parent,
+           void* underlay,
+           char* name_fmt,
+           uint32_t type,
+           va_list args);
+
+struct device*
 device_addseq(struct device* parent, void* underlay, char* name_fmt, ...);
 
 struct device*
@@ -43,7 +51,10 @@ struct device*
 device_getbyid(struct llist_header* devlist, dev_t id);
 
 struct device*
-device_getbyname(struct llist_header* devlist, struct hstr* name);
+device_getbyhname(struct llist_header* devlist, struct hstr* name);
+
+struct device*
+device_getbyname(struct llist_header* devlist, const char* name, size_t len);
 
 struct device*
 device_getbyoffset(struct llist_header* devlist, int pos);

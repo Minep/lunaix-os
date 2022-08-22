@@ -9,11 +9,11 @@ static DEFINE_LLIST(root_list);
 static volatile dev_t devid = 0;
 
 struct device*
-__device_add(struct device* parent,
-             void* underlay,
-             char* name_fmt,
-             uint32_t type,
-             va_list args)
+device_add(struct device* parent,
+           void* underlay,
+           char* name_fmt,
+           uint32_t type,
+           va_list args)
 {
     struct device* dev = vzalloc(sizeof(struct device));
 
@@ -43,7 +43,7 @@ device_addseq(struct device* parent, void* underlay, char* name_fmt, ...)
     va_start(args, name_fmt);
 
     struct device* dev =
-      __device_add(parent, underlay, name_fmt, DEV_IFSEQ, args);
+      device_add(parent, underlay, name_fmt, DEV_IFSEQ, args);
 
     va_end(args);
     return dev;
@@ -56,7 +56,7 @@ device_addvol(struct device* parent, void* underlay, char* name_fmt, ...)
     va_start(args, name_fmt);
 
     struct device* dev =
-      __device_add(parent, underlay, name_fmt, DEV_IFVOL, args);
+      device_add(parent, underlay, name_fmt, DEV_IFVOL, args);
 
     va_end(args);
     return dev;
@@ -68,7 +68,7 @@ device_addcat(struct device* parent, char* name_fmt, ...)
     va_list args;
     va_start(args, name_fmt);
 
-    struct device* dev = __device_add(parent, NULL, name_fmt, DEV_IFCAT, args);
+    struct device* dev = device_add(parent, NULL, name_fmt, DEV_IFCAT, args);
 
     va_end(args);
     return dev;
@@ -90,7 +90,7 @@ device_getbyid(struct llist_header* devlist, dev_t id)
 }
 
 struct device*
-device_getbyname(struct llist_header* devlist, struct hstr* name)
+device_getbyhname(struct llist_header* devlist, struct hstr* name)
 {
     devlist = devlist ? devlist : &root_list;
     struct device *pos, *n;
@@ -102,6 +102,15 @@ device_getbyname(struct llist_header* devlist, struct hstr* name)
     }
 
     return NULL;
+}
+
+struct device*
+device_getbyname(struct llist_header* devlist, const char* name, size_t len)
+{
+    struct hstr hname = HSTR(name, len);
+    hstr_rehash(&hname, HSTR_FULL_HASH);
+
+    return device_getbyhname(devlist, &hname);
 }
 
 void

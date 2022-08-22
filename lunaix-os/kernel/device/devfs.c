@@ -74,7 +74,7 @@ devfs_mknod(struct v_dnode* dnode, struct device* dev)
 int
 devfs_dirlookup(struct v_inode* this, struct v_dnode* dnode)
 {
-    struct device* dev = device_getbyname(this->data, &dnode->name);
+    struct device* dev = device_getbyhname(this->data, &dnode->name);
     if (!dev) {
         return ENOENT;
     }
