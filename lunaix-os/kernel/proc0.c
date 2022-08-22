@@ -27,6 +27,8 @@
 
 #include <klibc/string.h>
 
+#include <ulibc/stdio.h>
+
 LOG_MODULE("PROC0")
 
 extern void
@@ -74,8 +76,8 @@ __proc0_usr()
     // 打开tty设备(控制台)，作为标准输入输出。
     //  tty设备属于序列设备（Sequential Device），该类型设备的上层读写
     //  无须经过Lunaix的缓存层，而是直接下发到底层驱动。（不受FO_DIRECT的影响）
-    int stdout = open("/dev/tty", 0);
-    int stdin = dup2(stdout, 1);
+    int fdstdout = open("/dev/tty", 0);
+    int fdstdin = dup2(stdout, 1);
 
     pid_t p;
     // if (!fork()) {
@@ -96,6 +98,7 @@ __proc0_usr()
 #else
         _lxinit_main();
 #endif
+        printf("==== test end ====\n");
         _exit(0);
     }
 
@@ -148,9 +151,6 @@ init_platform()
     // 锁定所有系统预留页（内存映射IO，ACPI之类的），并且进行1:1映射
     lock_reserved_memory();
 
-    // we are using no kalloc!
-    // assert_msg(kalloc_init(), "Fail to initialize heap");
-
     rtc_init();
     acpi_init(_k_init_mb_info);
     apic_init();
@@ -161,8 +161,6 @@ init_platform()
     pci_init();
     block_init();
     ahci_init();
-    // ahci_list_device();
-    // cake_stats();
 
     syscall_install();
 

@@ -50,22 +50,8 @@ void
 lxconsole_init()
 {
     memset(&lx_console, 0, sizeof(lx_console));
-    fifo_init(&lx_console.output, VGA_BUFFER_VADDR + 0x1000, 8192, 0);
+    fifo_init(&lx_console.output, vzalloc(8192), 8192, 0);
     fifo_init(&lx_console.input, valloc(4096), 4096, 0);
-
-    // FIXME use valloc to allocate console buffer.
-    // In doing this, the console buffer can only be accessed from kernel mode
-    //  any direct write to this buffer from user land should be purged!
-
-    // 分配控制台缓存
-    for (size_t i = 0; i < PG_ALIGN(lx_console.output.size); i += PG_SIZE) {
-        uintptr_t pa = pmm_alloc_page(KERNEL_PID, 0);
-        vmm_set_mapping(PD_REFERENCED,
-                        (uintptr_t)lx_console.output.data + i,
-                        pa,
-                        PG_PREM_URW,
-                        0);
-    }
 
     lx_console.flush_timer = NULL;
 

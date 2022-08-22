@@ -22,7 +22,7 @@ device_add(struct device* parent,
     }
 
     size_t strlen =
-      __sprintf_internal(dev->name_val, name_fmt, DEVICE_NAME_SIZE, args);
+      __ksprintf_internal(dev->name_val, name_fmt, DEVICE_NAME_SIZE, args);
 
     dev->dev_id = devid++;
     dev->name = HSTR(dev->name_val, strlen);

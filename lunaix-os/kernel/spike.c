@@ -7,7 +7,7 @@ static char buffer[1024];
 void
 __assert_fail(const char* expr, const char* file, unsigned int line)
 {
-    sprintf(buffer, "%s (%s:%u)", expr, file, line);
+    ksprintf(buffer, "%s (%s:%u)", expr, file, line);
 
     // Here we load the buffer's address into %edi ("D" constraint)
     //  This is a convention we made that the LUNAIX_SYS_PANIC syscall will
@@ -30,7 +30,7 @@ panickf(const char* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    __sprintf_internal(buffer, fmt, 1024, args);
+    __ksprintf_internal(buffer, fmt, 1024, args);
     va_end(args);
 
     asm("int %0" ::"i"(LUNAIX_SYS_PANIC), "D"(buffer));

@@ -2,6 +2,7 @@
 #include <lunaix/foptions.h>
 #include <lunaix/input.h>
 #include <lunaix/lunistd.h>
+#include <ulibc/stdio.h>
 
 #define STDIN 1
 #define STDOUT 0
@@ -12,21 +13,26 @@ input_test()
     int fd = open("/dev/input/i8042-kbd", 0);
 
     if (fd < 0) {
-        write(STDOUT, "fail to open", 13);
+        printf("fail to open (%d)", fd);
         return;
     }
 
     struct input_evt_pkt event;
 
     while (read(fd, &event, sizeof(event)) > 0) {
+        char* action;
         if (event.pkt_type == PKT_PRESS) {
-            write(STDOUT, "PRESSED: ", 10);
+            action = "pressed";
         } else {
-            write(STDOUT, "RELEASE: ", 10);
+            action = "release";
         }
-        char c = event.sys_code & 0xff;
-        write(STDOUT, &c, 1);
-        write(STDOUT, "\n", 2);
+
+        printf("%u: %s '%c', class=0x%x, scan=%d\n",
+               event.timestamp,
+               action,
+               event.sys_code & 0xff,
+               (event.sys_code & 0xff00) >> 8,
+               event.scan_code);
     }
     return;
 }
