@@ -50,7 +50,8 @@ __do_reserved_memory(int unlock);
 // #define DEMO_SIGNAL
 // #define DEMO_READDIR
 // #define DEMO_IOTEST
-#define DEMO_INPUT_TEST
+// #define DEMO_INPUT_TEST
+#define DEMO_SIMPLE_SH
 
 extern void
 _pconsole_main();
@@ -69,6 +70,9 @@ _iotest_main();
 
 extern void
 input_test();
+
+extern void
+sh_main();
 
 void __USER__
 __proc0_usr()
@@ -95,6 +99,8 @@ __proc0_usr()
         _iotest_main();
 #elif defined DEMO_INPUT_TEST
         input_test();
+#elif defined DEMO_SIMPLE_SH
+        sh_main();
 #else
         _lxinit_main();
 #endif

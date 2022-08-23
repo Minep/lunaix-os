@@ -84,7 +84,9 @@ devfs_dirlookup(struct v_inode* this, struct v_dnode* dnode)
 int
 devfs_readdir(struct v_file* file, struct dir_context* dctx)
 {
-    struct device* dev = device_getbyoffset(file->inode->data, dctx->index);
+    struct device* holder = (struct device*)(file->inode->data);
+    struct device* dev =
+      device_getbyoffset(holder ? &holder->children : NULL, dctx->index);
     if (!dev) {
         return 0;
     }

@@ -19,6 +19,9 @@ device_add(struct device* parent,
 
     if (parent) {
         assert((parent->dev_type & DEV_MSKIF) == DEV_IFCAT);
+        llist_append(&parent->children, &dev->siblings);
+    } else {
+        llist_append(&root_list, &dev->siblings);
     }
 
     size_t strlen =
@@ -31,7 +34,7 @@ device_add(struct device* parent,
     dev->dev_type = type;
 
     hstr_rehash(&dev->name, HSTR_FULL_HASH);
-    llist_append(&root_list, &dev->siblings);
+    llist_init_head(&dev->children);
 
     return dev;
 }

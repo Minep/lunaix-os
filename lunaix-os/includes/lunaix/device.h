@@ -18,6 +18,7 @@ typedef unsigned int dev_t;
 struct device
 {
     struct llist_header siblings;
+    struct llist_header children;
     struct device* parent;
     struct hstr name;
     dev_t dev_id;

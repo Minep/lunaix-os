@@ -18,12 +18,16 @@ strrtrim(char* str)
     str[l + 1] = '\0';
 }
 
-void*
+char*
 strltrim_safe(char* str)
 {
     size_t l = 0;
     char c = 0;
-    while ((c = str[l++]) && WS_CHAR(c))
-        ;
+    while ((c = str[l]) && WS_CHAR(c)) {
+        l++;
+    }
+
+    if (!l)
+        return str;
     return strcpy(str, str + l);
 }

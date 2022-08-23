@@ -42,6 +42,7 @@
 volatile static inode_t ino = 0;
 
 extern const struct v_inode_ops ramfs_inode_ops;
+extern const struct v_file_ops ramfs_file_ops;
 
 int
 ramfs_readdir(struct v_file* file, struct dir_context* dctx)
@@ -88,7 +89,7 @@ ramfs_inode_init(struct v_superblock* vsb, struct v_inode* inode)
 {
     inode->id = ino++;
     inode->ops = &ramfs_inode_ops;
-    inode->default_fops = &default_file_ops;
+    inode->default_fops = &ramfs_file_ops;
 }
 
 int
@@ -128,3 +129,9 @@ const struct v_inode_ops ramfs_inode_ops = { .mkdir = ramfs_mkdir,
                                              .create = ramfs_create,
                                              .open = default_inode_open,
                                              .rename = default_inode_rename };
+
+const struct v_file_ops ramfs_file_ops = { .readdir = ramfs_readdir,
+                                           .close = default_file_close,
+                                           .read = default_file_read,
+                                           .write = default_file_write,
+                                           .seek = default_file_seek };

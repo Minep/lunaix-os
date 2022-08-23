@@ -487,6 +487,8 @@ __vfs_try_locate_file(const char* path,
     char name_str[VFS_NAME_MAXLEN];
     struct hstr name = HSTR(name_str, 0);
     int errno;
+
+    name_str[0] = 0;
     if ((errno = vfs_walk_proc(path, fdir, &name, VFS_WALK_PARENT))) {
         return errno;
     }
