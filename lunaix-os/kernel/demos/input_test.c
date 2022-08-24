@@ -2,6 +2,7 @@
 #include <lunaix/foptions.h>
 #include <lunaix/input.h>
 #include <lunaix/lunistd.h>
+#include <lunaix/proc.h>
 #include <ulibc/stdio.h>
 
 #define STDIN 1
@@ -13,7 +14,7 @@ input_test()
     int fd = open("/dev/input/i8042-kbd", 0);
 
     if (fd < 0) {
-        printf("fail to open (%d)", fd);
+        printf("fail to open (%d)", geterrno());
         return;
     }
 
@@ -27,7 +28,7 @@ input_test()
             action = "release";
         }
 
-        printf("%u: %s '%c', class=0x%x, scan=%d\n",
+        printf("%u: %s '%c', class=0x%x, scan=%x\n",
                event.timestamp,
                action,
                event.sys_code & 0xff,

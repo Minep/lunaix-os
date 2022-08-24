@@ -52,12 +52,12 @@ struct device*
 device_getbyid(struct llist_header* devlist, dev_t id);
 
 struct device*
-device_getbyhname(struct llist_header* devlist, struct hstr* name);
+device_getbyhname(struct device* root_dev, struct hstr* name);
 
 struct device*
-device_getbyname(struct llist_header* devlist, const char* name, size_t len);
+device_getbyname(struct device* root_dev, const char* name, size_t len);
 
 struct device*
-device_getbyoffset(struct llist_header* devlist, int pos);
+device_getbyoffset(struct device* root_dev, int pos);
 
 #endif /* __LUNAIX_DEVICE_H */

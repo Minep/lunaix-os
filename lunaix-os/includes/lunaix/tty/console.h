@@ -9,8 +9,8 @@ struct console
     struct lx_timer* flush_timer;
     struct fifo_buf output;
     struct fifo_buf input;
-    unsigned int erd_pos;
-    unsigned int lines;
+    size_t wnd_start;
+    size_t lines;
 };
 
 #endif /* __LUNAIX_CONSOLE_H */

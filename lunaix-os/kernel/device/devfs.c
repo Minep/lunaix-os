@@ -74,7 +74,8 @@ devfs_mknod(struct v_dnode* dnode, struct device* dev)
 int
 devfs_dirlookup(struct v_inode* this, struct v_dnode* dnode)
 {
-    struct device* dev = device_getbyhname(this->data, &dnode->name);
+    struct device* dev =
+      device_getbyhname((struct device*)this->data, &dnode->name);
     if (!dev) {
         return ENOENT;
     }
@@ -84,9 +85,8 @@ devfs_dirlookup(struct v_inode* this, struct v_dnode* dnode)
 int
 devfs_readdir(struct v_file* file, struct dir_context* dctx)
 {
-    struct device* holder = (struct device*)(file->inode->data);
     struct device* dev =
-      device_getbyoffset(holder ? &holder->children : NULL, dctx->index);
+      device_getbyoffset((struct device*)(file->inode->data), dctx->index);
     if (!dev) {
         return 0;
     }

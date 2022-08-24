@@ -74,9 +74,12 @@ static struct input_device* kbd_idev;
 #define KBD_STATE_KWAIT 0x00
 #define KBD_STATE_KSPECIAL 0x01
 #define KBD_STATE_KRELEASED 0x02
+#define KBD_STATE_E012 0x03
+#define KBD_STATE_KRELEASED_E0 0x04
 #define KBD_STATE_CMDPROCS 0x40
 
-#define KBD_ENABLE_SPIRQ_FIX
+// #define KBD_ENABLE_SPIRQ_FIX
+#define KBD_ENABLE_SPIRQ_FIX2
 // #define KBD_DBGLOG
 
 void
@@ -336,6 +339,12 @@ intr_ps2_kbd_handler(const isr_param* param)
     }
 #endif
 
+#ifdef KBD_ENABLE_SPIRQ_FIX2
+    if (scancode == PS2_RESULT_ACK || scancode == PS2_RESULT_NAK) {
+        return;
+    }
+#endif
+
 #ifdef KBD_DBGLOG
     kprintf(KDEBUG "%x\n", scancode & 0xff);
 #endif
@@ -353,8 +362,10 @@ intr_ps2_kbd_handler(const isr_param* param)
             }
             break;
         case KBD_STATE_KSPECIAL:
-            if (scancode == 0xf0) { // release code
-                kbd_state.state = KBD_STATE_KRELEASED;
+            if (scancode == 0x12) {
+                kbd_state.state = KBD_STATE_E012;
+            } else if (scancode == 0xf0) { // release code
+                kbd_state.state = KBD_STATE_KRELEASED_E0;
             } else {
                 key = kbd_state.translation_table[scancode];
                 kbd_buffer_key_event(key, scancode, KBD_KEY_FPRESSED);
@@ -363,10 +374,23 @@ intr_ps2_kbd_handler(const isr_param* param)
                 kbd_state.translation_table = scancode_set2;
             }
             break;
+        // handle the '0xE0, 0x12, 0xE0, xx' sequence
+        case KBD_STATE_E012:
+            if (scancode == 0xe0) {
+                kbd_state.state = KBD_STATE_KSPECIAL;
+                kbd_state.translation_table = scancode_set2_ex;
+            }
+            break;
+        case KBD_STATE_KRELEASED_E0:
+            if (scancode == 0x12) {
+                goto escape_release;
+            }
+            // fall through
         case KBD_STATE_KRELEASED:
             key = kbd_state.translation_table[scancode];
             kbd_buffer_key_event(key, scancode, KBD_KEY_FRELEASED);
 
+        escape_release:
             // reset the translation table to scancode_set2
             kbd_state.state = KBD_STATE_KWAIT;
             kbd_state.translation_table = scancode_set2;

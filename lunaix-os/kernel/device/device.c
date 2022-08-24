@@ -93,9 +93,9 @@ device_getbyid(struct llist_header* devlist, dev_t id)
 }
 
 struct device*
-device_getbyhname(struct llist_header* devlist, struct hstr* name)
+device_getbyhname(struct device* root_dev, struct hstr* name)
 {
-    devlist = devlist ? devlist : &root_list;
+    struct llist_header* devlist = root_dev ? &root_dev->children : &root_list;
     struct device *pos, *n;
     llist_for_each(pos, n, devlist, siblings)
     {
@@ -108,12 +108,12 @@ device_getbyhname(struct llist_header* devlist, struct hstr* name)
 }
 
 struct device*
-device_getbyname(struct llist_header* devlist, const char* name, size_t len)
+device_getbyname(struct device* root_dev, const char* name, size_t len)
 {
     struct hstr hname = HSTR(name, len);
     hstr_rehash(&hname, HSTR_FULL_HASH);
 
-    return device_getbyhname(devlist, &hname);
+    return device_getbyhname(root_dev, &hname);
 }
 
 void
@@ -124,9 +124,9 @@ device_remove(struct device* dev)
 }
 
 struct device*
-device_getbyoffset(struct llist_header* devlist, int offset)
+device_getbyoffset(struct device* root_dev, int offset)
 {
-    devlist = devlist ? devlist : &root_list;
+    struct llist_header* devlist = root_dev ? &root_dev->children : &root_list;
     struct device *pos, *n;
     int off = 0;
     llist_for_each(pos, n, devlist, siblings)

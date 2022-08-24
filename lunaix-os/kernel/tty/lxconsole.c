@@ -27,9 +27,9 @@ __lxconsole_listener(struct input_device* dev)
     uint32_t keycode = dev->current_pkt.sys_code;
     uint32_t type = dev->current_pkt.pkt_type;
     if (type == PKT_PRESS) {
-        if (keycode == KEY_UP) {
+        if (keycode == KEY_PG_UP) {
             console_view_up();
-        } else if (keycode == KEY_DOWN) {
+        } else if (keycode == KEY_PG_DOWN) {
             console_view_down();
         }
         goto done;
@@ -50,7 +50,7 @@ void
 lxconsole_init()
 {
     memset(&lx_console, 0, sizeof(lx_console));
-    fifo_init(&lx_console.output, vzalloc(8192), 8192, 0);
+    fifo_init(&lx_console.output, valloc(8192), 8192, 0);
     fifo_init(&lx_console.input, valloc(4096), 4096, 0);
 
     lx_console.flush_timer = NULL;
@@ -103,36 +103,43 @@ console_schedule_flush()
     // TODO make the flush on-demand rather than periodic
 }
 
+size_t
+__find_next_line(size_t start)
+{
+    size_t p = start - 1;
+    struct fifo_buf* buffer = &lx_console.output;
+    do {
+        p = (p + 1) % buffer->size;
+    } while (p != buffer->wr_pos && ((char*)buffer->data)[p] != '\n');
+    return p + (((char*)buffer->data)[p] == '\n');
+}
+
+size_t
+__find_prev_line(size_t start)
+{
+    size_t p = start - 1;
+    struct fifo_buf* buffer = &lx_console.output;
+    do {
+        p--;
+    } while (p < lx_console.wnd_start && p != buffer->wr_pos &&
+             ((char*)buffer->data)[p] != '\n');
+
+    if (p > lx_console.wnd_start) {
+        return 0;
+    }
+    return p + 1;
+}
+
 void
 console_view_up()
 {
     struct fifo_buf* buffer = &lx_console.output;
     mutex_lock(&buffer->lock);
-    size_t p = lx_console.erd_pos - 2;
-    while (p < lx_console.erd_pos && p != buffer->wr_pos &&
-           ((char*)buffer->data)[p] != '\n') {
-        p--;
-    }
-    p++;
-
-    if (p > lx_console.erd_pos) {
-        p = 0;
-    }
-
+    fifo_set_rdptr(buffer, __find_prev_line(buffer->rd_pos));
     buffer->flags |= FIFO_DIRTY;
-    lx_console.erd_pos = p;
     mutex_unlock(&buffer->lock);
-}
 
-size_t
-__find_next_line(size_t start)
-{
-    size_t p = start;
-    while (p != lx_console.output.wr_pos &&
-           ((char*)lx_console.output.data)[p] != '\n') {
-        p = (p + 1) % lx_console.output.size;
-    }
-    return p + 1;
+    console_flush();
 }
 
 void
@@ -141,9 +148,13 @@ console_view_down()
     struct fifo_buf* buffer = &lx_console.output;
     mutex_lock(&buffer->lock);
 
-    lx_console.erd_pos = __find_next_line(lx_console.erd_pos);
+    size_t wnd = lx_console.wnd_start;
+    size_t p = __find_next_line(buffer->rd_pos);
+    fifo_set_rdptr(buffer, p > wnd ? wnd : p);
     buffer->flags |= FIFO_DIRTY;
     mutex_unlock(&buffer->lock);
+
+    console_flush();
 }
 
 void
@@ -156,52 +167,49 @@ console_flush()
         return;
     }
 
-    tty_flush_buffer(lx_console.output.data,
-                     lx_console.erd_pos,
-                     lx_console.output.wr_pos,
-                     lx_console.output.size);
+    size_t rdpos_save = lx_console.output.rd_pos;
+    tty_flush_buffer(&lx_console.output);
+    fifo_set_rdptr(&lx_console.output, rdpos_save);
+
     lx_console.output.flags &= ~FIFO_DIRTY;
 }
 
 void
 console_write(struct console* console, uint8_t* data, size_t size)
 {
+    struct fifo_buf* fbuf = &console->output;
     mutex_lock(&console->output.lock);
-    uint8_t* buffer = console->output.data;
-    uintptr_t ptr = console->output.wr_pos;
-    uintptr_t rd_ptr = console->output.rd_pos;
+    fifo_set_rdptr(fbuf, console->wnd_start);
+
+    uint8_t* buffer = fbuf->data;
+    uintptr_t ptr = fbuf->wr_pos;
+    uintptr_t rd_ptr = fbuf->rd_pos;
 
     char c;
-    int lines = 0;
     int j = 0;
     for (size_t i = 0; i < size; i++) {
         c = data[i];
         if (!c) {
             continue;
         }
-        buffer[(ptr + j) % console->output.size] = c;
-        lines += (c == '\n');
+        if (c == '\n') {
+            console->lines++;
+        }
+        buffer[(ptr + j) % fbuf->size] = c;
         j++;
     }
 
-    size = j;
+    fifo_set_wrptr(fbuf, (ptr + j) % fbuf->size);
 
-    uintptr_t new_ptr = (ptr + size) % console->output.size;
-    console->output.wr_pos = new_ptr;
-
-    if (console->lines > TTY_HEIGHT && lines > 0) {
-        console->output.rd_pos =
-          __find_next_line((size + rd_ptr) % console->output.size);
+    while (console->lines >= TTY_HEIGHT) {
+        rd_ptr = __find_next_line(rd_ptr);
+        console->lines--;
     }
 
-    if (new_ptr < ptr + size && new_ptr > rd_ptr) {
-        console->output.rd_pos = new_ptr;
-    }
-
-    console->lines += lines;
-    console->erd_pos = console->output.rd_pos;
-    console->output.flags |= FIFO_DIRTY;
-    mutex_unlock(&console->output.lock);
+    fifo_set_rdptr(&lx_console.output, rd_ptr);
+    console->wnd_start = rd_ptr;
+    fbuf->flags |= FIFO_DIRTY;
+    mutex_unlock(&fbuf->lock);
 }
 
 void

@@ -67,9 +67,11 @@ sh_main()
     char buf[512];
     char *cmd, *argpart;
 
+    printf("\n Simple shell. Use <PG_UP> or <PG_DOWN> to scroll.\n\n");
+
     while (1) {
         getcwd(pwd, 512);
-        printf("%s> ", pwd);
+        printf("%s$ ", pwd);
         size_t sz = read(stdin, buf, 512);
         if (sz < 0) {
             printf("fail to read user input (%d)\n", geterrno());
@@ -77,6 +79,9 @@ sh_main()
         }
         buf[sz - 1] = '\0';
         parse_cmdline(buf, &cmd, &argpart);
+        if (cmd[0] == 0) {
+            goto cont;
+        }
         if (streq(cmd, "cd")) {
             if (chdir(argpart) < 0) {
                 sh_printerr();
@@ -100,6 +105,7 @@ sh_main()
         } else {
             printf("unknow command");
         }
+    cont:
         printf("\n");
     }
 }

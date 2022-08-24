@@ -23,6 +23,15 @@ fifo_backone(struct fifo_buf* fbuf);
 size_t
 fifo_putone(struct fifo_buf* fbuf, uint8_t data);
 
+size_t
+fifo_readone_async(struct fifo_buf* fbuf, uint8_t* data);
+
+void
+fifo_set_rdptr(struct fifo_buf* fbuf, size_t rdptr);
+
+void
+fifo_set_wrptr(struct fifo_buf* fbuf, size_t wrptr);
+
 void
 fifo_init(struct fifo_buf* buf, void* data_buffer, size_t buf_size, int flags);
 

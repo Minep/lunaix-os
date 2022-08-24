@@ -54,6 +54,43 @@ fifo_putone(struct fifo_buf* fbuf, uint8_t data)
 }
 
 size_t
+fifo_readone_async(struct fifo_buf* fbuf, uint8_t* data)
+{
+    if (fbuf->free_len == fbuf->size) {
+        return 0;
+    }
+
+    uint8_t* dest = fbuf->data;
+    *data = dest[fbuf->rd_pos];
+    fbuf->rd_pos = (fbuf->rd_pos + 1) % fbuf->size;
+    fbuf->free_len++;
+
+    return 1;
+}
+
+void
+fifo_set_rdptr(struct fifo_buf* fbuf, size_t rdptr)
+{
+    fbuf->rd_pos = rdptr;
+    if (rdptr <= fbuf->wr_pos) {
+        fbuf->free_len = fbuf->size - fbuf->wr_pos + rdptr;
+    } else {
+        fbuf->free_len = rdptr - fbuf->wr_pos;
+    }
+}
+
+void
+fifo_set_wrptr(struct fifo_buf* fbuf, size_t wrptr)
+{
+    fbuf->wr_pos = wrptr;
+    if (wrptr <= fbuf->rd_pos) {
+        fbuf->free_len = fbuf->size - fbuf->rd_pos + wrptr;
+    } else {
+        fbuf->free_len = wrptr - fbuf->rd_pos;
+    }
+}
+
+size_t
 fifo_write(struct fifo_buf* fbuf, void* data, size_t count)
 {
     size_t wr_count = 0, wr_pos = fbuf->wr_pos;

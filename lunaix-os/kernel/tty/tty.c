@@ -10,18 +10,21 @@ vga_attribute* tty_vga_buffer = (vga_attribute*)VGA_BUFFER_PADDR;
 
 vga_attribute tty_theme_color = VGA_COLOR_BLACK;
 
-#define TTY_CLEAR                                                              \
-    asm volatile("rep stosw" ::"D"(tty_vga_buffer),                            \
-                 "c"(TTY_HEIGHT * TTY_WIDTH),                                  \
-                 "a"(tty_theme_color)                                          \
+inline void
+tty_clear()
+{
+    asm volatile("rep stosw" ::"D"(tty_vga_buffer),
+                 "c"(TTY_HEIGHT * TTY_WIDTH),
+                 "a"(tty_theme_color)
                  : "memory");
+}
 
 void
 tty_init(void* vga_buf)
 {
     tty_vga_buffer = (vga_attribute*)vga_buf;
 
-    TTY_CLEAR
+    tty_clear();
 
     io_outb(0x3D4, 0x0A);
     io_outb(0x3D5, (io_inb(0x3D5) & 0xC0) | 13);
@@ -36,23 +39,19 @@ tty_set_theme(vga_attribute fg, vga_attribute bg)
     tty_theme_color = (bg << 4 | fg) << 8;
 }
 
-size_t
-tty_flush_buffer(char* data, size_t pos, size_t limit, size_t buf_size)
+void
+tty_flush_buffer(struct fifo_buf* buf)
 {
     int x = 0, y = 0;
 
     // Clear screen
-    TTY_CLEAR
+    tty_clear();
 
+    char chr;
     int state = 0;
     int g[2] = { 0, 0 };
     vga_attribute current_theme = tty_theme_color;
-    while (1) {
-        size_t ptr = pos % buf_size;
-        if (pos == limit) {
-            break;
-        }
-        char chr = data[pos];
+    while (fifo_readone_async(buf, &chr)) {
         if (state == 0 && chr == '\033') {
             state = 1;
         } else if (state == 1 && chr == '[') {
@@ -105,10 +104,8 @@ tty_flush_buffer(char* data, size_t pos, size_t limit, size_t buf_size)
                 break;
             }
         }
-        pos++;
     }
     tty_set_cursor(x, y);
-    return pos;
 }
 
 void
