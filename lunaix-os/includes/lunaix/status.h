@@ -17,7 +17,7 @@
 #define EEXIST -12
 #define EBADF -13
 #define ENOTSUP -14
-#define ENXIO -15
+#define EIO -15
 #define ELOOP -16
 #define ENOTEMPTY -17
 #define EROFS -18

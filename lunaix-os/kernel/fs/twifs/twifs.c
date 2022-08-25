@@ -8,12 +8,14 @@
  * @copyright Copyright (c) 2022
  *
  */
+#include <klibc/stdio.h>
 #include <klibc/string.h>
 #include <lunaix/clock.h>
 #include <lunaix/fs.h>
 #include <lunaix/fs/twifs.h>
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/valloc.h>
+#include <lunaix/spike.h>
 
 static struct twifs_node* fs_root;
 
@@ -33,7 +35,9 @@ __twifs_new_node(struct twifs_node* parent,
     struct twifs_node* node = cake_grab(twi_pile);
     memset(node, 0, sizeof(*node));
 
-    node->name = HSTR(name, name_len);
+    strncpy(node->name_val, name, VFS_NAME_MAXLEN);
+
+    node->name = HSTR(node->name_val, MIN(name_len, VFS_NAME_MAXLEN));
     node->itype = itype;
     node->ino_id = inode_id++;
     hstr_rehash(&node->name, HSTR_FULL_HASH);
@@ -120,24 +124,24 @@ __twifs_dirlookup(struct v_inode* inode, struct v_dnode* dnode)
 
     struct twifs_node* child_node = __twifs_get_node(twi_node, &dnode->name);
     if (child_node) {
-        struct v_inode* inode = vfs_i_find(inode->sb, child_node->ino_id);
-        if (inode) {
+        struct v_inode* child_inode = vfs_i_find(inode->sb, child_node->ino_id);
+        if (child_inode) {
             goto done;
         }
 
-        if (!(inode = vfs_i_alloc(inode->sb))) {
+        if (!(child_inode = vfs_i_alloc(inode->sb))) {
             return ENOENT;
         }
 
-        inode->id = child_node->ino_id;
-        inode->itype = child_node->itype;
-        inode->data = child_node;
+        child_inode->id = child_node->ino_id;
+        child_inode->itype = child_node->itype;
+        child_inode->data = child_node;
 
-        vfs_i_addhash(inode);
+        vfs_i_addhash(child_inode);
 
     done:
         dnode->data = child_node->data;
-        vfs_assign_inode(dnode, inode);
+        vfs_assign_inode(dnode, child_inode);
         return 0;
     }
     return ENOENT;
@@ -185,40 +189,35 @@ twifs_rm_node(struct twifs_node* node)
 }
 
 struct twifs_node*
-twifs_file_node(struct twifs_node* parent,
-                const char* name,
-                int name_len,
-                uint32_t itype)
+twifs_file_node(struct twifs_node* parent, const char* fmt, ...)
 {
+    va_list args;
+    va_start(args, fmt);
+
+    char buf[VFS_NAME_MAXLEN];
+    size_t len = __ksprintf_internal(buf, fmt, VFS_NAME_MAXLEN, args);
     struct twifs_node* twi_node =
-      __twifs_new_node(parent, name, name_len, VFS_IFFILE | itype);
+      __twifs_new_node(parent ? parent : fs_root, buf, len, VFS_IFSEQDEV);
+
+    va_end(args);
 
     return twi_node;
 }
 
 struct twifs_node*
-twifs_dir_node(struct twifs_node* parent,
-               const char* name,
-               int name_len,
-               uint32_t itype)
+twifs_dir_node(struct twifs_node* parent, const char* fmt, ...)
 {
-    struct hstr hname = HSTR(name, name_len);
-    hstr_rehash(&hname, HSTR_FULL_HASH);
-    struct twifs_node* node = __twifs_get_node(parent, &hname);
-    if (node) {
-        return node;
-    }
+    va_list args;
+    va_start(args, fmt);
 
+    char buf[VFS_NAME_MAXLEN];
+    size_t len = __ksprintf_internal(buf, fmt, VFS_NAME_MAXLEN, args);
     struct twifs_node* twi_node =
-      __twifs_new_node(parent, name, name_len, VFS_IFDIR | itype);
+      __twifs_new_node(parent ? parent : fs_root, buf, len, VFS_IFDIR);
+
+    va_end(args);
 
     return twi_node;
-}
-
-struct twifs_node*
-twifs_toplevel_node(const char* name, int name_len, uint32_t itype)
-{
-    return twifs_dir_node(fs_root, name, name_len, itype);
 }
 
 void

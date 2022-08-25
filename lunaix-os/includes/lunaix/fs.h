@@ -44,7 +44,7 @@
 #define VFS_VALID_CHAR(chr)                                                    \
     (('A' <= (chr) && (chr) <= 'Z') || ('a' <= (chr) && (chr) <= 'z') ||       \
      ('0' <= (chr) && (chr) <= '9') || (chr) == '.' || (chr) == '_' ||         \
-     (chr) == '-')
+     (chr) == '-' || (chr) == ':')
 
 #define unlock_inode(inode) mutex_unlock(&inode->lock)
 #define lock_inode(inode)                                                      \
@@ -369,7 +369,7 @@ pcache_new_page(struct pcache* pcache, uint32_t index);
 void
 pcache_set_dirty(struct pcache* pcache, struct pcache_pg* pg);
 
-struct pcache_pg*
+int
 pcache_get_page(struct pcache* pcache,
                 uint32_t index,
                 uint32_t* offset,

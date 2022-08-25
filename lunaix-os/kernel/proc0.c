@@ -179,6 +179,10 @@ init_platform()
         vmm_del_mapping(PD_REFERENCED, (void*)i);
         pmm_free_page(KERNEL_PID, (void*)i);
     }
+
+    for (size_t i = L1_INDEX(KERNEL_MM_BASE); i < 1023; i++) {
+        vmm_set_mapping(PD_REFERENCED, i << 22, 0, 0, VMAP_NOMAP);
+    }
 }
 
 void

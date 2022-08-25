@@ -44,13 +44,14 @@ __block_read(struct device* dev, void* buf, size_t offset, size_t len)
     int errno;
     struct block_dev* bdev = (struct block_dev*)dev->underlay;
     size_t acc_size = 0, rd_size = 0, bsize = bdev->hd_dev->block_size,
-           rd_block = offset / bsize, r = offset % bsize;
+           rd_block = offset / bsize, r = offset % bsize,
+           max_blk = (size_t)bdev->hd_dev->max_lba;
     void* block = vzalloc(bsize);
 
-    while (acc_size < len) {
+    while (acc_size < len && rd_block < max_blk) {
         if (!bdev->hd_dev->ops.read_buffer(
               bdev->hd_dev, rd_block, block, bsize)) {
-            errno = ENXIO;
+            errno = EIO;
             goto error;
         }
         rd_size = MIN(len - acc_size, bsize - r);
@@ -61,7 +62,7 @@ __block_read(struct device* dev, void* buf, size_t offset, size_t len)
     }
 
     vfree(block);
-    return rd_block;
+    return acc_size;
 
 error:
     vfree(block);
@@ -82,7 +83,7 @@ __block_write(struct device* dev, void* buf, size_t offset, size_t len)
         memcpy(block + r, buf + acc_size, wr_size);
         if (!bdev->hd_dev->ops.write_buffer(
               bdev->hd_dev, wr_block, block, bsize)) {
-            errno = ENXIO;
+            errno = EIO;
             break;
         }
         acc_size += wr_size;

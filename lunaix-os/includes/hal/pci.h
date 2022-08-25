@@ -91,9 +91,6 @@ pci_write_cspace(uint32_t base, int offset, pci_reg_t data)
 void
 pci_init();
 
-void
-pci_print_device();
-
 /**
  * @brief 根据类型代码（Class Code）去在拓扑中寻找一个设备
  * 类型代码请参阅： PCI LB Spec. Appendix D.

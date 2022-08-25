@@ -9,6 +9,7 @@ struct twifs_node
     inode_t ino_id;
     void* data;
     uint32_t itype;
+    char name_val[VFS_NAME_MAXLEN];
     struct llist_header children;
     struct llist_header siblings;
     struct
@@ -28,19 +29,10 @@ void
 twifs_init();
 
 struct twifs_node*
-twifs_file_node(struct twifs_node* parent,
-                const char* name,
-                int name_len,
-                uint32_t itype);
+twifs_file_node(struct twifs_node* parent, const char* fmt, ...);
 
 struct twifs_node*
-twifs_dir_node(struct twifs_node* parent,
-               const char* name,
-               int name_len,
-               uint32_t itype);
-
-struct twifs_node*
-twifs_toplevel_node(const char* name, int name_len, uint32_t itype);
+twifs_dir_node(struct twifs_node* parent, const char* fmt, ...);
 
 int
 twifs_rm_node(struct twifs_node* node);

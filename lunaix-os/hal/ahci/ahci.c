@@ -194,7 +194,7 @@ __ahci_hba_isr(const isr_param* param)
 {
     // TODO: clear the interrupt status
     // TODO: I/O-operation scheduler should be here
-    kprintf(KDEBUG "HBA INTR\n");
+    // kprintf(KDEBUG "HBA INTR\n");
 }
 
 void

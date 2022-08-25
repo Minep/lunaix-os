@@ -186,7 +186,6 @@ console_write(struct console* console, uint8_t* data, size_t size)
     uintptr_t rd_ptr = fbuf->rd_pos;
 
     char c;
-    int j = 0;
     for (size_t i = 0; i < size; i++) {
         c = data[i];
         if (!c) {
@@ -194,12 +193,15 @@ console_write(struct console* console, uint8_t* data, size_t size)
         }
         if (c == '\n') {
             console->lines++;
+        } else if (c == '\x08') {
+            ptr = ptr ? ptr - 1 : fbuf->size - 1;
+            continue;
         }
-        buffer[(ptr + j) % fbuf->size] = c;
-        j++;
+        buffer[ptr] = c;
+        ptr = (ptr + 1) % fbuf->size;
     }
 
-    fifo_set_wrptr(fbuf, (ptr + j) % fbuf->size);
+    fifo_set_wrptr(fbuf, ptr);
 
     while (console->lines >= TTY_HEIGHT) {
         rd_ptr = __find_next_line(rd_ptr);

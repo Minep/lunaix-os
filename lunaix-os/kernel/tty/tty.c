@@ -83,11 +83,10 @@ tty_flush_buffer(struct fifo_buf* buf)
                 case '\r':
                     x = 0;
                     break;
-                case '\x08':
-                    x = x ? x - 1 : 0;
-                    *(tty_vga_buffer + x + y * TTY_WIDTH) =
-                      (current_theme | 0x20);
-                    break;
+                // case '\x08':
+                //     *(tty_vga_buffer + x + y * TTY_WIDTH) =
+                //       (current_theme | 0x20);
+                //     break;
                 default:
                     *(tty_vga_buffer + x + y * TTY_WIDTH) =
                       (current_theme | chr);

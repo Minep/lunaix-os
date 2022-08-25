@@ -76,7 +76,7 @@ pcache_set_dirty(struct pcache* pcache, struct pcache_pg* pg)
     }
 }
 
-struct pcache_pg*
+int
 pcache_get_page(struct pcache* pcache,
                 uint32_t index,
                 uint32_t* offset,
@@ -140,7 +140,7 @@ pcache_read(struct v_inode* inode, void* data, uint32_t len, uint32_t fpos)
             errno = inode->default_fops->read(inode, pg->pg, PG_SIZE, pg->fpos);
             if (errno >= 0 && errno < PG_SIZE) {
                 // EOF
-                len = buf_off + errno;
+                len = MIN(len, buf_off + errno);
             } else if (errno < 0) {
                 break;
             }

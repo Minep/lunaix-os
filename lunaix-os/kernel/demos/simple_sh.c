@@ -8,6 +8,7 @@
 #include <ulibc/stdio.h>
 
 char pwd[512];
+char cat_buf[1024];
 
 /*
     Simple shell - (actually this is not even a shell)
@@ -55,6 +56,9 @@ sh_printerr()
         case ENOMEM:
             printf("Error: Out of memory\n");
             break;
+        case EISDIR:
+            printf("Error: This is a directory\n");
+            break;
         default:
             printf("Error: Fail to open (%d)\n", errno);
             break;
@@ -100,6 +104,22 @@ sh_main()
                 if (status < 0)
                     sh_printerr();
 
+                close(fd);
+            }
+        } else if (streq(cmd, "cat")) {
+            int fd = open(argpart, 0);
+            if (fd < 0) {
+                sh_printerr();
+            } else {
+                int sz;
+                while ((sz = read(fd, cat_buf, 1024)) == 1024) {
+                    write(stdout, cat_buf, 1024);
+                }
+                if (sz < 0) {
+                    sh_printerr();
+                } else {
+                    write(stdout, cat_buf, sz);
+                }
                 close(fd);
             }
         } else {

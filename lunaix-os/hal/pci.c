@@ -11,6 +11,7 @@
 #include <hal/acpi/acpi.h>
 #include <hal/apic.h>
 #include <hal/pci.h>
+#include <lunaix/fs/twifs.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
@@ -108,45 +109,40 @@ pci_probe_msi_info(struct pci_device* device)
 
 #define PCI_PRINT_BAR_LISTING
 
-void
-pci_print_device()
+int
+__pci_read_cspace(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 {
+    if (len < 256) {
+        return ERANGE;
+    }
+
+    struct twifs_node* node = (struct twifs_node*)(inode->data);
+    struct pci_device* pcidev = (struct pci_device*)(node->data);
+
+    for (size_t i = 0; i < 256; i += sizeof(pci_reg_t)) {
+        *(pci_reg_t*)(buffer + i) = pci_read_cspace(pcidev->cspace_base, i);
+    }
+
+    return 256;
+}
+
+void
+pci_build_fsmapping()
+{
+    struct twifs_node *pci_class = twifs_dir_node(NULL, "pci"), *pci_dev;
     struct pci_device *pos, *n;
     llist_for_each(pos, n, &pci_devices, dev_chain)
     {
-        kprintf(KINFO "(B%xh:D%xh:F%xh) Dev %x:%x, Class 0x%x\n",
-                PCI_BUS_NUM(pos->cspace_base),
-                PCI_SLOT_NUM(pos->cspace_base),
-                PCI_FUNCT_NUM(pos->cspace_base),
-                PCI_DEV_VENDOR(pos->device_info),
-                PCI_DEV_DEVID(pos->device_info),
-                PCI_DEV_CLASS(pos->class_info));
-
-        kprintf(KINFO "\t IRQ: %d, INT#x: %d\n",
-                PCI_INTR_IRQ(pos->intr_info),
-                PCI_INTR_PIN(pos->intr_info));
-#ifdef PCI_PRINT_BAR_LISTING
-        uint32_t bar;
-        for (size_t i = 1; i <= 6; i++) {
-            size_t size = pci_bar_sizing(pos, &bar, i);
-            if (!bar)
-                continue;
-            if (PCI_BAR_MMIO(bar)) {
-                kprintf(KINFO "\t BAR#%d (MMIO) %p [%d]\n",
-                        i,
-                        PCI_BAR_ADDR_MM(bar),
-                        size);
-            } else {
-                kprintf(KINFO "\t BAR#%d (I/O) %p [%d]\n",
-                        i,
-                        PCI_BAR_ADDR_IO(bar),
-                        size);
-            }
-        }
-#endif
-        if (pos->msi_loc) {
-            kprintf(KINFO "\t MSI supported (@%xh)\n", pos->msi_loc);
-        }
+        pci_dev = twifs_dir_node(pci_class,
+                                 "B%d:D%d:F%d.%x:%x",
+                                 PCI_BUS_NUM(pos->cspace_base),
+                                 PCI_SLOT_NUM(pos->cspace_base),
+                                 PCI_FUNCT_NUM(pos->cspace_base),
+                                 PCI_DEV_VENDOR(pos->device_info),
+                                 PCI_DEV_DEVID(pos->device_info));
+        struct twifs_node* fnode = twifs_file_node(pci_dev, "cspace");
+        fnode->data = pos;
+        fnode->ops.read = __pci_read_cspace;
     }
 }
 
@@ -241,4 +237,6 @@ pci_init()
     }
     // Otherwise, fallback to use legacy PCI 3.0 method.
     pci_probe();
+
+    pci_build_fsmapping();
 }
