@@ -189,15 +189,21 @@ twifs_rm_node(struct twifs_node* node)
 }
 
 struct twifs_node*
+twifs_file_node_vargs(struct twifs_node* parent, const char* fmt, va_list args)
+{
+    char buf[VFS_NAME_MAXLEN];
+    size_t len = __ksprintf_internal(buf, fmt, VFS_NAME_MAXLEN, args);
+
+    return __twifs_new_node(parent ? parent : fs_root, buf, len, VFS_IFSEQDEV);
+}
+
+struct twifs_node*
 twifs_file_node(struct twifs_node* parent, const char* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
 
-    char buf[VFS_NAME_MAXLEN];
-    size_t len = __ksprintf_internal(buf, fmt, VFS_NAME_MAXLEN, args);
-    struct twifs_node* twi_node =
-      __twifs_new_node(parent ? parent : fs_root, buf, len, VFS_IFSEQDEV);
+    struct twifs_node* twi_node = twifs_file_node_vargs(parent, fmt, args);
 
     va_end(args);
 

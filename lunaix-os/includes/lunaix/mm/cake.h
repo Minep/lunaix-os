@@ -70,11 +70,7 @@ cake_release(struct cake_pile* pile, void* area);
 void
 cake_init();
 
-/**
- * @brief 统计蛋糕数量 - 问问Pinkie :D
- *
- */
 void
-cake_stats();
+cake_export();
 
 #endif /* __LUNAIX_VALLOC_H */

@@ -48,6 +48,7 @@ __new_cake(struct cake_pile* pile)
 
     cake->first_piece = (void*)((uintptr_t)cake + pile->offset);
     cake->next_free = 0;
+    pile->cakes_count++;
 
     piece_index_t* free_list = cake->free_list;
     for (size_t i = 0; i < max_piece - 1; i++) {
@@ -187,21 +188,4 @@ found:
     }
 
     return 1;
-}
-
-void
-cake_stats()
-{
-    kprintf(KDEBUG "<name> <cake> <pg/c> <p/c> <alloced>\n");
-
-    struct cake_pile *pos, *n;
-    llist_for_each(pos, n, &piles, piles)
-    {
-        kprintf("%s %d %d %d %d\n",
-                pos->pile_name,
-                pos->cakes_count,
-                pos->pg_per_cake,
-                pos->pieces_per_cake,
-                pos->alloced_pieces);
-    }
 }

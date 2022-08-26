@@ -173,6 +173,7 @@ init_platform()
     console_start_flushing();
     console_flush();
 
+    cake_export();
     unlock_reserved_memory();
 
     for (size_t i = 0; i < (uintptr_t)(&__init_hhk_end); i += PG_SIZE) {

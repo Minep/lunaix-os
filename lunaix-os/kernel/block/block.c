@@ -36,6 +36,8 @@ block_init()
     lbd_pile = cake_new_pile("block_dev", sizeof(struct block_dev), 1, 0);
     dev_registry = vcalloc(sizeof(struct block_dev*), MAX_DEV);
     free_slot = 0;
+
+    blk_mapping_init();
 }
 
 int
@@ -113,6 +115,7 @@ block_mount_disk(struct hba_device* hd_dev)
         goto error;
     }
 
+    blk_set_blkmapping(bdev);
     return errno;
 
 error:
@@ -120,6 +123,7 @@ error:
             hd_dev->model,
             hd_dev->serial_num,
             -errno);
+    return errno;
 }
 
 int
@@ -134,6 +138,7 @@ __block_register(struct block_dev* bdev)
     dev->read = __block_read;
 
     bdev->dev = dev;
+    strcpy(bdev->bdev_id, dev->name_val);
     dev_registry[free_slot++] = bdev;
     return 1;
 }

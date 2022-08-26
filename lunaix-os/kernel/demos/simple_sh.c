@@ -75,7 +75,7 @@ sh_main()
 
     while (1) {
         getcwd(pwd, 512);
-        printf("%s$ ", pwd);
+        printf("[\033[2m%s\033[39;49m]$ ", pwd);
         size_t sz = read(stdin, buf, 512);
         if (sz < 0) {
             printf("fail to read user input (%d)\n", geterrno());
@@ -121,6 +121,7 @@ sh_main()
                     write(stdout, cat_buf, sz);
                 }
                 close(fd);
+                printf("\n");
             }
         } else {
             printf("unknow command");

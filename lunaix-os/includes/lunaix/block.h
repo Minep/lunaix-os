@@ -44,4 +44,10 @@ block_init();
 int
 block_mount_disk(struct hba_device* hd_dev);
 
+void
+blk_mapping_init();
+
+void
+blk_set_blkmapping(struct block_dev* bdev);
+
 #endif /* __LUNAIX_BLOCK_H */
