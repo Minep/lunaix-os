@@ -6,7 +6,7 @@
 #include <lunaix/tty/tty.h>
 #include <stdint.h>
 
-vga_attribute* tty_vga_buffer = (vga_attribute*)VGA_BUFFER_PADDR;
+vga_attribute* tty_vga_buffer;
 
 vga_attribute tty_theme_color = VGA_COLOR_BLACK;
 

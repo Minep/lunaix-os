@@ -167,12 +167,12 @@ __pci_bar_read(struct twimap* map)
     }
 
     twimap_printf(
-      map, "[%d] base=%p, size=%p, ", bar_index, bar->start, bar->size);
+      map, "[%d] base=%.8p, size=%.8p, ", bar_index, bar->start, bar->size);
 
     if ((bar->type & BAR_TYPE_MMIO)) {
         twimap_printf(map, "mmio");
         if ((bar->type & BAR_TYPE_CACHABLE)) {
-            twimap_printf(map, ", cachable");
+            twimap_printf(map, ", prefetchable");
         }
     } else {
         twimap_printf(map, "io");

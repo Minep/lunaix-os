@@ -108,14 +108,8 @@ int
 do_kernel(v_mapping* mapping)
 {
     uintptr_t addr = mapping->va;
-    if (addr >= KHEAP_START && addr < PROC_START) {
-        // This is kernel heap page
-        uintptr_t pa = pmm_alloc_page(KERNEL_PID, 0);
-        *mapping->pte = (*mapping->pte & 0xfff) | pa | PG_PRESENT;
-        cpu_invplg(mapping->pte);
-        cpu_invplg(addr);
-        goto done;
-    }
+
+    // TODO
 
     return 0;
 done:

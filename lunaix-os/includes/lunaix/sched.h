@@ -5,7 +5,7 @@
 
 struct scheduler
 {
-    struct proc_info* _procs;
+    struct proc_info** _procs;
     int procs_index;
     unsigned int ptable_len;
 };

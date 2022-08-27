@@ -151,7 +151,7 @@ init_proc_user_space(struct proc_info* pcb)
         vmm_set_mapping(PD_MOUNT_1, i, 0, PG_ALLOW_USER | PG_WRITE, VMAP_NULL);
     }
 
-    // todo: other uspace initialization stuff
+    // TODO other uspace initialization stuff
 
     vmm_unmount_pd(PD_MOUNT_1);
 }

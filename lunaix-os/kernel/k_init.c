@@ -5,6 +5,7 @@
 #include <lunaix/foptions.h>
 #include <lunaix/input.h>
 #include <lunaix/lxconsole.h>
+#include <lunaix/mm/mmio.h>
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
@@ -56,9 +57,6 @@ _kernel_pre_init()
 
     setup_memory((multiboot_memory_map_t*)_k_init_mb_info->mmap_addr, map_size);
 
-    tty_init((void*)VGA_BUFFER_VADDR);
-    tty_set_theme(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
-
     __kernel_ptd = cpu_rcr3();
 
     tmp = (struct proc_info){ .page_table = __kernel_ptd };
@@ -72,6 +70,9 @@ _kernel_init()
     int errno = 0;
     cake_init();
     valloc_init();
+
+    tty_init(ioremap(VGA_FRAMEBUFFER, PG_SIZE));
+    tty_set_theme(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
 
     vfs_init();
     fsm_init();
@@ -193,22 +194,7 @@ setup_memory(multiboot_memory_map_t* map, size_t map_size)
 
     // 将内核占据的页，包括前1MB，hhk_init 设为已占用
     size_t pg_count = V2P(&__kernel_end) >> PG_SIZE_BITS;
-    pmm_mark_chunk_occupied(KERNEL_PID, 0, pg_count, 0);
-
-    size_t vga_buf_pgs = VGA_BUFFER_SIZE >> PG_SIZE_BITS;
-
-    // 首先，标记VGA部分为已占用，并且锁定
-    pmm_mark_chunk_occupied(
-      KERNEL_PID, VGA_BUFFER_PADDR >> PG_SIZE_BITS, vga_buf_pgs, PP_FGLOCKED);
-
-    // 重映射VGA文本缓冲区（以后会变成显存，i.e., framebuffer）
-    for (size_t i = 0; i < vga_buf_pgs; i++) {
-        vmm_set_mapping(PD_REFERENCED,
-                        VGA_BUFFER_VADDR + (i << PG_SIZE_BITS),
-                        VGA_BUFFER_PADDR + (i << PG_SIZE_BITS),
-                        PG_PREM_URW,
-                        VMAP_NULL);
-    }
+    pmm_mark_chunk_occupied(KERNEL_PID, 0, pg_count, PP_FGLOCKED);
 
     for (uintptr_t i = &__usrtext_start; i < &__usrtext_end; i += PG_SIZE) {
         vmm_set_mapping(PD_REFERENCED, i, V2P(i), PG_PREM_UR, VMAP_NULL);

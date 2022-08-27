@@ -21,7 +21,7 @@ region_release_all(struct mm_region* regions)
 
     llist_for_each(pos, n, &regions->head, head)
     {
-        lxfree(pos);
+        vfree(pos);
     }
 }
 

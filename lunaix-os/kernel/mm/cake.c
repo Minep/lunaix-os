@@ -120,6 +120,12 @@ cake_new_pile(char* name,
     return pile;
 }
 
+void
+cake_set_constructor(struct cake_pile* pile, pile_cb ctor)
+{
+    pile->ctor = ctor;
+}
+
 void*
 cake_grab(struct cake_pile* pile)
 {
@@ -147,8 +153,14 @@ cake_grab(struct cake_pile* pile)
         llist_append(&pile->partial, &pos->cakes);
     }
 
-    return (void*)((uintptr_t)pos->first_piece +
-                   found_index * pile->piece_size);
+    void* ptr =
+      (void*)((uintptr_t)pos->first_piece + found_index * pile->piece_size);
+
+    if (pile->ctor) {
+        pile->ctor(pile, ptr);
+    }
+
+    return ptr;
 }
 
 int
@@ -188,4 +200,10 @@ found:
     }
 
     return 1;
+}
+
+void
+cake_ctor_zeroing(struct cake_pile* pile, void* piece)
+{
+    memset(piece, 0, pile->piece_size);
 }
