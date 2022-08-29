@@ -1,4 +1,5 @@
 #include <lunaix/device.h>
+#include <lunaix/dirent.h>
 #include <lunaix/fs.h>
 #include <lunaix/fs/devfs.h>
 #include <lunaix/spike.h>
@@ -50,6 +51,18 @@ devfs_get_itype(struct device* dev)
 }
 
 int
+devfs_get_dtype(struct device* dev)
+{
+    switch (dev->dev_type & DEV_MSKIF) {
+        case DEV_IFCAT:
+            return DT_DIR;
+
+        default:
+            return DT_FILE;
+    }
+}
+
+int
 devfs_mknod(struct v_dnode* dnode, struct device* dev)
 {
     assert(dev);
@@ -91,7 +104,7 @@ devfs_readdir(struct v_file* file, struct dir_context* dctx)
         return 0;
     }
     dctx->read_complete_callback(
-      dctx, dev->name.value, dev->name.len, devfs_get_itype(dev));
+      dctx, dev->name.value, dev->name.len, devfs_get_dtype(dev));
     return 1;
 }
 

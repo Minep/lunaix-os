@@ -98,7 +98,11 @@ sh_main()
                 struct dirent ent = { .d_offset = 0 };
                 int status;
                 while ((status = readdir(fd, &ent)) == 1) {
-                    printf(" %s\n", ent.d_name);
+                    if (ent.d_type == DT_DIR) {
+                        printf(" \033[3m%s\033[39;49m\n", ent.d_name);
+                    } else {
+                        printf(" %s\n", ent.d_name);
+                    }
                 }
 
                 if (status < 0)
@@ -112,13 +116,11 @@ sh_main()
                 sh_printerr();
             } else {
                 int sz;
-                while ((sz = read(fd, cat_buf, 1024)) == 1024) {
-                    write(stdout, cat_buf, 1024);
+                while ((sz = read(fd, cat_buf, 1024)) > 0) {
+                    write(stdout, cat_buf, sz);
                 }
                 if (sz < 0) {
                     sh_printerr();
-                } else {
-                    write(stdout, cat_buf, sz);
                 }
                 close(fd);
                 printf("\n");

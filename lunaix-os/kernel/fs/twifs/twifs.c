@@ -13,6 +13,7 @@
 #include <lunaix/clock.h>
 #include <lunaix/fs.h>
 #include <lunaix/fs/twifs.h>
+#include <lunaix/fs/twimap.h>
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
@@ -159,7 +160,7 @@ __twifs_iterate_dir(struct v_file* file, struct dir_context* dctx)
         if (counter++ >= dctx->index) {
             dctx->index = counter;
             dctx->read_complete_callback(
-              dctx, pos->name.value, pos->name.len, pos->itype);
+              dctx, pos->name.value, pos->name.len, vfs_get_dtype(pos->itype));
             return 1;
         }
     }
@@ -240,6 +241,30 @@ twifs_init()
     fsm_register(twifs);
 
     fs_root = twifs_dir_node(NULL, NULL, 0, 0);
+}
+
+int
+__twifs_twimap_file_read(struct v_inode* inode,
+                         void* buf,
+                         size_t len,
+                         size_t fpos)
+{
+    struct twimap* map = twinode_getdata(inode, struct twimap*);
+    return twimap_read(map, buf, len, fpos);
+}
+
+struct twimap*
+twifs_mapping(struct twifs_node* parent, void* data, const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+
+    struct twimap* map = twimap_create(data);
+    struct twifs_node* node = twifs_file_node_vargs(parent, fmt, args);
+    node->ops.read = __twifs_twimap_file_read;
+    node->data = map;
+
+    return map;
 }
 
 const struct v_file_ops twifs_file_ops = { .close = default_file_close,

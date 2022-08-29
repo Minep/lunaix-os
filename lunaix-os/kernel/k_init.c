@@ -84,6 +84,7 @@ _kernel_init()
 
     vfs_mount("/dev", "devfs", NULL, 0);
     vfs_mount("/sys", "twifs", NULL, MNT_RO);
+    vfs_mount("/task", "taskfs", NULL, MNT_RO);
 
     lxconsole_init();
 

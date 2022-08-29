@@ -58,6 +58,7 @@ struct proc_info
 
     /* ---- critical section end ---- */
 
+    struct llist_header tasks;
     struct llist_header siblings;
     struct llist_header children;
     struct llist_header grp_member;

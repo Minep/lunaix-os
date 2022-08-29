@@ -52,8 +52,10 @@ ramfs_readdir(struct v_file* file, struct dir_context* dctx)
     llist_for_each(pos, n, &file->dnode->children, siblings)
     {
         if (i++ >= dctx->index) {
-            dctx->read_complete_callback(
-              dctx, pos->name.value, pos->name.len, 0);
+            dctx->read_complete_callback(dctx,
+                                         pos->name.value,
+                                         pos->name.len,
+                                         vfs_get_dtype(pos->inode->itype));
             return 1;
         }
     }

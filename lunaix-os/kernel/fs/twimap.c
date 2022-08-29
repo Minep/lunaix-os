@@ -1,5 +1,7 @@
-#include <lunaix/fs/twifs.h>
+#include <lunaix/fs.h>
+#include <lunaix/fs/twimap.h>
 #include <lunaix/mm/valloc.h>
+#include <lunaix/spike.h>
 
 #include <klibc/stdio.h>
 #include <klibc/string.h>
@@ -19,9 +21,15 @@ __twimap_default_gonext(struct twimap* map)
 }
 
 int
-__twimap_read(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
+__twimap_file_read(struct v_inode* inode, void* buf, size_t len, size_t fpos)
 {
-    struct twimap* map = twinode_getdata(inode, struct twimap*);
+    struct twimap* map = (struct twimap*)(inode->data);
+    return twimap_read(map, buf, len, fpos);
+}
+
+int
+twimap_read(struct twimap* map, void* buffer, size_t len, size_t fpos)
+{
     map->buffer = valloc(TWIMAP_BUFFER_SIZE);
     map->reset(map);
 
@@ -58,24 +66,6 @@ __twimap_read(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
     return acc_size;
 }
 
-struct twimap*
-twifs_mapping(struct twifs_node* parent, void* data, const char* fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-
-    struct twimap* map = vzalloc(sizeof(struct twimap));
-    struct twifs_node* node = twifs_file_node_vargs(parent, fmt, args);
-    node->ops.read = __twimap_read;
-    node->data = map;
-
-    map->reset = __twimap_default_reset;
-    map->go_next = __twimap_default_gonext;
-    map->data = data;
-
-    return map;
-}
-
 void
 twimap_printf(struct twimap* mapping, const char* fmt, ...)
 {
@@ -108,3 +98,20 @@ twimap_memappend(struct twimap* mapping, const void* src, const size_t len)
 
     return cpy_len;
 }
+
+struct twimap*
+twimap_create(void* data)
+{
+    struct twimap* map = vzalloc(sizeof(struct twimap));
+    map->reset = __twimap_default_reset;
+    map->go_next = __twimap_default_gonext;
+    map->data = data;
+
+    return map;
+}
+
+struct v_file_ops twimap_file_ops = { .close = default_file_close,
+                                      .read = __twimap_file_read,
+                                      .readdir = default_file_readdir,
+                                      .seek = default_file_seek,
+                                      .write = default_file_write };

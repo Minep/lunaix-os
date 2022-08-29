@@ -609,9 +609,9 @@ __DEFINE_LXSYSCALL2(int, readdir, int, fd, struct dirent*, dent)
                                   __vfs_readdir_callback };
         errno = 1;
         if (dent->d_offset == 0) {
-            __vfs_readdir_callback(&dctx, vfs_dot.value, vfs_dot.len, 0);
+            __vfs_readdir_callback(&dctx, vfs_dot.value, vfs_dot.len, DT_DIR);
         } else if (dent->d_offset == 1) {
-            __vfs_readdir_callback(&dctx, vfs_ddot.value, vfs_ddot.len, 0);
+            __vfs_readdir_callback(&dctx, vfs_ddot.value, vfs_ddot.len, DT_DIR);
         } else {
             dctx.index -= 2;
             if ((errno = fd_s->file->ops->readdir(fd_s->file, &dctx)) != 1) {
@@ -791,6 +791,19 @@ vfs_readlink(struct v_dnode* dnode, char* buf, size_t size)
         return errno;
     }
     return 0;
+}
+
+int
+vfs_get_dtype(int itype)
+{
+    switch (itype) {
+        case VFS_IFDIR:
+            return DT_DIR;
+        case VFS_IFSYMLINK:
+            return DT_SYMLINK;
+        default:
+            return DT_PIPE;
+    }
 }
 
 __DEFINE_LXSYSCALL3(int, realpathat, int, fd, char*, buf, size_t, size)

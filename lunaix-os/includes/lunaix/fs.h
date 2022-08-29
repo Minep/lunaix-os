@@ -172,6 +172,18 @@ struct v_fd
     int flags;
 };
 
+// FIXME how do we invalidate corresponding v_dnodes given the v_inode?
+/*
+    Consider taskfs, which is Lunaix's speak of Linux's procfs, that allow
+    info of every process being accessible via file system. Each process's
+    creation will result a creation of a directory under the root of task fs
+    with it's pid as name. But that dir must delete when process is killed, and
+    such deletion does not mediated by vfs itself, so there is a need of cache
+    syncing.
+    And this is also the case of all ramfs where argumentation to file tree is
+    performed by third party.
+*/
+
 struct v_inode
 {
     inode_t id;
@@ -356,6 +368,9 @@ vfs_dup_fd(struct v_fd* old, struct v_fd** new);
 
 int
 vfs_getfd(int fd, struct v_fd** fd_s);
+
+int
+vfs_get_dtype(int itype);
 
 void
 pcache_init(struct pcache* pcache);

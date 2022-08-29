@@ -99,7 +99,7 @@ extern void __pg_mount_point;
 
 /* 四个页挂载点，两个页目录挂载点： 用于临时创建&编辑页表 */
 #define PG_MOUNT_RANGE(l1_index) (701 <= l1_index && l1_index <= 703)
-#define PD_MOUNT_1 (PROC_START + MEM_4MB)
+#define PD_MOUNT_1 (KERNEL_MM_BASE + MEM_4MB)
 #define PG_MOUNT_BASE (PD_MOUNT_1 + MEM_4MB)
 #define PG_MOUNT_1 (PG_MOUNT_BASE)
 #define PG_MOUNT_2 (PG_MOUNT_BASE + 0x1000)

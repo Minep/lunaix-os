@@ -17,9 +17,6 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
 
-#define PROC_TABLE_SIZE 8192
-#define MAX_PROCESS (PROC_TABLE_SIZE / sizeof(uintptr_t))
-
 volatile struct proc_info* __current;
 
 struct proc_info dummy;
@@ -286,6 +283,7 @@ alloc_process()
     proc->fdtable = vzalloc(sizeof(struct v_fdtable));
 
     llist_init_head(&proc->mm.regions.head);
+    llist_init_head(&proc->tasks);
     llist_init_head(&proc->children);
     llist_init_head(&proc->grp_member);
     llist_init_head(&proc->sleep.sleepers);
@@ -312,6 +310,7 @@ commit_process(struct proc_info* process)
     }
 
     llist_append(&process->parent->children, &process->siblings);
+    llist_append(&sched_ctx._procs[0]->tasks, &process->tasks);
 
     process->state = PS_READY;
 }

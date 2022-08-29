@@ -102,6 +102,9 @@ __ksprintf_internal(char* buffer, char* fmt, size_t max_len, va_list vargs)
                              : va_arg(vargs, unsigned);
                 flags |= FLAG_NUMERIC;
                 break;
+            case 'b':
+                base = 2;
+                goto format_unsigned;
             case 'x':
                 base = 16;
                 goto format_unsigned;
