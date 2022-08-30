@@ -373,6 +373,12 @@ int
 vfs_get_dtype(int itype);
 
 void
+vfs_ref_dnode(struct v_dnode* dnode);
+
+void
+vfs_unref_dnode(struct v_dnode* dnode);
+
+void
 pcache_init(struct pcache* pcache);
 
 void

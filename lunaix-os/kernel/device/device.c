@@ -1,8 +1,11 @@
 #include <klibc/stdio.h>
 #include <lunaix/device.h>
+#include <lunaix/fs.h>
 #include <lunaix/fs/twifs.h>
+#include <lunaix/ioctl.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
+#include <lunaix/syscall.h>
 
 static DEFINE_LLIST(root_list);
 
@@ -27,6 +30,7 @@ device_add(struct device* parent,
     size_t strlen =
       __ksprintf_internal(dev->name_val, name_fmt, DEVICE_NAME_SIZE, args);
 
+    dev->magic = DEV_STRUCT_MAGIC;
     dev->dev_id = devid++;
     dev->name = HSTR(dev->name_val, strlen);
     dev->parent = parent;
@@ -136,4 +140,29 @@ device_getbyoffset(struct device* root_dev, int offset)
         }
     }
     return NULL;
+}
+
+__DEFINE_LXSYSCALL3(int, ioctl, int, fd, int, req, va_list, args)
+{
+    int errno;
+    struct v_fd* fd_s;
+    if ((errno = vfs_getfd(fd, &fd_s))) {
+        goto done;
+    }
+
+    struct device* dev = (struct device*)fd_s->file->inode->data;
+    if (dev->magic != DEV_STRUCT_MAGIC) {
+        errno = ENODEV;
+        goto done;
+    }
+
+    if (!dev->exec_cmd) {
+        errno = EINVAL;
+        goto done;
+    }
+
+    errno = dev->exec_cmd(dev, req, args);
+
+done:
+    return DO_STATUS_OR_RETURN(errno);
 }

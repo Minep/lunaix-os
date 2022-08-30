@@ -7,6 +7,8 @@
 #include <lunaix/ds/llist.h>
 #include <lunaix/types.h>
 
+#define DEV_STRUCT_MAGIC 0x5645444c
+
 #define DEV_MSKIF 0x00000003
 
 #define DEV_IFVOL 0x0 // volumetric (block) device
@@ -17,6 +19,7 @@ typedef unsigned int dev_t;
 
 struct device
 {
+    uint32_t magic;
     struct llist_header siblings;
     struct llist_header children;
     struct device* parent;
@@ -27,6 +30,7 @@ struct device
     void* underlay;
     int (*read)(struct device* dev, void* buf, size_t offset, size_t len);
     int (*write)(struct device* dev, void* buf, size_t offset, size_t len);
+    int (*exec_cmd)(struct device* dev, uint32_t req, va_list args);
 };
 
 struct device*

@@ -274,11 +274,11 @@ kbd_buffer_key_event(kbd_keycode_t key, uint8_t scancode, kbd_kstate_t state)
         key = key & (0xffdf |
                      -('a' > key || key > 'z' || !(state & KBD_KEY_FCAPSLKED)));
 
-        struct input_evt_pkt ipkt = {
-            .pkt_type = (state & KBD_KEY_FPRESSED) ? PKT_PRESS : PKT_RELEASE,
-            .scan_code = scancode,
-            .sys_code = key,
-        };
+        struct input_evt_pkt ipkt = { .pkt_type = (state & KBD_KEY_FPRESSED)
+                                                    ? PKT_PRESS
+                                                    : PKT_RELEASE,
+                                      .scan_code = scancode,
+                                      .sys_code = (state << 16) | key };
 
         input_fire_event(kbd_idev, &ipkt);
 

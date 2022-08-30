@@ -111,7 +111,8 @@ taskfs_dirlookup(struct v_inode* this, struct v_dnode* dnode)
         if (!tattr || !(proc = get_process(pid)))
             return ENOENT;
 
-        int errno = taskfs_mknod(dnode, pid, taskfs_next_counter(), VFS_IFFILE);
+        int errno =
+          taskfs_mknod(dnode, pid, taskfs_next_counter(), VFS_IFSEQDEV);
         if (!errno) {
             tattr->map_file->data = proc;
             dnode->inode->data = tattr->map_file;

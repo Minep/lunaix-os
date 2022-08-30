@@ -1,7 +1,9 @@
 #include <lunaix/fctrl.h>
 #include <lunaix/foptions.h>
+#include <lunaix/ioctl.h>
 #include <lunaix/lunistd.h>
 #include <lunaix/proc.h>
+#include <lunaix/signal.h>
 #include <lunaix/status.h>
 
 #include <klibc/string.h>
@@ -60,75 +62,123 @@ sh_printerr()
             printf("Error: This is a directory\n");
             break;
         default:
-            printf("Error: Fail to open (%d)\n", errno);
+            printf("Error: (%d)\n", errno);
             break;
     }
 }
 
 void
-sh_main()
+sigint_handle(int signum)
+{
+    return;
+}
+
+void
+do_cat(const char* file)
+{
+    int fd = open(file, 0);
+    if (fd < 0) {
+        sh_printerr();
+    } else {
+        int sz;
+        while ((sz = read(fd, cat_buf, 1024)) > 0) {
+            write(stdout, cat_buf, sz);
+        }
+        if (sz < 0) {
+            sh_printerr();
+        }
+        close(fd);
+        printf("\n");
+    }
+}
+
+void
+do_ls(const char* path)
+{
+    int fd = open(path, 0);
+    if (fd < 0) {
+        sh_printerr();
+    } else {
+        struct dirent ent = { .d_offset = 0 };
+        int status;
+        while ((status = readdir(fd, &ent)) == 1) {
+            if (ent.d_type == DT_DIR) {
+                printf(" \033[3m%s\033[39;49m\n", ent.d_name);
+            } else {
+                printf(" %s\n", ent.d_name);
+            }
+        }
+
+        if (status < 0)
+            sh_printerr();
+
+        close(fd);
+    }
+}
+
+void
+sh_loop()
 {
     char buf[512];
     char *cmd, *argpart;
+    pid_t p;
+    signal(_SIGINT, sigint_handle);
 
-    printf("\n Simple shell. Use <PG_UP> or <PG_DOWN> to scroll.\n\n");
+    // set our shell as foreground process (unistd.h:tcsetpgrp is wrapper of
+    // this)
+    // stdout (by default, unless user did smth) is the tty we are currently at
+    ioctl(stdout, TIOCSPGRP, getpgid());
 
     while (1) {
         getcwd(pwd, 512);
         printf("[\033[2m%s\033[39;49m]$ ", pwd);
-        size_t sz = read(stdin, buf, 512);
+        size_t sz = read(stdin, buf, 511);
         if (sz < 0) {
             printf("fail to read user input (%d)\n", geterrno());
             return;
         }
-        buf[sz - 1] = '\0';
+        buf[sz] = '\0';
         parse_cmdline(buf, &cmd, &argpart);
         if (cmd[0] == 0) {
+            printf("\n");
             goto cont;
         }
         if (streq(cmd, "cd")) {
             if (chdir(argpart) < 0) {
                 sh_printerr();
             }
+            goto cont;
+        } else if (streq(cmd, "clear")) {
+            ioctl(stdout, TIOCCLSBUF);
+            goto cont;
         } else if (streq(cmd, "ls")) {
-            int fd = open(argpart, 0);
-            if (fd < 0) {
-                sh_printerr();
-            } else {
-                struct dirent ent = { .d_offset = 0 };
-                int status;
-                while ((status = readdir(fd, &ent)) == 1) {
-                    if (ent.d_type == DT_DIR) {
-                        printf(" \033[3m%s\033[39;49m\n", ent.d_name);
-                    } else {
-                        printf(" %s\n", ent.d_name);
-                    }
-                }
-
-                if (status < 0)
-                    sh_printerr();
-
-                close(fd);
+            if (!(p = fork())) {
+                do_ls(argpart);
+                _exit(0);
             }
         } else if (streq(cmd, "cat")) {
-            int fd = open(argpart, 0);
-            if (fd < 0) {
-                sh_printerr();
-            } else {
-                int sz;
-                while ((sz = read(fd, cat_buf, 1024)) > 0) {
-                    write(stdout, cat_buf, sz);
-                }
-                if (sz < 0) {
-                    sh_printerr();
-                }
-                close(fd);
-                printf("\n");
+            if (!(p = fork())) {
+                do_cat(argpart);
+                _exit(0);
             }
         } else {
-            printf("unknow command");
+            printf("unknow command\n");
+            goto cont;
         }
+        setpgid(p, getpgid());
+        waitpid(p, NULL, 0);
     cont:
         printf("\n");
     }
+}
+
+void
+sh_main()
+{
+    printf("\n Simple shell. Use <PG_UP> or <PG_DOWN> to scroll.\n\n");
+    if (!fork()) {
+        sh_loop();
+        _exit(0);
+    }
+    wait(NULL);
 }

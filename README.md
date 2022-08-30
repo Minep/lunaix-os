@@ -22,7 +22,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + 内存管理与按需分页（Demand Paging）
 + 键盘输入
 + 多进程
-+ 44个常见的Linux/POSIX系统调用（[附录1](#appendix1)）
++ 47个常见的Linux/POSIX系统调用（[附录1](#appendix1)）
 + 用户模式
 + 信号机制
 + PCI 3.0
@@ -189,6 +189,9 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 2. `setxattr(2)`※
 2. `fgetxattr(2)`※
 2. `fsetxattr(2)`※
+2. `ioctl(2)`※
+2. `getpgid(2)`
+2. `setpgid(2)`
 
 **LunaixOS自有**
 

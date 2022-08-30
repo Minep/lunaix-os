@@ -1,6 +1,7 @@
 #include <klibc/string.h>
 #include <lunaix/device.h>
 #include <lunaix/input.h>
+#include <lunaix/ioctl.h>
 #include <lunaix/keyboard.h>
 #include <lunaix/lxconsole.h>
 #include <lunaix/mm/pmm.h>
@@ -10,6 +11,8 @@
 #include <lunaix/tty/console.h>
 #include <lunaix/tty/tty.h>
 
+#include <lunaix/lxsignal.h>
+
 static struct console lx_console;
 
 int
@@ -18,32 +21,94 @@ __tty_write(struct device* dev, void* buf, size_t offset, size_t len);
 int
 __tty_read(struct device* dev, void* buf, size_t offset, size_t len);
 
+void
+console_flush();
+
 static waitq_t lx_reader;
-static volatile char key;
+static volatile char ttychr;
+
+static pid_t fg_pgid = 0;
+
+inline void
+print_control_code(const char cntrl)
+{
+    console_write_char('^');
+    console_write_char(cntrl + 64);
+}
 
 int
 __lxconsole_listener(struct input_device* dev)
 {
-    uint32_t keycode = dev->current_pkt.sys_code;
+    uint32_t key = dev->current_pkt.sys_code;
     uint32_t type = dev->current_pkt.pkt_type;
-    if (type == PKT_PRESS) {
-        if (keycode == KEY_PG_UP) {
-            console_view_up();
-        } else if (keycode == KEY_PG_DOWN) {
-            console_view_down();
-        }
-        goto done;
-    }
-    if ((keycode & 0xff00) > KEYPAD) {
+    kbd_kstate_t state = key >> 16;
+    ttychr = key & 0xff;
+    key = key & 0xffff;
+
+    if (type == PKT_RELEASE) {
         goto done;
     }
 
-    key = (char)(keycode & 0x00ff);
+    if ((state & KBD_KEY_FLCTRL_HELD)) {
+        char cntrl = (char)(ttychr | 0x20);
+        if ('a' > cntrl || cntrl > 'z') {
+            goto done;
+        }
+        ttychr = cntrl - 'a' + 1;
+        switch (ttychr) {
+            case TCINTR:
+                signal_send(-fg_pgid, _SIGINT);
+                print_control_code(ttychr);
+                break;
+            case TCSTOP:
+                signal_send(-fg_pgid, _SIGSTOP);
+                print_control_code(ttychr);
+                break;
+            default:
+                break;
+        }
+    } else if (key == KEY_PG_UP) {
+        console_view_up();
+        goto done;
+    } else if (key == KEY_PG_DOWN) {
+        console_view_down();
+        goto done;
+    } else if ((key & 0xff00) <= KEYPAD) {
+        ttychr = key;
+    } else {
+        goto done;
+    }
 
     pwake_all(&lx_reader);
 
 done:
     return INPUT_EVT_NEXT;
+}
+
+int
+__tty_exec_cmd(struct device* dev, uint32_t req, va_list args)
+{
+    switch (req) {
+        case TIOCGPGRP:
+            return fg_pgid;
+        case TIOCSPGRP:
+            fg_pgid = va_arg(args, pid_t);
+            break;
+        case TIOCCLSBUF:
+            fifo_clear(&lx_console.output);
+            fifo_clear(&lx_console.input);
+            lx_console.wnd_start = 0;
+            lx_console.lines = 0;
+            lx_console.output.flags |= FIFO_DIRTY;
+            break;
+        case TIOCFLUSH:
+            lx_console.output.flags |= FIFO_DIRTY;
+            console_flush();
+            break;
+        default:
+            return EINVAL;
+    }
+    return 0;
 }
 
 void
@@ -58,6 +123,7 @@ lxconsole_init()
     struct device* tty_dev = device_addseq(NULL, &lx_console, "tty");
     tty_dev->write = __tty_write;
     tty_dev->read = __tty_read;
+    tty_dev->exec_cmd = __tty_exec_cmd;
 
     waitq_init(&lx_reader);
     input_add_listener(__lxconsole_listener);
@@ -83,14 +149,30 @@ __tty_read(struct device* dev, void* buf, size_t offset, size_t len)
     while (count < len) {
         pwait(&lx_reader);
 
-        if (key == 0x08) {
-            if (fifo_backone(&console->input)) {
-                console_write_char(key);
+        if (ttychr < 0x1B) {
+            // ASCII control codes
+            switch (ttychr) {
+                case TCINTR:
+                    fifo_clear(&console->input);
+                    return 0;
+                case TCBS:
+                    if (fifo_backone(&console->input)) {
+                        console_write_char(ttychr);
+                    }
+                    continue;
+                case TCLF:
+                case TCCR:
+                    goto proceed;
+                default:
+                    break;
             }
+            print_control_code(ttychr);
             continue;
         }
-        console_write_char(key);
-        if (!fifo_putone(&console->input, key) || key == '\n') {
+
+    proceed:
+        console_write_char(ttychr);
+        if (!fifo_putone(&console->input, ttychr) || ttychr == '\n') {
             break;
         }
     }

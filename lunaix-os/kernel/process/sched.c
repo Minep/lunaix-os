@@ -331,6 +331,13 @@ destroy_process(pid_t pid)
     sched_ctx._procs[index] = 0;
 
     llist_delete(&proc->siblings);
+    llist_delete(&proc->grp_member);
+    llist_delete(&proc->tasks);
+    llist_delete(&proc->sleep.sleepers);
+
+    if (proc->cwd) {
+        vfs_unref_dnode(proc->cwd);
+    }
 
     for (size_t i = 0; i < VFS_MAX_FD; i++) {
         struct v_fd* fd = proc->fdtable->fds[i];

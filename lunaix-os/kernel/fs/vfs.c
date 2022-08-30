@@ -257,9 +257,33 @@ int
 vfs_close(struct v_file* file)
 {
     int errno = 0;
-    if (!(errno = file->ops->close(file))) {
+    if (file->ref_count > 1) {
+        atomic_fetch_sub(&file->ref_count, 1);
+    } else if (!(errno = file->ops->close(file))) {
         atomic_fetch_sub(&file->dnode->ref_count, 1);
         file->inode->open_count--;
+
+        // Remove dead lock.
+        // This happened when process is terminated while blocking on read.
+        // In that case, the process is still holding the inode lock and it will
+        // never get released.
+        // FIXME is this a good solution?
+        /*
+         * Consider two process both open the same file both with fd=x.
+         *      Process A: busy on reading x
+         *      Process B: do nothing with x
+         * Assume that, after a very short time, process B get terminated while
+         * process A is still busy in it's reading business. By this design, the
+         * inode lock of this file x is get released by B rather than A. And
+         * this will cause a probable race condition on A if other process is
+         * writing to this file later after B exit.
+         *
+         * A possible solution is to add a owner identification in the lock
+         * context, so only the lock holder can do the release.
+         */
+        if (mutex_on_hold(&file->inode->lock)) {
+            unlock_inode(file->inode);
+        }
         mnt_chillax(file->dnode->mnt);
 
         pcache_commit_all(file->inode);
@@ -561,9 +585,7 @@ __DEFINE_LXSYSCALL1(int, close, int, fd)
         goto done_err;
     }
 
-    if (fd_s->file->ref_count > 1) {
-        fd_s->file->ref_count--;
-    } else if ((errno = vfs_close(fd_s->file))) {
+    if ((errno = vfs_close(fd_s->file))) {
         goto done_err;
     }
 
@@ -687,13 +709,11 @@ __DEFINE_LXSYSCALL3(int, write, int, fd, void*, buf, size_t, count)
 
     file->inode->mtime = clock_unixtime();
 
-    __SYSCALL_INTERRUPTIBLE({
-        if ((file->inode->itype & VFS_IFSEQDEV) || (fd_s->flags & FO_DIRECT)) {
-            errno = file->ops->write(file->inode, buf, count, file->f_pos);
-        } else {
-            errno = pcache_write(file->inode, buf, count, file->f_pos);
-        }
-    })
+    if ((file->inode->itype & VFS_IFSEQDEV) || (fd_s->flags & FO_DIRECT)) {
+        errno = file->ops->write(file->inode, buf, count, file->f_pos);
+    } else {
+        errno = pcache_write(file->inode, buf, count, file->f_pos);
+    }
 
     if (errno > 0) {
         file->f_pos += errno;
@@ -1175,8 +1195,22 @@ done:
     return DO_STATUS(errno);
 }
 
+void
+vfs_ref_dnode(struct v_dnode* dnode)
+{
+    atomic_fetch_add(&dnode->ref_count, 1);
+    mnt_mkbusy(dnode->mnt);
+}
+
+void
+vfs_unref_dnode(struct v_dnode* dnode)
+{
+    atomic_fetch_sub(&dnode->ref_count, 1);
+    mnt_chillax(dnode->mnt);
+}
+
 int
-__vfs_do_chdir(struct v_dnode* dnode)
+vfs_do_chdir(struct proc_info* proc, struct v_dnode* dnode)
 {
     int errno = 0;
 
@@ -1187,14 +1221,12 @@ __vfs_do_chdir(struct v_dnode* dnode)
         goto done;
     }
 
-    if (__current->cwd) {
-        atomic_fetch_sub(&__current->cwd->ref_count, 1);
-        mnt_chillax(__current->cwd->mnt);
+    if (proc->cwd) {
+        vfs_unref_dnode(proc->cwd);
     }
 
-    atomic_fetch_add(&dnode->ref_count, 1);
-    mnt_mkbusy(dnode->mnt);
-    __current->cwd = dnode;
+    vfs_ref_dnode(dnode);
+    proc->cwd = dnode;
 
     unlock_dnode(dnode);
 
@@ -1211,7 +1243,7 @@ __DEFINE_LXSYSCALL1(int, chdir, const char*, path)
         goto done;
     }
 
-    errno = __vfs_do_chdir(dnode);
+    errno = vfs_do_chdir(__current, dnode);
 
 done:
     return DO_STATUS(errno);
@@ -1226,7 +1258,7 @@ __DEFINE_LXSYSCALL1(int, fchdir, int, fd)
         goto done;
     }
 
-    errno = __vfs_do_chdir(fd_s->file->dnode);
+    errno = vfs_do_chdir(__current, fd_s->file->dnode);
 
 done:
     return DO_STATUS(errno);

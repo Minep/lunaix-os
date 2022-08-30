@@ -38,7 +38,9 @@ __read_pgid(struct twimap* map)
 void
 __read_children(struct twimap* map)
 {
-    struct proc_info* proc = twimap_index(map, struct proc_info*);
+    struct llist_header* proc_list = twimap_index(map, struct llist_header*);
+    struct proc_info* proc =
+      container_of(proc_list, struct proc_info, siblings);
     if (!proc)
         return;
     twimap_printf(map, "%d ", proc->pid);
@@ -47,11 +49,12 @@ __read_children(struct twimap* map)
 int
 __next_children(struct twimap* map)
 {
-    struct proc_info* proc = twimap_index(map, struct proc_info*);
+    struct llist_header* proc = twimap_index(map, struct llist_header*);
+    struct proc_info* current = twimap_data(map, struct proc_info*);
     if (!proc)
         return 0;
-    map->index = container_of(proc->siblings.next, struct proc_info, siblings);
-    if (map->index == proc) {
+    map->index = proc->next;
+    if (map->index == &current->children) {
         return 0;
     }
     return 1;
@@ -65,7 +68,7 @@ __reset_children(struct twimap* map)
         map->index = 0;
         return;
     }
-    map->index = container_of(proc->children.next, struct proc_info, siblings);
+    map->index = proc->children.next;
 }
 
 void

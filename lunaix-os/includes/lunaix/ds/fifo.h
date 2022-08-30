@@ -41,4 +41,7 @@ fifo_write(struct fifo_buf* fbuf, void* data, size_t count);
 size_t
 fifo_read(struct fifo_buf* fbuf, void* buf, size_t count);
 
+void
+fifo_clear(struct fifo_buf* fbuf);
+
 #endif /* __LUNAIX_FIFO_BUF_H */

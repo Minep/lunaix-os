@@ -54,6 +54,10 @@
 #define __SYSCALL_fgetxattr 46
 #define __SYSCALL_fsetxattr 47
 
+#define __SYSCALL_ioctl 48
+#define __SYSCALL_getpgid 49
+#define __SYSCALL_setpgid 50
+
 #define __SYSCALL_MAX 0x100
 
 #ifndef __ASM__
@@ -128,6 +132,14 @@ syscall_install();
     static rettype name(__PARAM_MAP4(t1, p1, t2, p2, t3, p3, t4, p4))          \
     {                                                                          \
         asm("\n" ::"b"(p1), "c"(p2), "d"(p3), "D"(p4));                        \
+        ___DOINT33(__SYSCALL_##name, rettype)                                  \
+    }
+
+#define __LXSYSCALL2_VARG(rettype, name, t1, p1, t2, p2)                       \
+    static rettype name(__PARAM_MAP2(t1, p1, t2, p2), ...)                     \
+    {                                                                          \
+        void* _last = (void*)&p2 + sizeof(void*);                              \
+        asm("\n" ::"b"(p1), "c"(p2), "d"(_last));                              \
         ___DOINT33(__SYSCALL_##name, rettype)                                  \
     }
 #endif

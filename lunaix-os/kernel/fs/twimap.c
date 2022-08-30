@@ -40,9 +40,9 @@ twimap_read(struct twimap* map, void* buffer, size_t len, size_t fpos)
         map->size_acc = 0;
         map->read(map);
         pos += map->size_acc;
-    } while (pos < fpos && map->go_next(map));
+    } while (pos <= fpos && map->go_next(map));
 
-    if (pos < fpos) {
+    if (pos <= fpos) {
         vfree(map->buffer);
         return 0;
     }

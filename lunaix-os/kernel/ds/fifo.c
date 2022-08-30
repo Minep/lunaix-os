@@ -15,6 +15,16 @@ fifo_init(struct fifo_buf* buf, void* data_buffer, size_t buf_size, int flags)
     mutex_init(&buf->lock);
 }
 
+void
+fifo_clear(struct fifo_buf* fbuf)
+{
+    mutex_lock(&fbuf->lock);
+    fbuf->rd_pos = 0;
+    fbuf->wr_pos = 0;
+    fbuf->free_len = fbuf->size;
+    mutex_unlock(&fbuf->lock);
+}
+
 int
 fifo_backone(struct fifo_buf* fbuf)
 {
