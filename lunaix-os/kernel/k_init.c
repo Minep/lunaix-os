@@ -78,6 +78,8 @@ _kernel_init()
     fsm_init();
     input_init();
 
+    vfs_export_attributes();
+
     if ((errno = vfs_mount_root("ramfs", NULL))) {
         panickf("Fail to mount root. (errno=%d)", errno);
     }

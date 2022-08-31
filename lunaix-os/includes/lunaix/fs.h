@@ -281,6 +281,9 @@ fsm_get(const char* fs_name);
 void
 vfs_init();
 
+void
+vfs_export_attributes();
+
 struct v_dnode*
 vfs_dcache_lookup(struct v_dnode* parent, struct hstr* str);
 
@@ -331,6 +334,9 @@ int
 vfs_open(struct v_dnode* dnode, struct v_file** file);
 
 int
+vfs_pclose(struct v_file* file, pid_t pid);
+
+int
 vfs_close(struct v_file* file);
 
 int
@@ -377,6 +383,9 @@ vfs_ref_dnode(struct v_dnode* dnode);
 
 void
 vfs_unref_dnode(struct v_dnode* dnode);
+
+int
+vfs_get_path(struct v_dnode* dnode, char* buf, size_t size, int depth);
 
 void
 pcache_init(struct pcache* pcache);

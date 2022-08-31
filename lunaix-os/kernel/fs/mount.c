@@ -4,7 +4,7 @@
 #include <lunaix/process.h>
 #include <lunaix/types.h>
 
-static struct llist_header all_mnts = { .next = &all_mnts, .prev = &all_mnts };
+struct llist_header all_mnts = { .next = &all_mnts, .prev = &all_mnts };
 
 struct v_mount*
 vfs_create_mount(struct v_mount* parent, struct v_dnode* mnt_point)

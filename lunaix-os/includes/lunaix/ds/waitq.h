@@ -8,10 +8,16 @@ typedef struct waitq
     struct llist_header waiters;
 } waitq_t;
 
-inline void
+static inline void
 waitq_init(waitq_t* waitq)
 {
     llist_init_head(&waitq->waiters);
+}
+
+static inline int
+waitq_empty(waitq_t* waitq)
+{
+    return llist_empty(&waitq->waiters);
 }
 
 void

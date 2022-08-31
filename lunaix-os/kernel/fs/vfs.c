@@ -254,7 +254,7 @@ vfs_link(struct v_dnode* to_link, struct v_dnode* name)
 }
 
 int
-vfs_close(struct v_file* file)
+vfs_pclose(struct v_file* file, pid_t pid)
 {
     int errno = 0;
     if (file->ref_count > 1) {
@@ -263,26 +263,25 @@ vfs_close(struct v_file* file)
         atomic_fetch_sub(&file->dnode->ref_count, 1);
         file->inode->open_count--;
 
-        // Remove dead lock.
+        // Prevent dead lock.
         // This happened when process is terminated while blocking on read.
         // In that case, the process is still holding the inode lock and it will
         // never get released.
-        // FIXME is this a good solution?
         /*
-         * Consider two process both open the same file both with fd=x.
+         * The unlocking should also include ownership check.
+         *
+         * To see why, consider two process both open the same file both with
+         * fd=x.
          *      Process A: busy on reading x
          *      Process B: do nothing with x
-         * Assume that, after a very short time, process B get terminated while
-         * process A is still busy in it's reading business. By this design, the
-         * inode lock of this file x is get released by B rather than A. And
-         * this will cause a probable race condition on A if other process is
-         * writing to this file later after B exit.
-         *
-         * A possible solution is to add a owner identification in the lock
-         * context, so only the lock holder can do the release.
+         * Assuming that, after a very short time, process B get terminated
+         * while process A is still busy in it's reading business. By this
+         * design, the inode lock of this file x is get released by B rather
+         * than A. And this will cause a probable race condition on A if other
+         * process is writing to this file later after B exit.
          */
         if (mutex_on_hold(&file->inode->lock)) {
-            unlock_inode(file->inode);
+            mutex_unlock_for(&file->inode->lock, pid);
         }
         mnt_chillax(file->dnode->mnt);
 
@@ -290,6 +289,12 @@ vfs_close(struct v_file* file)
         cake_release(file_pile, file);
     }
     return errno;
+}
+
+int
+vfs_close(struct v_file* file)
+{
+    return vfs_pclose(file, __current->pid);
 }
 
 int
@@ -773,7 +778,7 @@ done:
 int
 vfs_get_path(struct v_dnode* dnode, char* buf, size_t size, int depth)
 {
-    if (!dnode || dnode->parent == dnode) {
+    if (!dnode) {
         return 0;
     }
 
@@ -781,13 +786,19 @@ vfs_get_path(struct v_dnode* dnode, char* buf, size_t size, int depth)
         return ENAMETOOLONG;
     }
 
-    size_t len = vfs_get_path(dnode->parent, buf, size, depth + 1);
+    size_t len = 0;
+
+    if (dnode->parent != dnode) {
+        len = vfs_get_path(dnode->parent, buf, size, depth + 1);
+    }
 
     if (len >= size) {
         return len;
     }
 
-    buf[len++] = VFS_PATH_DELIM;
+    if (!len || buf[len - 1] != VFS_PATH_DELIM) {
+        buf[len++] = VFS_PATH_DELIM;
+    }
 
     size_t cpy_size = MIN(dnode->name.len, size - len);
     strncpy(buf + len, dnode->name.value, cpy_size);

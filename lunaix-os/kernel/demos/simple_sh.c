@@ -124,8 +124,8 @@ sh_loop()
     pid_t p;
     signal(_SIGINT, sigint_handle);
 
-    // set our shell as foreground process (unistd.h:tcsetpgrp is wrapper of
-    // this)
+    // set our shell as foreground process
+    // (unistd.h:tcsetpgrp is essentially a wrapper of this)
     // stdout (by default, unless user did smth) is the tty we are currently at
     ioctl(stdout, TIOCSPGRP, getpgid());
 
