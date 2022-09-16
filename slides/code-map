@@ -1,0 +1,18 @@
+The following list records the commit hashes correspond to the topics
+
+NOTE: the undermentioned commits does not directly reference the topic but aggregated code that resemble the topic
+
+1.  (asm and multiboot) ca038e65d1ccf0dae9e624baa4b4d173ea8ad175
+2.  (hello kernel world) e0ee3d449aacd33a84cb1f58961e55f9f06acb46
+3.  (protected mode) 0264889df8dd6775d765416a13804bc4ed8cc3f7
+4.  (gdt setup) fedfd71f5492177a7c7d7fd2bd1529a832106395
+5.  (interrupts) 8ef44e8d53fcd532d6c581e1984532df3f01c7b8
+6.  (virtual memory) e141fd4dcd5effc2dbe59a498d7ea274b7199147
+7.  (malloc) 4c6d990440cdba6c7dd294adb7e435770ffcbcc4
+8.  (acpi and apic) 287a5f7ae6a3bec3d679a5de394e915b56c7367d
+9.  (ps2 keyboard) af336b49c908dc0d2b62846a19001d4dac7cad61
+10. (multitasking) 088403ac98acf7991507715d29a282dcba222053
+11. (signal) eb251af8672e033f29322253f136e09c76f2b0a3
+12. (pci and ioremap/iounmap) 03944e7734220bf7e7aa7b7113bcbdf9c22808a5
+13. (sata-ahci) e8e64a4f1d76aaeac3defa13243505cccd25c078
+14. (vfs) 96cf56ea15a22b8b362aac6c3ab202d2608e9151
