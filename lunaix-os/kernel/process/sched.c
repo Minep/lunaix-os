@@ -282,6 +282,8 @@ alloc_process()
     proc->created = clock_systime();
     proc->pgid = proc->pid;
     proc->fdtable = vzalloc(sizeof(struct v_fdtable));
+    proc->fxstate =
+      vzalloc_dma(512); // FXSAVE需要十六位对齐地址，使用DMA块（128位对齐）
 
     llist_init_head(&proc->mm.regions.head);
     llist_init_head(&proc->tasks);
@@ -349,6 +351,7 @@ destroy_process(pid_t pid)
     }
 
     vfree(proc->fdtable);
+    vfree_dma(proc->fxstate);
 
     struct mm_region *pos, *n;
     llist_for_each(pos, n, &proc->mm.regions.head, head)

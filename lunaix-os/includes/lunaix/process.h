@@ -31,14 +31,18 @@ struct proc_mm
     struct mm_region regions;
 };
 
+struct proc_sigstate
+{
+    isr_param proc_regs;
+    char fxstate[512] __attribute__((aligned(16)));
+};
+
 struct proc_sig
 {
     void* signal_handler;
     int sig_num;
-    isr_param prev_context;
-};
-
-#define PROC_SIG_SIZE sizeof(struct proc_sig) // size=84
+    struct proc_sigstate prev_context;
+} __attribute__((packed));
 
 struct proc_info
 {
@@ -50,11 +54,12 @@ struct proc_info
 
     /* ---- critical section start ---- */
 
-    pid_t pid;
-    struct proc_info* parent;
-    isr_param intr_ctx; // size=76
-    uintptr_t ustack_top;
-    void* page_table;
+    pid_t pid;                // offset = 0
+    struct proc_info* parent; // offset = 4
+    isr_param intr_ctx;       // offset = 8
+    uintptr_t ustack_top;     // offset = 84
+    void* page_table;         // offset = 88
+    void* fxstate;            // offset = 92
 
     /* ---- critical section end ---- */
 

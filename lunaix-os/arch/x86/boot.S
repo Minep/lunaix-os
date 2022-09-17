@@ -77,10 +77,16 @@
         andl $0xfffff000, %eax      # 有点多余，但写上还算明白一点
         movl %eax, %cr3
 
-        /* 开启分页与地址转换 (CR0.PG=1, PG.WP=1) */
         movl %cr0, %eax
-        orl $0x80010000, %eax
+        orl $0x80010000, %eax   /* 开启分页与地址转换 (CR0.PG=1, CR0.WP=1) */
+        andl $0xfffffffb, %eax
+        orl $0x2, %eax          /* 启用x87 FPU (CR0.MP=1, CR0.EM=0) */
         movl %eax, %cr0
+
+        movl %cr4, %eax
+        orl $0x600, %eax
+        movl %eax, %cr4         /* CR4.OSFXSR=1, CR4.OSXMMEXCPT=1 */
+                                /* x87 FPU 已配置 */
 
         addl $16, %esp
 

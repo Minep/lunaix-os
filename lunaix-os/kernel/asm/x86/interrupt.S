@@ -74,7 +74,12 @@
 
         # 保存用户栈顶指针。这是因为我们允许系统调用内进行上下文切换，而这样一来，我们就失去了用户栈的信息，
         # 这样一来，就无法设置信号上下文。这主要是为了实现了pause()而做的准备
-        movl (__current), %eax  
+        movl (__current), %eax
+
+        # 保存x87FPU的状态
+        movl 92(%eax), %ebx
+        fxsave (%ebx)
+
         movl 68(%esp), %ebx     # 取出esp
         movl %ebx, 84(%eax)     # 存入__current->ustack_top
 
@@ -97,6 +102,9 @@
         movl 56(%esp), %eax
         movl %eax, (debug_resv + 4)
 #endif
+        movl (__current), %eax
+        movl 92(%eax), %eax
+        fxrstor (%eax)
 
         popl %eax
         popl %ebx
@@ -168,9 +176,9 @@
         # 注意2：handle_signal在调用之前，须确保proc_sig已经写入用户栈！
         leal 8(%eax), %ebx      # arg1 in %eax: addr of proc_sig structure in user stack
 
-        pushl $UDATA_SEG        # proc_sig->prev_context.ss
+        pushl $UDATA_SEG        # proc_sig->prev_context.proc_regs.ss
         pushl %eax              # esp
-        pushl 64(%ebx)          # proc_sig->prev_context.eflags
+        pushl 64(%ebx)          # proc_sig->prev_context.proc_regs.eflags
         pushl $UCODE_SEG        # cs
         pushl $sig_wrapper      # eip for sig wrapper
 

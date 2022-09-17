@@ -1,3 +1,4 @@
+#include <klibc/string.h>
 #include <lunaix/lunistd.h>
 #include <lunaix/lxsignal.h>
 #include <lunaix/process.h>
@@ -22,7 +23,7 @@ void* default_handlers[_SIG_NUM] = {
     [_SIGINT] = default_sighandler_term,
 };
 
-volatile isr_param __temp_save;
+volatile struct proc_sigstate __temp_save;
 // Referenced in kernel/asm/x86/interrupt.S
 void*
 signal_dispatch()
@@ -79,7 +80,9 @@ signal_dispatch()
 
         解决办法就是先吧intr_ctx拷贝到一个静态分配的区域里，然后再注入到用户栈。
     */
-    __temp_save = __current->intr_ctx;
+    __temp_save.proc_regs = __current->intr_ctx;
+    memcpy(__temp_save.fxstate, __current->fxstate, 512);
+
     sig_ctx->prev_context = __temp_save;
 
     sig_ctx->sig_num = sig_selected;
@@ -138,7 +141,8 @@ send_single:
 
 __DEFINE_LXSYSCALL1(int, sigreturn, struct proc_sig, *sig_ctx)
 {
-    __current->intr_ctx = sig_ctx->prev_context;
+    memcpy(__current->fxstate, sig_ctx->prev_context.fxstate, 512);
+    __current->intr_ctx = sig_ctx->prev_context.proc_regs;
     __current->flags &= ~PROC_FINPAUSE;
     __SIGCLEAR(__current->sig_inprogress, sig_ctx->sig_num);
     schedule();
