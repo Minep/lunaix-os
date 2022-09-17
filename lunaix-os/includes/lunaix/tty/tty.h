@@ -1,5 +1,8 @@
 #ifndef __LUNAIX_TTY_H
 #define __LUNAIX_TTY_H
+
+#include <lunaix/ds/fifo.h>
+
 typedef unsigned short vga_attribute;
 
 #define VGA_COLOR_BLACK 0
@@ -31,8 +34,8 @@ tty_set_theme(vga_attribute fg, vga_attribute bg);
 vga_attribute
 tty_get_theme();
 
-size_t
-tty_flush_buffer(char* data, size_t pos, size_t limit, size_t buf_size);
+void
+tty_flush_buffer(struct fifo_buf* buf);
 
 void
 tty_clear_line(int line_num);

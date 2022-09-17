@@ -2,32 +2,29 @@
 #include <lunaix/fctrl.h>
 #include <lunaix/lunistd.h>
 #include <lunaix/proc.h>
-#include <lunaix/syslog.h>
-
-LOG_MODULE("RDDIR")
 
 void
 _readdir_main()
 {
     int fd = open("/dev/./../dev/.", 0);
     if (fd == -1) {
-        kprintf(KERROR "fail to open (%d)\n", geterrno());
+        printf("fail to open (%d)\n", geterrno());
         return;
     }
 
     char path[129];
     int len = realpathat(fd, path, 128);
     if (len < 0) {
-        kprintf(KERROR "fail to read (%d)\n", geterrno());
+        printf("fail to read (%d)\n", geterrno());
     } else {
         path[len] = 0;
-        kprintf("%s\n", path);
+        printf("%s\n", path);
     }
 
     struct dirent ent = { .d_offset = 0 };
 
     while (readdir(fd, &ent) == 1) {
-        kprintf(KINFO "%s\n", ent.d_name);
+        printf("%s\n", ent.d_name);
     }
 
     close(fd);

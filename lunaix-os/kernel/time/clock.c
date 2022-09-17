@@ -1,5 +1,6 @@
 #include <hal/rtc.h>
 #include <lunaix/clock.h>
+#include <lunaix/fs/twifs.h>
 #include <lunaix/spike.h>
 #include <lunaix/timer.h>
 
@@ -7,6 +8,52 @@ static volatile time_t sys_time;
 
 void
 clock_systime_counter(void* arg);
+
+void
+__clock_read_systime(struct twimap* map)
+{
+    time_t save = sys_time;
+    twimap_printf(map, "%u", save);
+}
+
+void
+__clock_read_datetime(struct twimap* map)
+{
+    datetime_t dt;
+    clock_walltime(&dt);
+    twimap_printf(map,
+                  "%.4d-%.2d-%.2d %.2d:%.2d:%.2d",
+                  dt.year,
+                  dt.month,
+                  dt.day,
+                  dt.hour,
+                  dt.minute,
+                  dt.second);
+}
+
+void
+__clock_read_unix(struct twimap* map)
+{
+    datetime_t dt;
+    clock_walltime(&dt);
+    twimap_printf(map, "%u", clock_tounixtime(&dt));
+}
+
+void
+clock_build_mapping()
+{
+    struct twifs_node* root = twifs_dir_node(NULL, "clock");
+    struct twimap* map;
+
+    map = twifs_mapping(root, NULL, "systime");
+    map->read = __clock_read_systime;
+
+    map = twifs_mapping(root, NULL, "unix");
+    map->read = __clock_read_unix;
+
+    map = twifs_mapping(root, NULL, "datetime");
+    map->read = __clock_read_datetime;
+}
 
 void
 clock_init()
@@ -17,6 +64,8 @@ clock_init()
 
     // 系统计时器每毫秒累加。
     timer_run_ms(1, clock_systime_counter, NULL, TIMER_MODE_PERIODIC);
+
+    clock_build_mapping();
 }
 
 void

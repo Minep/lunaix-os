@@ -15,6 +15,10 @@ __LXSYSCALL(pid_t, getpid)
 
 __LXSYSCALL(pid_t, getppid)
 
+__LXSYSCALL(pid_t, getpgid)
+
+__LXSYSCALL2(pid_t, setpgid, pid_t, pid, pid_t, pgid)
+
 __LXSYSCALL1(void, _exit, int, status)
 
 __LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)

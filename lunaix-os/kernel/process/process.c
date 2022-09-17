@@ -123,7 +123,7 @@ __DEFINE_LXSYSCALL2(int, setpgid, pid_t, pid, pid_t, pgid)
 
     struct proc_info* gruppenfuhrer = get_process(pgid);
 
-    if (!gruppenfuhrer || proc->pgid == proc->pid) {
+    if (!gruppenfuhrer || proc->pgid == gruppenfuhrer->pid) {
         __current->k_status = EINVAL;
         return -1;
     }
@@ -151,7 +151,7 @@ init_proc_user_space(struct proc_info* pcb)
         vmm_set_mapping(PD_MOUNT_1, i, 0, PG_ALLOW_USER | PG_WRITE, VMAP_NULL);
     }
 
-    // todo: other uspace initialization stuff
+    // TODO other uspace initialization stuff
 
     vmm_unmount_pd(PD_MOUNT_1);
 }
@@ -195,6 +195,11 @@ dup_proc()
     pcb->mm.u_heap = __current->mm.u_heap;
     pcb->intr_ctx = __current->intr_ctx;
     pcb->parent = __current;
+
+    if (__current->cwd) {
+        pcb->cwd = __current->cwd;
+        vfs_ref_dnode(pcb->cwd);
+    }
 
     __copy_fdtable(pcb);
     region_copy(&__current->mm.regions, &pcb->mm.regions);

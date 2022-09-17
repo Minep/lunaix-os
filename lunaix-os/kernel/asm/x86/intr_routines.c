@@ -79,7 +79,7 @@ intr_routine_apic_error(const isr_param* param)
 {
     uint32_t error_reg = apic_read_reg(APIC_ESR);
     char buf[32];
-    sprintf(buf, "APIC error, ESR=0x%x", error_reg);
+    ksprintf(buf, "APIC error, ESR=0x%x", error_reg);
     console_flush();
     __print_panic_msg(buf, param);
     spin();

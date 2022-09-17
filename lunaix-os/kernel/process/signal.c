@@ -126,7 +126,6 @@ send_grp:
     {
         __SIGSET(pos->sig_pending, signum);
     }
-    return 0;
 
 send_single:
     if (PROC_TERMINATED(proc->state)) {

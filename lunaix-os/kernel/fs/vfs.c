@@ -163,6 +163,7 @@ vfs_dcache_remove(struct v_dnode* dnode)
     assert(dnode->ref_count == 1);
 
     llist_delete(&dnode->siblings);
+    llist_delete(&dnode->aka_list);
     hlist_delete(&dnode->hash_list);
 
     dnode->parent = NULL;
@@ -225,8 +226,10 @@ void
 vfs_assign_inode(struct v_dnode* assign_to, struct v_inode* inode)
 {
     if (assign_to->inode) {
+        llist_delete(&assign_to->aka_list);
         assign_to->inode->link_count--;
     }
+    llist_append(&inode->aka_dnodes, &assign_to->aka_list);
     assign_to->inode = inode;
     inode->link_count++;
 }
@@ -254,18 +257,47 @@ vfs_link(struct v_dnode* to_link, struct v_dnode* name)
 }
 
 int
-vfs_close(struct v_file* file)
+vfs_pclose(struct v_file* file, pid_t pid)
 {
     int errno = 0;
-    if (!(errno = file->ops->close(file))) {
+    if (file->ref_count > 1) {
+        atomic_fetch_sub(&file->ref_count, 1);
+    } else if (!(errno = file->ops->close(file))) {
         atomic_fetch_sub(&file->dnode->ref_count, 1);
         file->inode->open_count--;
+
+        // Prevent dead lock.
+        // This happened when process is terminated while blocking on read.
+        // In that case, the process is still holding the inode lock and it will
+        // never get released.
+        /*
+         * The unlocking should also include ownership check.
+         *
+         * To see why, consider two process both open the same file both with
+         * fd=x.
+         *      Process A: busy on reading x
+         *      Process B: do nothing with x
+         * Assuming that, after a very short time, process B get terminated
+         * while process A is still busy in it's reading business. By this
+         * design, the inode lock of this file x is get released by B rather
+         * than A. And this will cause a probable race condition on A if other
+         * process is writing to this file later after B exit.
+         */
+        if (mutex_on_hold(&file->inode->lock)) {
+            mutex_unlock_for(&file->inode->lock, pid);
+        }
         mnt_chillax(file->dnode->mnt);
 
         pcache_commit_all(file->inode);
         cake_release(file_pile, file);
     }
     return errno;
+}
+
+int
+vfs_close(struct v_file* file)
+{
+    return vfs_pclose(file, __current->pid);
 }
 
 int
@@ -358,6 +390,7 @@ vfs_d_alloc(struct v_dnode* parent, struct hstr* name)
     memset(dnode, 0, sizeof(*dnode));
     llist_init_head(&dnode->children);
     llist_init_head(&dnode->siblings);
+    llist_init_head(&dnode->aka_list);
     mutex_init(&dnode->lock);
 
     dnode->ref_count = ATOMIC_VAR_INIT(0);
@@ -367,6 +400,7 @@ vfs_d_alloc(struct v_dnode* parent, struct hstr* name)
 
     if (parent) {
         dnode->super_block = parent->super_block;
+        dnode->mnt = parent->mnt;
     }
 
     lru_use_one(dnode_lru, &dnode->lru);
@@ -439,6 +473,7 @@ vfs_i_alloc(struct v_superblock* sb)
     memset(inode, 0, sizeof(*inode));
     mutex_init(&inode->lock);
     llist_init_head(&inode->xattrs);
+    llist_init_head(&inode->aka_dnodes);
 
     sb->ops.init_inode(sb, inode);
 
@@ -486,6 +521,8 @@ __vfs_try_locate_file(const char* path,
     char name_str[VFS_NAME_MAXLEN];
     struct hstr name = HSTR(name_str, 0);
     int errno;
+
+    name_str[0] = 0;
     if ((errno = vfs_walk_proc(path, fdir, &name, VFS_WALK_PARENT))) {
         return errno;
     }
@@ -558,9 +595,7 @@ __DEFINE_LXSYSCALL1(int, close, int, fd)
         goto done_err;
     }
 
-    if (fd_s->file->ref_count > 1) {
-        fd_s->file->ref_count--;
-    } else if ((errno = vfs_close(fd_s->file))) {
+    if ((errno = vfs_close(fd_s->file))) {
         goto done_err;
     }
 
@@ -606,9 +641,9 @@ __DEFINE_LXSYSCALL2(int, readdir, int, fd, struct dirent*, dent)
                                   __vfs_readdir_callback };
         errno = 1;
         if (dent->d_offset == 0) {
-            __vfs_readdir_callback(&dctx, vfs_dot.value, vfs_dot.len, 0);
+            __vfs_readdir_callback(&dctx, vfs_dot.value, vfs_dot.len, DT_DIR);
         } else if (dent->d_offset == 1) {
-            __vfs_readdir_callback(&dctx, vfs_ddot.value, vfs_ddot.len, 0);
+            __vfs_readdir_callback(&dctx, vfs_ddot.value, vfs_ddot.len, DT_DIR);
         } else {
             dctx.index -= 2;
             if ((errno = fd_s->file->ops->readdir(fd_s->file, &dctx)) != 1) {
@@ -643,13 +678,11 @@ __DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
 
     file->inode->atime = clock_unixtime();
 
-    __SYSCALL_INTERRUPTIBLE({
-        if ((file->inode->itype & VFS_IFSEQDEV) || (fd_s->flags & FO_DIRECT)) {
-            errno = file->ops->read(file->inode, buf, count, file->f_pos);
-        } else {
-            errno = pcache_read(file->inode, buf, count, file->f_pos);
-        }
-    })
+    if ((file->inode->itype & VFS_IFSEQDEV) || (fd_s->flags & FO_DIRECT)) {
+        errno = file->ops->read(file->inode, buf, count, file->f_pos);
+    } else {
+        errno = pcache_read(file->inode, buf, count, file->f_pos);
+    }
 
     if (errno > 0) {
         file->f_pos += errno;
@@ -686,13 +719,11 @@ __DEFINE_LXSYSCALL3(int, write, int, fd, void*, buf, size_t, count)
 
     file->inode->mtime = clock_unixtime();
 
-    __SYSCALL_INTERRUPTIBLE({
-        if ((file->inode->itype & VFS_IFSEQDEV) || (fd_s->flags & FO_DIRECT)) {
-            errno = file->ops->write(file->inode, buf, count, file->f_pos);
-        } else {
-            errno = pcache_write(file->inode, buf, count, file->f_pos);
-        }
-    })
+    if ((file->inode->itype & VFS_IFSEQDEV) || (fd_s->flags & FO_DIRECT)) {
+        errno = file->ops->write(file->inode, buf, count, file->f_pos);
+    } else {
+        errno = pcache_write(file->inode, buf, count, file->f_pos);
+    }
 
     if (errno > 0) {
         file->f_pos += errno;
@@ -752,7 +783,7 @@ done:
 int
 vfs_get_path(struct v_dnode* dnode, char* buf, size_t size, int depth)
 {
-    if (!dnode || dnode->parent == dnode) {
+    if (!dnode) {
         return 0;
     }
 
@@ -760,13 +791,19 @@ vfs_get_path(struct v_dnode* dnode, char* buf, size_t size, int depth)
         return ENAMETOOLONG;
     }
 
-    size_t len = vfs_get_path(dnode->parent, buf, size, depth + 1);
+    size_t len = 0;
+
+    if (dnode->parent != dnode) {
+        len = vfs_get_path(dnode->parent, buf, size, depth + 1);
+    }
 
     if (len >= size) {
         return len;
     }
 
-    buf[len++] = VFS_PATH_DELIM;
+    if (!len || buf[len - 1] != VFS_PATH_DELIM) {
+        buf[len++] = VFS_PATH_DELIM;
+    }
 
     size_t cpy_size = MIN(dnode->name.len, size - len);
     strncpy(buf + len, dnode->name.value, cpy_size);
@@ -790,6 +827,19 @@ vfs_readlink(struct v_dnode* dnode, char* buf, size_t size)
         return errno;
     }
     return 0;
+}
+
+int
+vfs_get_dtype(int itype)
+{
+    switch (itype) {
+        case VFS_IFDIR:
+            return DT_DIR;
+        case VFS_IFSYMLINK:
+            return DT_SYMLINK;
+        default:
+            return DT_PIPE;
+    }
 }
 
 __DEFINE_LXSYSCALL3(int, realpathat, int, fd, char*, buf, size_t, size)
@@ -1161,8 +1211,22 @@ done:
     return DO_STATUS(errno);
 }
 
+void
+vfs_ref_dnode(struct v_dnode* dnode)
+{
+    atomic_fetch_add(&dnode->ref_count, 1);
+    mnt_mkbusy(dnode->mnt);
+}
+
+void
+vfs_unref_dnode(struct v_dnode* dnode)
+{
+    atomic_fetch_sub(&dnode->ref_count, 1);
+    mnt_chillax(dnode->mnt);
+}
+
 int
-__vfs_do_chdir(struct v_dnode* dnode)
+vfs_do_chdir(struct proc_info* proc, struct v_dnode* dnode)
 {
     int errno = 0;
 
@@ -1173,14 +1237,12 @@ __vfs_do_chdir(struct v_dnode* dnode)
         goto done;
     }
 
-    if (__current->cwd) {
-        atomic_fetch_sub(&__current->cwd->ref_count, 1);
-        mnt_chillax(__current->cwd->mnt);
+    if (proc->cwd) {
+        vfs_unref_dnode(proc->cwd);
     }
 
-    atomic_fetch_add(&dnode->ref_count, 1);
-    mnt_mkbusy(dnode->mnt);
-    __current->cwd = dnode;
+    vfs_ref_dnode(dnode);
+    proc->cwd = dnode;
 
     unlock_dnode(dnode);
 
@@ -1197,7 +1259,7 @@ __DEFINE_LXSYSCALL1(int, chdir, const char*, path)
         goto done;
     }
 
-    errno = __vfs_do_chdir(dnode);
+    errno = vfs_do_chdir(__current, dnode);
 
 done:
     return DO_STATUS(errno);
@@ -1212,7 +1274,7 @@ __DEFINE_LXSYSCALL1(int, fchdir, int, fd)
         goto done;
     }
 
-    errno = __vfs_do_chdir(fd_s->file->dnode);
+    errno = vfs_do_chdir(__current, fd_s->file->dnode);
 
 done:
     return DO_STATUS(errno);

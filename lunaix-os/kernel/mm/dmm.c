@@ -50,13 +50,11 @@ dmm_init(heap_context_t* heap)
     heap->brk = heap->start;
     mutex_init(&heap->lock);
 
-    int perm = PG_ALLOW_USER;
-    if (heap->brk >= KHEAP_START) {
-        perm = 0;
-    }
-
-    return vmm_set_mapping(
-             PD_REFERENCED, heap->brk, 0, PG_WRITE | perm, VMAP_NULL) != NULL;
+    return vmm_set_mapping(PD_REFERENCED,
+                           heap->brk,
+                           0,
+                           PG_WRITE | PG_ALLOW_USER,
+                           VMAP_NULL) != NULL;
 }
 
 int

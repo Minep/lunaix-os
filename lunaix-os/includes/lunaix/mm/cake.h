@@ -7,6 +7,10 @@
 
 #define PILE_CACHELINE 1
 
+struct cake_pile;
+
+typedef void (*pile_cb)(struct cake_pile*, void*);
+
 struct cake_pile
 {
     struct llist_header piles;
@@ -20,6 +24,8 @@ struct cake_pile
     unsigned int pieces_per_cake;
     unsigned int pg_per_cake;
     char pile_name[PILE_NAME_MAXLEN];
+
+    pile_cb ctor;
 };
 
 typedef unsigned int piece_index_t;
@@ -49,6 +55,9 @@ cake_new_pile(char* name,
               unsigned int pg_per_cake,
               int options);
 
+void
+cake_set_constructor(struct cake_pile* pile, pile_cb ctor);
+
 /**
  * @brief 拿一块儿蛋糕
  *
@@ -70,11 +79,12 @@ cake_release(struct cake_pile* pile, void* area);
 void
 cake_init();
 
-/**
- * @brief 统计蛋糕数量 - 问问Pinkie :D
- *
- */
 void
-cake_stats();
+cake_export();
+
+/********** some handy constructor ***********/
+
+void
+cake_ctor_zeroing(struct cake_pile* pile, void* piece);
 
 #endif /* __LUNAIX_VALLOC_H */

@@ -3,6 +3,7 @@
 
 #include <arch/x86/interrupts.h>
 #include <lunaix/clock.h>
+#include <lunaix/ds/waitq.h>
 #include <lunaix/fs.h>
 #include <lunaix/mm/mm.h>
 #include <lunaix/signal.h>
@@ -13,7 +14,7 @@
 // 虽然内核不是进程，但为了区分，这里使用Pid=-1来指代内核。这主要是方便物理页所有权检查。
 #define KERNEL_PID -1
 
-#define PS_STOPPED 0
+#define PS_READY 0
 #define PS_RUNNING 1
 #define PS_TERMNAT 2
 #define PS_DESTROY 4
@@ -57,9 +58,11 @@ struct proc_info
 
     /* ---- critical section end ---- */
 
+    struct llist_header tasks;
     struct llist_header siblings;
     struct llist_header children;
     struct llist_header grp_member;
+    waitq_t waitqueue;
 
     struct
     {

@@ -44,7 +44,6 @@
 #define PS2_DELAY 1000
 
 #define PS2_CMD_QUEUE_SIZE 8
-#define PS2_KBD_RECV_BUFFER_SIZE 8
 
 #define PS2_NO_ARG 0xff00
 
@@ -67,14 +66,6 @@ struct ps2_cmd_queue
     struct ps2_cmd cmd_queue[PS2_CMD_QUEUE_SIZE];
     int queue_ptr;
     int queue_len;
-    mutex_t mutex;
-};
-
-struct ps2_key_buffer
-{
-    struct kdb_keyinfo_pkt buffer[PS2_KBD_RECV_BUFFER_SIZE];
-    int read_ptr;
-    int buffered_len;
     mutex_t mutex;
 };
 

@@ -78,9 +78,8 @@ ahci_init()
     struct pci_device* ahci_dev = pci_get_device_by_class(AHCI_HBA_CLASS);
     assert_msg(ahci_dev, "AHCI: Not found.");
 
-    uintptr_t bar6, size;
-    size = pci_bar_sizing(ahci_dev, &bar6, 6);
-    assert_msg(bar6 && PCI_BAR_MMIO(bar6), "AHCI: BAR#6 is not MMIO.");
+    struct pci_base_addr* bar6 = &ahci_dev->bar[5];
+    assert_msg(bar6->type & BAR_TYPE_MMIO, "AHCI: BAR#6 is not MMIO.");
 
     pci_reg_t cmd = pci_read_cspace(ahci_dev->cspace_base, PCI_REG_STATUS_CMD);
 
@@ -94,7 +93,7 @@ ahci_init()
 
     memset(&hba, 0, sizeof(hba));
 
-    hba.base = (hba_reg_t*)ioremap(PCI_BAR_ADDR_MM(bar6), size);
+    hba.base = (hba_reg_t*)ioremap(bar6->start, bar6->size);
 
 #ifdef DO_HBA_FULL_RESET
     // 重置HBA
@@ -194,7 +193,7 @@ __ahci_hba_isr(const isr_param* param)
 {
     // TODO: clear the interrupt status
     // TODO: I/O-operation scheduler should be here
-    kprintf(KDEBUG "HBA INTR\n");
+    // kprintf(KDEBUG "HBA INTR\n");
 }
 
 void

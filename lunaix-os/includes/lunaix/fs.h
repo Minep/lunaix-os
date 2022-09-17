@@ -44,7 +44,7 @@
 #define VFS_VALID_CHAR(chr)                                                    \
     (('A' <= (chr) && (chr) <= 'Z') || ('a' <= (chr) && (chr) <= 'z') ||       \
      ('0' <= (chr) && (chr) <= '9') || (chr) == '.' || (chr) == '_' ||         \
-     (chr) == '-')
+     (chr) == '-' || (chr) == ':')
 
 #define unlock_inode(inode) mutex_unlock(&inode->lock)
 #define lock_inode(inode)                                                      \
@@ -172,6 +172,18 @@ struct v_fd
     int flags;
 };
 
+// FIXME how do we invalidate corresponding v_dnodes given the v_inode?
+/*
+    Consider taskfs, which is Lunaix's speak of Linux's procfs, that allow
+    info of every process being accessible via file system. Each process's
+    creation will result a creation of a directory under the root of task fs
+    with it's pid as name. But that dir must delete when process is killed, and
+    such deletion does not mediated by vfs itself, so there is a need of cache
+    syncing.
+    And this is also the case of all ramfs where argumentation to file tree is
+    performed by third party.
+*/
+
 struct v_inode
 {
     inode_t id;
@@ -185,12 +197,13 @@ struct v_inode
     uint32_t link_count;
     uint32_t lb_usage;
     uint32_t fsize;
+    void* data; // 允许底层FS绑定他的一些专有数据
+    struct llist_header aka_dnodes;
     struct llist_header xattrs;
     struct v_superblock* sb;
     struct hlist_node hash_list;
     struct lru_node lru;
     struct pcache* pg_cache;
-    void* data; // 允许底层FS绑定他的一些专有数据
     struct v_inode_ops* ops;
     struct v_file_ops* default_fops;
 };
@@ -216,6 +229,7 @@ struct v_dnode
     struct v_inode* inode;
     struct v_dnode* parent;
     struct hlist_node hash_list;
+    struct llist_header aka_list;
     struct llist_header children;
     struct llist_header siblings;
     struct v_superblock* super_block;
@@ -250,7 +264,7 @@ struct pcache_pg
     uint32_t flags;
     uint32_t fpos;
 };
-/* --- file system manager --- */
+
 void
 fsm_init();
 
@@ -268,6 +282,9 @@ fsm_get(const char* fs_name);
 
 void
 vfs_init();
+
+void
+vfs_export_attributes();
 
 struct v_dnode*
 vfs_dcache_lookup(struct v_dnode* parent, struct hstr* str);
@@ -319,6 +336,9 @@ int
 vfs_open(struct v_dnode* dnode, struct v_file** file);
 
 int
+vfs_pclose(struct v_file* file, pid_t pid);
+
+int
 vfs_close(struct v_file* file);
 
 int
@@ -357,6 +377,18 @@ vfs_dup_fd(struct v_fd* old, struct v_fd** new);
 int
 vfs_getfd(int fd, struct v_fd** fd_s);
 
+int
+vfs_get_dtype(int itype);
+
+void
+vfs_ref_dnode(struct v_dnode* dnode);
+
+void
+vfs_unref_dnode(struct v_dnode* dnode);
+
+int
+vfs_get_path(struct v_dnode* dnode, char* buf, size_t size, int depth);
+
 void
 pcache_init(struct pcache* pcache);
 
@@ -369,7 +401,7 @@ pcache_new_page(struct pcache* pcache, uint32_t index);
 void
 pcache_set_dirty(struct pcache* pcache, struct pcache_pg* pg);
 
-struct pcache_pg*
+int
 pcache_get_page(struct pcache* pcache,
                 uint32_t index,
                 uint32_t* offset,

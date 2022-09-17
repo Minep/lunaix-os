@@ -26,18 +26,18 @@ vmm_vmap(uintptr_t paddr, size_t size, pt_attr attr)
             current_addr = (current_addr & 0xffc00000) + MEM_4MB;
         } else {
             x86_page_table* ptd = (x86_page_table*)(L2_VADDR(l1inx));
-            size_t i = L2_INDEX(current_addr);
-            for (; i < PG_MAX_ENTRIES && examed_size < size; i++) {
+            size_t i = L2_INDEX(current_addr), j = 0;
+            for (; i < PG_MAX_ENTRIES && examed_size < size; i++, j++) {
                 if (!ptd->entry[i]) {
                     examed_size += PG_SIZE;
                 } else if (examed_size) {
                     // found a discontinuity, start from beginning
                     examed_size = 0;
-                    i++;
+                    j++;
                     break;
                 }
             }
-            current_addr += i << 12;
+            current_addr += j << 12;
         }
 
         if (examed_size >= size) {
@@ -46,6 +46,7 @@ vmm_vmap(uintptr_t paddr, size_t size, pt_attr attr)
 
         if (current_addr >= VMAP_END) {
             wrapped = 1;
+            examed_size = 0;
             current_addr = VMAP_START;
         }
     }

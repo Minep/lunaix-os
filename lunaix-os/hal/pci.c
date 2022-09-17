@@ -11,6 +11,7 @@
 #include <hal/acpi/acpi.h>
 #include <hal/apic.h>
 #include <hal/pci.h>
+#include <lunaix/fs/twifs.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
@@ -55,13 +56,14 @@ pci_probe_device(int bus, int dev, int funct)
     pci_reg_t intr = pci_read_cspace(base, 0x3c);
     pci_reg_t class = pci_read_cspace(base, 0x8);
 
-    struct pci_device* device = valloc(sizeof(struct pci_device));
+    struct pci_device* device = vzalloc(sizeof(struct pci_device));
     *device = (struct pci_device){ .cspace_base = base,
                                    .class_info = class,
                                    .device_info = reg1,
                                    .intr_info = intr };
 
     pci_probe_msi_info(device);
+    pci_probe_bar_info(device);
 
     llist_append(&pci_devices, &device->dev_chain);
 }
@@ -74,6 +76,24 @@ pci_probe()
     for (int bus = 0; bus < 1; bus++) {
         for (int dev = 0; dev < 32; dev++) {
             pci_probe_device(bus, dev, 0);
+        }
+    }
+}
+
+void
+pci_probe_bar_info(struct pci_device* device)
+{
+    uint32_t bar;
+    struct pci_base_addr* ba;
+    for (size_t i = 0; i < 6; i++) {
+        ba = &device->bar[i];
+        ba->size = pci_bar_sizing(device, &bar, i + 1);
+        if (PCI_BAR_MMIO(bar)) {
+            ba->start = PCI_BAR_ADDR_MM(bar);
+            ba->type |= PCI_BAR_CACHEABLE(bar) ? BAR_TYPE_CACHABLE : 0;
+            ba->type |= BAR_TYPE_MMIO;
+        } else {
+            ba->start = PCI_BAR_ADDR_IO(bar);
         }
     }
 }
@@ -106,47 +126,99 @@ pci_probe_msi_info(struct pci_device* device)
     }
 }
 
-#define PCI_PRINT_BAR_LISTING
+void
+__pci_read_cspace(struct twimap* map)
+{
+    struct pci_device* pcidev = (struct pci_device*)(map->data);
+
+    for (size_t i = 0; i < 256; i += sizeof(pci_reg_t)) {
+        *(pci_reg_t*)(map->buffer + i) =
+          pci_read_cspace(pcidev->cspace_base, i);
+    }
+
+    map->size_acc = 256;
+}
 
 void
-pci_print_device()
+__pci_read_revid(struct twimap* map)
 {
+    int class = twimap_data(map, struct pci_device*)->class_info;
+    twimap_printf(map, "0x%x", PCI_DEV_REV(class));
+}
+
+void
+__pci_read_class(struct twimap* map)
+{
+    int class = twimap_data(map, struct pci_device*)->class_info;
+    twimap_printf(map, "0x%x", PCI_DEV_CLASS(class));
+}
+
+void
+__pci_bar_read(struct twimap* map)
+{
+    struct pci_device* pcidev = twimap_data(map, struct pci_device*);
+    int bar_index = twimap_index(map, int);
+
+    struct pci_base_addr* bar = &pcidev->bar[bar_index];
+
+    if (!bar->start && !bar->size) {
+        twimap_printf(map, "[%d] not present \n", bar_index);
+        return;
+    }
+
+    twimap_printf(
+      map, "[%d] base=%.8p, size=%.8p, ", bar_index, bar->start, bar->size);
+
+    if ((bar->type & BAR_TYPE_MMIO)) {
+        twimap_printf(map, "mmio");
+        if ((bar->type & BAR_TYPE_CACHABLE)) {
+            twimap_printf(map, ", prefetchable");
+        }
+    } else {
+        twimap_printf(map, "io");
+    }
+
+    twimap_printf(map, "\n");
+}
+
+int
+__pci_bar_gonext(struct twimap* map)
+{
+    if (twimap_index(map, int) >= 5) {
+        return 0;
+    }
+    map->index += 1;
+    return 1;
+}
+
+void
+pci_build_fsmapping()
+{
+    struct twifs_node *pci_class = twifs_dir_node(NULL, "pci"), *pci_dev;
     struct pci_device *pos, *n;
+    struct twimap* map;
     llist_for_each(pos, n, &pci_devices, dev_chain)
     {
-        kprintf(KINFO "(B%xh:D%xh:F%xh) Dev %x:%x, Class 0x%x\n",
-                PCI_BUS_NUM(pos->cspace_base),
-                PCI_SLOT_NUM(pos->cspace_base),
-                PCI_FUNCT_NUM(pos->cspace_base),
-                PCI_DEV_VENDOR(pos->device_info),
-                PCI_DEV_DEVID(pos->device_info),
-                PCI_DEV_CLASS(pos->class_info));
+        pci_dev = twifs_dir_node(pci_class,
+                                 "%.2d:%.2d:%.2d.%.4x:%.4x",
+                                 PCI_BUS_NUM(pos->cspace_base),
+                                 PCI_SLOT_NUM(pos->cspace_base),
+                                 PCI_FUNCT_NUM(pos->cspace_base),
+                                 PCI_DEV_VENDOR(pos->device_info),
+                                 PCI_DEV_DEVID(pos->device_info));
 
-        kprintf(KINFO "\t IRQ: %d, INT#x: %d\n",
-                PCI_INTR_IRQ(pos->intr_info),
-                PCI_INTR_PIN(pos->intr_info));
-#ifdef PCI_PRINT_BAR_LISTING
-        uint32_t bar;
-        for (size_t i = 1; i <= 6; i++) {
-            size_t size = pci_bar_sizing(pos, &bar, i);
-            if (!bar)
-                continue;
-            if (PCI_BAR_MMIO(bar)) {
-                kprintf(KINFO "\t BAR#%d (MMIO) %p [%d]\n",
-                        i,
-                        PCI_BAR_ADDR_MM(bar),
-                        size);
-            } else {
-                kprintf(KINFO "\t BAR#%d (I/O) %p [%d]\n",
-                        i,
-                        PCI_BAR_ADDR_IO(bar),
-                        size);
-            }
-        }
-#endif
-        if (pos->msi_loc) {
-            kprintf(KINFO "\t MSI supported (@%xh)\n", pos->msi_loc);
-        }
+        map = twifs_mapping(pci_dev, pos, "config");
+        map->read = __pci_read_cspace;
+
+        map = twifs_mapping(pci_dev, pos, "revision");
+        map->read = __pci_read_revid;
+
+        map = twifs_mapping(pci_dev, pos, "class");
+        map->read = __pci_read_class;
+
+        map = twifs_mapping(pci_dev, pos, "io_bases");
+        map->read = __pci_bar_read;
+        map->go_next = __pci_bar_gonext;
     }
 }
 
@@ -241,4 +313,6 @@ pci_init()
     }
     // Otherwise, fallback to use legacy PCI 3.0 method.
     pci_probe();
+
+    pci_build_fsmapping();
 }

@@ -67,6 +67,12 @@ llist_empty(struct llist_header* elem)
     return elem->next == elem && elem->prev == elem;
 }
 
+#define DEFINE_LLIST(name)                                                     \
+    struct llist_header name = (struct llist_header)                           \
+    {                                                                          \
+        .prev = &name, .next = &name                                           \
+    }
+
 /**
  * list_entry - get the struct for this entry
  * @ptr:	the &struct list_head pointer.

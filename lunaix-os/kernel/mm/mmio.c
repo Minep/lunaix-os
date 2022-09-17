@@ -1,11 +1,19 @@
 #include <lunaix/mm/mmio.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
+#include <lunaix/spike.h>
 
 void*
 ioremap(uintptr_t paddr, uint32_t size)
 {
-    return vmm_vmap(paddr, size, PG_PREM_RW | PG_DISABLE_CACHE);
+    void* ptr = vmm_vmap(paddr, size, PG_PREM_RW | PG_DISABLE_CACHE);
+    if (ptr) {
+        pmm_mark_chunk_occupied(KERNEL_PID,
+                                paddr >> PG_SIZE_BITS,
+                                CEIL(size, PG_SIZE_BITS),
+                                PP_FGLOCKED);
+    }
+    return ptr;
 }
 
 void*

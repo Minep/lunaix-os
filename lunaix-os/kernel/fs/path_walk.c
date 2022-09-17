@@ -33,7 +33,10 @@ __vfs_walk(struct v_dnode* start,
                 panick("vfs: no root");
             }
         }
-        i++;
+
+        if (path[0] == VFS_PATH_DELIM) {
+            i++;
+        }
     }
 
     assert(start);
@@ -71,9 +74,7 @@ __vfs_walk(struct v_dnode* start,
 
         if (!lookahead && (walk_options & VFS_WALK_PARENT)) {
             if (component) {
-                component->hash = name.hash;
-                component->len = j;
-                strcpy(component->value, fname_buffer);
+                hstrcpy(component, &name);
             }
             break;
         }

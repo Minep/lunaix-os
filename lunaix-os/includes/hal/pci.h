@@ -56,6 +56,16 @@ typedef unsigned int pci_reg_t;
 // PCI device header format
 // Ref: "PCI Local Bus Specification, Rev.3, Section 6.1"
 
+#define BAR_TYPE_MMIO 0x1
+#define BAR_TYPE_CACHABLE 0x2
+
+struct pci_base_addr
+{
+    uint32_t start;
+    uint32_t size;
+    uint32_t type;
+};
+
 struct pci_device
 {
     struct llist_header dev_chain;
@@ -64,6 +74,7 @@ struct pci_device
     uint32_t cspace_base;
     uint32_t msi_loc;
     uint16_t intr_info;
+    struct pci_base_addr bar[6];
 };
 
 // PCI Configuration Space (C-Space) r/w:
@@ -90,9 +101,6 @@ pci_write_cspace(uint32_t base, int offset, pci_reg_t data)
  */
 void
 pci_init();
-
-void
-pci_print_device();
 
 /**
  * @brief 根据类型代码（Class Code）去在拓扑中寻找一个设备

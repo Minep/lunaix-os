@@ -2,12 +2,7 @@
 #include <lunaix/foptions.h>
 #include <lunaix/lunistd.h>
 #include <lunaix/proc.h>
-#include <lunaix/syslog.h>
-
-LOG_MODULE("IOTEST")
-
-#define STDIN 1
-#define STDOUT 0
+#include <ulibc/stdio.h>
 
 void
 _iotest_main()
@@ -20,14 +15,12 @@ _iotest_main()
     // 切换工作目录至 /dev
     int errno = chdir("/dev");
     if (errno) {
-        write(STDOUT, "fail to chdir", 15);
+        write(stdout, "fail to chdir", 15);
         return;
     }
 
     if (getcwd(read_out, sizeof(read_out))) {
-        write(STDOUT, "current working dir: ", 22);
-        write(STDOUT, read_out, 256);
-        write(STDOUT, "\n", 2);
+        printf("current working dir: %s\n", read_out);
     }
 
     // sda 设备 - 硬盘
@@ -36,7 +29,7 @@ _iotest_main()
     int fd = open("./sda", 0);
 
     if (fd < 0) {
-        kprintf(KERROR "fail to open (%d)\n", geterrno());
+        printf("fail to open (%d)\n", geterrno());
         return;
     }
 
@@ -52,24 +45,21 @@ _iotest_main()
     lseek(fd, 4 * 4096, FSEEK_SET);
     write(fd, test_sequence, sizeof(test_sequence));
 
-    write(STDOUT, "input: ", 8);
-    int size = read(STDIN, read_out, 256);
+    printf("input: ");
+    int size = read(stdin, read_out, 256);
 
-    write(STDOUT, "your input: ", 13);
-    write(STDOUT, read_out, size);
+    printf("your said: %s\n", read_out);
+
     write(fd, read_out, size);
-    write(STDOUT, "\n", 1);
 
     // 读出我们写的内容
     lseek(fd, 512, FSEEK_SET);
     read(fd, read_out, sizeof(read_out));
 
     // 将读出的内容直接写入tty设备
-    write(STDOUT, read_out, sizeof(read_out));
-    write(STDOUT, "\n", 1);
+    write(stdout, read_out, sizeof(read_out));
+    write(stdout, "\n", 1);
 
     // 关闭文件，这同时会将页缓存中的数据下发到底层驱动
     close(fd);
-
-    kprint_hex(read_out, sizeof(read_out));
 }

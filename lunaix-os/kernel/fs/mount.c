@@ -4,7 +4,7 @@
 #include <lunaix/process.h>
 #include <lunaix/types.h>
 
-static struct llist_header all_mnts = { .next = &all_mnts, .prev = &all_mnts };
+struct llist_header all_mnts = { .next = &all_mnts, .prev = &all_mnts };
 
 struct v_mount*
 vfs_create_mount(struct v_mount* parent, struct v_dnode* mnt_point)
@@ -145,12 +145,12 @@ vfs_mount_at(const char* fs_name,
     }
 
     struct v_mount* parent_mnt = mnt_point->mnt;
-    struct v_superblock* sb = vfs_sb_alloc();
+    struct v_superblock *sb = vfs_sb_alloc(), *old_sb = mnt_point->super_block;
     sb->dev = device;
+    mnt_point->super_block = sb;
 
     int errno = 0;
     if (!(errno = fs->mount(sb, mnt_point))) {
-        mnt_point->super_block = sb;
         sb->fs = fs;
         sb->root = mnt_point;
 
@@ -167,6 +167,7 @@ vfs_mount_at(const char* fs_name,
     return errno;
 
 cleanup:
+    mnt_point->super_block = old_sb;
     vfs_sb_free(sb);
     return errno;
 }
@@ -233,7 +234,7 @@ __DEFINE_LXSYSCALL4(int,
 
     // By our convention.
     // XXX could we do better?
-    struct device* device = (struct device*)dev->data;
+    struct device* device = (struct device*)dev->inode->data;
 
     if (!(dev->inode->itype & VFS_IFVOLDEV) || !device) {
         errno = ENOTDEV;

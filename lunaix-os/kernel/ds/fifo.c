@@ -15,6 +15,16 @@ fifo_init(struct fifo_buf* buf, void* data_buffer, size_t buf_size, int flags)
     mutex_init(&buf->lock);
 }
 
+void
+fifo_clear(struct fifo_buf* fbuf)
+{
+    mutex_lock(&fbuf->lock);
+    fbuf->rd_pos = 0;
+    fbuf->wr_pos = 0;
+    fbuf->free_len = fbuf->size;
+    mutex_unlock(&fbuf->lock);
+}
+
 int
 fifo_backone(struct fifo_buf* fbuf)
 {
@@ -51,6 +61,43 @@ fifo_putone(struct fifo_buf* fbuf, uint8_t data)
     mutex_unlock(&fbuf->lock);
 
     return 1;
+}
+
+size_t
+fifo_readone_async(struct fifo_buf* fbuf, uint8_t* data)
+{
+    if (fbuf->free_len == fbuf->size) {
+        return 0;
+    }
+
+    uint8_t* dest = fbuf->data;
+    *data = dest[fbuf->rd_pos];
+    fbuf->rd_pos = (fbuf->rd_pos + 1) % fbuf->size;
+    fbuf->free_len++;
+
+    return 1;
+}
+
+void
+fifo_set_rdptr(struct fifo_buf* fbuf, size_t rdptr)
+{
+    fbuf->rd_pos = rdptr;
+    if (rdptr <= fbuf->wr_pos) {
+        fbuf->free_len = fbuf->size - fbuf->wr_pos + rdptr;
+    } else {
+        fbuf->free_len = rdptr - fbuf->wr_pos;
+    }
+}
+
+void
+fifo_set_wrptr(struct fifo_buf* fbuf, size_t wrptr)
+{
+    fbuf->wr_pos = wrptr;
+    if (wrptr <= fbuf->rd_pos) {
+        fbuf->free_len = fbuf->size - fbuf->rd_pos + wrptr;
+    } else {
+        fbuf->free_len = wrptr - fbuf->rd_pos;
+    }
 }
 
 size_t

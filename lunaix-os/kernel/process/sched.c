@@ -4,6 +4,8 @@
 #include <hal/apic.h>
 #include <hal/cpu.h>
 
+#include <lunaix/fs/taskfs.h>
+#include <lunaix/mm/cake.h>
 #include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/valloc.h>
@@ -16,28 +18,31 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
 
-#define MAX_PROCESS 512
-
 volatile struct proc_info* __current;
 
 struct proc_info dummy;
 
 struct scheduler sched_ctx;
 
+struct cake_pile* proc_pile;
+
 LOG_MODULE("SCHED")
 
 void
 sched_init()
 {
-    size_t pg_size = ROUNDUP(sizeof(struct proc_info) * MAX_PROCESS, 0x1000);
+    // size_t pg_size = ROUNDUP(sizeof(struct proc_info) * MAX_PROCESS, 0x1000);
 
-    for (size_t i = 0; i <= pg_size; i += 4096) {
-        uintptr_t pa = pmm_alloc_page(KERNEL_PID, PP_FGPERSIST);
-        vmm_set_mapping(
-          PD_REFERENCED, PROC_START + i, pa, PG_PREM_RW, VMAP_NULL);
-    }
+    // for (size_t i = 0; i <= pg_size; i += 4096) {
+    //     uintptr_t pa = pmm_alloc_page(KERNEL_PID, PP_FGPERSIST);
+    //     vmm_set_mapping(
+    //       PD_REFERENCED, PROC_START + i, pa, PG_PREM_RW, VMAP_NULL);
+    // }
 
-    sched_ctx = (struct scheduler){ ._procs = (struct proc_info*)PROC_START,
+    proc_pile = cake_new_pile("proc", sizeof(struct proc_info), 1, 0);
+    cake_set_constructor(proc_pile, cake_ctor_zeroing);
+
+    sched_ctx = (struct scheduler){ ._procs = vzalloc(PROC_TABLE_SIZE),
                                     .ptable_len = 0,
                                     .procs_index = 0 };
 }
@@ -80,7 +85,7 @@ can_schedule(struct proc_info* proc)
 void
 check_sleepers()
 {
-    struct proc_info* leader = &sched_ctx._procs[0];
+    struct proc_info* leader = sched_ctx._procs[0];
     struct proc_info *pos, *n;
     time_t now = clock_systime();
     llist_for_each(pos, n, &leader->sleep.sleepers, sleep.sleepers)
@@ -94,7 +99,7 @@ check_sleepers()
 
         if (wtime && now >= wtime) {
             pos->sleep.wakeup_time = 0;
-            pos->state = PS_STOPPED;
+            pos->state = PS_READY;
         }
 
         if (atime && now >= atime) {
@@ -123,7 +128,7 @@ schedule()
     int ptr = prev_ptr;
 
     if (!(__current->state & ~PS_RUNNING)) {
-        __current->state = PS_STOPPED;
+        __current->state = PS_READY;
     }
 
     check_sleepers();
@@ -132,8 +137,8 @@ schedule()
 redo:
     do {
         ptr = (ptr + 1) % sched_ctx.ptable_len;
-        next = &sched_ctx._procs[ptr];
-    } while (next->state != PS_STOPPED && ptr != prev_ptr);
+        next = sched_ctx._procs[ptr];
+    } while (!next || (next->state != PS_READY && ptr != prev_ptr));
 
     sched_ctx.procs_index = ptr;
 
@@ -148,6 +153,7 @@ redo:
 void
 sched_yieldk()
 {
+    cpu_enable_interrupt();
     cpu_int(LUNAIX_SCHED);
 }
 
@@ -161,9 +167,9 @@ __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
         return (__current->sleep.wakeup_time - clock_systime()) / 1000U;
     }
 
+    struct proc_info* root_proc = sched_ctx._procs[0];
     __current->sleep.wakeup_time = clock_systime() + seconds * 1000;
-    llist_append(&sched_ctx._procs[0].sleep.sleepers,
-                 &__current->sleep.sleepers);
+    llist_append(&root_proc->sleep.sleepers, &__current->sleep.sleepers);
 
     __current->intr_ctx.registers.eax = seconds;
     __current->state = PS_BLOCKED;
@@ -177,9 +183,9 @@ __DEFINE_LXSYSCALL1(unsigned int, alarm, unsigned int, seconds)
 
     __current->sleep.alarm_time = seconds ? now + seconds * 1000 : 0;
 
+    struct proc_info* root_proc = sched_ctx._procs[0];
     if (llist_empty(&__current->sleep.sleepers)) {
-        llist_append(&sched_ctx._procs[0].sleep.sleepers,
-                     &__current->sleep.sleepers);
+        llist_append(&root_proc->sleep.sleepers, &__current->sleep.sleepers);
     }
 
     return prev_ddl ? (prev_ddl - now) / 1000 : 0;
@@ -233,7 +239,7 @@ repeat:
                 status_flags |= PEXITTERM;
                 goto done;
             }
-            if (proc->state == PS_STOPPED && (options & WUNTRACED)) {
+            if (proc->state == PS_READY && (options & WUNTRACED)) {
                 status_flags |= PEXITSTOP;
                 goto done;
             }
@@ -258,8 +264,7 @@ struct proc_info*
 alloc_process()
 {
     pid_t i = 0;
-    for (; i < sched_ctx.ptable_len && sched_ctx._procs[i].state != PS_DESTROY;
-         i++)
+    for (; i < sched_ctx.ptable_len && sched_ctx._procs[i]; i++)
         ;
 
     if (i == MAX_PROCESS) {
@@ -270,8 +275,7 @@ alloc_process()
         sched_ctx.ptable_len++;
     }
 
-    struct proc_info* proc = &sched_ctx._procs[i];
-    memset(proc, 0, sizeof(*proc));
+    struct proc_info* proc = cake_grab(proc_pile);
 
     proc->state = PS_CREATED;
     proc->pid = i;
@@ -280,9 +284,13 @@ alloc_process()
     proc->fdtable = vzalloc(sizeof(struct v_fdtable));
 
     llist_init_head(&proc->mm.regions.head);
+    llist_init_head(&proc->tasks);
     llist_init_head(&proc->children);
     llist_init_head(&proc->grp_member);
     llist_init_head(&proc->sleep.sleepers);
+    waitq_init(&proc->waitqueue);
+
+    sched_ctx._procs[i] = proc;
 
     return proc;
 }
@@ -290,7 +298,7 @@ alloc_process()
 void
 commit_process(struct proc_info* process)
 {
-    assert(process == &sched_ctx._procs[process->pid]);
+    assert(process == sched_ctx._procs[process->pid]);
 
     if (process->state != PS_CREATED) {
         __current->k_status = EINVAL;
@@ -299,12 +307,13 @@ commit_process(struct proc_info* process)
 
     // every process is the child of first process (pid=1)
     if (!process->parent) {
-        process->parent = &sched_ctx._procs[1];
+        process->parent = sched_ctx._procs[1];
     }
 
     llist_append(&process->parent->children, &process->siblings);
+    llist_append(&sched_ctx._procs[0]->tasks, &process->tasks);
 
-    process->state = PS_STOPPED;
+    process->state = PS_READY;
 }
 
 // from <kernel/process.c>
@@ -319,14 +328,24 @@ destroy_process(pid_t pid)
         __current->k_status = EINVAL;
         return;
     }
-    struct proc_info* proc = &sched_ctx._procs[index];
-    proc->state = PS_DESTROY;
+    struct proc_info* proc = sched_ctx._procs[index];
+    sched_ctx._procs[index] = 0;
+
     llist_delete(&proc->siblings);
+    llist_delete(&proc->grp_member);
+    llist_delete(&proc->tasks);
+    llist_delete(&proc->sleep.sleepers);
+
+    taskfs_invalidate(pid);
+
+    if (proc->cwd) {
+        vfs_unref_dnode(proc->cwd);
+    }
 
     for (size_t i = 0; i < VFS_MAX_FD; i++) {
         struct v_fd* fd = proc->fdtable->fds[i];
         if (fd)
-            vfs_close(fd->file);
+            vfs_pclose(fd->file, pid);
     }
 
     vfree(proc->fdtable);
@@ -342,6 +361,8 @@ destroy_process(pid_t pid)
     __del_pagetable(pid, PD_MOUNT_1);
 
     vmm_unmount_pd(PD_MOUNT_1);
+
+    cake_release(proc_pile, proc);
 
     return pid;
 }
@@ -362,7 +383,7 @@ get_process(pid_t pid)
     if (index < 0 || index > sched_ctx.ptable_len) {
         return NULL;
     }
-    return &sched_ctx._procs[index];
+    return sched_ctx._procs[index];
 }
 
 int
@@ -372,7 +393,7 @@ orphaned_proc(pid_t pid)
         return 0;
     if (pid >= sched_ctx.ptable_len)
         return 0;
-    struct proc_info* proc = &sched_ctx._procs[pid];
+    struct proc_info* proc = sched_ctx._procs[pid];
     struct proc_info* parent = proc->parent;
 
     // 如果其父进程的状态是terminated 或 destroy中的一种

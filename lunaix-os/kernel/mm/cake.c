@@ -48,6 +48,7 @@ __new_cake(struct cake_pile* pile)
 
     cake->first_piece = (void*)((uintptr_t)cake + pile->offset);
     cake->next_free = 0;
+    pile->cakes_count++;
 
     piece_index_t* free_list = cake->free_list;
     for (size_t i = 0; i < max_piece - 1; i++) {
@@ -119,6 +120,12 @@ cake_new_pile(char* name,
     return pile;
 }
 
+void
+cake_set_constructor(struct cake_pile* pile, pile_cb ctor)
+{
+    pile->ctor = ctor;
+}
+
 void*
 cake_grab(struct cake_pile* pile)
 {
@@ -146,8 +153,14 @@ cake_grab(struct cake_pile* pile)
         llist_append(&pile->partial, &pos->cakes);
     }
 
-    return (void*)((uintptr_t)pos->first_piece +
-                   found_index * pile->piece_size);
+    void* ptr =
+      (void*)((uintptr_t)pos->first_piece + found_index * pile->piece_size);
+
+    if (pile->ctor) {
+        pile->ctor(pile, ptr);
+    }
+
+    return ptr;
 }
 
 int
@@ -190,18 +203,7 @@ found:
 }
 
 void
-cake_stats()
+cake_ctor_zeroing(struct cake_pile* pile, void* piece)
 {
-    kprintf(KDEBUG "<name> <cake> <pg/c> <p/c> <alloced>\n");
-
-    struct cake_pile *pos, *n;
-    llist_for_each(pos, n, &piles, piles)
-    {
-        kprintf("%s %d %d %d %d\n",
-                pos->pile_name,
-                pos->cakes_count,
-                pos->pg_per_cake,
-                pos->pieces_per_cake,
-                pos->alloced_pieces);
-    }
+    memset(piece, 0, pile->piece_size);
 }
