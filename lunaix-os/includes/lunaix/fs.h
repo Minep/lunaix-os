@@ -197,12 +197,13 @@ struct v_inode
     uint32_t link_count;
     uint32_t lb_usage;
     uint32_t fsize;
+    void* data; // 允许底层FS绑定他的一些专有数据
+    struct llist_header aka_dnodes;
     struct llist_header xattrs;
     struct v_superblock* sb;
     struct hlist_node hash_list;
     struct lru_node lru;
     struct pcache* pg_cache;
-    void* data; // 允许底层FS绑定他的一些专有数据
     struct v_inode_ops* ops;
     struct v_file_ops* default_fops;
 };
@@ -228,6 +229,7 @@ struct v_dnode
     struct v_inode* inode;
     struct v_dnode* parent;
     struct hlist_node hash_list;
+    struct llist_header aka_list;
     struct llist_header children;
     struct llist_header siblings;
     struct v_superblock* super_block;
@@ -262,7 +264,7 @@ struct pcache_pg
     uint32_t flags;
     uint32_t fpos;
 };
-/* --- file system manager --- */
+
 void
 fsm_init();
 

@@ -22,4 +22,7 @@ taskfs_export_attr(const char* key, struct twimap* attr_map_file);
 struct task_attribute*
 taskfs_get_attr(struct hstr* key);
 
+void
+taskfs_invalidate(pid_t pid);
+
 #endif /* __LUNAIX_TASKFS_H */

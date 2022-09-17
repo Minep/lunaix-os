@@ -163,6 +163,7 @@ vfs_dcache_remove(struct v_dnode* dnode)
     assert(dnode->ref_count == 1);
 
     llist_delete(&dnode->siblings);
+    llist_delete(&dnode->aka_list);
     hlist_delete(&dnode->hash_list);
 
     dnode->parent = NULL;
@@ -225,8 +226,10 @@ void
 vfs_assign_inode(struct v_dnode* assign_to, struct v_inode* inode)
 {
     if (assign_to->inode) {
+        llist_delete(&assign_to->aka_list);
         assign_to->inode->link_count--;
     }
+    llist_append(&inode->aka_dnodes, &assign_to->aka_list);
     assign_to->inode = inode;
     inode->link_count++;
 }
@@ -387,6 +390,7 @@ vfs_d_alloc(struct v_dnode* parent, struct hstr* name)
     memset(dnode, 0, sizeof(*dnode));
     llist_init_head(&dnode->children);
     llist_init_head(&dnode->siblings);
+    llist_init_head(&dnode->aka_list);
     mutex_init(&dnode->lock);
 
     dnode->ref_count = ATOMIC_VAR_INIT(0);
@@ -469,6 +473,7 @@ vfs_i_alloc(struct v_superblock* sb)
     memset(inode, 0, sizeof(*inode));
     mutex_init(&inode->lock);
     llist_init_head(&inode->xattrs);
+    llist_init_head(&inode->aka_dnodes);
 
     sb->ops.init_inode(sb, inode);
 

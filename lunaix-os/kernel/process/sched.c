@@ -4,6 +4,7 @@
 #include <hal/apic.h>
 #include <hal/cpu.h>
 
+#include <lunaix/fs/taskfs.h>
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/pmm.h>
@@ -334,6 +335,8 @@ destroy_process(pid_t pid)
     llist_delete(&proc->grp_member);
     llist_delete(&proc->tasks);
     llist_delete(&proc->sleep.sleepers);
+
+    taskfs_invalidate(pid);
 
     if (proc->cwd) {
         vfs_unref_dnode(proc->cwd);

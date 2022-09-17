@@ -85,6 +85,7 @@ taskfs_readdir(struct v_file* file, struct dir_context* dctx)
     return 0;
 }
 
+// ascii to pid
 pid_t
 taskfs_atop(const char* str)
 {
@@ -148,12 +149,33 @@ taskfs_init_inode(struct v_superblock* vsb, struct v_inode* inode)
     inode->ops = &taskfs_inode_ops;
 }
 
+static volatile struct v_superblock* taskfs_sb;
+
 int
 taskfs_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
 {
+    taskfs_sb = vsb;
     vsb->ops.init_inode = taskfs_init_inode;
 
     return taskfs_mknod(mount_point, 0, 0, VFS_IFDIR);
+}
+
+void
+taskfs_invalidate(pid_t pid)
+{
+    struct v_dnode *pos, *n;
+    struct v_inode* inode = vfs_i_find(taskfs_sb, taskfs_inode_id(pid, 0));
+
+    if (!inode)
+        return;
+
+    llist_for_each(pos, n, &inode->aka_dnodes, aka_list)
+    {
+        if (pos->ref_count > 1) {
+            continue;
+        }
+        vfs_d_free(pos);
+    }
 }
 
 #define ATTR_TABLE_LEN 16
