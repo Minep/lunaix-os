@@ -164,6 +164,11 @@ spawn_proc0()
                  : "i"(KSTACK_TOP), "i"(KCODE_SEG), "r"(proc0->intr_ctx.eip)
                  : "%ebx", "memory");
 
+    // 加载x87默认配置
+    asm volatile("fninit\n"
+                 "fxsave (%%eax)" ::"a"(proc0->fxstate)
+                 : "memory");
+
     // 向调度器注册进程。
     commit_process(proc0);
 
