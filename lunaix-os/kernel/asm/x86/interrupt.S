@@ -4,17 +4,6 @@
 #include <lunaix/syscall.h>
 #define __ASM_INTR_DIAGNOSIS
 
-.macro isr_template vector, no_error_code=1
-    .global _asm_isr\vector
-    .type _asm_isr\vector, @function
-    _asm_isr\vector:
-        .if \no_error_code
-            pushl $0x0
-        .endif
-        pushl $\vector
-        jmp interrupt_wrapper
-.endm
-
 #ifdef __ASM_INTR_DIAGNOSIS
 .section .bss
     .global debug_resv
@@ -29,24 +18,7 @@
     tmp_stack:
 
 .section .text
-    isr_template FAULT_DIVISION_ERROR
-    isr_template FAULT_GENERAL_PROTECTION, no_error_code=0
-    isr_template FAULT_PAGE_FAULT, no_error_code=0
-    isr_template FAULT_STACK_SEG_FAULT, no_error_code=0
-
-    isr_template LUNAIX_SYS_PANIC
-    isr_template LUNAIX_SYS_CALL
-    isr_template LUNAIX_SCHED
-
-    isr_template APIC_ERROR_IV
-    isr_template APIC_LINT0_IV
-    isr_template APIC_TIMER_IV
-    isr_template APIC_SPIV_IV
-    isr_template RTC_TIMER_IV
-    
-    isr_template PC_KBD_IV
-    isr_template AHCI_HBA_IV
-
+    .global interrupt_wrapper
     interrupt_wrapper:
         /*
          Stack layout (layout of struct isr_param)
