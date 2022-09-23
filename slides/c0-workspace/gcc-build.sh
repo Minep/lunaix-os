@@ -1,13 +1,13 @@
 #! /usr/bin/bash
 sudo apt update &&\
-     apt install -y \
-	build-essential \
-	bison\
-	flex\
-	libgmp3-dev\
-	libmpc-dev\
-	libmpfr-dev\
-	texinfo
+     sudo apt install -y \
+		build-essential \
+		bison\
+		flex\
+		libgmp3-dev\
+		libmpc-dev\
+		libmpfr-dev\
+		texinfo
 
 BINUTIL_VERSION=2.37
 BINUTIL_URL=https://ftp.gnu.org/gnu/binutils/binutils-2.37.tar.xz
