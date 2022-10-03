@@ -106,7 +106,7 @@ __vfs_walk(struct v_dnode* start,
             }
 
             // reposition the resolved subtree pointed by symlink
-            vfs_dcache_rehash(current_level->parent, dnode);
+            // vfs_dcache_rehash(current_level->parent, dnode);
             current_level = dnode;
             current_inode = dnode->inode;
         }

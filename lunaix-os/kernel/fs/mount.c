@@ -68,25 +68,17 @@ __vfs_do_unmount(struct v_mount* mnt)
 void
 mnt_mkbusy(struct v_mount* mnt)
 {
-    while (mnt) {
-        mutex_lock(&mnt->lock);
-        mnt->busy_counter++;
-        mutex_unlock(&mnt->lock);
-
-        mnt = mnt->parent;
-    }
+    mutex_lock(&mnt->lock);
+    mnt->busy_counter++;
+    mutex_unlock(&mnt->lock);
 }
 
 void
 mnt_chillax(struct v_mount* mnt)
 {
-    while (mnt) {
-        mutex_lock(&mnt->lock);
-        mnt->busy_counter--;
-        mutex_unlock(&mnt->lock);
-
-        mnt = mnt->parent;
-    }
+    mutex_lock(&mnt->lock);
+    mnt->busy_counter--;
+    mutex_unlock(&mnt->lock);
 }
 
 int
