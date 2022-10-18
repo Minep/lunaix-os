@@ -10,11 +10,13 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/peripheral/ps2kbd.h>
+#include <lunaix/peripheral/serial.h>
 #include <lunaix/proc.h>
 #include <lunaix/spike.h>
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
 #include <lunaix/types.h>
+#include <sdbg/protocol.h>
 
 #include <hal/acpi/acpi.h>
 #include <hal/ahci/ahci.h>
@@ -161,6 +163,8 @@ init_platform()
     acpi_init(_k_init_mb_info);
     apic_init();
     ioapic_init();
+    serial_init();
+    sdbg_init();
     timer_init(SYS_TIMER_FREQUENCY_HZ);
     clock_init();
     ps2_kbd_init();

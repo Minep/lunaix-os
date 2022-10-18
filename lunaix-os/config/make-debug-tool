@@ -8,6 +8,7 @@ QEMU_OPTIONS := -s -S -m 1G \
 				-no-shutdown \
 				-d cpu_reset \
 				-d trace:ide_dma_cb \
+				-serial tcp::12345,server,nowait\
 				-drive id=disk,file="machine/disk0.vdi",if=none \
 				-drive id=cdrom,file="$(BUILD_DIR)/$(OS_ISO)",readonly=on,if=none,format=raw \
 				-device ahci,id=ahci \

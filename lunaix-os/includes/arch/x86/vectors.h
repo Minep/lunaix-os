@@ -4,7 +4,7 @@
 // clang-format off
 
 #define FAULT_DIVISION_ERROR            0
-#define FAULT_TRAP_DEBUG_EXCEPTION      1
+#define INSTR_DEBUG                     1
 #define INT_NMI                         2
 #define TRAP_BREAKPOINT                 3
 #define TRAP_OVERFLOW                   4
@@ -36,6 +36,7 @@
 // Keyboard
 #define PC_KBD_IV                       201
 #define AHCI_HBA_IV                     202
+#define UART_COM1                       203
 
 #define RTC_TIMER_IV                    210
 

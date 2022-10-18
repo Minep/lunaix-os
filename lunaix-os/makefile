@@ -70,3 +70,7 @@ debug-qemu-vscode: all-debug
 
 debug-bochs: all-debug
 	@bochs -q -f bochs.cfg
+
+debug-metal: 
+	@printf "@cmc" > $(PORT)
+	@gdb -s $(BUILD_DIR)/kernel.dbg -ex "target remote $(PORT)"

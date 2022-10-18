@@ -87,6 +87,24 @@ kprint_panic(const char* fmt, ...)
 }
 
 void
+kprint_dbg(const char* fmt, ...)
+{
+    char buf[MAX_KPRINTF_BUF_SIZE];
+    va_list args;
+    va_start(args, fmt);
+
+    tty_set_theme(VGA_COLOR_WHITE, VGA_COLOR_MAGENTA);
+    tty_clear_line(24);
+
+    __ksprintf_internal(buf, fmt, MAX_KPRINTF_BUF_SIZE, args);
+    tty_put_str_at(buf, 0, 24);
+
+    va_end(args);
+
+    tty_set_theme(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+}
+
+void
 kprint_hex(const void* buffer, unsigned int size)
 {
     unsigned char* data = (unsigned char*)buffer;

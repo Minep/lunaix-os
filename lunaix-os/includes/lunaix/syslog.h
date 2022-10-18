@@ -31,4 +31,7 @@ kprint_hex(const void* buffer, unsigned int size);
 void
 kprint_panic(const char* fmt, ...);
 
+void
+kprint_dbg(const char* fmt, ...);
+
 #endif /* __LUNAIX_SYSLOG_H */
