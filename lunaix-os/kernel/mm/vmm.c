@@ -3,6 +3,9 @@
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
+#include <lunaix/syslog.h>
+
+LOG_MODULE("VMM")
 
 void
 vmm_init()
@@ -53,6 +56,9 @@ vmm_set_mapping(uintptr_t mnt,
         // This must be writable
         l1pt->entry[l1_inx] =
           NEW_L1_ENTRY(attr | PG_WRITE | PG_PRESENT, new_l1pt_pa);
+
+        // make sure our new l2 table is visible to CPU
+        cpu_invplg(l2pt);
 
         memset((void*)l2pt, 0, PG_SIZE);
     } else {

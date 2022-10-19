@@ -43,7 +43,7 @@ pmm_mark_chunk_occupied(pid_t owner,
 // 我们跳过位于0x0的页。我们不希望空指针是指向一个有效的内存空间。
 #define LOOKUP_START 1
 
-size_t pg_lookup_ptr;
+volatile size_t pg_lookup_ptr;
 
 void
 pmm_init(uintptr_t mem_upper_lim)

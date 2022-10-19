@@ -25,12 +25,21 @@ The following list presents all features it does have in current stage.
 + Memory management & demand paging
 + PS/2 Keyboard support
 + Muti-tasking and task management
-+ 17 commonly used POSIX syscall（[See Appendix 1](#appendix1)）
++ 47 commonly used POSIX syscall（[See Appendix 1](#appendix1)）
 + User Space
 + Signal
 + PCI 3.0
 + PCIe 1.1 (WIP)
-+ Serial ATA AHCI (WIP)
++ Serial ATA AHCI
++ Virtual File System
++ GDB Remote debugger (via UART)
+  
+The OS has been tested in the following environments, including both virtual and bare-metal.
+
++ QEMU (>=7.0.0)
++ Bochs (Not really, as it lacks support on SATA)
++ Virtualbox
++ Dell G3 3775 Laptop
 
 ## Project Structure
 
@@ -39,6 +48,66 @@ The following list presents all features it does have in current stage.
 | [lunaix-os](../lunaix-os/) | LunaixOS source code |
 | [slides](../slides/) | Slides used in my videos |
 | [reference-material](../reference-material/)| References |
+
+## Compile and Build
+
+You will need following dependencies in order to build LunaixOS
+
++ gcc **(target=i686-elf)**
++ binutils
++ make
++ xorriso
++ grub-mkrescue
+
+The following `make` actions are available to use.
+
+| Action | Description |
+|---|---|
+| `make all` | Build bootable（`-O2`） |
+| `make all-debug` | Build debuggable bootable（`-Og`） |
+| `make run` | Boot the OS with QEMU |
+| `make debug-qemu` | Build and debug with QEMU |
+| `make debug-bochs` | Build and debug with Bochs |
+| `make debug-qemu-vscode` | Used for integrated with vscode for better debug experience |
+| `make clean` | Delete recent build |
+
+When a bootable is built, it is an `.iso` image file and can be found under `build/` directory.
+
+## Running and Issue
+
+To run LunaixOS, you will be required to attach a usable virtual disk image. You can use the following handy command to create one:
+
+```bash
+qemu-img create -f vdi machine/disk0.vdi 128M
+```
+
+However, if you have image other than standard `.vdi`, you shall change `configs/make-debug-tool` accordingly.
+
+Locate this particular line:
+
+```
+-drive id=disk,file="machine/disk0.vdi",if=none \
+```
+
+and replace the default path with your preferred.
+
+There are also many other ways to create disk image, such as the aforementioned `qemu-img`.
+
+The next thing is about issue. In the most common situation, the master branch should be stable in aforementioned running environments. However, one might encounter compiler-optimization related issue when they compiled with `-O2`. Such condition will usually be addressed and fixed in the following commits. Should the issue remains, please post your issue here.
+
+To maximize the value of this section, we will provide some FAQ below that hopefully resolve some "not working" complains:
+
+#### Q1: Prompting "i8042: not found" after boot in QEMU
+
+This is a issue related to misconfiguration of ACPI table in QEMU, and has been addressed in version 7.0.0.
+
+#### Q2: General Protection exception get triggered.
+
+It is possible a race condition result from multiprogramming. This is not possible in current stage, and we however encourage you to report in case of it.
+
+#### Q3: Prompting "AHCI: Not found." after boot in Bochs
+
+This is an expected behaviour, as Bochs does not support SATA!
 
 ## Referenced Tutorial
 
@@ -51,6 +120,7 @@ You can find most of aforementioned materials in [reference-material](../referen
 The following list also enumerated such materials the author has used:
 
 #### Manuals, Technical References and Standards
+
 + [Intel 64 and IA-32 Architecture Software Developer's Manual (Full Volume Bundle)](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html)
 + [ACPI Specification (version 6.4)](https://uefi.org/sites/default/files/resources/ACPI_Spec_6_4_Jan22.pdf)
 + IBM PC/AT Technical Reference
@@ -63,6 +133,8 @@ The following list also enumerated such materials the author has used:
 + PCI Firmware Specification, Revision 3.0
 + Serial ATA - Advanced Host Controller Interface (AHCI), Revision 1.3.1
 + Serial ATA: HIgh Speed Serialized AT Attachment, Revision 3.2
++ SCSI Command Reference Manual
++ ATA/ATAPI Command Set - 3 (ACS-3)
 
 **DISCLAIMER: All rights of PCI-related specification is reserved by PCI-SIG. It is provided ONLY for learning purpose. Any commercial use should purchase a copy from PCI-SIG**
 
@@ -83,7 +155,7 @@ The following list also enumerated such materials the author has used:
 
 ## Appendix 1: Supported System Call<a id="appendix1"></a>
 
-### Unix/Linux/POSIX
+**Unix/Linux/POSIX**
 1. `sleep(3)`
 1. `wait(2)`
 1. `waitpid(2)`
@@ -101,7 +173,57 @@ The following list also enumerated such materials the author has used:
 1. `kill(2)`
 1. `sigpending(2)`
 1. `sigsuspend(2)`
+2. `read(2)`
+2. `write(2)`
+2. `open(2)`
+2. `close(2)`
+2. `mkdir(2)`※
+2. `lseek(2)`
+2. `readdir(2)`
+2. `readlink(2)`※
+2. `readlinkat(2)`※
+2. `rmdir(2)`※
+2. `unlink(2)`※
+2. `unlinkat(2)`※
+2. `link(2)`※
+2. `fsync(2)`※
+2. `dup(2)`
+2. `dup2(2)`
+2. `symlink(2)`※
+2. `chdir(2)`
+2. `fchdir(2)`
+2. `getcwd(2)`
+2. `rename(2)`※
+2. `mount(2)`
+2. `unmount` (a.k.a `umount(2)`)※
+2. `getxattr(2)`※
+2. `setxattr(2)`※
+2. `fgetxattr(2)`※
+2. `fsetxattr(2)`※
+2. `ioctl(2)`※
+2. `getpgid(2)`
+2. `setpgid(2)`
 
-### Unique to LunaixOS
+**LunaixOS**
 
 1. `yield`
+2. `geterrno`
+3. `realpathat`
+
+( **※**：Indicate syscall is not tested )
+
+## Appendix 2: Debugging with GDB remotely via UART
+
+The LunaixOS kernel comes with a built-in GDB debugging server, which runs on COM1@9600Bd. However, LunaixOS must be in debug mode before involving GDB.
+
+One could trigger the debug mode by writing a byte sequence `0x40` `0x63` `0x6D` `0x63`, to the same serial port. A text "DEBUG MODE" with magenta-coloured background shall be present at the bottom of the screen.
+
+Note that, whenever the text appears, the LunaixOS always halt all activities other than the debugging server, which means no scheduling and no external interrupt servicing. Users are now recommended to attach their GDB and drive the kernel with the debugging workflow.
+
+Currently, LunaixOS implements the required minimal server-side command subset required by GDB Remote Protocol, namely, `g`, `G`, `p`, `P`, `Q`, `S`, `k`, `?`, `m`, `M`, `X`. Which should be enough to cover most debugging activities.
+
+When debugging is finished, one shall disconnect with `kill` command. This command will not force LunaixOS to power down the computer, instead it just resume the execution (identical behavior as `c` command). However, disconnecting does not means exiting of debug mode. The debug mode is still actived and any subsequent GDB attaching request shall remain the highest priority amongst all other activity. One shall deactivate the debug mode by writing byte sequence `0x40` `0x79` `0x61` `0x79` to the port, after GDB detached.
+
+### Limitations
+
+Currently, one should avoid the use of `info stack`, `bt` or any other command that involves stack unwinding or stack backtracing. As it will somehow corrupt the stack layout and result in undefined behaviour. This issue should be addressed in future releases.

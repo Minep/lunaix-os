@@ -10,6 +10,8 @@
 
 // #define USE_LSDBG_BACKEND
 
+LOG_MODULE("SDBG")
+
 volatile int debug_mode = 0;
 
 void
@@ -68,6 +70,36 @@ done:
     serial_enable_irq(SERIAL_COM1);
 }
 
+void
+sdbg_imm(const isr_param* param)
+{
+    kprintf(KDEBUG "Quick debug mode\n");
+    kprintf(KDEBUG "cs=%p eip=%p eax=%p ebx=%p\n",
+            param->cs,
+            param->eip,
+            param->registers.eax,
+            param->registers.ebx);
+    kprintf(KDEBUG "ecx=%p edx=%p edi=%p esi=%p\n",
+            param->registers.ecx,
+            param->registers.edx,
+            param->registers.edi,
+            param->registers.esi);
+    kprintf(KDEBUG "u.esp=%p k.esp=%p ebp=%p ps=%p\n",
+            param->registers.esp,
+            param->esp,
+            param->registers.ebp,
+            param->eflags);
+    kprintf(KDEBUG "ss=%p ds=%p es=%p fs=%p gs=%p\n",
+            param->ss,
+            param->registers.ds,
+            param->registers.es,
+            param->registers.fs,
+            param->registers.gs);
+    console_flush();
+    while (1)
+        ;
+}
+
 extern uint8_t
 ioapic_get_irq(acpi_context* acpi_ctx, uint8_t old_irq);
 
@@ -76,6 +108,7 @@ sdbg_init()
 {
     intr_subscribe(UART_COM1, sdbg_loop);
     intr_subscribe(INSTR_DEBUG, sdbg_loop); // #DB
+    intr_subscribe(INSTR_BREAK, sdbg_loop); // #BRK
 
     acpi_context* acpi_ctx = acpi_get_context();
     uint8_t irq = ioapic_get_irq(acpi_ctx, COM1_IRQ);

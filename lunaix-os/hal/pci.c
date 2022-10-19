@@ -73,7 +73,7 @@ pci_probe()
 {
     // 暴力扫描所有PCI设备
     // XXX: 尽管最多会有256条PCI总线，但就目前而言，只考虑bus #0就足够了
-    for (int bus = 0; bus < 1; bus++) {
+    for (int bus = 0; bus < 256; bus++) {
         for (int dev = 0; dev < 32; dev++) {
             pci_probe_device(bus, dev, 0);
         }

@@ -85,6 +85,9 @@ static struct input_device* kbd_idev;
 void
 intr_ps2_kbd_handler(const isr_param* param);
 
+static uint8_t
+ps2_issue_cmd_wretry(char cmd, uint16_t arg);
+
 void
 ps2_device_post_cmd(char cmd, char arg)
 {
@@ -157,27 +160,30 @@ ps2_kbd_init()
 
     // 3、屏蔽所有PS/2设备（端口1&2）IRQ，并且禁用键盘键码转换功能
     result = ps2_issue_cmd(PS2_CMD_READ_CFG, PS2_NO_ARG);
-    result = result & ~(PS2_CFG_P1INT | PS2_CFG_P2INT | PS2_CFG_TRANSLATION);
+    result = result & ~(PS2_CFG_P1INT | PS2_CFG_P2INT);
     ps2_post_cmd(PS2_PORT_CTRL_CMDREG, PS2_CMD_WRITE_CFG, result);
 
     // 4、控制器自检
-    result = ps2_issue_cmd(PS2_CMD_SELFTEST, PS2_NO_ARG);
+    result = ps2_issue_cmd_wretry(PS2_CMD_SELFTEST, PS2_NO_ARG);
     if (result != PS2_RESULT_TEST_OK) {
-        kprintf(KERROR "Controller self-test failed.");
-        goto done;
+        kprintf(KWARN "Controller self-test failed. (%x)\n", result);
+        // goto done;
     }
 
     // 5、设备自检（端口1自检，通常是我们的键盘）
-    result = ps2_issue_cmd(PS2_CMD_SELFTEST_PORT1, PS2_NO_ARG);
+    result = ps2_issue_cmd_wretry(PS2_CMD_SELFTEST_PORT1, PS2_NO_ARG);
     if (result != 0) {
-        kprintf(KERROR "Interface test on port 1 failed.");
-        goto done;
+        kprintf(KERROR "Interface test on port 1 failed. (%x)\n", result);
+        // goto done;
     }
+
+    ps2_post_cmd(PS2_PORT_CTRL_CMDREG, PS2_CMD_PORT2_DISABLE, PS2_NO_ARG);
 
     // 6、开启位于端口1的 IRQ，并启用端口1。不用理会端口2，那儿一般是鼠标。
     ps2_post_cmd(PS2_PORT_CTRL_CMDREG, PS2_CMD_PORT1_ENABLE, PS2_NO_ARG);
     result = ps2_issue_cmd(PS2_CMD_READ_CFG, PS2_NO_ARG);
-    result = result | PS2_CFG_P1INT;
+    // 重新设置配置字节，因为控制器自检有可能重置我们先前做的改动。
+    result = (result | PS2_CFG_P1INT) & ~(PS2_CFG_TRANSLATION | PS2_CFG_P2INT);
     ps2_post_cmd(PS2_PORT_CTRL_CMDREG, PS2_CMD_WRITE_CFG, result);
 
     // 至此，PS/2控制器和设备已完成初始化，可以正常使用。
@@ -241,7 +247,6 @@ ps2_process_cmd(void* arg)
 #endif
         attempts++;
     } while (result == PS2_RESULT_NAK && attempts < PS2_DEV_CMD_MAX_ATTEMPTS);
-
     // XXX: 是否需要处理不成功的指令？
 
     cmd_q.queue_ptr = (cmd_q.queue_ptr + 1) % PS2_CMD_QUEUE_SIZE;
@@ -297,8 +302,8 @@ intr_ps2_kbd_handler(const isr_param* param)
 {
 
     // This is important! Don't believe me? try comment it out and run on Bochs!
-    while (!(io_inb(PS2_PORT_CTRL_STATUS) & PS2_STATUS_OFULL))
-        ;
+    // while (!(io_inb(PS2_PORT_CTRL_STATUS) & PS2_STATUS_OFULL))
+    //    ;
 
     // I know you are tempting to move this chunk after the keyboard state
     // check. But DO NOT. This chunk is in right place and right order. Moving
@@ -414,6 +419,19 @@ ps2_issue_cmd(char cmd, uint16_t arg)
     return io_inb(PS2_PORT_ENC_CMDREG);
 }
 
+static uint8_t
+ps2_issue_cmd_wretry(char cmd, uint16_t arg)
+{
+    uint8_t r, c = 0;
+    while ((r = ps2_issue_cmd(cmd, arg)) == PS2_RESULT_NAK && c < 5) {
+        c++;
+    }
+    if (c >= 5) {
+        kprintf(KWARN "Max attempt reached.\n");
+    }
+    return r;
+}
+
 static void
 ps2_post_cmd(uint8_t port, char cmd, uint16_t arg)
 {
@@ -426,6 +444,8 @@ ps2_post_cmd(uint8_t port, char cmd, uint16_t arg)
 
     if (!(arg & PS2_NO_ARG)) {
         // 所有参数一律通过0x60传入。
+        while (io_inb(PS2_PORT_CTRL_STATUS) & PS2_STATUS_IFULL)
+            ;
         io_outb(PS2_PORT_ENC_CMDREG, (uint8_t)(arg & 0x00ff));
         io_delay(PS2_DELAY);
     }

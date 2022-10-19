@@ -6,7 +6,7 @@
 #define FAULT_DIVISION_ERROR            0
 #define INSTR_DEBUG                     1
 #define INT_NMI                         2
-#define TRAP_BREAKPOINT                 3
+#define INSTR_BREAK                     3
 #define TRAP_OVERFLOW                   4
 #define FAULT_BOUND_EXCEED              5
 #define FAULT_INVALID_OPCODE            6
