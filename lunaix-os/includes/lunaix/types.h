@@ -19,7 +19,18 @@
     ((wstatus & PEXITTERM) && ((char)WEXITSTATUS(wstatus) >= 0))
 
 #define WIFSIGNALED(wstatus) ((wstatus & PEXITSIG))
+
+#define PACKED __attribute__((packed))
+
 // TODO: WTERMSIG
+
+// TODO: replace the integer type with these. To make thing more portable.
+
+typedef unsigned char u8_t;
+typedef unsigned short u16_t;
+typedef unsigned int u32_t;
+typedef unsigned long long u64_t;
+typedef unsigned long ptr_t;
 
 typedef int32_t pid_t;
 typedef int64_t lba_t;
