@@ -32,16 +32,6 @@ typedef struct
     unsigned int ss;
 } __attribute__((packed)) isr_param;
 
-typedef void (*int_subscriber)(const isr_param*);
-
-void
-intr_subscribe(const uint8_t vector, int_subscriber);
-
-void
-intr_unsubscribe(const uint8_t vector, int_subscriber);
-
-void intr_set_fallback_handler(int_subscriber);
-
 void
 intr_handler(isr_param* param);
 

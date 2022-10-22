@@ -76,6 +76,16 @@ acpi_rsdp_validate(acpi_rsdp_t* rsdp)
     return sum == 0;
 }
 
+uint8_t
+acpi_gistranslate(uint8_t old_irq)
+{
+    if (old_irq >= 24) {
+        return old_irq;
+    }
+    acpi_intso_t* int_override = ctx->madt.irq_exception[old_irq];
+    return int_override ? (uint8_t)int_override->gsi : old_irq;
+}
+
 #define VIRTUAL_BOX_PROBLEM
 
 acpi_rsdp_t*

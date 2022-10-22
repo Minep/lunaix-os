@@ -14,7 +14,7 @@
 // 获取v最近的最大k倍数
 #define ROUNDUP(v, k) (((v) + (k)-1) & ~((k)-1))
 
-// 获取v最近的最小k倍数
+// 获取v最近的最小k倍数 (k=2^m)
 #define ROUNDDOWN(v, k) ((v) & ~((k)-1))
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))

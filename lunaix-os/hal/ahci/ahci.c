@@ -16,6 +16,7 @@
 #include <hal/pci.h>
 #include <klibc/string.h>
 #include <lunaix/block.h>
+#include <lunaix/isrm.h>
 #include <lunaix/mm/mmio.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/valloc.h>
@@ -88,8 +89,7 @@ ahci_init()
 
     pci_write_cspace(ahci_dev->cspace_base, PCI_REG_STATUS_CMD, cmd);
 
-    pci_setup_msi(ahci_dev, AHCI_HBA_IV);
-    intr_subscribe(AHCI_HBA_IV, __ahci_hba_isr);
+    pci_setup_msi(ahci_dev, isrm_ivexalloc(__ahci_hba_isr));
 
     memset(&hba, 0, sizeof(hba));
 

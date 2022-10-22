@@ -4,6 +4,7 @@
 #include <lunaix/device.h>
 #include <lunaix/foptions.h>
 #include <lunaix/input.h>
+#include <lunaix/isrm.h>
 #include <lunaix/lxconsole.h>
 #include <lunaix/mm/mmio.h>
 #include <lunaix/mm/page.h>
@@ -46,9 +47,12 @@ setup_memory(multiboot_memory_map_t* map, size_t map_size);
 void
 _kernel_pre_init()
 {
+    // interrupts
     _init_idt();
+    isrm_init();
     intr_routine_init();
 
+    // memory
     pmm_init(MEM_1MB + (_k_init_mb_info->mem_upper << 10));
     vmm_init();
 
@@ -68,12 +72,16 @@ void
 _kernel_init()
 {
     int errno = 0;
+
+    // allocators
     cake_init();
     valloc_init();
 
+    // crt
     tty_init(ioremap(VGA_FRAMEBUFFER, PG_SIZE));
     tty_set_theme(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
 
+    // file system & device subsys
     vfs_init();
     fsm_init();
     input_init();
@@ -91,6 +99,8 @@ _kernel_init()
     lxconsole_init();
 
     sched_init();
+
+    syscall_install();
 
     spawn_proc0();
 }

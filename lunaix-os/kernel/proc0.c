@@ -86,9 +86,6 @@ __proc0_usr()
     int fdstdin = dup2(stdout, 1);
 
     pid_t p;
-    // if (!fork()) {
-    //     _pconsole_main();
-    // }
 
     if (!(p = fork())) {
 #ifndef USE_DEMO
@@ -132,6 +129,7 @@ __proc0()
 
     init_proc_user_space(__current);
 
+    // user space
     asm volatile("movw %0, %%ax\n"
                  "movw %%ax, %%es\n"
                  "movw %%ax, %%ds\n"
@@ -159,32 +157,44 @@ init_platform()
     // 锁定所有系统预留页（内存映射IO，ACPI之类的），并且进行1:1映射
     lock_reserved_memory();
 
-    rtc_init();
+    // firmware
     acpi_init(_k_init_mb_info);
+
+    // die
     apic_init();
     ioapic_init();
+
+    // debugger
     serial_init();
     sdbg_init();
+
+    // timers & clock
+    rtc_init();
     timer_init(SYS_TIMER_FREQUENCY_HZ);
     clock_init();
+
+    // peripherals & chipset features
     ps2_kbd_init();
     pci_init();
     block_init();
     ahci_init();
 
-    syscall_install();
-
+    // console
     console_start_flushing();
     console_flush();
 
+    // expose cake allocator states to vfs
     cake_export();
+
     unlock_reserved_memory();
 
+    // clean up
     for (size_t i = 0; i < (uintptr_t)(&__init_hhk_end); i += PG_SIZE) {
         vmm_del_mapping(PD_REFERENCED, (void*)i);
         pmm_free_page(KERNEL_PID, (void*)i);
     }
 
+    // reserve higher half
     for (size_t i = L1_INDEX(KERNEL_MM_BASE); i < 1023; i++) {
         vmm_set_mapping(PD_REFERENCED, i << 22, 0, 0, VMAP_NOMAP);
     }

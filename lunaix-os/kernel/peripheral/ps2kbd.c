@@ -3,6 +3,7 @@
 #include <lunaix/clock.h>
 #include <lunaix/common.h>
 #include <lunaix/input.h>
+#include <lunaix/isrm.h>
 #include <lunaix/peripheral/ps2kbd.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
@@ -188,9 +189,6 @@ ps2_kbd_init()
 
     // 至此，PS/2控制器和设备已完成初始化，可以正常使用。
 
-    // 将我们的键盘驱动挂载到第204号中断上（已由IOAPIC映射至IRQ#1），
-    intr_subscribe(PC_KBD_IV, intr_ps2_kbd_handler);
-
     // 搞一个计时器，将我们的 ps2_process_cmd
     // 挂上去。每隔5毫秒执行排在队头的命令。
     //  为什么只执行队头的命令，而不是全部的命令？
@@ -207,8 +205,7 @@ ps2_kbd_init()
      *
      *  所以，保险的方法是：在初始化后才去设置ioapic，这样一来我们就能有一个稳定的IRQ#1以放心使用。
      */
-    uint8_t irq_kbd = ioapic_get_irq(acpi_ctx, PC_AT_IRQ_KBD);
-    ioapic_redirect(irq_kbd, PC_KBD_IV, 0, IOAPIC_DELMOD_FIXED);
+    isrm_bindirq(PC_AT_IRQ_KBD, intr_ps2_kbd_handler);
 
 done:
     cpu_enable_interrupt();
