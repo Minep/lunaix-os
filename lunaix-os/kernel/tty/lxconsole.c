@@ -29,7 +29,7 @@ static volatile char ttychr;
 
 static volatile pid_t fg_pgid = 0;
 
-inline void
+static inline void
 print_control_code(const char cntrl)
 {
     console_write_char('^');

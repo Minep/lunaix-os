@@ -3,9 +3,25 @@ include config/make-os
 include config/make-cc
 include config/make-debug-tool
 
+DEPS := $(CC) $(LD) xorriso grub-mkrescue
+
 INCLUDES := $(patsubst %, -I%, $(INCLUDES_DIR))
 SOURCE_FILES := $(shell find -name "*.[cS]")
 SRC := $(patsubst ./%, $(OBJECT_DIR)/%.o, $(SOURCE_FILES))
+
+$(DEPS):
+	@echo -n "checking $@ .... "
+	@if which $@ > /dev/null; then \
+		echo "ok";\
+	else\
+		echo "failed" && exit 1;\
+	fi
+
+check-cc:
+	@echo -n "checking target i686-elf.... "
+	@test "`i686-elf-gcc -dumpmachine`" = "i686-elf" && echo ok || (echo "failed" && exit 1)
+
+check: $(DEPS) check-cc
 
 $(OBJECT_DIR):
 	@mkdir -p $(OBJECT_DIR)
@@ -32,12 +48,12 @@ $(BIN_DIR)/$(OS_BIN): $(OBJECT_DIR) $(BIN_DIR) $(SRC)
 	@echo "  LD    $(BIN_DIR)/$(OS_BIN)"
 	@$(CC) -T link/linker.ld -o $(BIN_DIR)/$(OS_BIN) $(SRC) $(LDFLAGS)
 
-$(BUILD_DIR)/$(OS_ISO): $(ISO_DIR) $(BIN_DIR)/$(OS_BIN) GRUB_TEMPLATE
+$(BUILD_DIR)/$(OS_ISO): check $(ISO_DIR) $(BIN_DIR)/$(OS_BIN) GRUB_TEMPLATE
 	@./config-grub.sh ${OS_NAME} $(ISO_GRUB_DIR)/grub.cfg
 	@cp $(BIN_DIR)/$(OS_BIN) $(ISO_BOOT_DIR)
 	@grub-mkrescue -o $(BUILD_DIR)/$(OS_ISO) $(ISO_DIR)
 
-all: clean $(BUILD_DIR)/$(OS_ISO)
+all: $(BUILD_DIR)/$(OS_ISO)
 
 instable: CFLAGS := -g -std=gnu99 -ffreestanding $(O) $(W) $(ARCH_OPT) -D__LUNAIXOS_DEBUG__
 instable: all
@@ -51,7 +67,6 @@ all-debug: clean $(BUILD_DIR)/$(OS_ISO)
 
 clean:
 	@rm -rf $(BUILD_DIR) || exit 1
-	@sleep 1
 
 run: $(BUILD_DIR)/$(OS_ISO)
 	@qemu-system-i386 $(QEMU_OPTIONS)
