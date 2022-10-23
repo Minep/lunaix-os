@@ -10,6 +10,13 @@ W := -Wall -Wextra -Wno-unknown-pragmas \
 		-Wno-unused-parameter \
 		-Wno-unused-variable\
 		-Werror=incompatible-pointer-types
-		
-CFLAGS := -std=gnu99 -ffreestanding $(O) $(W) $(ARCH_OPT)
+
+OFLAGS := -fno-gcse\
+		  -fno-gcse-lm\
+		  -fno-cse-follow-jumps\
+		  -fno-cse-skip-blocks\
+		  -fno-optimize-strlen\
+		  -fno-tree-builtin-call-dce 
+
+CFLAGS := -std=gnu99 -ffreestanding $(O) $(OFLAGS) $(W) $(ARCH_OPT)
 LDFLAGS := -ffreestanding $(O) -nostdlib -lgcc

@@ -1,4 +1,6 @@
 #include <arch/x86/interrupts.h>
+
+#include <lunaix/isrm.h>
 #include <lunaix/lxconsole.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
@@ -94,16 +96,14 @@ intr_routine_sched(const isr_param* param)
 void
 intr_routine_init()
 {
-    intr_subscribe(FAULT_DIVISION_ERROR, intr_routine_divide_zero);
-    intr_subscribe(FAULT_GENERAL_PROTECTION, intr_routine_general_protection);
-    intr_subscribe(FAULT_PAGE_FAULT, intr_routine_page_fault);
-    intr_subscribe(FAULT_STACK_SEG_FAULT, intr_routine_page_fault);
+    isrm_bindiv(FAULT_DIVISION_ERROR, intr_routine_divide_zero);
+    isrm_bindiv(FAULT_GENERAL_PROTECTION, intr_routine_general_protection);
+    isrm_bindiv(FAULT_PAGE_FAULT, intr_routine_page_fault);
+    isrm_bindiv(FAULT_STACK_SEG_FAULT, intr_routine_page_fault);
 
-    intr_subscribe(LUNAIX_SYS_PANIC, intr_routine_sys_panic);
-    intr_subscribe(LUNAIX_SCHED, intr_routine_sched);
+    isrm_bindiv(LUNAIX_SYS_PANIC, intr_routine_sys_panic);
+    isrm_bindiv(LUNAIX_SCHED, intr_routine_sched);
 
-    intr_subscribe(APIC_SPIV_IV, intr_routine_apic_spi);
-    intr_subscribe(APIC_ERROR_IV, intr_routine_apic_error);
-
-    intr_set_fallback_handler(intr_routine_fallback);
+    isrm_bindiv(APIC_SPIV_IV, intr_routine_apic_spi);
+    isrm_bindiv(APIC_ERROR_IV, intr_routine_apic_error);
 }

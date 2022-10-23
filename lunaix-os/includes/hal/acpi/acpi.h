@@ -56,4 +56,7 @@ acpi_init(multiboot_info_t* mb_info);
 acpi_context*
 acpi_get_context();
 
+uint8_t
+acpi_gistranslate(uint8_t old_irq);
+
 #endif /* __LUNAIX_ACPI_ACPI_H */

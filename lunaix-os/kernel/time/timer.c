@@ -13,12 +13,15 @@
 #include <hal/apic.h>
 #include <hal/rtc.h>
 
+#include <lunaix/isrm.h>
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/sched.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
+
+#include <hal/acpi/acpi.h>
 
 #define LVT_ENTRY_TIMER(vector, mode) (LVT_DELIVERY_FIXED | mode | vector)
 
@@ -69,10 +72,20 @@ timer_init(uint32_t frequency)
 
     // Setup APIC timer
 
+    // Remap the IRQ 8 (rtc timer's vector) to RTC_TIMER_IV in ioapic
+    //       (Remarks IRQ 8 is pin INTIN8)
+    //       See IBM PC/AT Technical Reference 1-10 for old RTC IRQ
+    //       See Intel's Multiprocessor Specification for IRQ - IOAPIC INTIN
+    //       mapping config.
+
+    // grab ourselves these irq numbers
+    uint32_t iv_rtc = isrm_bindirq(PC_AT_IRQ_RTC, temp_intr_routine_rtc_tick);
+    uint32_t iv_timer = isrm_ivexalloc(temp_intr_routine_apic_timer);
+
     // Setup a one-shot timer, we will use this to measure the bus speed. So we
     // can then calibrate apic timer to work at *nearly* accurate hz
     apic_write_reg(APIC_TIMER_LVT,
-                   LVT_ENTRY_TIMER(APIC_TIMER_IV, LVT_TIMER_ONESHOT));
+                   LVT_ENTRY_TIMER(iv_timer, LVT_TIMER_ONESHOT));
 
     // Set divider to 64
     apic_write_reg(APIC_TIMER_DCR, APIC_TIMER_DIV64);
@@ -110,9 +123,6 @@ timer_init(uint32_t frequency)
     rtc_counter = 0;
     apic_timer_done = 0;
 
-    intr_subscribe(APIC_TIMER_IV, temp_intr_routine_apic_timer);
-    intr_subscribe(RTC_TIMER_IV, temp_intr_routine_rtc_tick);
-
     rtc_enable_timer();                                     // start RTC timer
     apic_write_reg(APIC_TIMER_ICR, APIC_CALIBRATION_CONST); // start APIC timer
 
@@ -129,12 +139,12 @@ timer_init(uint32_t frequency)
     timer_ctx->tphz = timer_ctx->base_frequency / frequency;
 
     // cleanup
-    intr_unsubscribe(APIC_TIMER_IV, temp_intr_routine_apic_timer);
-    intr_unsubscribe(RTC_TIMER_IV, temp_intr_routine_rtc_tick);
+    isrm_ivfree(iv_timer);
+    isrm_ivfree(iv_rtc);
 
-    apic_write_reg(APIC_TIMER_LVT,
-                   LVT_ENTRY_TIMER(APIC_TIMER_IV, LVT_TIMER_PERIODIC));
-    intr_subscribe(APIC_TIMER_IV, timer_update);
+    apic_write_reg(
+      APIC_TIMER_LVT,
+      LVT_ENTRY_TIMER(isrm_ivexalloc(timer_update), LVT_TIMER_PERIODIC));
 
     apic_write_reg(APIC_TIMER_ICR, timer_ctx->tphz);
 

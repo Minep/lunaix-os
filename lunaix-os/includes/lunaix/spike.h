@@ -14,7 +14,7 @@
 // 获取v最近的最大k倍数
 #define ROUNDUP(v, k) (((v) + (k)-1) & ~((k)-1))
 
-// 获取v最近的最小k倍数
+// 获取v最近的最小k倍数 (k=2^m)
 #define ROUNDDOWN(v, k) ((v) & ~((k)-1))
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -71,7 +71,7 @@ spin()
         ;
 }
 
-#ifdef __LUNAIXOS_DEBUG__
+#ifndef __LUNAIXOS_NASSERT__
 #define assert(cond)                                                           \
     if (!(cond)) {                                                             \
         __assert_fail(#cond, __FILE__, __LINE__);                              \
@@ -87,7 +87,8 @@ __assert_fail(const char* expr, const char* file, unsigned int line)
 #else
 #define assert(cond) (void)(cond);          // assert nothing
 #define assert_msg(cond, msg) (void)(cond); // assert nothing
-#endif
+
+#endif // __LUNAIXOS_NASSERT__
 
 void
 panick(const char* msg);

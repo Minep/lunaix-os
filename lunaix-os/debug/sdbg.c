@@ -1,6 +1,7 @@
 #include <hal/acpi/acpi.h>
 #include <hal/ioapic.h>
 #include <klibc/stdio.h>
+#include <lunaix/isrm.h>
 #include <lunaix/lxconsole.h>
 #include <lunaix/peripheral/serial.h>
 #include <lunaix/syslog.h>
@@ -99,18 +100,11 @@ sdbg_imm(const isr_param* param)
     while (1)
         ;
 }
-
-extern uint8_t
-ioapic_get_irq(acpi_context* acpi_ctx, uint8_t old_irq);
-
 void
 sdbg_init()
 {
-    intr_subscribe(UART_COM1, sdbg_loop);
-    intr_subscribe(INSTR_DEBUG, sdbg_loop); // #DB
-    intr_subscribe(INSTR_BREAK, sdbg_loop); // #BRK
+    isrm_bindiv(INSTR_DEBUG, sdbg_loop); // #DB
+    isrm_bindiv(INSTR_BREAK, sdbg_loop); // #BRK
 
-    acpi_context* acpi_ctx = acpi_get_context();
-    uint8_t irq = ioapic_get_irq(acpi_ctx, COM1_IRQ);
-    ioapic_redirect(irq, UART_COM1, 0, IOAPIC_DELMOD_FIXED);
+    isrm_bindirq(COM1_IRQ, sdbg_loop);
 }

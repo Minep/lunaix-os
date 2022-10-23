@@ -9,9 +9,6 @@
 
 static volatile uintptr_t _ioapic_base;
 
-uint8_t
-ioapic_get_irq(acpi_context* acpi_ctx, uint8_t old_irq);
-
 void
 ioapic_init()
 {
@@ -20,31 +17,6 @@ ioapic_init()
     acpi_context* acpi_ctx = acpi_get_context();
 
     _ioapic_base = ioremap(acpi_ctx->madt.ioapic->ioapic_addr & ~0xfff, 4096);
-
-    // Remap the IRQ 8 (rtc timer's vector) to RTC_TIMER_IV in ioapic
-    //       (Remarks IRQ 8 is pin INTIN8)
-    //       See IBM PC/AT Technical Reference 1-10 for old RTC IRQ
-    //       See Intel's Multiprocessor Specification for IRQ - IOAPIC INTIN
-    //       mapping config.
-
-    // The ioapic_get_irq is to make sure we capture those overriden IRQs
-
-    // grab ourselves these irq numbers
-    uint8_t irq_rtc = ioapic_get_irq(acpi_ctx, PC_AT_IRQ_RTC);
-
-    // PC_AT_IRQ_RTC -> RTC_TIMER_IV, fixed, edge trigged, polarity=high,
-    // physical, APIC ID 0
-    ioapic_redirect(irq_rtc, RTC_TIMER_IV, 0, IOAPIC_DELMOD_FIXED);
-}
-
-uint8_t
-ioapic_get_irq(acpi_context* acpi_ctx, uint8_t old_irq)
-{
-    if (old_irq >= 24) {
-        return old_irq;
-    }
-    acpi_intso_t* int_override = acpi_ctx->madt.irq_exception[old_irq];
-    return int_override ? (uint8_t)int_override->gsi : old_irq;
 }
 
 void

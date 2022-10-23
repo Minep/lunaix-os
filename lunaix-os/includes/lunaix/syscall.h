@@ -136,8 +136,10 @@ syscall_install();
     }
 
 #define __LXSYSCALL2_VARG(rettype, name, t1, p1, t2, p2)                       \
-    static rettype name(__PARAM_MAP2(t1, p1, t2, p2), ...)                     \
+    __attribute__((noinline)) static rettype name(                             \
+      __PARAM_MAP2(t1, p1, t2, p2), ...)                                       \
     {                                                                          \
+        /* No inlining! This depends on the call frame assumption */           \
         void* _last = (void*)&p2 + sizeof(void*);                              \
         asm("\n" ::"b"(p1), "c"(p2), "d"(_last));                              \
         ___DOINT33(__SYSCALL_##name, rettype)                                  \

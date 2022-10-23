@@ -27,7 +27,7 @@ console_flush();
 static waitq_t lx_reader;
 static volatile char ttychr;
 
-static pid_t fg_pgid = 0;
+static volatile pid_t fg_pgid = 0;
 
 inline void
 print_control_code(const char cntrl)

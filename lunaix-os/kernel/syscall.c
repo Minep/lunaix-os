@@ -1,4 +1,5 @@
 #include <arch/x86/interrupts.h>
+#include <lunaix/isrm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/syscall.h>
@@ -12,5 +13,5 @@ syscall_hndlr(const isr_param* param);
 void
 syscall_install()
 {
-    intr_subscribe(LUNAIX_SYS_CALL, syscall_hndlr);
+    isrm_bindiv(LUNAIX_SYS_CALL, syscall_hndlr);
 }
