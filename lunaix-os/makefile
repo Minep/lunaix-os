@@ -39,7 +39,7 @@ $(BUILD_DIR)/$(OS_ISO): $(ISO_DIR) $(BIN_DIR)/$(OS_BIN) GRUB_TEMPLATE
 
 all: clean $(BUILD_DIR)/$(OS_ISO)
 
-instable: O := -O2
+instable: CFLAGS := -g -std=gnu99 -ffreestanding $(O) $(W) $(ARCH_OPT) -D__LUNAIXOS_DEBUG__
 instable: all
 
 all-debug: O := -Og
