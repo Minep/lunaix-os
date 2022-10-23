@@ -21,7 +21,7 @@ typedef struct
         reg32 fs;
         reg32 gs;
         reg32 esp;
-    } registers;
+    } __attribute__((packed)) registers;
 
     unsigned int vector;
     unsigned int err_code;

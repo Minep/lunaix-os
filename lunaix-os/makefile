@@ -20,16 +20,16 @@ $(ISO_DIR):
 
 $(OBJECT_DIR)/%.S.o: %.S
 	@mkdir -p $(@D)
-	@echo " BUILD: $<"
+	@echo "  CC    $<"
 	@$(CC) $(INCLUDES) -c $< -o $@
 
 $(OBJECT_DIR)/%.c.o: %.c 
 	@mkdir -p $(@D)
-	@echo " BUILD: $<"
+	@echo "  CC    $<"
 	@$(CC) $(INCLUDES) -c $< -o $@ $(CFLAGS)
 
 $(BIN_DIR)/$(OS_BIN): $(OBJECT_DIR) $(BIN_DIR) $(SRC)
-	@echo " LINK: $(BIN_DIR)/$(OS_BIN)"
+	@echo "  LD    $(BIN_DIR)/$(OS_BIN)"
 	@$(CC) -T link/linker.ld -o $(BIN_DIR)/$(OS_BIN) $(SRC) $(LDFLAGS)
 
 $(BUILD_DIR)/$(OS_ISO): $(ISO_DIR) $(BIN_DIR)/$(OS_BIN) GRUB_TEMPLATE
@@ -38,6 +38,9 @@ $(BUILD_DIR)/$(OS_ISO): $(ISO_DIR) $(BIN_DIR)/$(OS_BIN) GRUB_TEMPLATE
 	@grub-mkrescue -o $(BUILD_DIR)/$(OS_ISO) $(ISO_DIR)
 
 all: clean $(BUILD_DIR)/$(OS_ISO)
+
+instable: O := -O2
+instable: all
 
 all-debug: O := -Og
 all-debug: CFLAGS := -g -std=gnu99 -ffreestanding $(O) $(W) $(ARCH_OPT) -D__LUNAIXOS_DEBUG__

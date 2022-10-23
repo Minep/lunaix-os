@@ -2,6 +2,7 @@
 #include <lunaix/fs.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/process.h>
+#include <lunaix/spike.h>
 #include <lunaix/types.h>
 
 struct llist_header all_mnts = { .next = &all_mnts, .prev = &all_mnts };
@@ -18,12 +19,12 @@ vfs_create_mount(struct v_mount* parent, struct v_dnode* mnt_point)
     llist_append(&all_mnts, &mnt->list);
     mutex_init(&mnt->lock);
 
-    mnt_mkbusy(parent);
     mnt->parent = parent;
     mnt->mnt_point = mnt_point;
     mnt->super_block = mnt_point->super_block;
 
     if (parent) {
+        mnt_mkbusy(parent);
         mutex_lock(&mnt->parent->lock);
         llist_append(&parent->submnts, &mnt->sibmnts);
         mutex_unlock(&mnt->parent->lock);
@@ -84,6 +85,7 @@ mnt_chillax(struct v_mount* mnt)
 int
 vfs_mount_root(const char* fs_name, struct device* device)
 {
+    extern struct v_dnode* vfs_sysroot;
     int errno = 0;
     if (vfs_sysroot->mnt && (errno = vfs_unmount_at(vfs_sysroot))) {
         return errno;

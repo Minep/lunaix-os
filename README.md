@@ -63,13 +63,16 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 本项目支持的make命令：
 | 命令 | 用途 |
 |---|---|
-| `make all` | 构建镜像（`-O2`） |
+| `make all` | 构建镜像（`-O1`） |
+| `make instable` | 构建镜像（`-O2`）**※** |
 | `make all-debug` | 构建适合调试用的镜像（`-Og`） |
 | `make run` | 使用QEMU运行build目录下的镜像|
 | `make debug-qemu` | 构建并使用QEMU进行调试 |
 | `make debug-bochs` | 构建并使用Bochs进行调试 |
 | `make debug-qemu-vscode` | 用于vscode整合 |
 | `make clean` | 删除build目录 |
+
+**※：由于在`-O2`模式下，GCC会进行大量的优化，这导致LunaixOS会出现一些非常奇怪、离谱的bug，从而影响到基本运行。调试这些bug需要大量的汗水与时间，属于日后维护的任务。所以，在目前，LunaixOS将默认最大的优化程度设置为比较安全的`-O1`。`make instable`仅用于方便日后的对该问题的进一步调试。**
 
 ## 运行以及Issue
 
