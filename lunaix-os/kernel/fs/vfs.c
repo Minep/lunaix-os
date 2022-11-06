@@ -112,10 +112,10 @@ inline struct hbucket*
 __dcache_hash(struct v_dnode* parent, uint32_t* hash)
 {
     uint32_t _hash = *hash;
-    // 与parent的指针值做加法，来减小碰撞的可能性。
-    _hash += (uint32_t)parent;
     // 确保低位更加随机
     _hash = _hash ^ (_hash >> VFS_HASHBITS);
+    // 与parent的指针值做加法，来减小碰撞的可能性。
+    _hash += (uint32_t)parent;
     *hash = _hash;
     return &dnode_cache[_hash & VFS_HASH_MASK];
 }
