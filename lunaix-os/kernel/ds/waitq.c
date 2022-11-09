@@ -10,8 +10,7 @@ pwait(waitq_t* queue)
 
     llist_append(&queue->waiters, &current_wq->waiters);
 
-    // FIXME centralize the state change.
-    __current->state = PS_BLOCKED;
+    block_current();
     sched_yieldk();
 }
 

@@ -6,14 +6,13 @@ vbuf_alloc(struct vecbuf* vec, void* buf, size_t size)
 {
     struct vecbuf* vbuf = valloc(sizeof(struct vecbuf));
 
-    *vbuf =
-      (struct vecbuf){ .buf = { .buffer = buf, .size = size }, .acc_sz = 0 };
+    *vbuf = (struct vecbuf){ .buf = { .buffer = buf, .size = size },
+                             .acc_sz = vbuf_size(vec) + size };
 
     if (vec) {
-        vbuf->acc_sz = vbuf_size(vec) + size;
         llist_append(&vec->components, &vbuf->components);
     } else {
-        llist_init_head(&vec->components);
+        llist_init_head(&vbuf->components);
     }
 
     return vbuf;

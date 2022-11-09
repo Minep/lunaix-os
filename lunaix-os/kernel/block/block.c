@@ -34,6 +34,7 @@ __block_register(struct block_dev* dev);
 void
 block_init()
 {
+    blkio_init();
     lbd_pile = cake_new_pile("block_dev", sizeof(struct block_dev), 1, 0);
     dev_registry = vcalloc(sizeof(struct block_dev*), MAX_DEV);
     free_slot = 0;
@@ -47,6 +48,10 @@ __block_read(struct device* dev, void* buf, size_t offset, size_t len)
     struct block_dev* bdev = (struct block_dev*)dev->underlay;
     size_t bsize = bdev->blk_size, rd_block = offset / bsize,
            r = offset % bsize, rd_size = 0;
+
+    if (!(len = MIN(len, ((size_t)bdev->end_lba - rd_block + 1) * bsize))) {
+        return 0;
+    }
 
     struct vecbuf* vbuf = vbuf_alloc(NULL, buf, len);
     struct blkio_req* req;
@@ -63,10 +68,14 @@ __block_read(struct device* dev, void* buf, size_t offset, size_t len)
 
     req = blkio_vrd(vbuf, rd_block, NULL, NULL, 0);
     blkio_commit(bdev->blkio, req);
-    wait_if(req->flags & BLKIO_PENDING);
+
+    pwait(&req->wait);
 
     if (!(errno = req->errcode)) {
         memcpy(buf, tmp_buf + r, rd_size);
+        errno = len;
+    } else {
+        errno = -errno;
     }
 
     if (tmp_buf) {
@@ -85,6 +94,10 @@ __block_write(struct device* dev, void* buf, size_t offset, size_t len)
     size_t bsize = bdev->blk_size, rd_block = offset / bsize,
            r = offset % bsize;
 
+    if (!(len = MIN(len, ((size_t)bdev->end_lba - rd_block + 1) * bsize))) {
+        return 0;
+    }
+
     struct vecbuf* vbuf = vbuf_alloc(NULL, buf, len);
     struct blkio_req* req;
     void* tmp_buf = NULL;
@@ -101,9 +114,15 @@ __block_write(struct device* dev, void* buf, size_t offset, size_t len)
 
     req = blkio_vwr(vbuf, rd_block, NULL, NULL, 0);
     blkio_commit(bdev->blkio, req);
-    wait_if(req->flags & BLKIO_PENDING);
+
+    pwait(&req->wait);
 
     int errno = req->errcode;
+    if (!errno) {
+        errno = len;
+    } else {
+        errno = -errno;
+    }
 
     if (tmp_buf) {
         vfree(tmp_buf);
@@ -118,11 +137,13 @@ struct block_dev*
 block_alloc_dev(const char* blk_id, void* driver, req_handler ioreq_handler)
 {
     struct block_dev* bdev = cake_grab(lbd_pile);
-    *bdev = (struct block_dev){ .driver = driver };
+    memset(bdev, 0, sizeof(struct block_dev));
 
     strncpy(bdev->name, blk_id, PARTITION_NAME_SIZE);
 
     bdev->blkio = blkio_newctx(ioreq_handler);
+    bdev->driver = driver;
+    bdev->blkio->driver = driver;
 
     return bdev;
 }

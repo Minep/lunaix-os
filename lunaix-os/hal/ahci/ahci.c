@@ -27,6 +27,8 @@
 #define HBA_FIS_SIZE 256
 #define HBA_CLB_SIZE 1024
 
+#define HBA_MY_IE (HBA_PxINTR_DHR | HBA_PxINTR_TFEE)
+
 // #define DO_HBA_FULL_RESET
 
 LOG_MODULE("AHCI")
@@ -287,7 +289,7 @@ sata_create_fis(struct sata_reg_fis* cmd_fis,
 int
 hba_bind_sbuf(struct hba_cmdh* cmdh, struct hba_cmdt* cmdt, struct membuf mbuf)
 {
-    assert_msg(mbuf.buffer <= 0x400000, "HBA: Buffer too big");
+    assert_msg(mbuf.size <= 0x400000, "HBA: Buffer too big");
     cmdh->prdt_len = 1;
     cmdt->entries[0] = (struct hba_prdte){ .data_base = vmm_v2p(mbuf.buffer),
                                            .byte_count = mbuf.size - 1 };
@@ -297,17 +299,17 @@ int
 hba_bind_vbuf(struct hba_cmdh* cmdh, struct hba_cmdt* cmdt, struct vecbuf* vbuf)
 {
     size_t i = 0;
-    struct vecbuf *pos, *n;
+    struct vecbuf* pos = vbuf;
 
-    llist_for_each(pos, n, &vbuf->components, components)
-    {
+    do {
         assert_msg(i < HBA_MAX_PRDTE, "HBA: Too many PRDTEs");
-        assert_msg(pos->buf.buffer <= 0x400000, "HBA: Buffer too big");
+        assert_msg(pos->buf.size <= 0x400000, "HBA: Buffer too big");
 
         cmdt->entries[i++] =
           (struct hba_prdte){ .data_base = vmm_v2p(pos->buf.buffer),
                               .byte_count = pos->buf.size - 1 };
-    }
+        pos = list_entry(pos->components.next, struct vecbuf, components);
+    } while (pos != vbuf);
 
     cmdh->prdt_len = i + 1;
 }
@@ -345,7 +347,7 @@ ahci_init_device(struct hba_port* port)
     struct hba_cmdh* cmd_header;
 
     // mask DHR interrupt
-    port->regs[HBA_RPxIE] &= ~HBA_PxINTR_DHR;
+    port->regs[HBA_RPxIE] &= ~HBA_MY_IE;
 
     // 预备DMA接收缓存，用于存放HBA传回的数据
     uint16_t* data_in = (uint16_t*)valloc_dma(512);
@@ -434,7 +436,7 @@ ahci_init_device(struct hba_port* port)
 
 done:
     // reset interrupt status and unmask D2HR interrupt
-    port->regs[HBA_RPxIE] |= HBA_PxINTR_DHR;
+    port->regs[HBA_RPxIE] |= HBA_MY_IE;
     achi_register_ops(port);
 
     vfree_dma(data_in);
@@ -443,7 +445,7 @@ done:
     return 1;
 
 fail:
-    port->regs[HBA_RPxIE] |= HBA_PxINTR_DHR;
+    port->regs[HBA_RPxIE] |= HBA_MY_IE;
     vfree_dma(data_in);
     vfree_dma(cmd_table);
 

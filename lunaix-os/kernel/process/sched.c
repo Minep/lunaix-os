@@ -172,7 +172,8 @@ __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
     llist_append(&root_proc->sleep.sleepers, &__current->sleep.sleepers);
 
     __current->intr_ctx.registers.eax = seconds;
-    __current->state = PS_BLOCKED;
+
+    block_current();
     schedule();
 }
 

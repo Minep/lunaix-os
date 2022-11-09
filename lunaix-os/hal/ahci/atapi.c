@@ -77,7 +77,7 @@ scsi_submit(struct hba_device* dev, struct blkio_req* io_req)
     } else {
         scsi_create_packet12((struct scsi_cdb12*)cdb,
                              write ? SCSI_WRITE_BLOCKS_12 : SCSI_READ_BLOCKS_12,
-                             io_req->blk_addr,
+                             io_req->blk_addr & -1,
                              count);
     }
 

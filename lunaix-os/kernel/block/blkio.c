@@ -24,6 +24,7 @@ __blkio_req_create(struct vecbuf* buffer,
                                 .flags = options,
                                 .evt_args = evt_args };
     breq->vbuf = buffer;
+    waitq_init(&breq->wait);
     return breq;
 }
 
@@ -76,7 +77,7 @@ blkio_commit(struct blkio_context* ctx, struct blkio_req* req)
     llist_append(&ctx->queue, &req->reqs);
 
     // if the pipeline is not running (e.g., stalling). Then we should schedule
-    // one immediately and kick it start.
+    // one immediately and kick it started.
     if (!ctx->busy) {
         blkio_schedule(ctx);
     }
@@ -102,9 +103,15 @@ void
 blkio_complete(struct blkio_req* req)
 {
     req->flags &= ~(BLKIO_BUSY | BLKIO_PENDING);
+
     if (req->completed) {
         req->completed(req);
     }
+
+    // Wake all blocked processes on completion,
+    //  albeit should be no more than one process in everycase (by design)
+    pwake_all(&req->wait);
+
     if ((req->flags & BLKIO_FOC)) {
         blkio_free_req(req);
     }

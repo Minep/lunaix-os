@@ -40,6 +40,10 @@ vbuf_alloc(struct vecbuf* vec, void* buf, size_t len);
 static inline size_t
 vbuf_size(struct vecbuf* vbuf)
 {
+    if (!vbuf) {
+        return 0;
+    }
+
     struct vecbuf* last =
       list_entry(vbuf->components.prev, struct vecbuf, components);
     return last->acc_sz;

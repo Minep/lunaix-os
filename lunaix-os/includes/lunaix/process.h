@@ -93,6 +93,12 @@ struct proc_info
 
 extern volatile struct proc_info* __current;
 
+static inline void
+block_current()
+{
+    __current->state = PS_BLOCKED;
+}
+
 /**
  * @brief 分配并初始化一个进程控制块
  *

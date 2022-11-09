@@ -3,14 +3,16 @@
 
 #include <lunaix/buffer.h>
 #include <lunaix/ds/llist.h>
+#include <lunaix/ds/waitq.h>
 #include <lunaix/types.h>
 
 #define BLKIO_WRITE 0x1
 #define BLKIO_ERROR 0x2
 
-// Free on complete
 #define BLKIO_BUSY 0x4
 #define BLKIO_PENDING 0x8
+
+// Free on complete
 #define BLKIO_FOC 0x10
 
 #define BLKIO_SCHED_IDEL 0x1
@@ -24,8 +26,9 @@ struct blkio_req
 {
     struct llist_header reqs;
     struct blkio_context* io_ctx;
-    u32_t flags;
     struct vecbuf* vbuf;
+    u32_t flags;
+    waitq_t wait;
     u64_t blk_addr;
     void* evt_args;
     blkio_cb completed;
