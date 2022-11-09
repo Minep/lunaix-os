@@ -341,6 +341,9 @@ vfs_pclose(struct v_file* file, pid_t pid);
 int
 vfs_close(struct v_file* file);
 
+void
+vfs_free_fd(struct v_fd* fd);
+
 int
 vfs_fsync(struct v_file* file);
 

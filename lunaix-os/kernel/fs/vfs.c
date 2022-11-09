@@ -300,6 +300,12 @@ vfs_close(struct v_file* file)
     return vfs_pclose(file, __current->pid);
 }
 
+void
+vfs_free_fd(struct v_fd* fd)
+{
+    cake_release(fd_pile, fd);
+}
+
 int
 vfs_fsync(struct v_file* file)
 {
@@ -570,7 +576,9 @@ vfs_do_open(const char* path, int options)
     struct v_inode* o_inode = ofile->inode;
 
     if (!errno && !(errno = vfs_alloc_fdslot(&fd))) {
-        struct v_fd* fd_s = vzalloc(sizeof(*fd_s));
+        struct v_fd* fd_s = cake_grab(fd_pile);
+        memset(fd_s, 0, sizeof(*fd_s));
+
         ofile->f_pos = ofile->inode->fsize & -((options & FO_APPEND) != 0);
         fd_s->file = ofile;
         fd_s->flags = options;
@@ -599,7 +607,7 @@ __DEFINE_LXSYSCALL1(int, close, int, fd)
         goto done_err;
     }
 
-    vfree(fd_s);
+    cake_release(fd_pile, fd_s);
     __current->fdtable->fds[fd] = 0;
 
 done_err:
