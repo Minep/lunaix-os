@@ -1,6 +1,5 @@
 #include <lunaix/ds/waitq.h>
 #include <lunaix/process.h>
-#include <lunaix/sched.h>
 #include <lunaix/spike.h>
 
 void

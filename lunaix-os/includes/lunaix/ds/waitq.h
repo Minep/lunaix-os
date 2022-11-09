@@ -2,6 +2,7 @@
 #define __LUNAIX_CODVAR_H
 
 #include <lunaix/ds/llist.h>
+#include <lunaix/sched.h>
 
 typedef struct waitq
 {
@@ -28,5 +29,10 @@ pwake_one(waitq_t* queue);
 
 void
 pwake_all(waitq_t* queue);
+
+#define wait_if(cond)                                                          \
+    while ((cond)) {                                                           \
+        sched_yieldk();                                                        \
+    }
 
 #endif /* __LUNAIX_CODVAR_H */

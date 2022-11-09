@@ -1,6 +1,8 @@
 #ifndef __LUNAIX_HBA_H
 #define __LUNAIX_HBA_H
 
+#include <lunaix/blkio.h>
+#include <lunaix/buffer.h>
 #include <lunaix/types.h>
 
 #define HBA_RCAP 0
@@ -64,6 +66,8 @@ typedef unsigned int hba_reg_t;
 #define HBA_CMDH_CLR_BUSY (1 << 10)
 #define HBA_CMDH_PRDT_LEN(entries) (((entries)&0xffff) << 16)
 
+#define HBA_MAX_PRDTE 4
+
 struct hba_cmdh
 {
     uint16_t options;
@@ -87,7 +91,7 @@ struct hba_cmdt
     uint8_t command_fis[64];
     uint8_t atapi_cmd[16];
     uint8_t reserved[0x30];
-    struct hba_prdte entries[3];
+    struct hba_prdte entries[HBA_MAX_PRDTE];
 } __HBA_PACKED__;
 
 #define HBA_DEV_FEXTLBA 1
@@ -119,15 +123,20 @@ struct hba_device
     struct
     {
         int (*identify)(struct hba_device* dev);
-        int (*read_buffer)(struct hba_device* dev,
-                           uint64_t lba,
-                           void* buffer,
-                           uint32_t size);
-        int (*write_buffer)(struct hba_device* dev,
-                            uint64_t lba,
-                            void* buffer,
-                            uint32_t size);
+        void (*submit)(struct hba_device* dev, struct blkio_req* io_req);
     } ops;
+};
+
+struct hba_cmd_state
+{
+    struct hba_cmdt* cmd_table;
+    void* state_ctx;
+};
+
+struct hba_cmd_context
+{
+    struct hba_cmd_state* issued[32];
+    u32_t tracked_ci;
 };
 
 struct hba_port
@@ -135,6 +144,7 @@ struct hba_port
     volatile hba_reg_t* regs;
     unsigned int ssts;
     struct hba_cmdh* cmdlst;
+    struct hba_cmd_context cmdctx;
     void* fis;
     struct hba_device* device;
 };
@@ -152,8 +162,14 @@ struct ahci_hba
 int
 hba_prepare_cmd(struct hba_port* port,
                 struct hba_cmdt** cmdt,
-                struct hba_cmdh** cmdh,
-                void* buffer,
-                unsigned int size);
+                struct hba_cmdh** cmdh);
+
+int
+hba_bind_vbuf(struct hba_cmdh* cmdh,
+              struct hba_cmdt* cmdt,
+              struct vecbuf* vbuf);
+
+int
+hba_bind_sbuf(struct hba_cmdh* cmdh, struct hba_cmdt* cmdt, struct membuf mbuf);
 
 #endif /* __LUNAIX_HBA_H */

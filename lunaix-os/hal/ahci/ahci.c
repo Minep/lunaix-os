@@ -31,16 +31,30 @@
 
 LOG_MODULE("AHCI")
 
-static struct ahci_hba hba;
+struct ahci_hba hba;
 
-void
+static char sata_ifs[][20] = { "Not detected",
+                               "SATA I (1.5Gbps)",
+                               "SATA II (3.0Gbps)",
+                               "SATA III (6.0Gbps)" };
+
+extern void
+ahci_fsexport(struct block_dev* bdev, void* fs_node);
+
+extern void
 __ahci_hba_isr(const isr_param* param);
+
+extern void
+__ahci_blkio_handler(struct blkio_req* req);
 
 int
 ahci_init_device(struct hba_port* port);
 
 void
 achi_register_ops(struct hba_port* port);
+
+void
+ahci_register_device(struct hba_device* hbadev);
 
 unsigned int
 ahci_get_port_usage()
@@ -173,27 +187,27 @@ ahci_init()
             continue;
         }
 
+        struct hba_device* hbadev = port->device;
         kprintf(KINFO "sata%d: %s, sector_size=%dB, sector=%d\n",
                 i,
-                port->device->model,
-                port->device->block_size,
-                (uint32_t)port->device->max_lba);
+                hbadev->model,
+                hbadev->block_size,
+                (uint32_t)hbadev->max_lba);
 
-        block_mount_disk(port->device);
+        ahci_register_device(hbadev);
     }
 }
 
-char sata_ifs[][20] = { "Not detected",
-                        "SATA I (1.5Gbps)",
-                        "SATA II (3.0Gbps)",
-                        "SATA III (6.0Gbps)" };
-
 void
-__ahci_hba_isr(const isr_param* param)
+ahci_register_device(struct hba_device* hbadev)
 {
-    // TODO: clear the interrupt status
-    // TODO: I/O-operation scheduler should be here
-    // kprintf(KDEBUG "HBA INTR\n");
+    struct block_dev* bdev =
+      block_alloc_dev(hbadev->model, hbadev, __ahci_blkio_handler);
+
+    bdev->end_lba = hbadev->max_lba;
+    bdev->blk_size = hbadev->block_size;
+
+    block_mount(bdev, ahci_fsexport);
 }
 
 void
@@ -271,15 +285,40 @@ sata_create_fis(struct sata_reg_fis* cmd_fis,
 }
 
 int
+hba_bind_sbuf(struct hba_cmdh* cmdh, struct hba_cmdt* cmdt, struct membuf mbuf)
+{
+    assert_msg(mbuf.buffer <= 0x400000, "HBA: Buffer too big");
+    cmdh->prdt_len = 1;
+    cmdt->entries[0] = (struct hba_prdte){ .data_base = vmm_v2p(mbuf.buffer),
+                                           .byte_count = mbuf.size - 1 };
+}
+
+int
+hba_bind_vbuf(struct hba_cmdh* cmdh, struct hba_cmdt* cmdt, struct vecbuf* vbuf)
+{
+    size_t i = 0;
+    struct vecbuf *pos, *n;
+
+    llist_for_each(pos, n, &vbuf->components, components)
+    {
+        assert_msg(i < HBA_MAX_PRDTE, "HBA: Too many PRDTEs");
+        assert_msg(pos->buf.buffer <= 0x400000, "HBA: Buffer too big");
+
+        cmdt->entries[i++] =
+          (struct hba_prdte){ .data_base = vmm_v2p(pos->buf.buffer),
+                              .byte_count = pos->buf.size - 1 };
+    }
+
+    cmdh->prdt_len = i + 1;
+}
+
+int
 hba_prepare_cmd(struct hba_port* port,
                 struct hba_cmdt** cmdt,
-                struct hba_cmdh** cmdh,
-                void* buffer,
-                unsigned int size)
+                struct hba_cmdh** cmdh)
 {
     int slot = __get_free_slot(port);
     assert_msg(slot >= 0, "HBA: No free slot");
-    assert_msg(size <= 0x400000, "HBA: buffer too big");
 
     // 构建命令头（Command Header）和命令表（Command Table）
     struct hba_cmdh* cmd_header = &port->cmdlst[slot];
@@ -291,13 +330,6 @@ hba_prepare_cmd(struct hba_port* port,
     cmd_header->cmd_table_base = vmm_v2p(cmd_table);
     cmd_header->options =
       HBA_CMDH_FIS_LEN(sizeof(struct sata_reg_fis)) | HBA_CMDH_CLR_BUSY;
-
-    if (buffer) {
-        cmd_header->prdt_len = 1;
-        cmd_table->entries[0] =
-          (struct hba_prdte){ .data_base = vmm_v2p(buffer),
-                              .byte_count = size - 1 };
-    }
 
     *cmdh = cmd_header;
     *cmdt = cmd_table;
@@ -318,7 +350,9 @@ ahci_init_device(struct hba_port* port)
     // 预备DMA接收缓存，用于存放HBA传回的数据
     uint16_t* data_in = (uint16_t*)valloc_dma(512);
 
-    int slot = hba_prepare_cmd(port, &cmd_table, &cmd_header, data_in, 512);
+    int slot = hba_prepare_cmd(port, &cmd_table, &cmd_header);
+    hba_bind_sbuf(
+      cmd_header, cmd_table, (struct membuf){ .buffer = data_in, .size = 512 });
 
     port->device = vzalloc(sizeof(struct hba_device));
     port->device->port = port;
@@ -429,10 +463,8 @@ achi_register_ops(struct hba_port* port)
 {
     port->device->ops.identify = ahci_identify_device;
     if (!(port->device->flags & HBA_DEV_FATAPI)) {
-        port->device->ops.read_buffer = sata_read_buffer;
-        port->device->ops.write_buffer = sata_write_buffer;
+        port->device->ops.submit = sata_submit;
     } else {
-        port->device->ops.read_buffer = scsi_read_buffer;
-        port->device->ops.write_buffer = scsi_write_buffer;
+        port->device->ops.submit = scsi_submit;
     }
 }

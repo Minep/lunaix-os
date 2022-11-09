@@ -53,17 +53,8 @@ sata_create_fis(struct sata_reg_fis* cmd_fis,
                 uint64_t lba,
                 uint16_t sector_count);
 
-int
-sata_read_buffer(struct hba_device* dev,
-                 uint64_t lba,
-                 void* buffer,
-                 uint32_t size);
-
-int
-sata_write_buffer(struct hba_device* dev,
-                  uint64_t lba,
-                  void* buffer,
-                  uint32_t size);
+void
+sata_submit(struct hba_device* dev, struct blkio_req* io_req);
 
 void
 sata_read_error(struct hba_port* port);

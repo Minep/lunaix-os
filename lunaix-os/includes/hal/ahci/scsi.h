@@ -50,17 +50,8 @@ scsi_create_packet16(struct scsi_cdb16* cdb,
                      uint64_t lba,
                      uint32_t alloc_size);
 
-int
-scsi_read_buffer(struct hba_device* dev,
-                 uint64_t lba,
-                 void* buffer,
-                 uint32_t size);
-
-int
-scsi_write_buffer(struct hba_device* dev,
-                  uint64_t lba,
-                  void* buffer,
-                  uint32_t size);
+void
+scsi_submit(struct hba_device* dev, struct blkio_req* io_req);
 
 void
 scsi_parse_capacity(struct hba_device* device, uint32_t* parameter);

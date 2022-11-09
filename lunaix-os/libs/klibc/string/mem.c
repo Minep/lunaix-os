@@ -4,6 +4,8 @@
 void*
 memcpy(void* dest, const void* src, size_t num)
 {
+    if (!num)
+        return dest;
     asm volatile("movl %1, %%edi\n"
                  "rep movsb\n" ::"S"(src),
                  "r"(dest),

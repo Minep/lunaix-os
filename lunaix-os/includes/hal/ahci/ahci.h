@@ -36,7 +36,24 @@ ahci_parse_dev_info(struct hba_device* dev_info, uint16_t* data);
 void
 ahci_parsestr(char* str, uint16_t* reg_start, int size_word);
 
+/**
+ * @brief Issue a HBA command (synchronized)
+ *
+ * @param port
+ * @param slot
+ * @return int
+ */
 int
 ahci_try_send(struct hba_port* port, int slot);
+
+/**
+ * @brief Issue a HBA command (asynchronized)
+ *
+ * @param port
+ * @param state
+ * @param slot
+ */
+void
+ahci_post(struct hba_port* port, struct hba_cmd_state* state, int slot);
 
 #endif /* __LUNAIX_AHCI_H */

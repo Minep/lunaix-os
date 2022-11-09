@@ -31,6 +31,7 @@ typedef unsigned short u16_t;
 typedef unsigned int u32_t;
 typedef unsigned long long u64_t;
 typedef unsigned long ptr_t;
+typedef signed long ssize_t;
 
 typedef int32_t pid_t;
 typedef int64_t lba_t;

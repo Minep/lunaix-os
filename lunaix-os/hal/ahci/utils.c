@@ -86,3 +86,18 @@ ahci_try_send(struct hba_port* port, int slot)
 
     return retries < MAX_RETRY;
 }
+
+void
+ahci_post(struct hba_port* port, struct hba_cmd_state* state, int slot)
+{
+    int bitmask = 1 << slot;
+
+    // 确保端口是空闲的
+    wait_until(!(port->regs[HBA_RPxTFD] & (HBA_PxTFD_BSY | HBA_PxTFD_DRQ)));
+
+    hba_clear_reg(port->regs[HBA_RPxIS]);
+
+    port->cmdctx.issued[slot] = state;
+    port->cmdctx.tracked_ci |= bitmask;
+    port->regs[HBA_RPxCI] |= bitmask;
+}

@@ -15,31 +15,31 @@ sata_read_error(struct hba_port* port)
     port->device->last_result.status = tfd & 0x00ff;
 }
 
-int
-__sata_buffer_io(struct hba_device* dev,
-                 uint64_t lba,
-                 void* buffer,
-                 uint32_t size,
-                 int write)
+void
+sata_submit(struct hba_device* dev, struct blkio_req* io_req)
 {
-    assert_msg(((uintptr_t)buffer & 0x3) == 0, "HBA: Bad buffer alignment");
-
     struct hba_port* port = dev->port;
     struct hba_cmdh* header;
     struct hba_cmdt* table;
-    int slot = hba_prepare_cmd(port, &table, &header, buffer, size);
 
-    header->options |= HBA_CMDH_WRITE * (write == 1);
+    int write = !!(io_req->flags & BLKIO_WRITE);
+    int slot = hba_prepare_cmd(port, &table, &header);
+    hba_bind_vbuf(header, table, io_req->vbuf);
 
-    uint16_t count = ICEIL(size, port->device->block_size);
+    header->options |= HBA_CMDH_WRITE * write;
+
+    uint16_t count = ICEIL(vbuf_size(io_req->vbuf), port->device->block_size);
     struct sata_reg_fis* fis = (struct sata_reg_fis*)table->command_fis;
 
     if ((port->device->flags & HBA_DEV_FEXTLBA)) {
         // 如果该设备支持48位LBA寻址
-        sata_create_fis(
-          fis, write ? ATA_WRITE_DMA_EXT : ATA_READ_DMA_EXT, lba, count);
+        sata_create_fis(fis,
+                        write ? ATA_WRITE_DMA_EXT : ATA_READ_DMA_EXT,
+                        io_req->blk_addr,
+                        count);
     } else {
-        sata_create_fis(fis, write ? ATA_WRITE_DMA : ATA_READ_DMA, lba, count);
+        sata_create_fis(
+          fis, write ? ATA_WRITE_DMA : ATA_READ_DMA, io_req->blk_addr, count);
     }
     /*
           确保我们使用的是LBA寻址模式
@@ -52,26 +52,8 @@ __sata_buffer_io(struct hba_device* dev,
     */
     fis->dev = (1 << 6);
 
-    int is_ok = ahci_try_send(port, slot);
-
-    vfree_dma(table);
-    return is_ok;
-}
-
-int
-sata_read_buffer(struct hba_device* dev,
-                 uint64_t lba,
-                 void* buffer,
-                 uint32_t size)
-{
-    return __sata_buffer_io(dev, lba, buffer, size, 0);
-}
-
-int
-sata_write_buffer(struct hba_device* dev,
-                  uint64_t lba,
-                  void* buffer,
-                  uint32_t size)
-{
-    return __sata_buffer_io(dev, lba, buffer, size, 1);
+    // The async way...
+    struct hba_cmd_state* cmds = valloc(sizeof(struct hba_cmd_state));
+    *cmds = (struct hba_cmd_state){ .cmd_table = table, .state_ctx = io_req };
+    ahci_post(port, cmds, slot);
 }

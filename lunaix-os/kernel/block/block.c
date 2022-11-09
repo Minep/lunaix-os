@@ -19,8 +19,9 @@ LOG_MODULE("BLOCK")
 
 #define MAX_DEV 32
 
-struct cake_pile* lbd_pile;
-struct block_dev** dev_registry;
+static struct cake_pile* lbd_pile;
+static struct block_dev** dev_registry;
+static struct twifs_node* blk_sysroot;
 
 int free_slot = 0;
 
@@ -36,8 +37,7 @@ block_init()
     lbd_pile = cake_new_pile("block_dev", sizeof(struct block_dev), 1, 0);
     dev_registry = vcalloc(sizeof(struct block_dev*), MAX_DEV);
     free_slot = 0;
-
-    blk_mapping_init();
+    blk_sysroot = twifs_dir_node(NULL, "block");
 }
 
 int
@@ -45,84 +45,106 @@ __block_read(struct device* dev, void* buf, size_t offset, size_t len)
 {
     int errno;
     struct block_dev* bdev = (struct block_dev*)dev->underlay;
-    size_t acc_size = 0, rd_size = 0, bsize = bdev->hd_dev->block_size,
-           rd_block = offset / bsize, r = offset % bsize,
-           max_blk = (size_t)bdev->hd_dev->max_lba;
-    void* block = vzalloc(bsize);
+    size_t bsize = bdev->blk_size, rd_block = offset / bsize,
+           r = offset % bsize, rd_size = 0;
 
-    while (acc_size < len && rd_block < max_blk) {
-        if (!bdev->hd_dev->ops.read_buffer(
-              bdev->hd_dev, rd_block, block, bsize)) {
-            errno = EIO;
-            goto error;
-        }
-        rd_size = MIN(len - acc_size, bsize - r);
-        memcpy(buf + acc_size, block + r, rd_size);
-        acc_size += rd_size;
-        r = 0;
-        rd_block++;
+    struct vecbuf* vbuf = vbuf_alloc(NULL, buf, len);
+    struct blkio_req* req;
+    void* tmp_buf = NULL;
+
+    if (r) {
+        tmp_buf = vzalloc(bsize);
+        rd_size = MIN(len, bsize - r);
+        vbuf->buf.size = rd_size;
+        vbuf->buf.buffer = tmp_buf;
+
+        vbuf_alloc(vbuf, buf + rd_size, len - rd_size);
     }
 
-    vfree(block);
-    return acc_size;
+    req = blkio_vrd(vbuf, rd_block, NULL, NULL, 0);
+    blkio_commit(bdev->blkio, req);
+    wait_if(req->flags & BLKIO_PENDING);
 
-error:
-    vfree(block);
+    if (!(errno = req->errcode)) {
+        memcpy(buf, tmp_buf + r, rd_size);
+    }
+
+    if (tmp_buf) {
+        vfree(tmp_buf);
+    }
+
+    blkio_free_req(req);
+    vbuf_free(vbuf);
     return errno;
 }
 
 int
 __block_write(struct device* dev, void* buf, size_t offset, size_t len)
 {
-    int errno;
     struct block_dev* bdev = (struct block_dev*)dev->underlay;
-    size_t acc_size = 0, wr_size = 0, bsize = bdev->hd_dev->block_size,
-           wr_block = offset / bsize, r = offset % bsize;
-    void* block = vzalloc(bsize);
+    size_t bsize = bdev->blk_size, rd_block = offset / bsize,
+           r = offset % bsize;
 
-    while (acc_size < len) {
-        wr_size = MIN(len - acc_size, bsize - r);
-        memcpy(block + r, buf + acc_size, wr_size);
-        if (!bdev->hd_dev->ops.write_buffer(
-              bdev->hd_dev, wr_block, block, bsize)) {
-            errno = EIO;
-            break;
-        }
-        acc_size += wr_size;
-        r = 0;
-        wr_block++;
+    struct vecbuf* vbuf = vbuf_alloc(NULL, buf, len);
+    struct blkio_req* req;
+    void* tmp_buf = NULL;
+
+    if (r) {
+        size_t rd_size = MIN(len, bsize - r);
+        tmp_buf = vzalloc(bsize);
+        vbuf->buf.size = bsize;
+        vbuf->buf.buffer = tmp_buf;
+
+        memcpy(tmp_buf + r, buf, rd_size);
+        vbuf_alloc(vbuf, buf + rd_size, len - rd_size);
     }
 
-    vfree(block);
-    return wr_block;
+    req = blkio_vwr(vbuf, rd_block, NULL, NULL, 0);
+    blkio_commit(bdev->blkio, req);
+    wait_if(req->flags & BLKIO_PENDING);
 
-error:
-    vfree(block);
+    int errno = req->errcode;
+
+    if (tmp_buf) {
+        vfree(tmp_buf);
+    }
+
+    blkio_free_req(req);
+    vbuf_free(vbuf);
     return errno;
 }
 
+struct block_dev*
+block_alloc_dev(const char* blk_id, void* driver, req_handler ioreq_handler)
+{
+    struct block_dev* bdev = cake_grab(lbd_pile);
+    *bdev = (struct block_dev){ .driver = driver };
+
+    strncpy(bdev->name, blk_id, PARTITION_NAME_SIZE);
+
+    bdev->blkio = blkio_newctx(ioreq_handler);
+
+    return bdev;
+}
+
 int
-block_mount_disk(struct hba_device* hd_dev)
+block_mount(struct block_dev* bdev, devfs_exporter fs_export)
 {
     int errno = 0;
-    struct block_dev* bdev = cake_grab(lbd_pile);
-    strncpy(bdev->name, hd_dev->model, PARTITION_NAME_SIZE);
-    bdev->hd_dev = hd_dev;
-    bdev->base_lba = 0;
-    bdev->end_lba = hd_dev->max_lba;
+
     if (!__block_register(bdev)) {
         errno = BLOCK_EFULL;
         goto error;
     }
 
-    blk_set_blkmapping(bdev);
+    struct twifs_node* dev_root = twifs_dir_node(blk_sysroot, bdev->bdev_id);
+    blk_set_blkmapping(bdev, dev_root);
+    fs_export(bdev, dev_root);
+
     return errno;
 
 error:
-    kprintf(KERROR "Fail to mount hd: %s[%s] (%x)\n",
-            hd_dev->model,
-            hd_dev->serial_num,
-            -errno);
+    kprintf(KERROR "Fail to mount block device: %s (%x)\n", bdev->name, -errno);
     return errno;
 }
 

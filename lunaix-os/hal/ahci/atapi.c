@@ -48,22 +48,20 @@ scsi_parse_capacity(struct hba_device* device, uint32_t* parameter)
     }
 }
 
-int
-__scsi_buffer_io(struct hba_device* dev,
-                 uint64_t lba,
-                 void* buffer,
-                 uint32_t size,
-                 int write)
+void
+scsi_submit(struct hba_device* dev, struct blkio_req* io_req)
 {
-    assert_msg(((uintptr_t)buffer & 0x3) == 0, "HBA: Bad buffer alignment");
-
     struct hba_port* port = dev->port;
     struct hba_cmdh* header;
     struct hba_cmdt* table;
-    int slot = hba_prepare_cmd(port, &table, &header, buffer, size);
+
+    int write = !!(io_req->flags & BLKIO_WRITE);
+    int slot = hba_prepare_cmd(port, &table, &header);
+    hba_bind_vbuf(header, table, io_req->vbuf);
 
     header->options |= (HBA_CMDH_WRITE * (write == 1)) | HBA_CMDH_ATAPI;
 
+    size_t size = vbuf_size(io_req->vbuf);
     uint32_t count = ICEIL(size, port->device->block_size);
 
     struct sata_reg_fis* fis = (struct sata_reg_fis*)table->command_fis;
@@ -74,38 +72,20 @@ __scsi_buffer_io(struct hba_device* dev,
     if (port->device->cbd_size == SCSI_CDB16) {
         scsi_create_packet16((struct scsi_cdb16*)cdb,
                              write ? SCSI_WRITE_BLOCKS_16 : SCSI_READ_BLOCKS_16,
-                             lba,
+                             io_req->blk_addr,
                              count);
     } else {
         scsi_create_packet12((struct scsi_cdb12*)cdb,
                              write ? SCSI_WRITE_BLOCKS_12 : SCSI_READ_BLOCKS_12,
-                             lba,
+                             io_req->blk_addr,
                              count);
     }
 
     // field: cdb->misc1
     *((uint8_t*)cdb + 1) = 3 << 5; // RPROTECT=011b 禁用保护检查
 
-    int is_ok = ahci_try_send(port, slot);
-    vfree_dma(table);
-
-    return is_ok;
-}
-
-int
-scsi_read_buffer(struct hba_device* dev,
-                 uint64_t lba,
-                 void* buffer,
-                 uint32_t size)
-{
-    return __scsi_buffer_io(dev, lba, buffer, size, 0);
-}
-
-int
-scsi_write_buffer(struct hba_device* dev,
-                  uint64_t lba,
-                  void* buffer,
-                  uint32_t size)
-{
-    return __scsi_buffer_io(dev, lba, buffer, size, 1);
+    // The async way...
+    struct hba_cmd_state* cmds = valloc(sizeof(struct hba_cmd_state));
+    *cmds = (struct hba_cmd_state){ .cmd_table = table, .state_ctx = io_req };
+    ahci_post(port, cmds, slot);
 }
