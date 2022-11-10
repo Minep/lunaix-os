@@ -133,7 +133,8 @@ timer_init(uint32_t frequency)
 
     assert_msg(timer_ctx->base_frequency, "Fail to initialize timer (NOFREQ)");
 
-    kprintf(KINFO "Base frequency: %u Hz\n", timer_ctx->base_frequency);
+    kprintf(
+      KINFO "hw: %u Hz; os: %u Hz\n", timer_ctx->base_frequency, frequency);
 
     timer_ctx->running_frequency = frequency;
     timer_ctx->tphz = timer_ctx->base_frequency / frequency;

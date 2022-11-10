@@ -40,13 +40,16 @@ acpi_init(multiboot_info_t* mb_info)
           (acpi_sdthdr_t*)((acpi_apic_t**)&(rsdt->entry))[i];
         switch (sdthdr->signature) {
             case ACPI_MADT_SIG:
+                kprintf(KINFO "MADT: %p\n", sdthdr);
                 madt_parse((acpi_madt_t*)sdthdr, ctx);
                 break;
             case ACPI_FADT_SIG:
                 // FADT just a plain structure, no need to parse.
+                kprintf(KINFO "FADT: %p\n", sdthdr);
                 ctx->fadt = *(acpi_fadt_t*)sdthdr;
                 break;
             case ACPI_MCFG_SIG:
+                kprintf(KINFO "MCFG: %p\n", sdthdr);
                 mcfg_parse(sdthdr, ctx);
                 break;
             default:

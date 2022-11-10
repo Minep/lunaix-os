@@ -190,7 +190,7 @@ ahci_init()
         }
 
         struct hba_device* hbadev = port->device;
-        kprintf(KINFO "sata%d: %s, sector_size=%dB, sector=%d\n",
+        kprintf(KINFO "sata%d: %s, blk_size=%d, blk=0..%d\n",
                 i,
                 hbadev->model,
                 hbadev->block_size,

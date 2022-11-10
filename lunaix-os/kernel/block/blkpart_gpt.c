@@ -3,6 +3,7 @@
 #include <lunaix/block.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/status.h>
+#include <lunaix/syslog.h>
 
 #include <lib/crc.h>
 
@@ -14,6 +15,8 @@
 #define GPTSIG_HI 0x54524150UL
 
 static u8_t NULL_GUID[16] = { 0 };
+
+LOG_MODULE("GPT")
 
 int
 blkpart_parse(struct device* master, struct gpt_header* header)
@@ -46,6 +49,11 @@ blkpart_parse(struct device* master, struct gpt_header* header)
         u64_t slba_local = (ent->start_lba * GPT_BLKSIZE) / bdev->blk_size;
         u64_t elba_local = (ent->end_lba * GPT_BLKSIZE) / (u64_t)bdev->blk_size;
 
+        kprintf("%s: guid part#%d: %d..%d\n",
+                bdev->bdev_id,
+                i,
+                (u32_t)slba_local,
+                (u32_t)elba_local);
         // we ignore the partition name, as it rarely used.
         blk_mount_part(bdev, NULL, i, slba_local, elba_local);
     }
@@ -73,6 +81,7 @@ blkpart_probegpt(struct device* master)
     u32_t crc = gpt_hdr->hdr_cksum;
     gpt_hdr->hdr_cksum = 0;
     if (crc32b((void*)gpt_hdr, sizeof(*gpt_hdr)) != crc) {
+        kprintf(KWARN "checksum failed\n");
         // FUTURE check the backup header
         return EINVAL;
     }

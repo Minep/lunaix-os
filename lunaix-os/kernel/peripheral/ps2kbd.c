@@ -16,7 +16,7 @@
 
 #define PS2_DEV_CMD_MAX_ATTEMPTS 5
 
-LOG_MODULE("PS2KBD");
+LOG_MODULE("i8042");
 
 static struct ps2_cmd_queue cmd_q;
 static struct ps2_kbd_state kbd_state;
@@ -139,13 +139,13 @@ ps2_kbd_init()
          *      https://bochs.sourceforge.io/cgi-bin/lxr/source/bios/rombios32.c#L1314
          */
         if (!(acpi_ctx->fadt.boot_arch & IAPC_ARCH_8042)) {
-            kprintf(KERROR "i8042: not found\n");
+            kprintf(KERROR "not found\n");
             // FUTURE: Some alternative fallback on this? Check PCI bus for USB
             // controller instead?
             return;
         }
     } else {
-        kprintf(KWARN "i8042: outdated FADT used, assuming exists.\n");
+        kprintf(KWARN "outdated FADT used, assuming exists.\n");
     }
 
     char result;
@@ -167,14 +167,14 @@ ps2_kbd_init()
     // 4、控制器自检
     result = ps2_issue_cmd_wretry(PS2_CMD_SELFTEST, PS2_NO_ARG);
     if (result != PS2_RESULT_TEST_OK) {
-        kprintf(KWARN "Controller self-test failed. (%x)\n", result);
+        kprintf(KWARN "controller self-test failed. (%x)\n", result);
         // goto done;
     }
 
     // 5、设备自检（端口1自检，通常是我们的键盘）
     result = ps2_issue_cmd_wretry(PS2_CMD_SELFTEST_PORT1, PS2_NO_ARG);
     if (result != 0) {
-        kprintf(KERROR "Interface test on port 1 failed. (%x)\n", result);
+        kprintf(KERROR "interface test on port 1 failed. (%x)\n", result);
         // goto done;
     }
 
@@ -424,7 +424,7 @@ ps2_issue_cmd_wretry(char cmd, uint16_t arg)
         c++;
     }
     if (c >= 5) {
-        kprintf(KWARN "Max attempt reached.\n");
+        kprintf(KWARN "max attempt reached.\n");
     }
     return r;
 }

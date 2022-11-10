@@ -164,7 +164,7 @@ block_mount(struct block_dev* bdev, devfs_exporter fs_export)
 
     errno = blkpart_probegpt(bdev->dev);
     if (errno < 0) {
-        kprintf(KERROR "Corrupted partition table. (%d)", errno);
+        kprintf(KERROR "Fail to parse partition table (%d)\n", errno);
     } else if (!errno) {
         // TODO try other PT parser...
     }

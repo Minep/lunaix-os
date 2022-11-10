@@ -21,20 +21,11 @@ __kprintf(const char* component, const char* fmt, va_list args)
     }
 
     switch (log_level) {
-        case '0':
-            ksnprintf(expanded_fmt,
-                      MAX_XFMT_SIZE,
-                      "[%s] (%s) %s",
-                      "INFO",
-                      component,
-                      fmt);
-            break;
         case '1':
             // tty_set_theme(VGA_COLOR_BROWN, current_theme >> 12);
             ksnprintf(expanded_fmt,
                       MAX_XFMT_SIZE,
-                      "\033[6;0m[%s] (%s) %s\033[39;49m",
-                      "WARN",
+                      "\033[6;0mW %s: %s\033[39;49m",
                       component,
                       fmt);
             break;
@@ -42,8 +33,7 @@ __kprintf(const char* component, const char* fmt, va_list args)
             // tty_set_theme(VGA_COLOR_LIGHT_RED, current_theme >> 12);
             ksnprintf(expanded_fmt,
                       MAX_XFMT_SIZE,
-                      "\033[12;0m[%s] (%s) %s\033[39;49m",
-                      "EROR",
+                      "\033[12;0mE %s: %s\033[39;49m",
                       component,
                       fmt);
             break;
@@ -51,18 +41,12 @@ __kprintf(const char* component, const char* fmt, va_list args)
             // tty_set_theme(VGA_COLOR_LIGHT_BLUE, current_theme >> 12);
             ksnprintf(expanded_fmt,
                       MAX_XFMT_SIZE,
-                      "\033[9;0m[%s] (%s) %s\033[39;49m",
-                      "DEBG",
+                      "\033[9;0mD %s: %s\033[39;49m",
                       component,
                       fmt);
             break;
         default:
-            ksnprintf(expanded_fmt,
-                      MAX_XFMT_SIZE,
-                      "[%s] (%s) %s",
-                      "LOG",
-                      component,
-                      fmt);
+            ksnprintf(expanded_fmt, MAX_XFMT_SIZE, "- %s: %s", component, fmt);
             break;
     }
 

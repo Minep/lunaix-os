@@ -294,6 +294,10 @@ console_write(struct console* console, uint8_t* data, size_t size)
     console->wnd_start = rd_ptr;
     fbuf->flags |= FIFO_DIRTY;
     mutex_unlock(&fbuf->lock);
+
+    if (!lx_console.flush_timer) {
+        console_flush();
+    }
 }
 
 void

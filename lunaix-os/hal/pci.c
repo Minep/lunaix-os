@@ -62,6 +62,13 @@ pci_probe_device(int bus, int dev, int funct)
                                    .device_info = reg1,
                                    .intr_info = intr };
 
+    kprintf("dev.%d:%d:%d %x:%x\n",
+            bus,
+            dev,
+            funct,
+            PCI_DEV_VENDOR(reg1),
+            PCI_DEV_DEVID(reg1));
+
     pci_probe_msi_info(device);
     pci_probe_bar_info(device);
 

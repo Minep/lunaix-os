@@ -154,6 +154,8 @@ extern multiboot_info_t* _k_init_mb_info; /* k_init.c */
 void
 init_platform()
 {
+    kprintf(KINFO "\033[11;0mLunaixOS \033[39;49m\n");
+
     // 锁定所有系统预留页（内存映射IO，ACPI之类的），并且进行1:1映射
     lock_reserved_memory();
 
@@ -229,6 +231,10 @@ __do_reserved_memory(int unlock)
         size_t pg_num = CEIL(mmap.len_low, PG_SIZE_BITS);
         size_t j = 0;
         if (!unlock) {
+            kprintf("mem: freeze: %p..%p type=%x\n",
+                    pa,
+                    pa + pg_num * PG_SIZE,
+                    mmap.type);
             for (; j < pg_num; j++) {
                 uintptr_t _pa = pa + (j << PG_SIZE_BITS);
                 if (_pa >= KERNEL_MM_BASE) {
@@ -242,6 +248,10 @@ __do_reserved_memory(int unlock)
             // Save the progress for later unmapping.
             mmaps[i].len_low = j * PG_SIZE;
         } else {
+            kprintf("mem: reclaim: %p..%p type=%x\n",
+                    pa,
+                    pa + pg_num * PG_SIZE,
+                    mmap.type);
             for (; j < pg_num; j++) {
                 uintptr_t _pa = pa + (j << PG_SIZE_BITS);
                 vmm_del_mapping(PD_REFERENCED, _pa);

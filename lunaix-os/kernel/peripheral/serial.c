@@ -3,7 +3,7 @@
 #include <lunaix/peripheral/serial.h>
 #include <lunaix/syslog.h>
 
-LOG_MODULE("COM")
+LOG_MODULE("UART")
 
 void
 serial_init_port(uintptr_t port)
@@ -27,13 +27,13 @@ serial_init_port(uintptr_t port)
     io_outb(COM_RRXTX(port), 0xaa);
 
     if (io_inb(COM_RRXTX(port)) != 0xaa) {
-        kprintf(KWARN "Port (%p) is faulty, use other instead.\n", port);
+        kprintf(KWARN "port.%p: faulty\n", port);
         return;
     }
 
     io_outb(COM_RCMODEM(port), 0xf);
     io_outb(COM_RIE(port), 0x1);
-    kprintf("Port (%p) ok\n", port);
+    kprintf("port.%p: ok\n", port);
 }
 
 void
