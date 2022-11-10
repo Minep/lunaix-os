@@ -55,19 +55,22 @@ __block_read(struct device* dev, void* buf, size_t offset, size_t len)
         return 0;
     }
 
-    struct vecbuf* vbuf = vbuf_alloc(NULL, buf, len);
+    struct vecbuf* vbuf = NULL;
     struct blkio_req* req;
-    void* tmp_buf = NULL;
+    void *head_buf = NULL, *tail_buf = NULL;
 
-    if (r) {
-        tmp_buf = vzalloc(bsize);
+    // align the boundary
+    if (r || len < bsize) {
+        head_buf = valloc(bsize);
         rd_size = MIN(len, bsize - r);
-        vbuf->buf.size = bsize;
-        vbuf->buf.buffer = tmp_buf;
+        vbuf_alloc(&vbuf, head_buf, bsize);
+    }
 
-        if ((len - rd_size)) {
-            vbuf_alloc(vbuf, buf + rd_size, len - rd_size);
-        }
+    // align the length
+    if ((len - rd_size)) {
+        size_t llen = len - rd_size;
+        assert_msg(!(llen % bsize), "misalign block read");
+        vbuf_alloc(&vbuf, buf + rd_size, llen);
     }
 
     req = blkio_vrd(vbuf, rd_block, NULL, NULL, 0);
@@ -76,14 +79,14 @@ __block_read(struct device* dev, void* buf, size_t offset, size_t len)
     pwait(&req->wait);
 
     if (!(errno = req->errcode)) {
-        memcpy(buf, tmp_buf + r, rd_size);
+        memcpy(buf, head_buf + r, rd_size);
         errno = len;
     } else {
         errno = -errno;
     }
 
-    if (tmp_buf) {
-        vfree(tmp_buf);
+    if (head_buf) {
+        vfree(head_buf);
     }
 
     blkio_free_req(req);
@@ -96,24 +99,28 @@ __block_write(struct device* dev, void* buf, size_t offset, size_t len)
 {
     struct block_dev* bdev = (struct block_dev*)dev->underlay;
     size_t bsize = bdev->blk_size, rd_block = offset / bsize + bdev->start_lba,
-           r = offset % bsize;
+           r = offset % bsize, wr_size = 0;
 
     if (!(len = MIN(len, ((size_t)bdev->end_lba - rd_block + 1) * bsize))) {
         return 0;
     }
 
-    struct vecbuf* vbuf = vbuf_alloc(NULL, buf, len);
+    struct vecbuf* vbuf = NULL;
     struct blkio_req* req;
     void* tmp_buf = NULL;
 
     if (r) {
-        size_t rd_size = MIN(len, bsize - r);
+        size_t wr_size = MIN(len, bsize - r);
         tmp_buf = vzalloc(bsize);
-        vbuf->buf.size = bsize;
-        vbuf->buf.buffer = tmp_buf;
+        vbuf_alloc(&vbuf, tmp_buf, bsize);
 
-        memcpy(tmp_buf + r, buf, rd_size);
-        vbuf_alloc(vbuf, buf + rd_size, len - rd_size);
+        memcpy(tmp_buf + r, buf, wr_size);
+    }
+
+    if ((len - wr_size)) {
+        size_t llen = len - wr_size;
+        assert_msg(!(llen % bsize), "misalign block write");
+        vbuf_alloc(&vbuf, buf + wr_size, llen);
     }
 
     req = blkio_vwr(vbuf, rd_block, NULL, NULL, 0);

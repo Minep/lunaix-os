@@ -2,17 +2,19 @@
 #include <lunaix/mm/valloc.h>
 
 struct vecbuf*
-vbuf_alloc(struct vecbuf* vec, void* buf, size_t size)
+vbuf_alloc(struct vecbuf** vec, void* buf, size_t size)
 {
     struct vecbuf* vbuf = valloc(sizeof(struct vecbuf));
+    struct vecbuf* _vec = *vec;
 
     *vbuf = (struct vecbuf){ .buf = { .buffer = buf, .size = size },
-                             .acc_sz = vbuf_size(vec) + size };
+                             .acc_sz = vbuf_size(_vec) + size };
 
-    if (vec) {
-        llist_append(&vec->components, &vbuf->components);
+    if (_vec) {
+        llist_append(&_vec->components, &vbuf->components);
     } else {
         llist_init_head(&vbuf->components);
+        *vec = vbuf;
     }
 
     return vbuf;

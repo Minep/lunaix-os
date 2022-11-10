@@ -35,12 +35,20 @@
 #define HBA_PxINTR_DMA (1 << 2)
 #define HBA_PxINTR_DHR (1)
 #define HBA_PxINTR_DPS (1 << 5)
-#define HBA_PxINTR_TFEE (1 << 30)
-#define HBA_PxINTR_OFE (1 << 24)
-#define HBA_PxINTR_IFE (1 << 27)
+#define HBA_PxINTR_TFE (1 << 30)
+#define HBA_PxINTR_HBF (1 << 29)
+#define HBA_PxINTR_HBD (1 << 28)
+#define HBA_PxINTR_IF (1 << 27)
+#define HBA_PxINTR_NIF (1 << 26)
+#define HBA_PxINTR_OF (1 << 24)
 #define HBA_PxTFD_ERR (1)
 #define HBA_PxTFD_BSY (1 << 7)
 #define HBA_PxTFD_DRQ (1 << 3)
+
+#define HBA_FATAL                                                              \
+    (HBA_PxINTR_TFE | HBA_PxINTR_HBF | HBA_PxINTR_HBD | HBA_PxINTR_IF)
+
+#define HBA_NONFATAL (HBA_PxINTR_NIF | HBA_PxINTR_OF)
 
 #define HBA_RGHC_ACHI_ENABLE (1 << 31)
 #define HBA_RGHC_INTR_ENABLE (1 << 1)

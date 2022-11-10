@@ -118,6 +118,4 @@ blkio_complete(struct blkio_req* req)
     }
 
     req->io_ctx->busy--;
-
-    blkio_schedule(req->io_ctx);
 }

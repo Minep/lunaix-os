@@ -35,7 +35,7 @@ vbuf_free(struct vecbuf* vbuf);
  * @return struct vecbuf*
  */
 struct vecbuf*
-vbuf_alloc(struct vecbuf* vec, void* buf, size_t len);
+vbuf_alloc(struct vecbuf** vec, void* buf, size_t len);
 
 static inline size_t
 vbuf_size(struct vecbuf* vbuf)
