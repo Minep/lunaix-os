@@ -11,21 +11,16 @@
 
 struct block_dev
 {
-    char bdev_id[DEV_ID_SIZE];
-    char name[PARTITION_NAME_SIZE];
+    struct llist_header parts;
     struct blkio_context* blkio;
     struct device* dev;
+    char bdev_id[DEV_ID_SIZE];
+    char name[PARTITION_NAME_SIZE];
     void* driver;
+    u64_t start_lba;
     u64_t end_lba;
     u32_t blk_size;
 };
-
-struct lpt_entry
-{
-    char part_name[PARTITION_NAME_SIZE];
-    u64_t base_lba;
-    u64_t end_lba;
-} __attribute__((packed));
 
 // Lunaix Partition Table
 struct lpt_header
@@ -55,5 +50,12 @@ blk_mapping_init();
 
 void
 blk_set_blkmapping(struct block_dev* bdev, void* fsnode);
+
+struct block_dev*
+blk_mount_part(struct block_dev* bdev,
+               const char* name,
+               size_t index,
+               u64_t start_lba,
+               u64_t end_lba);
 
 #endif /* __LUNAIX_BLOCK_H */

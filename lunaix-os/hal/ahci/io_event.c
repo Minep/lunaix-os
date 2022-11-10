@@ -9,7 +9,7 @@ void
 __ahci_hba_isr(const isr_param* param)
 {
     // ignore spurious interrupt
-    if (!hba.ports[HBA_RIS])
+    if (!hba.base[HBA_RIS])
         return;
 
     u32_t port_num = 31 - __builtin_clz(hba.base[HBA_RIS]);

@@ -108,6 +108,7 @@ blkio_complete(struct blkio_req* req)
         req->completed(req);
     }
 
+    // FIXME Not working in first process! Need a dummy process.
     // Wake all blocked processes on completion,
     //  albeit should be no more than one process in everycase (by design)
     pwake_all(&req->wait);
