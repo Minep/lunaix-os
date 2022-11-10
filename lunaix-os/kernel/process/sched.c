@@ -20,6 +20,8 @@
 
 volatile struct proc_info* __current;
 
+static struct proc_info dummy_proc;
+
 struct proc_info dummy;
 
 struct scheduler sched_ctx;
@@ -29,22 +31,53 @@ struct cake_pile* proc_pile;
 LOG_MODULE("SCHED")
 
 void
+sched_init_dummy();
+
+void
 sched_init()
 {
-    // size_t pg_size = ROUNDUP(sizeof(struct proc_info) * MAX_PROCESS, 0x1000);
-
-    // for (size_t i = 0; i <= pg_size; i += 4096) {
-    //     uintptr_t pa = pmm_alloc_page(KERNEL_PID, PP_FGPERSIST);
-    //     vmm_set_mapping(
-    //       PD_REFERENCED, PROC_START + i, pa, PG_PREM_RW, VMAP_NULL);
-    // }
-
     proc_pile = cake_new_pile("proc", sizeof(struct proc_info), 1, 0);
     cake_set_constructor(proc_pile, cake_ctor_zeroing);
 
     sched_ctx = (struct scheduler){ ._procs = vzalloc(PROC_TABLE_SIZE),
                                     .ptable_len = 0,
                                     .procs_index = 0 };
+
+    // TODO initialize dummy_proc
+    sched_init_dummy();
+}
+
+void
+sched_init_dummy()
+{
+    // This surely need to be simplified or encapsulated!
+    // It is a living nightmare!
+
+    extern void my_dummy();
+    static char dummy_stack[1024] __attribute__((aligned(16)));
+
+    // memset to 0
+    dummy_proc = (struct proc_info){};
+    dummy_proc.intr_ctx =
+      (isr_param){ .registers = { .ds = KDATA_SEG,
+                                  .es = KDATA_SEG,
+                                  .fs = KDATA_SEG,
+                                  .gs = KDATA_SEG,
+                                  .esp = (void*)dummy_stack + 1004 },
+                   .cs = KCODE_SEG,
+                   .eip = (void*)my_dummy,
+                   .ss = KDATA_SEG,
+                   .eflags = cpu_reflags() | 0x0200 };
+
+    *(u32_t*)(&dummy_stack[1020]) = dummy_proc.intr_ctx.eflags;
+    *(u32_t*)(&dummy_stack[1016]) = KCODE_SEG;
+    *(u32_t*)(&dummy_stack[1012]) = dummy_proc.intr_ctx.eip;
+
+    dummy_proc.page_table = cpu_rcr3();
+    dummy_proc.state = PS_READY;
+    dummy_proc.parent = &dummy_proc;
+
+    __current = &dummy_proc;
 }
 
 void
@@ -142,11 +175,18 @@ redo:
 
     sched_ctx.procs_index = ptr;
 
+    if (next->state != PS_READY) {
+        // schedule the dummy process if we're out of choice
+        next = &dummy_proc;
+        goto done;
+    }
+
     if (!can_schedule(next)) {
         // 如果该进程不给予调度，则尝试重新选择
         goto redo;
     }
 
+done:
     run(next);
 }
 

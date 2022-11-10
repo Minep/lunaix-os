@@ -104,8 +104,11 @@
 #endif
         movl (__current), %eax
         movl 92(%eax), %eax
-        fxrstor (%eax)
-
+        
+        test %eax, %eax     # do we have stored x87 context?
+        jz 1f 
+        fxrstor (%eax)      
+1:
         popl %eax
         popl %ebx
         popl %ecx

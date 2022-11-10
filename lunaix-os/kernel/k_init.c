@@ -33,8 +33,6 @@ multiboot_info_t* _k_init_mb_info;
 
 x86_page_table* __kernel_ptd;
 
-struct proc_info tmp;
-
 extern void
 __proc0(); /* proc0.c */
 
@@ -60,12 +58,6 @@ _kernel_pre_init()
       _k_init_mb_info->mmap_length / sizeof(multiboot_memory_map_t);
 
     setup_memory((multiboot_memory_map_t*)_k_init_mb_info->mmap_addr, map_size);
-
-    __kernel_ptd = cpu_rcr3();
-
-    tmp = (struct proc_info){ .page_table = __kernel_ptd };
-
-    __current = &tmp;
 }
 
 void
@@ -76,6 +68,8 @@ _kernel_init()
     // allocators
     cake_init();
     valloc_init();
+
+    sched_init();
 
     // crt
     tty_init(ioremap(VGA_FRAMEBUFFER, PG_SIZE));
@@ -97,8 +91,6 @@ _kernel_init()
     vfs_mount("/task", "taskfs", NULL, MNT_RO);
 
     lxconsole_init();
-
-    sched_init();
 
     syscall_install();
 

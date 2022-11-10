@@ -7,7 +7,7 @@
 #include <lib/crc.h>
 
 #define GPT_BLKSIZE 512
-#define LBA2OFF(lba) (lba * GPT_BLKSIZE)
+#define LBA2OFF(lba) ((lba)*GPT_BLKSIZE)
 #define ENT_PER_BLK (GPT_BLKSIZE / sizeof(struct gpt_entry))
 
 #define GPTSIG_LO 0x20494645UL

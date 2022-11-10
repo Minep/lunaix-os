@@ -75,10 +75,6 @@ __block_read(struct device* dev, void* buf, size_t offset, size_t len)
 
     pwait(&req->wait);
 
-    // XXX temporary work-around
-    //      in case pwait used in proc0. Need a dummy process!
-    wait_if((req->flags & BLKIO_PENDING));
-
     if (!(errno = req->errcode)) {
         memcpy(buf, tmp_buf + r, rd_size);
         errno = len;
@@ -124,10 +120,6 @@ __block_write(struct device* dev, void* buf, size_t offset, size_t len)
     blkio_commit(bdev->blkio, req);
 
     pwait(&req->wait);
-
-    // XXX temporary work-around
-    //      in case pwait used in proc0. Need a dummy process!
-    wait_if((req->flags & BLKIO_PENDING));
 
     int errno = req->errcode;
     if (!errno) {
