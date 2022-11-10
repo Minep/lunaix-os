@@ -11,6 +11,7 @@
 #include <hal/acpi/acpi.h>
 #include <hal/apic.h>
 #include <hal/pci.h>
+#include <klibc/string.h>
 #include <lunaix/fs/twifs.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
@@ -18,7 +19,8 @@
 
 LOG_MODULE("PCI")
 
-static struct llist_header pci_devices;
+static DEFINE_LLIST(pci_devices);
+static DEFINE_LLIST(pci_drivers);
 
 void
 pci_probe_msi_info(struct pci_device* device);
@@ -62,17 +64,27 @@ pci_probe_device(int bus, int dev, int funct)
                                    .device_info = reg1,
                                    .intr_info = intr };
 
-    kprintf("dev.%d:%d:%d %x:%x\n",
-            bus,
-            dev,
-            funct,
-            PCI_DEV_VENDOR(reg1),
-            PCI_DEV_DEVID(reg1));
-
     pci_probe_msi_info(device);
     pci_probe_bar_info(device);
 
     llist_append(&pci_devices, &device->dev_chain);
+
+    if (!pci_bind_driver(device)) {
+        kprintf(KWARN "dev.%d:%d:%d %x:%x unknown device\n",
+                bus,
+                dev,
+                funct,
+                PCI_DEV_VENDOR(reg1),
+                PCI_DEV_DEVID(reg1));
+    } else {
+        kprintf("dev.%d:%d:%d %x:%x %s\n",
+                bus,
+                dev,
+                funct,
+                PCI_DEV_VENDOR(reg1),
+                PCI_DEV_DEVID(reg1),
+                device->driver.type->name);
+    }
 }
 
 void
@@ -309,9 +321,50 @@ pci_get_device_by_class(uint32_t class)
 }
 
 void
+pci_add_driver(const char* name,
+               u32_t class,
+               u32_t vendor,
+               u32_t devid,
+               pci_drv_init init)
+{
+    struct pci_driver* pci_drv = valloc(sizeof(*pci_drv));
+    *pci_drv = (struct pci_driver){ .create_driver = init,
+                                    .dev_info = (vendor << 16) | devid,
+                                    .dev_class = class };
+    if (name) {
+        strncpy(pci_drv->name, name, PCI_DRV_NAME_LEN);
+    }
+
+    llist_append(&pci_drivers, &pci_drv->drivers);
+}
+
+int
+pci_bind_driver(struct pci_device* pci_dev)
+{
+    struct pci_driver *pos, *n;
+    llist_for_each(pos, n, &pci_drivers, drivers)
+    {
+        if (pos->dev_info) {
+            if (pos->dev_info == pci_dev->device_info) {
+                goto check_type;
+            }
+            continue;
+        }
+    check_type:
+        if (pos->dev_class) {
+            if (pos->dev_class == PCI_DEV_CLASS(pci_dev->class_info)) {
+                pci_dev->driver.type = pos;
+                pci_dev->driver.instance = pos->create_driver(pci_dev);
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+void
 pci_init()
 {
-    llist_init_head(&pci_devices);
     acpi_context* acpi = acpi_get_context();
     assert_msg(acpi, "ACPI not initialized.");
     if (acpi->mcfg.alloc_num) {

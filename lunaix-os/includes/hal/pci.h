@@ -3,6 +3,7 @@
 
 #include <hal/io.h>
 #include <lunaix/ds/llist.h>
+#include <lunaix/types.h>
 
 #define PCI_CONFIG_ADDR 0xcf8
 #define PCI_CONFIG_DATA 0xcfc
@@ -58,6 +59,9 @@ typedef unsigned int pci_reg_t;
 
 #define BAR_TYPE_MMIO 0x1
 #define BAR_TYPE_CACHABLE 0x2
+#define PCI_DRV_NAME_LEN 32
+
+struct pci_driver;
 
 struct pci_base_addr
 {
@@ -74,7 +78,23 @@ struct pci_device
     uint32_t cspace_base;
     uint32_t msi_loc;
     uint16_t intr_info;
+    struct
+    {
+        struct pci_driver* type;
+        void* instance;
+    } driver;
     struct pci_base_addr bar[6];
+};
+
+typedef void* (*pci_drv_init)(struct pci_device*);
+
+struct pci_driver
+{
+    struct llist_header drivers;
+    u32_t dev_info;
+    u32_t dev_class;
+    pci_drv_init create_driver;
+    char name[PCI_DRV_NAME_LEN];
 };
 
 // PCI Configuration Space (C-Space) r/w:
@@ -143,5 +163,15 @@ pci_bar_sizing(struct pci_device* dev, uint32_t* bar_out, uint32_t bar_num);
  */
 void
 pci_setup_msi(struct pci_device* device, int vector);
+
+void
+pci_add_driver(const char* name,
+               u32_t class,
+               u32_t vendor,
+               u32_t devid,
+               pci_drv_init init);
+
+int
+pci_bind_driver(struct pci_device* pci_dev);
 
 #endif /* __LUNAIX_PCI_H */

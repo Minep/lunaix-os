@@ -209,4 +209,9 @@ setup_memory(multiboot_memory_map_t* map, size_t map_size)
     for (uintptr_t i = &__usrtext_start; i < &__usrtext_end; i += PG_SIZE) {
         vmm_set_mapping(PD_REFERENCED, i, V2P(i), PG_PREM_UR, VMAP_NULL);
     }
+
+    // reserve higher half
+    for (size_t i = L1_INDEX(KERNEL_MM_BASE); i < 1023; i++) {
+        assert(vmm_set_mapping(PD_REFERENCED, i << 22, 0, 0, VMAP_NOMAP));
+    }
 }

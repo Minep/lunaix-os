@@ -25,7 +25,7 @@ isrm_init()
     }
 }
 
-static inline uint32_t
+static inline int
 __ivalloc_within(size_t a, size_t b, isr_cb handler)
 {
     a = (a - IV_BASE) / 8;
@@ -39,27 +39,27 @@ __ivalloc_within(size_t a, size_t b, isr_cb handler)
             j++;
         }
         iv_bmp[i] |= 1 << j;
-        uint32_t iv = IV_BASE + i * 8 + j;
+        int iv = IV_BASE + i * 8 + j;
         handlers[iv] = handler ? handler : intr_routine_fallback;
         return iv;
     }
     return 0;
 }
 
-uint32_t
+int
 isrm_ivosalloc(isr_cb handler)
 {
     return __ivalloc_within(IV_BASE, IV_EX, handler);
 }
 
-uint32_t
+int
 isrm_ivexalloc(isr_cb handler)
 {
     return __ivalloc_within(IV_EX, IV_MAX, handler);
 }
 
 void
-isrm_ivfree(uint32_t iv)
+isrm_ivfree(int iv)
 {
     assert(iv < 256);
     if (iv >= IV_BASE) {
@@ -68,10 +68,10 @@ isrm_ivfree(uint32_t iv)
     handlers[iv] = intr_routine_fallback;
 }
 
-uint32_t
-isrm_bindirq(uint32_t irq, isr_cb irq_handler)
+int
+isrm_bindirq(int irq, isr_cb irq_handler)
 {
-    uint32_t iv;
+    int iv;
     if (!(iv = isrm_ivexalloc(irq_handler))) {
         panickf("out of IV resource. (irq=%d)", irq);
         return 0; // never reach
@@ -83,8 +83,8 @@ isrm_bindirq(uint32_t irq, isr_cb irq_handler)
     return iv;
 }
 
-uint32_t
-isrm_bindiv(uint32_t iv, isr_cb handler)
+int
+isrm_bindiv(int iv, isr_cb handler)
 {
     assert(iv < 256);
     if (iv >= IV_BASE) {
@@ -94,7 +94,7 @@ isrm_bindiv(uint32_t iv, isr_cb handler)
 }
 
 isr_cb
-isrm_get(uint32_t iv)
+isrm_get(int iv)
 {
     assert(iv < 256);
     return handlers[iv];

@@ -27,13 +27,13 @@
 #define HBA_FIS_SIZE 256
 #define HBA_CLB_SIZE 1024
 
-#define HBA_MY_IE (HBA_PxINTR_DHR | HBA_PxINTR_TFEE)
+#define HBA_MY_IE (HBA_PxINTR_DHR | HBA_PxINTR_TFEE | HBA_PxINTR_OFE)
 
 // #define DO_HBA_FULL_RESET
 
 LOG_MODULE("AHCI")
 
-struct ahci_hba hba;
+struct llist_header ahcis;
 
 static char sata_ifs[][20] = { "Not detected",
                                "SATA I (1.5Gbps)",
@@ -58,20 +58,8 @@ achi_register_ops(struct hba_port* port);
 void
 ahci_register_device(struct hba_device* hbadev);
 
-unsigned int
-ahci_get_port_usage()
-{
-    return hba.ports_bmp;
-}
-
-struct hba_port*
-ahci_get_port(unsigned int index)
-{
-    if (index >= 32) {
-        return 0;
-    }
-    return hba.ports[index];
-}
+void*
+ahci_driver_init(struct pci_device* ahci_dev);
 
 void
 __hba_reset_port(hba_reg_t* port_reg)
@@ -92,9 +80,13 @@ __hba_reset_port(hba_reg_t* port_reg)
 void
 ahci_init()
 {
-    struct pci_device* ahci_dev = pci_get_device_by_class(AHCI_HBA_CLASS);
-    assert_msg(ahci_dev, "AHCI: Not found.");
+    llist_init_head(&ahcis);
+    pci_add_driver("Serial ATA AHCI", AHCI_HBA_CLASS, 0, 0, ahci_driver_init);
+}
 
+void*
+ahci_driver_init(struct pci_device* ahci_dev)
+{
     struct pci_base_addr* bar6 = &ahci_dev->bar[5];
     assert_msg(bar6->type & BAR_TYPE_MMIO, "AHCI: BAR#6 is not MMIO.");
 
@@ -105,30 +97,35 @@ ahci_init()
 
     pci_write_cspace(ahci_dev->cspace_base, PCI_REG_STATUS_CMD, cmd);
 
-    pci_setup_msi(ahci_dev, isrm_ivexalloc(__ahci_hba_isr));
+    int iv = isrm_ivexalloc(__ahci_hba_isr);
+    pci_setup_msi(ahci_dev, iv);
 
-    memset(&hba, 0, sizeof(hba));
+    struct ahci_driver* ahci_drv = vzalloc(sizeof(*ahci_drv));
+    struct ahci_hba* hba = &ahci_drv->hba;
+    ahci_drv->id = iv;
 
-    hba.base = (hba_reg_t*)ioremap(bar6->start, bar6->size);
+    llist_append(&ahcis, &ahci_drv->ahci_drvs);
+
+    hba->base = (hba_reg_t*)ioremap(bar6->start, bar6->size);
 
 #ifdef DO_HBA_FULL_RESET
     // 重置HBA
-    hba.base[HBA_RGHC] |= HBA_RGHC_RESET;
-    wait_until(!(hba.base[HBA_RGHC] & HBA_RGHC_RESET));
+    hba->base[HBA_RGHC] |= HBA_RGHC_RESET;
+    wait_until(!(hba->base[HBA_RGHC] & HBA_RGHC_RESET));
 #endif
 
     // 启用AHCI工作模式，启用中断
-    hba.base[HBA_RGHC] |= HBA_RGHC_ACHI_ENABLE;
-    hba.base[HBA_RGHC] |= HBA_RGHC_INTR_ENABLE;
+    hba->base[HBA_RGHC] |= HBA_RGHC_ACHI_ENABLE;
+    hba->base[HBA_RGHC] |= HBA_RGHC_INTR_ENABLE;
 
     // As per section 3.1.1, this is 0 based value.
-    hba_reg_t cap = hba.base[HBA_RCAP];
-    hba_reg_t pmap = hba.base[HBA_RPI];
+    hba_reg_t cap = hba->base[HBA_RCAP];
+    hba_reg_t pmap = hba->base[HBA_RPI];
 
-    hba.ports_num = (cap & 0x1f) + 1;  // CAP.PI
-    hba.cmd_slots = (cap >> 8) & 0x1f; // CAP.NCS
-    hba.version = hba.base[HBA_RVER];
-    hba.ports_bmp = pmap;
+    hba->ports_num = (cap & 0x1f) + 1;  // CAP.PI
+    hba->cmd_slots = (cap >> 8) & 0x1f; // CAP.NCS
+    hba->version = hba->base[HBA_RVER];
+    hba->ports_bmp = pmap;
 
     /* ------ HBA端口配置 ------ */
     uintptr_t clb_pg_addr, fis_pg_addr, clb_pa, fis_pa;
@@ -141,7 +138,7 @@ ahci_init()
         struct hba_port* port =
           (struct hba_port*)valloc(sizeof(struct hba_port));
         hba_reg_t* port_regs =
-          (hba_reg_t*)(&hba.base[HBA_RPBASE + i * HBA_RPSIZE]);
+          (hba_reg_t*)(&hba->base[HBA_RPBASE + i * HBA_RPSIZE]);
 
 #ifndef DO_HBA_FULL_RESET
         __hba_reset_port(port_regs);
@@ -167,14 +164,15 @@ ahci_init()
         *port = (struct hba_port){ .regs = port_regs,
                                    .ssts = port_regs[HBA_RPxSSTS],
                                    .cmdlst = clb_pg_addr + clbp * HBA_CLB_SIZE,
-                                   .fis = fis_pg_addr + fisp * HBA_FIS_SIZE };
+                                   .fis = fis_pg_addr + fisp * HBA_FIS_SIZE,
+                                   .hba = hba };
 
         /* 初始化端口，并置于就绪状态 */
         port_regs[HBA_RPxCI] = 0;
 
         hba_clear_reg(port_regs[HBA_RPxSERR]);
 
-        hba.ports[i] = port;
+        hba->ports[i] = port;
 
         if (!HBA_RPxSSTS_IF(port->ssts)) {
             continue;
@@ -198,6 +196,8 @@ ahci_init()
 
         ahci_register_device(hbadev);
     }
+
+    return ahci_drv;
 }
 
 void
@@ -212,46 +212,6 @@ ahci_register_device(struct hba_device* hbadev)
     block_mount(bdev, ahci_fsexport);
 }
 
-void
-ahci_list_device()
-{
-    kprintf(KINFO "Version: %x; Ports: %d; Slot: %d\n",
-            hba.version,
-            hba.ports_num,
-            hba.cmd_slots);
-    struct hba_port* port;
-    for (size_t i = 0; i < 32; i++) {
-        port = hba.ports[i];
-
-        // 愚蠢的gcc似乎认为 struct hba_port* 不可能为空
-        //  所以将这个非常关键的if给优化掉了。
-        //  这里将指针强制转换为整数，欺骗gcc :)
-        if ((uintptr_t)port == 0) {
-            continue;
-        }
-
-        int device_state = HBA_RPxSSTS_IF(port->ssts);
-
-        kprintf("\t Port %d: %s (%x)\n",
-                i,
-                &sata_ifs[device_state],
-                port->device->flags);
-
-        struct hba_device* dev_info = port->device;
-        if (!device_state || !dev_info) {
-            continue;
-        }
-        kprintf("\t\t capacity: %d KiB\n",
-                (dev_info->max_lba * dev_info->block_size) >> 10);
-        kprintf("\t\t block size: %dB\n", dev_info->block_size);
-        kprintf("\t\t block/sector: %d\n", dev_info->block_per_sec);
-        kprintf("\t\t alignment: %dB\n", dev_info->alignment_offset);
-        kprintf("\t\t capabilities: %x\n", dev_info->capabilities);
-        kprintf("\t\t model: %s\n", &dev_info->model);
-        kprintf("\t\t serial: %s\n", &dev_info->serial_num);
-    }
-}
-
 int
 __get_free_slot(struct hba_port* port)
 {
@@ -259,9 +219,9 @@ __get_free_slot(struct hba_port* port)
     hba_reg_t pxci = port->regs[HBA_RPxCI];
     hba_reg_t free_bmp = pxsact | pxci;
     uint32_t i = 0;
-    for (; i <= hba.cmd_slots && (free_bmp & 0x1); i++, free_bmp >>= 1)
+    for (; i <= port->hba->cmd_slots && (free_bmp & 0x1); i++, free_bmp >>= 1)
         ;
-    return i | -(i > hba.cmd_slots);
+    return i | -(i > port->hba->cmd_slots);
 }
 
 void
@@ -358,6 +318,7 @@ ahci_init_device(struct hba_port* port)
 
     port->device = vzalloc(sizeof(struct hba_device));
     port->device->port = port;
+    port->device->hba = port->hba;
 
     // 在命令表中构建命令FIS
     struct sata_reg_fis* cmd_fis = (struct sata_reg_fis*)cmd_table->command_fis;

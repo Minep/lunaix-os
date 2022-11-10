@@ -25,21 +25,21 @@ void
 isrm_init();
 
 void
-isrm_ivfree(uint32_t iv);
+isrm_ivfree(int iv);
 
-uint32_t
+int
 isrm_ivosalloc(isr_cb handler);
 
-uint32_t
+int
 isrm_ivexalloc(isr_cb handler);
 
-uint32_t
-isrm_bindirq(uint32_t irq, isr_cb irq_handler);
+int
+isrm_bindirq(int irq, isr_cb irq_handler);
 
-uint32_t
-isrm_bindiv(uint32_t iv, isr_cb handler);
+int
+isrm_bindiv(int iv, isr_cb handler);
 
 isr_cb
-isrm_get(uint32_t iv);
+isrm_get(int iv);
 
 #endif /* __LUNAIX_ISRM_H */

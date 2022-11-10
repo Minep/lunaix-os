@@ -36,6 +36,7 @@
 #define HBA_PxINTR_DHR (1)
 #define HBA_PxINTR_DPS (1 << 5)
 #define HBA_PxINTR_TFEE (1 << 30)
+#define HBA_PxINTR_OFE (1 << 24)
 #define HBA_PxINTR_IFE (1 << 27)
 #define HBA_PxTFD_ERR (1)
 #define HBA_PxTFD_BSY (1 << 7)
@@ -98,6 +99,7 @@ struct hba_cmdt
 #define HBA_DEV_FATAPI (1 << 1)
 
 struct hba_port;
+struct ahci_hba;
 
 struct hba_device
 {
@@ -119,6 +121,7 @@ struct hba_device
     uint32_t block_per_sec;
     uint32_t capabilities;
     struct hba_port* port;
+    struct ahci_hba* hba;
 
     struct
     {
@@ -147,6 +150,7 @@ struct hba_port
     struct hba_cmd_context cmdctx;
     void* fis;
     struct hba_device* device;
+    struct ahci_hba* hba;
 };
 
 struct ahci_hba

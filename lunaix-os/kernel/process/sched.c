@@ -47,6 +47,8 @@ sched_init()
     sched_init_dummy();
 }
 
+#define DUMMY_STACK_SIZE 2048
+
 void
 sched_init_dummy()
 {
@@ -54,28 +56,30 @@ sched_init_dummy()
     // It is a living nightmare!
 
     extern void my_dummy();
-    static char dummy_stack[1024] __attribute__((aligned(16)));
+    static char dummy_stack[DUMMY_STACK_SIZE] __attribute__((aligned(16)));
 
     // memset to 0
     dummy_proc = (struct proc_info){};
-    dummy_proc.intr_ctx =
-      (isr_param){ .registers = { .ds = KDATA_SEG,
-                                  .es = KDATA_SEG,
-                                  .fs = KDATA_SEG,
-                                  .gs = KDATA_SEG,
-                                  .esp = (void*)dummy_stack + 1004 },
-                   .cs = KCODE_SEG,
-                   .eip = (void*)my_dummy,
-                   .ss = KDATA_SEG,
-                   .eflags = cpu_reflags() | 0x0200 };
+    dummy_proc.intr_ctx = (isr_param){
+        .registers = { .ds = KDATA_SEG,
+                       .es = KDATA_SEG,
+                       .fs = KDATA_SEG,
+                       .gs = KDATA_SEG,
+                       .esp = (void*)dummy_stack + DUMMY_STACK_SIZE - 20 },
+        .cs = KCODE_SEG,
+        .eip = (void*)my_dummy,
+        .ss = KDATA_SEG,
+        .eflags = cpu_reflags() | 0x0200
+    };
 
-    *(u32_t*)(&dummy_stack[1020]) = dummy_proc.intr_ctx.eflags;
-    *(u32_t*)(&dummy_stack[1016]) = KCODE_SEG;
-    *(u32_t*)(&dummy_stack[1012]) = dummy_proc.intr_ctx.eip;
+    *(u32_t*)(&dummy_stack[DUMMY_STACK_SIZE - 4]) = dummy_proc.intr_ctx.eflags;
+    *(u32_t*)(&dummy_stack[DUMMY_STACK_SIZE - 8]) = KCODE_SEG;
+    *(u32_t*)(&dummy_stack[DUMMY_STACK_SIZE - 12]) = dummy_proc.intr_ctx.eip;
 
     dummy_proc.page_table = cpu_rcr3();
     dummy_proc.state = PS_READY;
     dummy_proc.parent = &dummy_proc;
+    dummy_proc.pid = KERNEL_PID;
 
     __current = &dummy_proc;
 }

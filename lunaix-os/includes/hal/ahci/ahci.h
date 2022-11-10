@@ -14,21 +14,19 @@
 
 #define AHCI_HBA_CLASS 0x10601
 
+struct ahci_driver
+{
+    struct llist_header ahci_drvs;
+    struct ahci_hba hba;
+    int id;
+};
+
 /**
  * @brief 初始化AHCI与HBA
  *
  */
 void
 ahci_init();
-
-void
-ahci_list_device();
-
-unsigned int
-ahci_get_port_usage();
-
-struct hba_port*
-ahci_get_port(unsigned int index);
 
 void
 ahci_parse_dev_info(struct hba_device* dev_info, uint16_t* data);

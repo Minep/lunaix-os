@@ -5,6 +5,9 @@
 void
 pwait(waitq_t* queue)
 {
+    // prevent race condition.
+    cpu_disable_interrupt();
+
     waitq_t* current_wq = &__current->waitqueue;
     assert(llist_empty(&current_wq->waiters));
 
@@ -12,6 +15,8 @@ pwait(waitq_t* queue)
 
     block_current();
     sched_yieldk();
+
+    cpu_enable_interrupt();
 }
 
 void
@@ -42,6 +47,7 @@ pwake_all(waitq_t* queue)
     {
         proc = container_of(pos, struct proc_info, waitqueue);
 
+        assert(proc->state == PS_BLOCKED);
         proc->state = PS_READY;
         llist_delete(&pos->waiters);
     }

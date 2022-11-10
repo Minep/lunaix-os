@@ -177,9 +177,10 @@ init_platform()
 
     // peripherals & chipset features
     ps2_kbd_init();
-    pci_init();
     block_init();
     ahci_init();
+
+    pci_init();
 
     // console
     console_start_flushing();
@@ -194,11 +195,6 @@ init_platform()
     for (size_t i = 0; i < (uintptr_t)(&__init_hhk_end); i += PG_SIZE) {
         vmm_del_mapping(PD_REFERENCED, (void*)i);
         pmm_free_page(KERNEL_PID, (void*)i);
-    }
-
-    // reserve higher half
-    for (size_t i = L1_INDEX(KERNEL_MM_BASE); i < 1023; i++) {
-        vmm_set_mapping(PD_REFERENCED, i << 22, 0, 0, VMAP_NOMAP);
     }
 }
 
