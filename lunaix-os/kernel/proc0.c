@@ -1,8 +1,10 @@
 #include <lunaix/block.h>
 #include <lunaix/common.h>
 #include <lunaix/fctrl.h>
+#include <lunaix/foptions.h>
 #include <lunaix/fs.h>
 #include <lunaix/fs/twifs.h>
+#include <lunaix/lunaix.h>
 #include <lunaix/lunistd.h>
 #include <lunaix/lxconsole.h>
 #include <lunaix/mm/cake.h>
@@ -11,11 +13,11 @@
 #include <lunaix/mm/vmm.h>
 #include <lunaix/peripheral/ps2kbd.h>
 #include <lunaix/peripheral/serial.h>
-#include <lunaix/proc.h>
 #include <lunaix/spike.h>
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
 #include <lunaix/types.h>
+
 #include <sdbg/protocol.h>
 
 #include <hal/acpi/acpi.h>
@@ -77,6 +79,18 @@ extern void
 sh_main();
 
 void __USER__
+__setup_dir()
+{
+    int errno;
+    mkdir("/mnt");
+    mkdir("/mnt/lunaix-os");
+
+    if ((errno = mount("/dev/sdb", "/mnt/lunaix-os", "iso9660", 0))) {
+        syslog(2, "fail mounting boot medium. (%d)\n", errno);
+    }
+}
+
+void __USER__
 __proc0_usr()
 {
     // 打开tty设备(控制台)，作为标准输入输出。
@@ -84,6 +98,8 @@ __proc0_usr()
     //  无须经过Lunaix的缓存层，而是直接下发到底层驱动。（不受FO_DIRECT的影响）
     int fdstdout = open("/dev/tty", 0);
     int fdstdin = dup2(stdout, 1);
+
+    __setup_dir();
 
     pid_t p;
 
@@ -154,7 +170,9 @@ extern multiboot_info_t* _k_init_mb_info; /* k_init.c */
 void
 init_platform()
 {
-    kprintf(KINFO "\033[11;0mLunaixOS \033[39;49m\n");
+    kprintf(KINFO "\033[11;0mLunaixOS (gcc v%s, %s)\033[39;49m\n",
+            __VERSION__,
+            __TIME__);
 
     // 锁定所有系统预留页（内存映射IO，ACPI之类的），并且进行1:1映射
     lock_reserved_memory();

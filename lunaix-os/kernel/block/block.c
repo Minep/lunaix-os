@@ -98,10 +98,10 @@ int
 __block_write(struct device* dev, void* buf, size_t offset, size_t len)
 {
     struct block_dev* bdev = (struct block_dev*)dev->underlay;
-    size_t bsize = bdev->blk_size, rd_block = offset / bsize + bdev->start_lba,
+    size_t bsize = bdev->blk_size, wr_block = offset / bsize + bdev->start_lba,
            r = offset % bsize, wr_size = 0;
 
-    if (!(len = MIN(len, ((size_t)bdev->end_lba - rd_block + 1) * bsize))) {
+    if (!(len = MIN(len, ((size_t)bdev->end_lba - wr_block + 1) * bsize))) {
         return 0;
     }
 
@@ -123,7 +123,10 @@ __block_write(struct device* dev, void* buf, size_t offset, size_t len)
         vbuf_alloc(&vbuf, buf + wr_size, llen);
     }
 
-    req = blkio_vwr(vbuf, rd_block, NULL, NULL, 0);
+    // FIXME race condition between blkio_commit and pwait.
+    //  Consider: what if scheduler complete the request before process enter
+    //  wait state?
+    req = blkio_vwr(vbuf, wr_block, NULL, NULL, 0);
     blkio_commit(bdev->blkio, req);
 
     pwait(&req->wait);
@@ -144,6 +147,64 @@ __block_write(struct device* dev, void* buf, size_t offset, size_t len)
     return errno;
 }
 
+int
+__block_rd_lb(struct block_dev* bdev, void* buf, u64_t start, size_t count)
+{
+    struct vecbuf* vbuf = NULL;
+    vbuf_alloc(&vbuf, buf, bdev->blk_size * count);
+
+    struct blkio_req* req = blkio_vrd(vbuf, start, NULL, NULL, 0);
+    blkio_commit(bdev->blkio, req);
+    pwait(&req->wait);
+
+    int errno = req->errcode;
+    if (!errno) {
+        errno = count;
+    } else {
+        errno = -errno;
+    }
+
+    blkio_free_req(req);
+    vbuf_free(vbuf);
+
+    return errno;
+}
+
+int
+__block_wr_lb(struct block_dev* bdev, void* buf, u64_t start, size_t count)
+{
+    struct vecbuf* vbuf = NULL;
+    vbuf_alloc(&vbuf, buf, bdev->blk_size * count);
+
+    struct blkio_req* req = blkio_vwr(vbuf, start, NULL, NULL, 0);
+    blkio_commit(bdev->blkio, req);
+    pwait(&req->wait);
+
+    int errno = req->errcode;
+    if (!errno) {
+        errno = count;
+    } else {
+        errno = -errno;
+    }
+
+    blkio_free_req(req);
+    vbuf_free(vbuf);
+
+    return errno;
+}
+
+void*
+block_alloc_buf(struct block_dev* bdev)
+{
+    return valloc(bdev->blk_size);
+}
+
+void
+block_free_buf(struct block_dev* bdev, void* buf)
+{
+    return vfree(buf);
+}
+
 struct block_dev*
 block_alloc_dev(const char* blk_id, void* driver, req_handler ioreq_handler)
 {
@@ -155,6 +216,8 @@ block_alloc_dev(const char* blk_id, void* driver, req_handler ioreq_handler)
     bdev->blkio = blkio_newctx(ioreq_handler);
     bdev->driver = driver;
     bdev->blkio->driver = driver;
+    bdev->ops = (struct block_dev_ops){ .block_read = __block_rd_lb,
+                                        .block_write = __block_wr_lb };
 
     return bdev;
 }

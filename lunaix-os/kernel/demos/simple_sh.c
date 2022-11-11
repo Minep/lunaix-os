@@ -1,8 +1,8 @@
 #include <lunaix/fctrl.h>
 #include <lunaix/foptions.h>
 #include <lunaix/ioctl.h>
+#include <lunaix/lunaix.h>
 #include <lunaix/lunistd.h>
-#include <lunaix/proc.h>
 #include <lunaix/signal.h>
 #include <lunaix/status.h>
 

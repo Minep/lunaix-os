@@ -9,6 +9,16 @@
 #define PARTITION_NAME_SIZE 48
 #define DEV_ID_SIZE 32
 
+struct block_dev;
+
+struct block_dev_ops
+{
+    int (*block_read)(struct block_dev*, void*, u64_t, size_t);
+    int (*block_write)(struct block_dev*, void*, u64_t, size_t);
+    void* (*block_alloc)(struct block_dev*);
+    void (*block_free)(struct block_dev*, void*);
+};
+
 struct block_dev
 {
     struct llist_header parts;
@@ -20,6 +30,7 @@ struct block_dev
     u64_t start_lba;
     u64_t end_lba;
     u32_t blk_size;
+    struct block_dev_ops ops;
 };
 
 // Lunaix Partition Table

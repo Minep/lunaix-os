@@ -12,7 +12,12 @@
 #ifndef __LUNAIX_ISO9660_H
 #define __LUNAIX_ISO9660_H
 
+#include <lunaix/clock.h>
+#include <lunaix/device.h>
 #include <lunaix/types.h>
+
+#define ISO_SIGNATURE_LO 0x30304443UL
+#define ISO_SIGNATURE_HI 0x31
 
 // Volume Types
 #define ISO_VOLBOOT 0   // Boot Record
@@ -27,6 +32,9 @@
 #define ISO_FRECORD 0x8   // file store in iso record fashion
 #define ISO_FPROTECT 0x10 // file being protected by access control
 #define ISO_FEXTENTS 0x80 // the extent by this record is a file partial
+
+#define ISO9660_BLKSZ 2048
+#define ISO9660_IDLEN 256
 
 // NOTES:
 // Each Descriptor sized 1 logical block (2048 bytes in common cases)
@@ -61,6 +69,20 @@ struct iso_datetime
     u8_t gmt;
 } PACKED;
 
+// 32bits both-byte-order integer
+typedef struct iso_bbo32
+{
+    u32_t le; // little-endian
+    u32_t be; // big-endian
+} PACKED iso_bbo32_t;
+
+// 16bits both-byte-order integer
+typedef struct iso_bbo16
+{
+    u16_t le; // little-endian
+    u16_t be; // big-endian
+} PACKED iso_bbo16_t;
+
 // (8.4) Describe a primary volume space
 struct iso_vol_primary
 {
@@ -68,17 +90,15 @@ struct iso_vol_primary
     u8_t reserved_1;
     u8_t sys_id[32];
     u8_t vol_id[32];
-    u8_t reserved_2;
-    u32_t sz_lo; // (8.4.8) only lower portion is valid.
-    u32_t sz_hi;
-    u8_t reserved_2;
-    u32_t set_size;
-    u32_t seq_num;
-    u32_t lb_size;
-    u32_t path_tbl_sz_lo; // lower partition - LE.
-    u32_t path_tbl_sz_hi;
+    u8_t reserved_2[8];
+    iso_bbo32_t vol_size;
+    u8_t reserved_3[32];
+    iso_bbo16_t set_size;
+    iso_bbo16_t seq_num;
+    iso_bbo16_t lb_size;
+    iso_bbo32_t ptable_size;
     u32_t lpath_tbl_ptr; // Type L Path table location (LBA)
-    u32_t reserved_3[3]; // use type M if big endian machine.
+    u32_t reserved_4[3]; // use type M if big endian machine.
     u8_t root_record[34];
     u8_t set_id[128];
     u8_t publisher_id[128];
@@ -104,10 +124,8 @@ struct iso_partition
     u8_t reserved;
     u8_t sys_id[32];
     u8_t part_id[32];
-    u32_t part_addr_lo; // (8.6.7) only lower portion is valid.
-    u32_t part_addr_hi;
-    u32_t part_sz_lo; // (8.6.8) only lower portion is valid.
-    u32_t part_sz_hi;
+    iso_bbo32_t part_addr;
+    iso_bbo32_t part_size;
 } PACKED;
 
 // (6.10.4) MDU with variable record
@@ -121,14 +139,13 @@ struct iso_var_mdu
 struct iso_drecord
 {
     u8_t xattr_len;
-    u32_t extent_lo; // location of extent, lower 32 bits is valid.
-    u32_t extent_hi;
-    u32_t data_sz_lo; // size of extent, lower 32 bits is valid.
-    u32_t data_sz_hi;
+    iso_bbo32_t extent_addr;
+    iso_bbo32_t data_size;
     struct
     {
         u8_t year;
         u8_t month;
+        u8_t day;
         u8_t hour;
         u8_t min;
         u8_t sec;
@@ -137,11 +154,11 @@ struct iso_drecord
     u8_t flags;
     u8_t fu_sz;  // size of file unit (FU)
     u8_t gap_sz; // size of gap if FU is interleaved.
-    u32_t vol_seq;
+    iso_bbo16_t vol_seq;
     struct iso_var_mdu name;
 } PACKED;
 
-// (9.4) Path Table Record. [Embedded into Variable MDU]
+// (9.4) L-Path Table Record. [Embedded into Variable MDU]
 struct iso_precord
 {
     u8_t xattr_len;
@@ -152,8 +169,8 @@ struct iso_precord
 
 struct iso_xattr
 {
-    u32_t owner;
-    u32_t group;
+    iso_bbo16_t owner;
+    iso_bbo16_t group;
     u16_t perm;
     struct iso_datetime ctime;
     struct iso_datetime mtime;
@@ -161,16 +178,94 @@ struct iso_xattr
     struct iso_datetime ef_time;
     u8_t record_fmt;
     u8_t record_attr;
-    u8_t record_len;
+    iso_bbo16_t record_len;
     u32_t sys_id;
     u8_t reserved1[64];
     u8_t version;
     u8_t len_esc;
     u8_t reserved2[64];
-    u32_t payload_sz;
+    iso_bbo16_t payload_sz;
     u8_t payload[0];
     // There is also a escape sequence after payload,
     // It however marked as optional, hence we ignore it.
 } PACKED;
+
+struct iso_ptable
+{
+    u32_t start_lba;
+    u32_t current_lba;
+    u32_t size;
+    u32_t range_lower;
+    u32_t range_upper;
+    void* ptable_part;
+};
+
+struct iso_inode
+{
+    time_t ctime;
+    time_t mtime;
+    u32_t record_fmt;
+    u32_t fu_size;
+    u32_t gap_size;
+    struct llist_header* drecaches;
+};
+
+struct iso_drecache
+{
+    struct llist_header caches;
+    u32_t extent_addr;
+    u32_t data_size;
+    u32_t xattr_len;
+    u32_t fu_size;
+    u32_t gap_size;
+    u32_t flags;
+    struct hstr name;
+    char name_val[ISO9660_IDLEN];
+};
+
+struct iso_superblock
+{
+    u32_t volume_size;
+    u32_t lb_size;
+};
+
+struct iso_drecord*
+iso9660_get_drecord(struct iso_var_mdu* drecord_mdu);
+
+int
+iso9660_fill_inode(struct v_inode* inode, struct iso_drecache* dir, int ino);
+
+time_t
+iso9660_dt2unix(struct iso_datetime* isodt);
+
+void
+iso9660_init();
+
+int
+iso9660_setup_dnode(struct v_dnode* dnode, struct v_inode* inode);
+
+void
+iso9660_fill_drecache(struct iso_drecache* cache, struct iso_drecord* drec);
+
+int
+iso9660_dir_lookup(struct v_inode* this, struct v_dnode* dnode);
+
+int
+iso9660_readdir(struct v_file* file, struct dir_context* dctx);
+
+int
+iso9660_open(struct v_inode* this, struct v_file* file);
+
+int
+iso9660_close(struct v_file* file);
+
+int
+iso9660_read(struct v_inode* inode, void* buffer, size_t len, size_t fpos);
+
+int
+iso9660_write(struct v_inode* inode, void* buffer, size_t len, size_t fpos);
+
+int
+iso9660_seek(struct v_inode* inode, size_t offset);
 
 #endif /* __LUNAIX_ISO9660_H */

@@ -97,6 +97,7 @@ struct v_superblock
     struct filesystem* fs;
     uint32_t iobuf_size;
     struct hbucket* i_cache;
+    void* data;
     struct
     {
         uint32_t (*read_capacity)(struct v_superblock* vsb);

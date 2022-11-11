@@ -58,6 +58,8 @@
 #define __SYSCALL_getpgid 49
 #define __SYSCALL_setpgid 50
 
+#define __SYSCALL_syslog 51
+
 #define __SYSCALL_MAX 0x100
 
 #ifndef __ASM__
@@ -145,4 +147,5 @@ syscall_install();
         ___DOINT33(__SYSCALL_##name, rettype)                                  \
     }
 #endif
+
 #endif /* __LUNAIX_SYSCALL_H */

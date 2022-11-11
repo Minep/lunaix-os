@@ -82,6 +82,8 @@ _kernel_init()
 
     vfs_export_attributes();
 
+    lxconsole_init();
+
     if ((errno = vfs_mount_root("ramfs", NULL))) {
         panickf("Fail to mount root. (errno=%d)", errno);
     }
@@ -90,7 +92,7 @@ _kernel_init()
     vfs_mount("/sys", "twifs", NULL, MNT_RO);
     vfs_mount("/task", "taskfs", NULL, MNT_RO);
 
-    lxconsole_init();
+    lxconsole_spawn_ttydev();
 
     syscall_install();
 

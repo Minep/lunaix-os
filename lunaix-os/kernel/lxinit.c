@@ -1,10 +1,10 @@
 #include <hal/cpu.h>
 #include <lunaix/clock.h>
+#include <lunaix/lunaix.h>
 #include <lunaix/lunistd.h>
 #include <lunaix/lxconsole.h>
 #include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/vmm.h>
-#include <lunaix/proc.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>

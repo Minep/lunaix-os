@@ -119,7 +119,11 @@ lxconsole_init()
     fifo_init(&lx_console.input, valloc(4096), 4096, 0);
 
     lx_console.flush_timer = NULL;
+}
 
+void
+lxconsole_spawn_ttydev()
+{
     struct device* tty_dev = device_addseq(NULL, &lx_console, "tty");
     tty_dev->write = __tty_write;
     tty_dev->read = __tty_read;

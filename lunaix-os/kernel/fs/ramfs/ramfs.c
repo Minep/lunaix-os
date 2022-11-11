@@ -117,7 +117,7 @@ ramfs_unmount(struct v_superblock* vsb)
 void
 ramfs_init()
 {
-    struct filesystem* ramfs = fsm_new_fs("ramfs", 5);
+    struct filesystem* ramfs = fsm_new_fs("ramfs", -1);
     ramfs->mount = ramfs_mount;
     ramfs->unmount = ramfs_unmount;
 

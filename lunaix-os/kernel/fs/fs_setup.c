@@ -1,5 +1,6 @@
 #include <lunaix/fs.h>
 #include <lunaix/fs/devfs.h>
+#include <lunaix/fs/iso9660.h>
 #include <lunaix/fs/ramfs.h>
 #include <lunaix/fs/taskfs.h>
 #include <lunaix/fs/twifs.h>
@@ -11,6 +12,7 @@ fsm_register_all()
     twifs_init();
     devfs_init();
     taskfs_init();
+    iso9660_init();
 
     // ... more fs implementation
 }

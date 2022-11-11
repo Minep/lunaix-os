@@ -1,7 +1,7 @@
 #include <lunaix/dirent.h>
 #include <lunaix/fctrl.h>
+#include <lunaix/lunaix.h>
 #include <lunaix/lunistd.h>
-#include <lunaix/proc.h>
 
 void
 _readdir_main()

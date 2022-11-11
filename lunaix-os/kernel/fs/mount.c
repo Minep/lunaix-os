@@ -3,7 +3,10 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
+#include <lunaix/syslog.h>
 #include <lunaix/types.h>
+
+LOG_MODULE("fs")
 
 struct llist_header all_mnts = { .next = &all_mnts, .prev = &all_mnts };
 
@@ -129,6 +132,10 @@ vfs_mount_at(const char* fs_name,
              struct v_dnode* mnt_point,
              int options)
 {
+    if (device && device->dev_type != DEV_IFVOL) {
+        return ENOTBLK;
+    }
+
     if (mnt_point->inode && !(mnt_point->inode->itype & VFS_IFDIR)) {
         return ENOTDIR;
     }
@@ -138,10 +145,19 @@ vfs_mount_at(const char* fs_name,
         return ENODEV;
     }
 
+    if (fs->types == FSTYPE_ROFS) {
+        options |= MNT_RO;
+    }
+
+    char* dev_name = "sys";
     struct v_mount* parent_mnt = mnt_point->mnt;
     struct v_superblock *sb = vfs_sb_alloc(), *old_sb = mnt_point->super_block;
     sb->dev = device;
     mnt_point->super_block = sb;
+
+    if (device) {
+        dev_name = device->name_val;
+    }
 
     int errno = 0;
     if (!(errno = fs->mount(sb, mnt_point))) {
@@ -153,6 +169,8 @@ vfs_mount_at(const char* fs_name,
             goto cleanup;
         }
 
+        kprintf("mount: dev=%s, fs=%s, mode=%d\n", dev_name, fs_name, options);
+
         mnt_point->mnt->flags = options;
     } else {
         goto cleanup;
@@ -161,6 +179,11 @@ vfs_mount_at(const char* fs_name,
     return errno;
 
 cleanup:
+    kprintf(KERROR "mount: dev=%s, fs=%s, mode=%d, err=%d\n",
+            dev_name,
+            fs_name,
+            options,
+            errno);
     mnt_point->super_block = old_sb;
     vfs_sb_free(sb);
     return errno;

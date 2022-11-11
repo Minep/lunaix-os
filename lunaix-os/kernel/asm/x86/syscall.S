@@ -58,6 +58,7 @@
         .long __lxsys_ioctl
         .long __lxsys_getpgid
         .long __lxsys_setpgid       /* 50 */
+        .long __lxsys_syslog
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
             .long 0

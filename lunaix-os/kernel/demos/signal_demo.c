@@ -1,5 +1,5 @@
+#include <lunaix/lunaix.h>
 #include <lunaix/lunistd.h>
-#include <lunaix/proc.h>
 #include <lunaix/signal.h>
 #include <lunaix/spike.h>
 #include <lunaix/types.h>

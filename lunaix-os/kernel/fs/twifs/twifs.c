@@ -61,7 +61,6 @@ __twifs_init_inode(struct v_superblock* vsb, struct v_inode* inode)
 int
 __twifs_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
 {
-    vsb->dev = 1;
     vsb->ops.init_inode = __twifs_init_inode;
 
     struct v_inode* inode = vfs_i_alloc(vsb);

@@ -1,8 +1,8 @@
 #include <lunaix/fctrl.h>
 #include <lunaix/foptions.h>
 #include <lunaix/input.h>
+#include <lunaix/lunaix.h>
 #include <lunaix/lunistd.h>
-#include <lunaix/proc.h>
 #include <ulibc/stdio.h>
 
 #define STDIN 1

@@ -1,5 +1,7 @@
 #include <klibc/stdio.h>
 #include <lunaix/lxconsole.h>
+#include <lunaix/spike.h>
+#include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
 #include <lunaix/tty/tty.h>
 
@@ -7,21 +9,16 @@
 #define MAX_XFMT_SIZE 512
 
 void
-__kprintf(const char* component, const char* fmt, va_list args)
+__kprintf_internal(const char* component,
+                   int log_level,
+                   const char* fmt,
+                   va_list args)
 {
     char buf[MAX_KPRINTF_BUF_SIZE];
-    if (!fmt)
-        return;
-    char log_level = '0';
     char expanded_fmt[MAX_XFMT_SIZE];
 
-    if (*fmt == '\x1b') {
-        log_level = *(++fmt);
-        fmt++;
-    }
-
     switch (log_level) {
-        case '1':
+        case 1:
             // tty_set_theme(VGA_COLOR_BROWN, current_theme >> 12);
             ksnprintf(expanded_fmt,
                       MAX_XFMT_SIZE,
@@ -29,7 +26,7 @@ __kprintf(const char* component, const char* fmt, va_list args)
                       component,
                       fmt);
             break;
-        case '2':
+        case 2:
             // tty_set_theme(VGA_COLOR_LIGHT_RED, current_theme >> 12);
             ksnprintf(expanded_fmt,
                       MAX_XFMT_SIZE,
@@ -37,7 +34,7 @@ __kprintf(const char* component, const char* fmt, va_list args)
                       component,
                       fmt);
             break;
-        case '3':
+        case 3:
             // tty_set_theme(VGA_COLOR_LIGHT_BLUE, current_theme >> 12);
             ksnprintf(expanded_fmt,
                       MAX_XFMT_SIZE,
@@ -52,6 +49,21 @@ __kprintf(const char* component, const char* fmt, va_list args)
 
     __ksprintf_internal(buf, expanded_fmt, MAX_KPRINTF_BUF_SIZE, args);
     console_write_str(buf);
+}
+
+void
+__kprintf(const char* component, const char* fmt, va_list args)
+{
+    if (!fmt)
+        return;
+    char log_level = '0';
+
+    if (*fmt == '\x1b') {
+        log_level = *(++fmt);
+        fmt++;
+    }
+
+    __kprintf_internal(component, log_level - '0', fmt, args);
 }
 
 void
@@ -112,4 +124,9 @@ kprint_hex(const void* buffer, unsigned int size)
         console_write_str(ch_cache);
         console_write_char('\n');
     }
+}
+
+__DEFINE_LXSYSCALL3(void, syslog, int, level, const char*, fmt, va_list, args)
+{
+    __kprintf_internal("syslog", level, fmt, args);
 }

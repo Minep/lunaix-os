@@ -54,6 +54,9 @@ struct filesystem*
 fsm_new_fs(char* name, size_t name_len)
 {
     struct filesystem* fs = vzalloc(sizeof(*fs));
+    if (name_len == (size_t)-1) {
+        name_len = strlen(name);
+    }
     fs->fs_name = HHSTR(name, name_len, 0);
     return fs;
 }

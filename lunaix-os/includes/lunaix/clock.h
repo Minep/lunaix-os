@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_CLOCK_H
 #define __LUNAIX_CLOCK_H
 
-#include <stdint.h>
+#include <lunaix/types.h>
 
 typedef uint32_t time_t;
 
@@ -42,6 +42,13 @@ clock_tounixtime(datetime_t* dt)
     return (dt->year - 1970) * 31556926u + (dt->month - 1) * 2629743u +
            (dt->day - 1) * 86400u + (dt->hour - 1) * 3600u +
            (dt->minute - 1) * 60u + dt->second;
+}
+
+static inline time_t
+time_tounix(u32_t yyyy, u32_t mm, u32_t dd, u32_t hh, u32_t MM, u32_t ss)
+{
+    return (yyyy - 1970) * 31556926u + (mm - 1) * 2629743u + (dd - 1) * 86400u +
+           (hh - 1) * 3600u + (MM - 1) * 60u + ss;
 }
 
 #endif /* __LUNAIX_CLOCK_H */
