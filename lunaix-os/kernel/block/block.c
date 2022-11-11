@@ -74,9 +74,7 @@ __block_read(struct device* dev, void* buf, size_t offset, size_t len)
     }
 
     req = blkio_vrd(vbuf, rd_block, NULL, NULL, 0);
-    blkio_commit(bdev->blkio, req);
-
-    pwait(&req->wait);
+    blkio_commit(bdev->blkio, req, BLKIO_WAIT);
 
     if (!(errno = req->errcode)) {
         memcpy(buf, head_buf + r, rd_size);
@@ -123,13 +121,8 @@ __block_write(struct device* dev, void* buf, size_t offset, size_t len)
         vbuf_alloc(&vbuf, buf + wr_size, llen);
     }
 
-    // FIXME race condition between blkio_commit and pwait.
-    //  Consider: what if scheduler complete the request before process enter
-    //  wait state?
     req = blkio_vwr(vbuf, wr_block, NULL, NULL, 0);
-    blkio_commit(bdev->blkio, req);
-
-    pwait(&req->wait);
+    blkio_commit(bdev->blkio, req, BLKIO_WAIT);
 
     int errno = req->errcode;
     if (!errno) {
@@ -154,8 +147,7 @@ __block_rd_lb(struct block_dev* bdev, void* buf, u64_t start, size_t count)
     vbuf_alloc(&vbuf, buf, bdev->blk_size * count);
 
     struct blkio_req* req = blkio_vrd(vbuf, start, NULL, NULL, 0);
-    blkio_commit(bdev->blkio, req);
-    pwait(&req->wait);
+    blkio_commit(bdev->blkio, req, BLKIO_WAIT);
 
     int errno = req->errcode;
     if (!errno) {
@@ -177,8 +169,7 @@ __block_wr_lb(struct block_dev* bdev, void* buf, u64_t start, size_t count)
     vbuf_alloc(&vbuf, buf, bdev->blk_size * count);
 
     struct blkio_req* req = blkio_vwr(vbuf, start, NULL, NULL, 0);
-    blkio_commit(bdev->blkio, req);
-    pwait(&req->wait);
+    blkio_commit(bdev->blkio, req, BLKIO_WAIT);
 
     int errno = req->errcode;
     if (!errno) {

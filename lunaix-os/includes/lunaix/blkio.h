@@ -12,6 +12,8 @@
 #define BLKIO_BUSY 0x4
 #define BLKIO_PENDING 0x8
 
+#define BLKIO_WAIT 0x1
+
 // Free on complete
 #define BLKIO_FOC 0x10
 
@@ -96,7 +98,7 @@ blkio_free_req(struct blkio_req* req);
  * @param req
  */
 void
-blkio_commit(struct blkio_context* ctx, struct blkio_req* req);
+blkio_commit(struct blkio_context* ctx, struct blkio_req* req, int options);
 
 /**
  * @brief Schedule an IO request to be handled.

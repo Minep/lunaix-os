@@ -32,7 +32,8 @@ int
 iso9660_setup_dnode(struct v_dnode* dnode, struct v_inode* inode)
 {
     if (!(inode->itype & VFS_IFDIR)) {
-        return;
+        vfs_assign_inode(dnode, inode);
+        return 0;
     }
 
     int errno = 0;
@@ -113,9 +114,7 @@ found:
         vfs_i_addhash(inode);
     }
 
-    iso9660_setup_dnode(dnode, inode);
-
-    return 0;
+    return iso9660_setup_dnode(dnode, inode);
 }
 
 static int

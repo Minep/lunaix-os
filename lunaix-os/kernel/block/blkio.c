@@ -2,6 +2,8 @@
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/valloc.h>
 
+#include <hal/cpu.h>
+
 static struct cake_pile* blkio_reqpile;
 
 void
@@ -70,7 +72,7 @@ blkio_newctx(req_handler handler)
 }
 
 void
-blkio_commit(struct blkio_context* ctx, struct blkio_req* req)
+blkio_commit(struct blkio_context* ctx, struct blkio_req* req, int options)
 {
     req->flags |= BLKIO_PENDING;
     req->io_ctx = ctx;
@@ -78,8 +80,25 @@ blkio_commit(struct blkio_context* ctx, struct blkio_req* req)
 
     // if the pipeline is not running (e.g., stalling). Then we should schedule
     // one immediately and kick it started.
+    // NOTE: Possible race condition between blkio_commit and pwait.
+    // Consider: what if scheduler complete the request before pwait even get
+    // called?
+    // Two possible work around:
+    //  #1. we disable the interrupt before schedule the request.
+    //  #2. we do scheduling within interrupt context (e.g., attach a timer)
+    // As we don't want to overwhelming the interrupt context and also keep the
+    // request RTT as small as possible, hence #1 is preferred.
+
     if (!ctx->busy) {
+        if ((options & BLKIO_WAIT)) {
+            cpu_disable_interrupt();
+            blkio_schedule(ctx);
+            pwait(&req->wait);
+            return;
+        }
         blkio_schedule(ctx);
+    } else if ((options & BLKIO_WAIT)) {
+        pwait(&req->wait);
     }
 }
 
@@ -108,7 +127,6 @@ blkio_complete(struct blkio_req* req)
         req->completed(req);
     }
 
-    // FIXME Not working in first process! Need a dummy process.
     // Wake all blocked processes on completion,
     //  albeit should be no more than one process in everycase (by design)
     pwake_all(&req->wait);

@@ -173,7 +173,8 @@ struct v_fd
     int flags;
 };
 
-// FIXME how do we invalidate corresponding v_dnodes given the v_inode?
+//  [v_inode::aka_nodes]
+//  how do we invalidate corresponding v_dnodes given the v_inode?
 /*
     Consider taskfs, which is Lunaix's speak of Linux's procfs, that allow
     info of every process being accessible via file system. Each process's
