@@ -36,6 +36,34 @@ devfs_write(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 }
 
 int
+devfs_read_page(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
+{
+    assert(inode->data);
+
+    struct device* dev = (struct device*)inode->data;
+
+    if (!dev->read_page) {
+        return ENOTSUP;
+    }
+
+    return dev->read_page(dev, buffer, fpos);
+}
+
+int
+devfs_write_page(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
+{
+    assert(inode->data);
+
+    struct device* dev = (struct device*)inode->data;
+
+    if (!dev->read_page) {
+        return ENOTSUP;
+    }
+
+    return dev->read_page(dev, buffer, fpos);
+}
+
+int
 devfs_get_itype(struct device* dev)
 {
     int itype = VFS_IFFILE;
@@ -157,6 +185,8 @@ struct v_inode_ops devfs_inode_ops = { .dir_lookup = devfs_dirlookup,
 
 struct v_file_ops devfs_file_ops = { .close = default_file_close,
                                      .read = devfs_read,
+                                     .read_page = devfs_read_page,
                                      .write = devfs_write,
+                                     .write_page = devfs_write_page,
                                      .seek = default_file_seek,
                                      .readdir = devfs_readdir };

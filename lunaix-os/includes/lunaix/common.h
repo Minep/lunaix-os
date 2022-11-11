@@ -1,6 +1,10 @@
 #ifndef __LUNAIX_CONSTANTS_H
 #define __LUNAIX_CONSTANTS_H
 
+#define PG_SIZE_BITS 12
+#define PG_SIZE (1 << PG_SIZE_BITS)
+#define PG_INDEX_BITS 10
+
 #define MEM_1MB 0x100000
 #define MEM_4MB 0x400000
 

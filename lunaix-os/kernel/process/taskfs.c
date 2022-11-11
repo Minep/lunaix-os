@@ -133,7 +133,9 @@ taskfs_dirlookup(struct v_inode* this, struct v_dnode* dnode)
 
 static struct v_file_ops taskfs_file_ops = { .close = default_file_close,
                                              .read = default_file_read,
+                                             .read_page = default_file_read,
                                              .write = default_file_write,
+                                             .write_page = default_file_write,
                                              .readdir = taskfs_readdir,
                                              .seek = default_file_seek };
 static struct v_inode_ops taskfs_inode_ops = { .dir_lookup = taskfs_dirlookup,

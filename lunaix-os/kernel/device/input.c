@@ -62,6 +62,12 @@ __input_dev_read(struct device* dev, void* buf, size_t offset, size_t len)
     return sizeof(struct input_evt_pkt);
 }
 
+int
+__input_dev_read_pg(struct device* dev, void* buf, size_t offset)
+{
+    return __input_dev_read(dev, buf, offset, PG_SIZE);
+}
+
 struct input_device*
 input_add_device(char* name_fmt, ...)
 {
@@ -78,6 +84,7 @@ input_add_device(char* name_fmt, ...)
 
     idev->dev_if = dev;
     dev->read = __input_dev_read;
+    dev->read_page = __input_dev_read_pg;
 
     va_end(args);
 

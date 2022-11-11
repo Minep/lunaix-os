@@ -30,6 +30,8 @@ struct device
     void* underlay;
     int (*read)(struct device* dev, void* buf, size_t offset, size_t len);
     int (*write)(struct device* dev, void* buf, size_t offset, size_t len);
+    int (*read_page)(struct device* dev, void* buf, size_t offset);
+    int (*write_page)(struct device* dev, void* buf, size_t offset);
     int (*exec_cmd)(struct device* dev, uint32_t req, va_list args);
 };
 

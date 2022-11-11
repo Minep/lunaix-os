@@ -141,6 +141,72 @@ __block_write(struct device* dev, void* buf, size_t offset, size_t len)
 }
 
 int
+__block_read_page(struct device* dev, void* buf, size_t offset)
+{
+    struct vecbuf* vbuf = NULL;
+    struct block_dev* bdev = (struct block_dev*)dev->underlay;
+
+    u32_t lba = offset / bdev->blk_size + bdev->start_lba;
+    u32_t rd_lba = MIN(lba + PG_SIZE / bdev->blk_size, bdev->end_lba);
+
+    if (rd_lba <= lba) {
+        return 0;
+    }
+
+    rd_lba -= lba;
+
+    vbuf_alloc(&vbuf, buf, rd_lba * bdev->blk_size);
+
+    struct blkio_req* req = blkio_vrd(vbuf, lba, NULL, NULL, 0);
+
+    blkio_commit(bdev->blkio, req, BLKIO_WAIT);
+
+    int errno = req->errcode;
+    if (!errno) {
+        errno = rd_lba * bdev->blk_size;
+    } else {
+        errno = -errno;
+    }
+
+    blkio_free_req(req);
+    vbuf_free(vbuf);
+    return errno;
+}
+
+int
+__block_write_page(struct device* dev, void* buf, size_t offset)
+{
+    struct vecbuf* vbuf = NULL;
+    struct block_dev* bdev = (struct block_dev*)dev->underlay;
+
+    u32_t lba = offset / bdev->blk_size + bdev->start_lba;
+    u32_t rd_lba = MIN(lba + PG_SIZE / bdev->blk_size, bdev->end_lba);
+
+    if (rd_lba <= lba) {
+        return 0;
+    }
+
+    rd_lba -= lba;
+
+    vbuf_alloc(&vbuf, buf, rd_lba * bdev->blk_size);
+
+    struct blkio_req* req = blkio_vwr(vbuf, lba, NULL, NULL, 0);
+
+    blkio_commit(bdev->blkio, req, BLKIO_WAIT);
+
+    int errno = req->errcode;
+    if (!errno) {
+        errno = rd_lba * bdev->blk_size;
+    } else {
+        errno = -errno;
+    }
+
+    blkio_free_req(req);
+    vbuf_free(vbuf);
+    return errno;
+}
+
+int
 __block_rd_lb(struct block_dev* bdev, void* buf, u64_t start, size_t count)
 {
     struct vecbuf* vbuf = NULL;
@@ -250,7 +316,9 @@ __block_register(struct block_dev* bdev)
 
     struct device* dev = device_addvol(NULL, bdev, "sd%c", 'a' + free_slot);
     dev->write = __block_write;
+    dev->write_page = __block_write_page;
     dev->read = __block_read;
+    dev->read_page = __block_read_page;
 
     bdev->dev = dev;
     strcpy(bdev->bdev_id, dev->name_val);
@@ -271,7 +339,9 @@ blk_mount_part(struct block_dev* bdev,
     struct device* dev =
       device_addvol(NULL, pbdev, "%sp%d", bdev->bdev_id, index + 1);
     dev->write = __block_write;
+    dev->write_page = __block_write_page;
     dev->read = __block_read;
+    dev->read_page = __block_read_page;
 
     pbdev->start_lba = start_lba;
     pbdev->end_lba = end_lba;

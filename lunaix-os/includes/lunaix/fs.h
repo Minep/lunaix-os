@@ -120,6 +120,16 @@ struct v_file_ops
 {
     int (*write)(struct v_inode* inode, void* buffer, size_t len, size_t fpos);
     int (*read)(struct v_inode* inode, void* buffer, size_t len, size_t fpos);
+
+    // for operatiosn {write|read}_page, following are true:
+    //  + `len` always equals to PG_SIZE
+    //  + `fpos` always PG_SIZE aligned.
+    // These additional operations allow underlying fs to use more specialized
+    // and optimized code.
+
+    int (*write_page)(struct v_inode* inode, void* pg, size_t len, size_t fpos);
+    int (*read_page)(struct v_inode* inode, void* pg, size_t len, size_t fpos);
+
     int (*readdir)(struct v_file* file, struct dir_context* dctx);
     int (*seek)(struct v_inode* inode, size_t offset); // optional
     int (*close)(struct v_file* file);

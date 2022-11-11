@@ -11,7 +11,9 @@ static struct v_inode_ops iso_inode_ops = {
 
 static struct v_file_ops iso_file_ops = { .close = iso9660_close,
                                           .read = iso9660_read,
+                                          .read_page = iso9660_read,
                                           .write = iso9660_write,
+                                          .write_page = iso9660_write,
                                           .seek = iso9660_seek,
                                           .readdir = iso9660_readdir };
 

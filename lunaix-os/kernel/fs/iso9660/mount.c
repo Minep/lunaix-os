@@ -24,9 +24,10 @@ iso9660_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
     struct device* dev = vsb->dev;
     struct iso_vol* vdesc = (struct iso_vol*)valloc(ISO9660_BLKSZ);
     struct iso_vol_primary* vprim = NULL;
+    u32_t lba = 16;
     int errno = 0;
     do {
-        errno = dev->read(dev, vdesc, ISO9660_BLKSZ * 16, ISO9660_BLKSZ);
+        errno = dev->read(dev, vdesc, ISO9660_BLKSZ * lba, ISO9660_BLKSZ);
         if (errno < 0) {
             errno = EIO;
             goto done;
@@ -39,7 +40,7 @@ iso9660_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
             vprim = (struct iso_vol_primary*)vdesc;
             break;
         }
-
+        lba++;
     } while (vdesc->type != ISO_VOLTERM);
 
     if (!vprim) {
@@ -81,10 +82,11 @@ iso9660_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
     }
 
     vfs_i_addhash(rootino);
+    return 0;
 
 done:
     vfree(vdesc);
-    return 0;
+    return errno;
 }
 
 int

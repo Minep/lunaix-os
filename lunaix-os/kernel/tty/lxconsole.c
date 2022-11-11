@@ -121,12 +121,26 @@ lxconsole_init()
     lx_console.flush_timer = NULL;
 }
 
+int
+__tty_write_pg(struct device* dev, void* buf, size_t offset)
+{
+    return __tty_write(dev, buf, offset, PG_SIZE);
+}
+
+int
+__tty_read_pg(struct device* dev, void* buf, size_t offset)
+{
+    return __tty_read(dev, buf, offset, PG_SIZE);
+}
+
 void
 lxconsole_spawn_ttydev()
 {
     struct device* tty_dev = device_addseq(NULL, &lx_console, "tty");
     tty_dev->write = __tty_write;
+    tty_dev->write_page = __tty_write_pg;
     tty_dev->read = __tty_read;
+    tty_dev->read_page = __tty_read_pg;
     tty_dev->exec_cmd = __tty_exec_cmd;
 
     waitq_init(&lx_reader);

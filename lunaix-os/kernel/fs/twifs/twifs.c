@@ -268,7 +268,9 @@ twifs_mapping(struct twifs_node* parent, void* data, const char* fmt, ...)
 
 const struct v_file_ops twifs_file_ops = { .close = default_file_close,
                                            .read = __twifs_fread,
+                                           .read_page = __twifs_fread,
                                            .write = __twifs_fwrite,
+                                           .write_page = __twifs_fwrite,
                                            .readdir = __twifs_iterate_dir };
 
 const struct v_inode_ops twifs_inode_ops = { .dir_lookup = __twifs_dirlookup,

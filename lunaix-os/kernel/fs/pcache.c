@@ -84,9 +84,10 @@ pcache_get_page(struct pcache* pcache,
 {
     struct pcache_pg* pg = btrie_get(&pcache->tree, index);
     int is_new = 0;
-    *offset = index & ((1 << pcache->tree.truncated) - 1);
+    u32_t mask = ((1 << pcache->tree.truncated) - 1);
+    *offset = index & mask;
     if (!pg && (pg = pcache_new_page(pcache, index))) {
-        pg->fpos = index - *offset;
+        pg->fpos = index & ~mask;
         pcache->n_pages++;
         is_new = 1;
     }
@@ -137,7 +138,8 @@ pcache_read(struct v_inode* inode, void* data, uint32_t len, uint32_t fpos)
             }
 
             // Filling up the page
-            errno = inode->default_fops->read(inode, pg->pg, PG_SIZE, pg->fpos);
+            errno =
+              inode->default_fops->read_page(inode, pg->pg, PG_SIZE, pg->fpos);
             if (errno >= 0 && errno < PG_SIZE) {
                 // EOF
                 len = MIN(len, buf_off + errno);
@@ -176,7 +178,7 @@ pcache_commit(struct v_inode* inode, struct pcache_pg* page)
     }
 
     int errno =
-      inode->default_fops->write(inode, page->pg, PG_SIZE, page->fpos);
+      inode->default_fops->write_page(inode, page->pg, PG_SIZE, page->fpos);
 
     if (!errno) {
         page->flags &= ~PCACHE_DIRTY;

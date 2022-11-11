@@ -3,10 +3,6 @@
 #include <lunaix/common.h>
 #include <stdint.h>
 
-#define PG_SIZE_BITS 12
-#define PG_SIZE (1 << PG_SIZE_BITS)
-#define PG_INDEX_BITS 10
-
 #define PG_MAX_ENTRIES 1024U
 #define PG_LAST_TABLE PG_MAX_ENTRIES - 1
 #define PG_FIRST_TABLE 0
