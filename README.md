@@ -6,7 +6,8 @@
   <span>简体中文</span> | <a href="docs/README_en.md">English</a>
 </p>
 
-# LunaixOS Project 
+# LunaixOS Project
+
 LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有浓重个人风格的操作系统。开发过程以视频教程形式在Bilibili呈现：[《从零开始自制操作系统系列》](https://space.bilibili.com/12995787/channel/collectiondetail?sid=196337)。
 
 ## 当前进度以及支持的功能
@@ -28,7 +29,11 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + PCI 3.0
 + PCIe 1.1 (WIP)
 + Serial ATA AHCI
-+ 文件系统 (WIP)
++ 文件系统
+  + 虚拟文件系统
+  + ISO9660
+    + 原生
+    + Rock Ridge拓展 (WIP)
 + 远程GDB串口调试 (COM1@9600Bd)
 
 已经测试过的环境：
@@ -40,11 +45,11 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 
 ## 目录结构
 
-| | |
-|-----|------|
-| [lunaix-os](lunaix-os/) | LunaixOS源代码 |
-| [slides](slides/) | 视频中所用的幻灯片和补充材料 |
-| [reference-material](reference-material/)| 标准，技术文档和参考文献 |
+|                                           |                              |
+| ----------------------------------------- | ---------------------------- |
+| [lunaix-os](lunaix-os/)                   | LunaixOS源代码               |
+| [slides](slides/)                         | 视频中所用的幻灯片和补充材料 |
+| [reference-material](reference-material/) | 标准，技术文档和参考文献     |
 
 ## 编译与构建
 
@@ -61,16 +66,16 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 假若条件满足，那么可以直接执行`make all`进行构建，完成后可在生成的`build`目录下找到可引导的iso。
 
 本项目支持的make命令：
-| 命令 | 用途 |
-|---|---|
-| `make all` | 构建镜像（`-O2`，但禁用CSE相关的优化项 **※** ） |
-| `make instable` | 构建镜像（`-O2`，开启CSE相关优化） |
-| `make all-debug` | 构建适合调试用的镜像（`-Og`） |
-| `make run` | 使用QEMU运行build目录下的镜像|
-| `make debug-qemu` | 构建并使用QEMU进行调试 |
-| `make debug-bochs` | 构建并使用Bochs进行调试 |
-| `make debug-qemu-vscode` | 用于vscode整合 |
-| `make clean` | 删除build目录 |
+| 命令                     | 用途                                            |
+| ------------------------ | ----------------------------------------------- |
+| `make all`               | 构建镜像（`-O2`，但禁用CSE相关的优化项 **※** ） |
+| `make instable`          | 构建镜像（`-O2`，开启CSE相关优化）              |
+| `make all-debug`         | 构建适合调试用的镜像（`-Og`）                   |
+| `make run`               | 使用QEMU运行build目录下的镜像                   |
+| `make debug-qemu`        | 构建并使用QEMU进行调试                          |
+| `make debug-bochs`       | 构建并使用Bochs进行调试                         |
+| `make debug-qemu-vscode` | 用于vscode整合                                  |
+| `make clean`             | 删除build目录                                   |
 
 **※：由于在`-O2`模式下，GCC会进行CSE优化，这导致LunaixOS会出现一些非常奇怪、离谱的bug，从而影响到基本运行。具体原因有待调查。**
 
@@ -85,6 +90,7 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 如果你想要使用别的磁盘镜像，需要修改`configs/make-debug-tool`
 
 找到这一行：
+
 ```
 -drive id=disk,file="machine/disk0.vdi",if=none \
 ```
@@ -97,11 +103,11 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 
 下面列出一些可能会出现的问题。
 
-#### 问题#1： QEMU下8042控制器提示找不到。
+#### 问题#1： QEMU下8042控制器提示找不到
 
 这是QEMU配置ACPI时的一个bug，在7.0.0版中修复了。
 
-#### 问题#2：多进程运行时，偶尔会出现General Protection错误。
+#### 问题#2：多进程运行时，偶尔会出现General Protection错误
 
 这很大概率是出现了竞态条件。虽然是相当不可能的。但如果出现了，还是请提issue。
 
@@ -120,6 +126,7 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 当然，您也可以参考以下列表来了解现阶段的LunaixOS都使用了哪些资料（本列表会随着开发进度更新）：
 
 #### 手册，标准，技术文档
+
 + [Intel 64 and IA-32 Architecture Software Developer's Manual (Full Volume Bundle)](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html)
 + [ACPI Specification (version 6.4)](https://uefi.org/sites/default/files/resources/ACPI_Spec_6_4_Jan22.pdf)
 + IBM PC/AT Technical Reference
@@ -131,31 +138,37 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 + PCI Express Base Specification, Revision 1.1
 + PCI Firmware Specification, Revision 3.0
 + Serial ATA - Advanced Host Controller Interface (AHCI), Revision 1.3.1
-+ Serial ATA: HIgh Speed Serialized AT Attachment, Revision 3.2
++ Serial ATA: High Speed Serialized AT Attachment, Revision 3.2
 + SCSI Command Reference Manual
 + ATA/ATAPI Command Set - 3 (ACS-3)
++ [ECMA-119 (ISO9660)](https://www.ecma-international.org/publications-and-standards/standards/ecma-119/)
++ Rock Ridge Interchange Protocol (RRIP: IEEE P1282)
++ System Use Sharing Protocol (SUSP: IEEE P1281)
 
 **免责声明：PCI相关的标准最终解释权归PCI-SIG所有。此处提供的副本仅供个人学习使用。任何商用目的须向PCI-SIG购买。**
 
 #### 理论书籍
+
 + *Computer System - A Programmer's Perspective Third Edition (CS:APP)* (Bryant, R & O'Hallaron, D)
 + *Modern Operating System* (Tanenbaum, A)
 + 《汇编语言》（王爽） - 用于入门Intel语法的x86汇编（对于AT&T语法，推荐阅读CS:APP）
 + ~~《微机原理与接口技术》 - 用于大致了解x86架构的微机体系（更加细致的了解可以阅读Intel Manual）~~ （已过时，推荐阅读CS:APP）
 
 #### 网站
+
 + [OSDev](https://wiki.osdev.org/Main_Page) - 杂七杂八的参考，很多过来人的经验。作者主要用于上古资料查询以及收集；技术文献，手册，标准的粗略总结；以及开发环境/工具链的搭建。
 + [FreeVGA](http://www.osdever.net/FreeVGA/home.htm) - 98年的资源！关于VGA编程技术的宝藏网站。
 + GNU CC 和 GNU LD 的官方文档。
 + [PCI Lookup](https://www.pcilookup.com/) - PCI设备编号查询
 
 #### 其他
-+ Linux Manual - 用于查询*nix API的一些具体行为。
 
++ Linux Manual - 用于查询*nix API的一些具体行为。
 
 ## 附录1：支持的系统调用<a id="appendix1"></a>
 
 **Unix/Linux/POSIX**
+
 1. `sleep(3)`
 1. `wait(2)`
 1. `waitpid(2)`
@@ -200,7 +213,7 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 2. `setxattr(2)`※
 2. `fgetxattr(2)`※
 2. `fsetxattr(2)`※
-2. `ioctl(2)`※
+2. `ioctl(2)`
 2. `getpgid(2)`
 2. `setpgid(2)`
 
@@ -209,6 +222,7 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 1. `yield`
 2. `geterrno`
 3. `realpathat`
+4. `syslog`
 
 ( **※**：该系统调用暂未经过测试 )
 
@@ -216,9 +230,10 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 
 注意，gcc需要从源码构建，并配置为交叉编译器，即目标平台为`i686-elf`。你可以使用本项目提供的[自动化脚本](slides/c0-workspace/gcc-build.sh)，这将会涵盖gcc和binutils源码的下载，配置和编译（没什么时间去打磨脚本，目前只知道在笔者的Ubuntu系统上可以运行）。
 
-**推荐**手动编译。以下编译步骤搬运自：https://wiki.osdev.org/GCC_Cross-Compiler 
+**推荐**手动编译。以下编译步骤搬运自：<https://wiki.osdev.org/GCC_Cross-Compiler>
 
 **首先安装构建依赖项：**
+
 ```bash
 sudo apt update &&\
      apt install -y \
@@ -232,10 +247,12 @@ sudo apt update &&\
 ```
 
 **开始编译：**
+
 1. 获取[gcc](https://ftp.gnu.org/gnu/gcc/)和[binutils](https://ftp.gnu.org/gnu/binutils)源码
 2. 解压，并在同级目录为gcc和binutil新建专门的build文件夹
 
 现在假设你的目录结构如下：
+
 ```
 + folder
   + gcc-src
@@ -247,25 +264,31 @@ sudo apt update &&\
 3. 确定gcc和binutil安装的位置，并设置环境变量：`export PREFIX=<安装路径>` 然后设置PATH： `export PATH="$PREFIX/bin:$PATH"`
 4. 设置目标平台：`export TARGET=i686-elf`
 5. 进入`binutils-build`进行配置
+
 ```bash
 ../binutils-src/configure --target="$TARGET" --prefix="$PREFIX" \
-	--with-sysroot --disable-nls --disable-werror
+ --with-sysroot --disable-nls --disable-werror
 ```
+
 然后 `make && make install`
 
 6. 确保上述的`binutils`已经正常安装：执行：`which i686-elf-as`，应该会给出一个位于你安装目录下的路径。
 6. 进入`gcc-build`进行配置
+
 ```bash
 ../gcc-src/configure --target="$TARGET" --prefix="$PREFIX" \
-	--disable-nls --enable-languages=c,c++ --without-headers
+ --disable-nls --enable-languages=c,c++ --without-headers
 ```
+
 然后编译安装（取决性能，大约10~20分钟）：
+
 ```bash
 make all-gcc &&\
  make all-target-libgcc &&\
  make install-gcc &&\
  make install-target-libgcc
 ```
+
 8. 验证安装：执行`i686-elf-gcc -dumpmachine`，输出应该为：`i686-elf`
 
 **将新编译好的GCC永久添加到`PATH`环境变量**
@@ -283,6 +306,7 @@ make all-gcc &&\
 由于目前LunaixOS没有一个完善强大的内核追踪功能。假若Lunaix的运行出现任何问题，还请按照以下的描述，在Issue里面提供详细的信息。
 
 最好提供：
+
 + 可用于复现问题的描述和指引（如Lunaix运行平台的软硬件配置）
 + 错误症状描述
 + （如可能）运行截图

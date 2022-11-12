@@ -6,15 +6,15 @@
   <a href="../README.md"><b>简体中文</b></a> | <span><b>English</b></span>
 </p>
 
-# The LunaixOS Project 
+# The LunaixOS Project
+
 LunaixOS - A simple (yet naive), POSIX-complaint (hopefully!), operating system from scratch. This is started for educational & learning purpose, for my online video tutorial on OS development **in Chinese**：[*Do It Yourself an Operating System*](https://space.bilibili.com/12995787/channel/collectiondetail?sid=196337).
 
 ## Features
 
-This operating system is a macro-kernel, has its root in Intel's x86 platform and its ecosystem. It runs in protected mode and uses 4GiB addressing with two-level paging mechanism. It does not have x86_64 variant and does not support multi-core machine. 
+This operating system is a macro-kernel, has its root in Intel's x86 platform and its ecosystem. It runs in protected mode and uses 4GiB addressing with two-level paging mechanism. It does not have x86_64 variant and does not support multi-core machine.
 
 The virtual address space is divided into two parts, that is, 3GiB for user space (0x400000 ~ 0xBFFFFFFF) and 1GiB for kernel space (0xC0000000 ~ 0xFFFFFFFF). Such paradigm is a common practicing found in major operating systems, for example x86_32 version of Linux and Windows. For a more detailed arrangement of memory in LunaixOS, please refer to [LunaixOS Virtual Memory Mappings](img/lunaix-os-mem.png).
-
 
 The following list presents all features it does have in current stage.
 
@@ -31,9 +31,13 @@ The following list presents all features it does have in current stage.
 + PCI 3.0
 + PCIe 1.1 (WIP)
 + Serial ATA AHCI
-+ Virtual File System
++ File System
+  + Virtual File System
+  + ISO9660
+    + Original
+    + Rock Ridge Extension (WIP)
 + GDB Remote debugger (via UART)
-  
+
 The OS has been tested in the following environments, including both virtual and bare-metal.
 
 + QEMU (>=7.0.0)
@@ -101,7 +105,7 @@ To maximize the value of this section, we will provide some FAQ below that hopef
 
 This is a issue related to misconfiguration of ACPI table in QEMU, and has been addressed in version 7.0.0.
 
-#### Q2: General Protection exception get triggered.
+#### Q2: General Protection exception get triggered
 
 It is possible a race condition result from multiprogramming. This is not possible in current stage, and we however encourage you to report in case of it.
 
@@ -132,30 +136,35 @@ The following list also enumerated such materials the author has used:
 + PCI Express Base Specification, Revision 1.1
 + PCI Firmware Specification, Revision 3.0
 + Serial ATA - Advanced Host Controller Interface (AHCI), Revision 1.3.1
-+ Serial ATA: HIgh Speed Serialized AT Attachment, Revision 3.2
++ Serial ATA: High Speed Serialized AT Attachment, Revision 3.2
 + SCSI Command Reference Manual
 + ATA/ATAPI Command Set - 3 (ACS-3)
++ [ECMA-119 (ISO9660)](https://www.ecma-international.org/publications-and-standards/standards/ecma-119/)
++ Rock Ridge Interchange Protocol (RRIP: IEEE P1282)
++ System Use Sharing Protocol (SUSP: IEEE P1281)
 
 **DISCLAIMER: All rights of PCI-related specification is reserved by PCI-SIG. It is provided ONLY for learning purpose. Any commercial use should purchase a copy from PCI-SIG**
 
 #### Textbook
+
 + *Computer System - A Programmer's Perspective Third Edition* (Bryant, R & O'Hallaron, D), a.k.a. CS:APP
 + *Modern Operating System* (Tanenbaum, A)
 
+#### Website
 
-#### Website 
 + [OSDev](https://wiki.osdev.org/Main_Page) - For material gathering.
 + [FreeVGA](http://www.osdever.net/FreeVGA/home.htm) - For VGA references.
 + GNU CC & LD online documentation.
 + [PCI Lookup](https://www.pcilookup.com/) - For device look up
 
 #### Others
-+ Linux Manual - For learning the system call behavior on real machine.
 
++ Linux Manual - For learning the system call behavior on real machine.
 
 ## Appendix 1: Supported System Call<a id="appendix1"></a>
 
 **Unix/Linux/POSIX**
+
 1. `sleep(3)`
 1. `wait(2)`
 1. `waitpid(2)`
