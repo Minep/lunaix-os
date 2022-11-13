@@ -90,7 +90,7 @@ def export_c(src: Path):
 uint64_t _idt[IDT_ENTRY];
 uint16_t _idt_limit = sizeof(_idt) - 1;
 static inline void
-_set_idt_entry(uint32_t vector,
+_set_idt_entry(u32_t vector,
                uint16_t seg_selector,
                void (*isr)(),
                uint8_t dpl,

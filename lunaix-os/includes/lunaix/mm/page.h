@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_PAGE_H
 #define __LUNAIX_PAGE_H
 #include <lunaix/common.h>
-#include <stdint.h>
+#include <lunaix/types.h>
 
 #define PG_MAX_ENTRIES 1024U
 #define PG_LAST_TABLE PG_MAX_ENTRIES - 1
@@ -14,9 +14,9 @@
 
 #define PG_ALIGN(addr) ((uintptr_t)(addr)&0xFFFFF000UL)
 
-#define L1_INDEX(vaddr) (uint32_t)(((uintptr_t)(vaddr)&0xFFC00000UL) >> 22)
-#define L2_INDEX(vaddr) (uint32_t)(((uintptr_t)(vaddr)&0x003FF000UL) >> 12)
-#define PG_OFFSET(vaddr) (uint32_t)((uintptr_t)(vaddr)&0x00000FFFUL)
+#define L1_INDEX(vaddr) (u32_t)(((uintptr_t)(vaddr)&0xFFC00000UL) >> 22)
+#define L2_INDEX(vaddr) (u32_t)(((uintptr_t)(vaddr)&0x003FF000UL) >> 12)
+#define PG_OFFSET(vaddr) (u32_t)((uintptr_t)(vaddr)&0x00000FFFUL)
 
 #define GET_PT_ADDR(pde) PG_ALIGN(pde)
 #define GET_PG_ADDR(pte) PG_ALIGN(pte)
@@ -66,7 +66,7 @@
 typedef unsigned long ptd_t;
 typedef unsigned long pt_t;
 typedef unsigned int pt_attr;
-typedef uint32_t x86_pte_t;
+typedef u32_t x86_pte_t;
 
 /**
  * @brief 虚拟映射属性
@@ -77,7 +77,7 @@ typedef struct
     // 虚拟页地址
     uintptr_t va;
     // 物理页码（如果不存在映射，则为0）
-    uint32_t pn;
+    u32_t pn;
     // 物理页地址（如果不存在映射，则为0）
     uintptr_t pa;
     // 映射的flags

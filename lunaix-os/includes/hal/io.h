@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_IO_H
 #define __LUNAIX_IO_H
 
-#include <stdint.h>
+#include <lunaix/types.h>
 
 static inline uint8_t
 io_inb(int port)
@@ -41,10 +41,10 @@ io_insw(int port, void* addr, int cnt)
                  : "memory", "cc");
 }
 
-static inline uint32_t
+static inline u32_t
 io_inl(int port)
 {
-    uint32_t data;
+    u32_t data;
     asm volatile("inl %w1,%0" : "=a"(data) : "d"(port));
     return data;
 }
@@ -106,19 +106,18 @@ io_outsl(int port, const void* addr, int cnt)
 }
 
 static inline void
-io_outl(int port, uint32_t data)
+io_outl(int port, u32_t data)
 {
     asm volatile("outl %0,%w1" : : "a"(data), "d"(port));
 }
 static inline void
 io_delay(int counter)
 {
-    asm volatile (
-        "   test %0, %0\n"
-        "   jz 1f\n"
-        "2: dec %0\n"
-        "   jnz 2b\n"
-        "1: dec %0"::"a"(counter));
+    asm volatile("   test %0, %0\n"
+                 "   jz 1f\n"
+                 "2: dec %0\n"
+                 "   jnz 2b\n"
+                 "1: dec %0" ::"a"(counter));
 }
 
 #endif /* __LUNAIX_IO_H */

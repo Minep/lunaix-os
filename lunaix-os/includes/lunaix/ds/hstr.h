@@ -7,8 +7,8 @@
 
 struct hstr
 {
-    uint32_t hash;
-    uint32_t len;
+    u32_t hash;
+    u32_t len;
     const char* value;
 };
 
@@ -27,7 +27,7 @@ struct hstr
 #define HSTR_EQ(str1, str2) ((str1)->hash == (str2)->hash)
 
 inline void
-hstr_rehash(struct hstr* hash_str, uint32_t truncate_to)
+hstr_rehash(struct hstr* hash_str, u32_t truncate_to)
 {
     hash_str->hash = strhash_32(hash_str->value, truncate_to);
 }

@@ -1,14 +1,14 @@
 
 #include <arch/x86/idt.h>
-#include <stdint.h>
 #include <arch/x86/intrhnds.h>
+#include <lunaix/types.h>
 
 #define IDT_ENTRY 256
 
 uint64_t _idt[IDT_ENTRY];
 uint16_t _idt_limit = sizeof(_idt) - 1;
 static inline void
-_set_idt_entry(uint32_t vector,
+_set_idt_entry(u32_t vector,
                uint16_t seg_selector,
                void (*isr)(),
                uint8_t dpl,
@@ -20,7 +20,9 @@ _set_idt_entry(uint32_t vector,
     _idt[vector] |= (seg_selector << 16) | (offset & 0x0000ffff);
 }
 
-void _init_idt() {
+void
+_init_idt()
+{
     _set_idt_entry(0, 8, _asm_isr0, 0, IDT_INTERRUPT);
     _set_idt_entry(1, 8, _asm_isr1, 0, IDT_INTERRUPT);
     _set_idt_entry(2, 8, _asm_isr2, 0, IDT_INTERRUPT);

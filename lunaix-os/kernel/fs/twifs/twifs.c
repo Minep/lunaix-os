@@ -22,7 +22,7 @@ static struct twifs_node* fs_root;
 
 static struct cake_pile* twi_pile;
 
-static volatile uint32_t inode_id = 0;
+static volatile u32_t inode_id = 0;
 
 extern const struct v_file_ops twifs_file_ops;
 extern const struct v_inode_ops twifs_inode_ops;
@@ -31,7 +31,7 @@ struct twifs_node*
 __twifs_new_node(struct twifs_node* parent,
                  const char* name,
                  int name_len,
-                 uint32_t itype)
+                 u32_t itype)
 {
     struct twifs_node* node = cake_grab(twi_pile);
     memset(node, 0, sizeof(*node));

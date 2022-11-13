@@ -18,12 +18,12 @@
 
 #define PACK(size, flags) (((size) & ~0x3) | (flags))
 
-#define SW(p, w) (*((uint32_t*)(p)) = w)
-#define LW(p) (*((uint32_t*)(p)))
+#define SW(p, w) (*((u32_t*)(p)) = w)
+#define LW(p) (*((u32_t*)(p)))
 
-#define HPTR(bp) ((uint32_t*)(bp)-1)
+#define HPTR(bp) ((u32_t*)(bp)-1)
 #define BPTR(bp) ((uint8_t*)(bp) + WSIZE)
-#define FPTR(hp, size) ((uint32_t*)(hp + size - WSIZE))
+#define FPTR(hp, size) ((u32_t*)(hp + size - WSIZE))
 #define NEXT_CHK(hp) ((uint8_t*)(hp) + CHUNK_S(LW(hp)))
 
 #define BOUNDARY 4

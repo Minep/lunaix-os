@@ -17,7 +17,7 @@ LOG_MODULE("INTR")
 extern void
 intr_routine_page_fault(const isr_param* param);
 
-extern uint32_t debug_resv;
+extern u32_t debug_resv;
 
 void
 __print_panic_msg(const char* msg, const isr_param* param)
@@ -79,7 +79,7 @@ intr_routine_apic_spi(const isr_param* param)
 void
 intr_routine_apic_error(const isr_param* param)
 {
-    uint32_t error_reg = apic_read_reg(APIC_ESR);
+    u32_t error_reg = apic_read_reg(APIC_ESR);
     char buf[32];
     ksprintf(buf, "APIC error, ESR=0x%x", error_reg);
     console_flush();

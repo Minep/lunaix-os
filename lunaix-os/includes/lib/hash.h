@@ -1,12 +1,12 @@
 #ifndef __LUNAIX_HASH_H
 #define __LUNAIX_HASH_H
 
-#include <stdint.h>
+#include <lunaix/types.h>
 
 #define HASH_SIZE_BITS 32
 
-uint32_t
-strhash_32(const char* str, uint32_t truncate_to);
+u32_t
+strhash_32(const char* str, u32_t truncate_to);
 
 /**
  * @brief Simple generic hash function
@@ -15,10 +15,10 @@ strhash_32(const char* str, uint32_t truncate_to);
  * https://elixir.bootlin.com/linux/v5.18.12/source/include/linux/hash.h#L60
  *
  * @param val
- * @return uint32_t
+ * @return u32_t
  */
-inline uint32_t
-hash_32(const uint32_t val, uint32_t truncate_to)
+inline u32_t
+hash_32(const u32_t val, u32_t truncate_to)
 {
     return (val * 0x61C88647u) >> (HASH_SIZE_BITS - truncate_to);
 }

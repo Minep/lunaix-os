@@ -26,12 +26,12 @@ void
 ioapic_init();
 
 void
-ioapic_write(uint8_t sel, uint32_t val);
+ioapic_write(uint8_t sel, u32_t val);
 
-uint32_t
+u32_t
 ioapic_read(uint8_t sel);
 
 void
-ioapic_redirect(uint8_t irq, uint8_t vector, uint8_t dest, uint32_t flags);
+ioapic_redirect(uint8_t irq, uint8_t vector, uint8_t dest, u32_t flags);
 
 #endif /* __LUNAIX_IOAPIC_H */

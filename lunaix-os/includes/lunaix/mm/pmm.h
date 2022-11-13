@@ -21,12 +21,12 @@
  */
 #define PP_FGLOCKED 0x2
 
-typedef uint32_t pp_attr_t;
+typedef u32_t pp_attr_t;
 
 struct pp_struct
 {
     pid_t owner;
-    uint32_t ref_counts;
+    u32_t ref_counts;
     pp_attr_t attr;
 };
 
@@ -63,7 +63,7 @@ pmm_mark_chunk_free(uintptr_t start_ppn, size_t page_count);
  */
 void
 pmm_mark_chunk_occupied(pid_t owner,
-                        uintptr_t start_ppn,
+                        u32_t start_ppn,
                         size_t page_count,
                         pp_attr_t attr);
 

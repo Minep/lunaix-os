@@ -65,18 +65,18 @@ struct pci_driver;
 
 struct pci_base_addr
 {
-    uint32_t start;
-    uint32_t size;
-    uint32_t type;
+    u32_t start;
+    u32_t size;
+    u32_t type;
 };
 
 struct pci_device
 {
     struct llist_header dev_chain;
-    uint32_t device_info;
-    uint32_t class_info;
-    uint32_t cspace_base;
-    uint32_t msi_loc;
+    u32_t device_info;
+    u32_t class_info;
+    u32_t cspace_base;
+    u32_t msi_loc;
     uint16_t intr_info;
     struct
     {
@@ -101,14 +101,14 @@ struct pci_driver
 //      Refer to "PCI Local Bus Specification, Rev.3, Section 3.2.2.3.2"
 
 static inline pci_reg_t
-pci_read_cspace(uint32_t base, int offset)
+pci_read_cspace(u32_t base, int offset)
 {
     io_outl(PCI_CONFIG_ADDR, base | (offset & ~0x3));
     return io_inl(PCI_CONFIG_DATA);
 }
 
 static inline void
-pci_write_cspace(uint32_t base, int offset, pci_reg_t data)
+pci_write_cspace(u32_t base, int offset, pci_reg_t data)
 {
     io_outl(PCI_CONFIG_ADDR, base | (offset & ~0x3));
     io_outl(PCI_CONFIG_DATA, data);
@@ -128,7 +128,7 @@ pci_init();
  *
  * @return struct pci_device*
  */
-struct pci_device* pci_get_device_by_class(uint32_t class);
+struct pci_device* pci_get_device_by_class(u32_t class);
 
 /**
  * @brief 根据设备商ID和设备ID，在拓扑中寻找一个设备
@@ -151,7 +151,7 @@ pci_get_device_by_id(uint16_t vendorId, uint16_t deviceId);
  * @return size_t
  */
 size_t
-pci_bar_sizing(struct pci_device* dev, uint32_t* bar_out, uint32_t bar_num);
+pci_bar_sizing(struct pci_device* dev, u32_t* bar_out, u32_t bar_num);
 
 /**
  * @brief 配置并启用设备MSI支持。

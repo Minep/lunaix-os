@@ -129,7 +129,7 @@
 //     mutex_lock(&kheap.lock);
 
 //     uint8_t* chunk_ptr = (uint8_t*)ptr - WSIZE;
-//     uint32_t hdr = LW(chunk_ptr);
+//     u32_t hdr = LW(chunk_ptr);
 //     size_t sz = CHUNK_S(hdr);
 //     uint8_t* next_hdr = chunk_ptr + sz;
 
@@ -165,7 +165,7 @@
 //     //  and space for header
 //     size = ROUNDUP(size + WSIZE, BOUNDARY);
 //     while (ptr < (uint8_t*)heap->brk) {
-//         uint32_t header = *((uint32_t*)ptr);
+//         u32_t header = *((u32_t*)ptr);
 //         size_t chunk_size = CHUNK_S(header);
 //         if (!chunk_size && CHUNK_A(header)) {
 //             break;
@@ -192,20 +192,20 @@
 // void
 // place_chunk(uint8_t* ptr, size_t size)
 // {
-//     uint32_t header = *((uint32_t*)ptr);
+//     u32_t header = *((u32_t*)ptr);
 //     size_t chunk_size = CHUNK_S(header);
-//     *((uint32_t*)ptr) = PACK(size, CHUNK_PF(header) | M_ALLOCATED);
+//     *((u32_t*)ptr) = PACK(size, CHUNK_PF(header) | M_ALLOCATED);
 //     uint8_t* n_hdrptr = (uint8_t*)(ptr + size);
-//     uint32_t diff = chunk_size - size;
+//     u32_t diff = chunk_size - size;
 
 //     if (!diff) {
 //         // if the current free block is fully occupied
-//         uint32_t n_hdr = LW(n_hdrptr);
+//         u32_t n_hdr = LW(n_hdrptr);
 //         // notify the next block about our avaliability
 //         SW(n_hdrptr, n_hdr & ~0x2);
 //     } else {
 //         // if there is remaining free space left
-//         uint32_t remainder_hdr = PACK(diff, M_NOT_ALLOCATED |
+//         u32_t remainder_hdr = PACK(diff, M_NOT_ALLOCATED |
 //         M_PREV_ALLOCATED); SW(n_hdrptr, remainder_hdr); SW(FPTR(n_hdrptr,
 //         diff), remainder_hdr);
 
@@ -224,32 +224,32 @@
 // void*
 // coalesce(uint8_t* chunk_ptr)
 // {
-//     uint32_t hdr = LW(chunk_ptr);
-//     uint32_t pf = CHUNK_PF(hdr);
-//     uint32_t sz = CHUNK_S(hdr);
+//     u32_t hdr = LW(chunk_ptr);
+//     u32_t pf = CHUNK_PF(hdr);
+//     u32_t sz = CHUNK_S(hdr);
 
-//     uint32_t n_hdr = LW(chunk_ptr + sz);
+//     u32_t n_hdr = LW(chunk_ptr + sz);
 
 //     if (CHUNK_A(n_hdr) && pf) {
 //         // case 1: prev is free
-//         uint32_t prev_ftr = LW(chunk_ptr - WSIZE);
+//         u32_t prev_ftr = LW(chunk_ptr - WSIZE);
 //         size_t prev_chunk_sz = CHUNK_S(prev_ftr);
-//         uint32_t new_hdr = PACK(prev_chunk_sz + sz, CHUNK_PF(prev_ftr));
+//         u32_t new_hdr = PACK(prev_chunk_sz + sz, CHUNK_PF(prev_ftr));
 //         SW(chunk_ptr - prev_chunk_sz, new_hdr);
 //         SW(FPTR(chunk_ptr, sz), new_hdr);
 //         chunk_ptr -= prev_chunk_sz;
 //     } else if (!CHUNK_A(n_hdr) && !pf) {
 //         // case 2: next is free
 //         size_t next_chunk_sz = CHUNK_S(n_hdr);
-//         uint32_t new_hdr = PACK(next_chunk_sz + sz, pf);
+//         u32_t new_hdr = PACK(next_chunk_sz + sz, pf);
 //         SW(chunk_ptr, new_hdr);
 //         SW(FPTR(chunk_ptr, sz + next_chunk_sz), new_hdr);
 //     } else if (!CHUNK_A(n_hdr) && pf) {
 //         // case 3: both free
-//         uint32_t prev_ftr = LW(chunk_ptr - WSIZE);
+//         u32_t prev_ftr = LW(chunk_ptr - WSIZE);
 //         size_t next_chunk_sz = CHUNK_S(n_hdr);
 //         size_t prev_chunk_sz = CHUNK_S(prev_ftr);
-//         uint32_t new_hdr =
+//         u32_t new_hdr =
 //           PACK(next_chunk_sz + prev_chunk_sz + sz, CHUNK_PF(prev_ftr));
 //         SW(chunk_ptr - prev_chunk_sz, new_hdr);
 //         SW(FPTR(chunk_ptr, sz + next_chunk_sz), new_hdr);
@@ -274,8 +274,8 @@
 //     // minus the overhead for epilogue, keep the invariant.
 //     heap->brk -= WSIZE;
 
-//     uint32_t old_marker = *((uint32_t*)start);
-//     uint32_t free_hdr = PACK(sz, CHUNK_PF(old_marker));
+//     u32_t old_marker = *((u32_t*)start);
+//     u32_t free_hdr = PACK(sz, CHUNK_PF(old_marker));
 //     SW(start, free_hdr);
 //     SW(FPTR(start, sz), free_hdr);
 //     SW(NEXT_CHK(start), PACK(0, M_ALLOCATED | M_PREV_FREE));

@@ -8,13 +8,13 @@
  * @param str
  * @return unsigned int
  */
-uint32_t
-strhash_32(const char* str, uint32_t truncate_to)
+u32_t
+strhash_32(const char* str, u32_t truncate_to)
 {
     if (!str)
         return 0;
 
-    uint32_t hash = 5381;
+    u32_t hash = 5381;
     int c;
 
     while ((c = *str++))

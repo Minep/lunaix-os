@@ -24,14 +24,14 @@
 
 typedef struct
 {
-    uint32_t signature_l;
-    uint32_t signature_h;
+    u32_t signature_l;
+    u32_t signature_h;
     uint8_t chksum;
     char oem_id[6];
     // Revision
     uint8_t rev;
     acpi_rsdt_t* rsdt;
-    uint32_t length;
+    u32_t length;
     acpi_sdthdr_t* xsdt;
     uint8_t x_chksum;
     char reserved[3]; // Reserved field

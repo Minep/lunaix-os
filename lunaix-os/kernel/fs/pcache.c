@@ -41,7 +41,7 @@ pcache_release_page(struct pcache* pcache, struct pcache_pg* page)
 }
 
 struct pcache_pg*
-pcache_new_page(struct pcache* pcache, uint32_t index)
+pcache_new_page(struct pcache* pcache, u32_t index)
 {
     struct pcache_pg* ppg = vzalloc(sizeof(struct pcache_pg));
     void* pg = valloc(PG_SIZE);
@@ -78,8 +78,8 @@ pcache_set_dirty(struct pcache* pcache, struct pcache_pg* pg)
 
 int
 pcache_get_page(struct pcache* pcache,
-                uint32_t index,
-                uint32_t* offset,
+                u32_t index,
+                u32_t* offset,
                 struct pcache_pg** page)
 {
     struct pcache_pg* pg = btrie_get(&pcache->tree, index);
@@ -98,9 +98,9 @@ pcache_get_page(struct pcache* pcache,
 }
 
 int
-pcache_write(struct v_inode* inode, void* data, uint32_t len, uint32_t fpos)
+pcache_write(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
 {
-    uint32_t pg_off, buf_off = 0;
+    u32_t pg_off, buf_off = 0;
     struct pcache* pcache = inode->pg_cache;
     struct pcache_pg* pg;
 
@@ -110,7 +110,7 @@ pcache_write(struct v_inode* inode, void* data, uint32_t len, uint32_t fpos)
             return ENOMEM;
         }
 
-        uint32_t wr_bytes = MIN(PG_SIZE - pg_off, len - buf_off);
+        u32_t wr_bytes = MIN(PG_SIZE - pg_off, len - buf_off);
         memcpy(pg->pg + pg_off, (data + buf_off), wr_bytes);
 
         pcache_set_dirty(pcache, pg);
@@ -124,9 +124,9 @@ pcache_write(struct v_inode* inode, void* data, uint32_t len, uint32_t fpos)
 }
 
 int
-pcache_read(struct v_inode* inode, void* data, uint32_t len, uint32_t fpos)
+pcache_read(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
 {
-    uint32_t pg_off, buf_off = 0, new_pg = 0;
+    u32_t pg_off, buf_off = 0, new_pg = 0;
     int errno = 0;
     struct pcache* pcache = inode->pg_cache;
     struct pcache_pg* pg;
@@ -149,7 +149,7 @@ pcache_read(struct v_inode* inode, void* data, uint32_t len, uint32_t fpos)
             }
             pg->len = errno;
         }
-        uint32_t rd_bytes = MIN(pg->len - pg_off, len - buf_off);
+        u32_t rd_bytes = MIN(pg->len - pg_off, len - buf_off);
 
         if (!rd_bytes)
             break;

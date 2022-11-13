@@ -109,13 +109,13 @@ vfs_init()
 }
 
 inline struct hbucket*
-__dcache_hash(struct v_dnode* parent, uint32_t* hash)
+__dcache_hash(struct v_dnode* parent, u32_t* hash)
 {
-    uint32_t _hash = *hash;
+    u32_t _hash = *hash;
     // 确保低位更加随机
     _hash = _hash ^ (_hash >> VFS_HASHBITS);
     // 与parent的指针值做加法，来减小碰撞的可能性。
-    _hash += (uint32_t)parent;
+    _hash += (u32_t)parent;
     *hash = _hash;
     return &dnode_cache[_hash & VFS_HASH_MASK];
 }
@@ -130,7 +130,7 @@ vfs_dcache_lookup(struct v_dnode* parent, struct hstr* str)
         return parent->parent;
     }
 
-    uint32_t hash = str->hash;
+    u32_t hash = str->hash;
     struct hbucket* slot = __dcache_hash(parent, &hash);
 
     struct v_dnode *pos, *n;
@@ -439,7 +439,7 @@ vfs_d_free(struct v_dnode* dnode)
 }
 
 struct v_inode*
-vfs_i_find(struct v_superblock* sb, uint32_t i_id)
+vfs_i_find(struct v_superblock* sb, u32_t i_id)
 {
     struct hbucket* slot = &sb->i_cache[i_id & VFS_HASH_MASK];
     struct v_inode *pos, *n;

@@ -192,7 +192,7 @@ ahci_driver_init(struct pci_device* ahci_dev)
                 i,
                 hbadev->model,
                 hbadev->block_size,
-                (uint32_t)hbadev->max_lba);
+                (u32_t)hbadev->max_lba);
 
         ahci_register_device(hbadev);
     }
@@ -218,7 +218,7 @@ __get_free_slot(struct hba_port* port)
     hba_reg_t pxsact = port->regs[HBA_RPxSACT];
     hba_reg_t pxci = port->regs[HBA_RPxCI];
     hba_reg_t free_bmp = pxsact | pxci;
-    uint32_t i = 0;
+    u32_t i = 0;
     for (; i <= port->hba->cmd_slots && (free_bmp & 0x1); i++, free_bmp >>= 1)
         ;
     return i | -(i > port->hba->cmd_slots);
@@ -393,7 +393,7 @@ ahci_init_device(struct hba_port* port)
         goto fail;
     }
 
-    scsi_parse_capacity(port->device, (uint32_t*)data_in);
+    scsi_parse_capacity(port->device, (u32_t*)data_in);
 
 done:
     // reset interrupt status and unmask D2HR interrupt

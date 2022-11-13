@@ -60,7 +60,7 @@
         lru_use_one(dnode_lru, &dnode->lru);                                   \
     })
 
-typedef uint32_t inode_t;
+typedef u32_t inode_t;
 
 struct v_dnode;
 struct v_inode;
@@ -83,7 +83,7 @@ struct filesystem
 {
     struct hlist_node fs_list;
     struct hstr fs_name;
-    uint32_t types;
+    u32_t types;
     int fs_id;
     int (*mount)(struct v_superblock* vsb, struct v_dnode* mount_point);
     int (*unmount)(struct v_superblock* vsb);
@@ -95,13 +95,13 @@ struct v_superblock
     struct device* dev;
     struct v_dnode* root;
     struct filesystem* fs;
-    uint32_t iobuf_size;
+    u32_t iobuf_size;
     struct hbucket* i_cache;
     void* data;
     struct
     {
-        uint32_t (*read_capacity)(struct v_superblock* vsb);
-        uint32_t (*read_usage)(struct v_superblock* vsb);
+        u32_t (*read_capacity)(struct v_superblock* vsb);
+        u32_t (*read_usage)(struct v_superblock* vsb);
         void (*init_inode)(struct v_superblock* vsb, struct v_inode* inode);
     } ops;
 };
@@ -172,7 +172,7 @@ struct v_file
     struct v_inode* inode;
     struct v_dnode* dnode;
     struct llist_header* f_list;
-    uint32_t f_pos;
+    u32_t f_pos;
     atomic_ulong ref_count;
     struct v_file_ops* ops; // for caching
 };
@@ -200,15 +200,15 @@ struct v_inode
 {
     inode_t id;
     mutex_t lock;
-    uint32_t itype;
+    u32_t itype;
     time_t ctime;
     time_t mtime;
     time_t atime;
     lba_t lb_addr;
-    uint32_t open_count;
-    uint32_t link_count;
-    uint32_t lb_usage;
-    uint32_t fsize;
+    u32_t open_count;
+    u32_t link_count;
+    u32_t lb_usage;
+    u32_t fsize;
     void* data; // 允许底层FS绑定他的一些专有数据
     struct llist_header aka_dnodes;
     struct llist_header xattrs;
@@ -229,7 +229,7 @@ struct v_mount
     struct v_mount* parent;
     struct v_dnode* mnt_point;
     struct v_superblock* super_block;
-    uint32_t busy_counter;
+    u32_t busy_counter;
     int flags;
 };
 
@@ -262,8 +262,8 @@ struct pcache
     struct btrie tree;
     struct llist_header pages;
     struct llist_header dirty;
-    uint32_t n_dirty;
-    uint32_t n_pages;
+    u32_t n_dirty;
+    u32_t n_pages;
 };
 
 struct pcache_pg
@@ -273,9 +273,9 @@ struct pcache_pg
     struct lru_node lru;
     struct pcache* holder;
     void* pg;
-    uint32_t flags;
-    uint32_t fpos;
-    uint32_t len;
+    u32_t flags;
+    u32_t fpos;
+    u32_t len;
 };
 
 void
@@ -376,7 +376,7 @@ void
 vfs_d_free(struct v_dnode* dnode);
 
 struct v_inode*
-vfs_i_find(struct v_superblock* sb, uint32_t i_id);
+vfs_i_find(struct v_superblock* sb, u32_t i_id);
 
 void
 vfs_i_addhash(struct v_inode* inode);
@@ -412,22 +412,22 @@ void
 pcache_release_page(struct pcache* pcache, struct pcache_pg* page);
 
 struct pcache_pg*
-pcache_new_page(struct pcache* pcache, uint32_t index);
+pcache_new_page(struct pcache* pcache, u32_t index);
 
 void
 pcache_set_dirty(struct pcache* pcache, struct pcache_pg* pg);
 
 int
 pcache_get_page(struct pcache* pcache,
-                uint32_t index,
-                uint32_t* offset,
+                u32_t index,
+                u32_t* offset,
                 struct pcache_pg** page);
 
 int
-pcache_write(struct v_inode* inode, void* data, uint32_t len, uint32_t fpos);
+pcache_write(struct v_inode* inode, void* data, u32_t len, u32_t fpos);
 
 int
-pcache_read(struct v_inode* inode, void* data, uint32_t len, uint32_t fpos);
+pcache_read(struct v_inode* inode, void* data, u32_t len, u32_t fpos);
 
 void
 pcache_release(struct pcache* pcache);

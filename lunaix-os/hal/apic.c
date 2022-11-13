@@ -53,8 +53,8 @@ apic_init()
                  : "eax", "ecx", "edx");
 
     // Print the basic information of our current local APIC
-    uint32_t apic_id = apic_read_reg(APIC_IDR) >> 24;
-    uint32_t apic_ver = apic_read_reg(APIC_VER);
+    u32_t apic_id = apic_read_reg(APIC_IDR) >> 24;
+    u32_t apic_ver = apic_read_reg(APIC_VER);
 
     kprintf(KINFO "ID: %x, Version: %x, Max LVT: %u\n",
             apic_id,
@@ -74,7 +74,7 @@ apic_init()
     apic_write_reg(APIC_TPR, APIC_PRIORITY(2, 0));
 
     // enable APIC
-    uint32_t spiv = apic_read_reg(APIC_SPIVR);
+    u32_t spiv = apic_read_reg(APIC_SPIVR);
 
     // install our handler for spurious interrupt.
     spiv = (spiv & ~0xff) | APIC_SPIV_APIC_ENABLE | APIC_SPIV_IV;

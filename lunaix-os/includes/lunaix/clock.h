@@ -3,11 +3,11 @@
 
 #include <lunaix/types.h>
 
-typedef uint32_t time_t;
+typedef u32_t time_t;
 
 typedef struct
 {
-    uint32_t year; // use int32 as we need to store the 4-digit year
+    u32_t year; // use int32 as we need to store the 4-digit year
     uint8_t month;
     uint8_t day;
     uint8_t weekday;

@@ -81,18 +81,18 @@ struct hba_cmdh
 {
     uint16_t options;
     uint16_t prdt_len;
-    uint32_t transferred_size;
-    uint32_t cmd_table_base;
-    uint32_t reserved[5];
+    u32_t transferred_size;
+    u32_t cmd_table_base;
+    u32_t reserved[5];
 } __HBA_PACKED__;
 
 #define HBA_PRDTE_BYTE_CNT(cnt) ((cnt & 0x3FFFFF) | 0x1)
 
 struct hba_prdte
 {
-    uint32_t data_base;
-    uint32_t reserved[2];
-    uint32_t byte_count;
+    u32_t data_base;
+    u32_t reserved[2];
+    u32_t byte_count;
 } __HBA_PACKED__;
 
 struct hba_cmdt
@@ -113,9 +113,9 @@ struct hba_device
 {
     char serial_num[20];
     char model[40];
-    uint32_t flags;
+    u32_t flags;
     uint64_t max_lba;
-    uint32_t block_size;
+    u32_t block_size;
     uint64_t wwn;
     uint8_t cbd_size;
     struct
@@ -125,9 +125,9 @@ struct hba_device
         uint8_t status;
         uint8_t reserve;
     } last_result;
-    uint32_t alignment_offset;
-    uint32_t block_per_sec;
-    uint32_t capabilities;
+    u32_t alignment_offset;
+    u32_t block_per_sec;
+    u32_t capabilities;
     struct hba_port* port;
     struct ahci_hba* hba;
 

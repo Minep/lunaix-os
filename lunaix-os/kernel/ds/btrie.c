@@ -16,12 +16,12 @@
 #define BTRIE_INSERT 1
 
 struct btrie_node*
-__btrie_traversal(struct btrie* root, uint32_t index, int options)
+__btrie_traversal(struct btrie* root, u32_t index, int options)
 {
     index = index >> root->truncated;
-    uint32_t lz = index ? ROUNDDOWN(31 - __builtin_clz(index), BTRIE_BITS) : 0;
-    uint32_t bitmask = ((1 << BTRIE_BITS) - 1) << lz;
-    uint32_t i = 0;
+    u32_t lz = index ? ROUNDDOWN(31 - __builtin_clz(index), BTRIE_BITS) : 0;
+    u32_t bitmask = ((1 << BTRIE_BITS) - 1) << lz;
+    u32_t i = 0;
     struct btrie_node* tree = root->btrie_root;
 
     // Time complexity: O(log_2(log_2(N))) where N is the index to lookup
@@ -57,7 +57,7 @@ __btrie_traversal(struct btrie* root, uint32_t index, int options)
 }
 
 void
-btrie_init(struct btrie* btrie, uint32_t trunc_bits)
+btrie_init(struct btrie* btrie, u32_t trunc_bits)
 {
     btrie->btrie_root = vzalloc(sizeof(struct btrie_node));
     llist_init_head(&btrie->btrie_root->nodes);
@@ -66,7 +66,7 @@ btrie_init(struct btrie* btrie, uint32_t trunc_bits)
 }
 
 void*
-btrie_get(struct btrie* root, uint32_t index)
+btrie_get(struct btrie* root, u32_t index)
 {
     struct btrie_node* node = __btrie_traversal(root, index, 0);
     if (!node) {
@@ -76,7 +76,7 @@ btrie_get(struct btrie* root, uint32_t index)
 }
 
 void
-btrie_set(struct btrie* root, uint32_t index, void* data)
+btrie_set(struct btrie* root, u32_t index, void* data)
 {
     struct btrie_node* node = __btrie_traversal(root, index, BTRIE_INSERT);
     node->data = data;
@@ -98,7 +98,7 @@ __btrie_rm_recursive(struct btrie_node* node)
 }
 
 void*
-btrie_remove(struct btrie* root, uint32_t index)
+btrie_remove(struct btrie* root, u32_t index)
 {
     struct btrie_node* node = __btrie_traversal(root, index, 0);
     if (!node) {

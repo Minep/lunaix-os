@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_CPU_H
 #define __LUNAIX_CPU_H
 
-#include <stdint.h>
+#include <lunaix/types.h>
 
 #define SEL_RPL(selector) ((selector)&0x3)
 
@@ -124,9 +124,9 @@ cpu_int(int vect)
 }
 
 void
-cpu_rdmsr(uint32_t msr_idx, uint32_t* reg_high, uint32_t* reg_low);
+cpu_rdmsr(u32_t msr_idx, u32_t* reg_high, u32_t* reg_low);
 
 void
-cpu_wrmsr(uint32_t msr_idx, uint32_t reg_high, uint32_t reg_low);
+cpu_wrmsr(u32_t msr_idx, u32_t reg_high, u32_t reg_low);
 
 #endif

@@ -5,7 +5,8 @@
 
 // Pulled from ACPI Specification (v6.4) section 5.2.9
 
-enum PMProfile {
+enum PMProfile
+{
     Desktop = 1,
     Mobile = 2,
     Workstation = 3,
@@ -32,28 +33,29 @@ enum PMProfile {
 #define ITIME_MON_ALARM 1
 #define ITIME_CENTURY 2
 
-#define IAPC_ARCH_LEGACY   0x1
-#define IAPC_ARCH_8042     0x2
-#define IAPC_ARCH_NO_VGA   0x4
-#define IAPC_ARCH_NO_MSI   0x8
-#define IAPC_ARCH_ASPM     0x10
-#define IAPC_ARCH_NO_RTC   0x20
+#define IAPC_ARCH_LEGACY 0x1
+#define IAPC_ARCH_8042 0x2
+#define IAPC_ARCH_NO_VGA 0x4
+#define IAPC_ARCH_NO_MSI 0x8
+#define IAPC_ARCH_ASPM 0x10
+#define IAPC_ARCH_NO_RTC 0x20
 
-typedef struct acpi_fadt {
+typedef struct acpi_fadt
+{
     acpi_sdthdr_t header;
-    uint32_t firmware_controller_addr;
-    uint32_t dsdt_addr;
+    u32_t firmware_controller_addr;
+    u32_t dsdt_addr;
     uint8_t reserved;
     uint8_t pm_profile;
     uint16_t sci_int;
-    uint32_t smi_cmd_port_addr;
+    u32_t smi_cmd_port_addr;
     uint8_t smi_acpi_enable;
     uint8_t smi_acpi_disable;
     uint8_t smi_s4bios_state;
     uint8_t smi_pstate;
-    uint32_t pm_reg_ports[6];
-    uint32_t gpe0_port_addr;
-    uint32_t gpe1_port_addr;
+    u32_t pm_reg_ports[6];
+    u32_t gpe0_port_addr;
+    u32_t gpe1_port_addr;
     uint8_t pm_reg_lens[4];
     uint8_t gpe0_len;
     uint8_t gpe1_len;

@@ -38,8 +38,8 @@ void
 __blk_rd_wwid(struct twimap* map)
 {
     struct hba_device* hbadev = twimap_data(map, struct hba_device*);
-    uint32_t h = hbadev->wwn >> 32;
-    uint32_t l = (uint32_t)hbadev->wwn;
+    u32_t h = hbadev->wwn >> 32;
+    u32_t l = (u32_t)hbadev->wwn;
     if ((h | l)) {
         twimap_printf(map, "wwn:%x%x", h, l);
     } else {

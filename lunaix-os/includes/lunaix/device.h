@@ -19,7 +19,7 @@ typedef unsigned int dev_t;
 
 struct device
 {
-    uint32_t magic;
+    u32_t magic;
     struct llist_header siblings;
     struct llist_header children;
     struct device* parent;
@@ -32,14 +32,14 @@ struct device
     int (*write)(struct device* dev, void* buf, size_t offset, size_t len);
     int (*read_page)(struct device* dev, void* buf, size_t offset);
     int (*write_page)(struct device* dev, void* buf, size_t offset);
-    int (*exec_cmd)(struct device* dev, uint32_t req, va_list args);
+    int (*exec_cmd)(struct device* dev, u32_t req, va_list args);
 };
 
 struct device*
 device_add(struct device* parent,
            void* underlay,
            char* name_fmt,
-           uint32_t type,
+           u32_t type,
            va_list args);
 
 struct device*

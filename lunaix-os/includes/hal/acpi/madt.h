@@ -28,7 +28,7 @@ typedef struct
     acpi_ics_hdr_t header;
     uint8_t processor_id;
     uint8_t apic_id;
-    uint32_t flags;
+    u32_t flags;
 } ACPI_TABLE_PACKED acpi_apic_t;
 
 /**
@@ -43,9 +43,10 @@ typedef struct
     acpi_ics_hdr_t header;
     uint8_t ioapic_id;
     uint8_t reserved;
-    uint32_t ioapic_addr;
-    // The global system interrupt offset for this IOAPIC. (Kind of IRQ offset for a slave IOAPIC)
-    uint32_t gis_offset;
+    u32_t ioapic_addr;
+    // The global system interrupt offset for this IOAPIC. (Kind of IRQ offset
+    // for a slave IOAPIC)
+    u32_t gis_offset;
 } ACPI_TABLE_PACKED acpi_ioapic_t;
 
 /**
@@ -65,7 +66,7 @@ typedef struct
     // PIC
     uint8_t source;
     // global system interrupt. The override of source in APIC mode
-    uint32_t gsi;
+    u32_t gsi;
     uint16_t flags;
 } ACPI_TABLE_PACKED acpi_intso_t;
 
@@ -73,7 +74,7 @@ typedef struct
 {
     acpi_sdthdr_t header;
     void* apic_addr;
-    uint32_t flags;
+    u32_t flags;
     // Here is a bunch of packed ICS reside here back-to-back.
 } ACPI_TABLE_PACKED acpi_madt_t;
 

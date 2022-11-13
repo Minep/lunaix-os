@@ -2,7 +2,7 @@
 #include <klibc/stdio.h>
 #include <klibc/stdlib.h>
 #include <klibc/string.h>
-#include <stdint.h>
+#include <lunaix/types.h>
 
 #define NUMBUFSIZ 24
 
@@ -26,7 +26,7 @@ __ksprintf_internal(char* buffer, char* fmt, size_t max_len, va_list vargs)
     //      Of course, with some modifications for porting to LunaixOS :)
 
     char numbuf[NUMBUFSIZ];
-    uint32_t ptr = 0;
+    u32_t ptr = 0;
     for (; *fmt; ++fmt) {
         if (max_len && ptr >= max_len - 1) {
             break;

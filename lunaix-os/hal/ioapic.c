@@ -4,8 +4,8 @@
 #include <lunaix/common.h>
 #include <lunaix/mm/mmio.h>
 
-#define IOAPIC_REG_SEL *((volatile uint32_t*)(_ioapic_base + IOAPIC_IOREGSEL))
-#define IOAPIC_REG_WIN *((volatile uint32_t*)(_ioapic_base + IOAPIC_IOWIN))
+#define IOAPIC_REG_SEL *((volatile u32_t*)(_ioapic_base + IOAPIC_IOREGSEL))
+#define IOAPIC_REG_WIN *((volatile u32_t*)(_ioapic_base + IOAPIC_IOWIN))
 
 static volatile uintptr_t _ioapic_base;
 
@@ -20,13 +20,13 @@ ioapic_init()
 }
 
 void
-ioapic_write(uint8_t sel, uint32_t val)
+ioapic_write(uint8_t sel, u32_t val)
 {
     IOAPIC_REG_SEL = sel;
     IOAPIC_REG_WIN = val;
 }
 
-uint32_t
+u32_t
 ioapic_read(uint8_t sel)
 {
     IOAPIC_REG_SEL = sel;
@@ -34,7 +34,7 @@ ioapic_read(uint8_t sel)
 }
 
 void
-ioapic_redirect(uint8_t irq, uint8_t vector, uint8_t dest, uint32_t flags)
+ioapic_redirect(uint8_t irq, uint8_t vector, uint8_t dest, u32_t flags)
 {
     uint8_t reg_sel = IOAPIC_IOREDTBL_BASE + irq * 2;
 

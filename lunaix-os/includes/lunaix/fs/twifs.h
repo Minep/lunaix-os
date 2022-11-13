@@ -10,7 +10,7 @@ struct twifs_node
     struct hstr name;
     inode_t ino_id;
     void* data;
-    uint32_t itype;
+    u32_t itype;
     char name_val[VFS_NAME_MAXLEN];
     struct llist_header children;
     struct llist_header siblings;

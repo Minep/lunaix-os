@@ -21,10 +21,10 @@
 
 struct input_evt_pkt
 {
-    uint32_t pkt_type;  // packet type
-    uint32_t scan_code; // hardware raw code
-    uint32_t sys_code;  // driver translated code
-    time_t timestamp;   // event timestamp
+    u32_t pkt_type;   // packet type
+    u32_t scan_code;  // hardware raw code
+    u32_t sys_code;   // driver translated code
+    time_t timestamp; // event timestamp
 };
 
 struct input_device

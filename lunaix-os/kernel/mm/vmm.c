@@ -85,8 +85,8 @@ vmm_del_mapping(uintptr_t mnt, uintptr_t va)
 {
     assert(((uintptr_t)va & 0xFFFU) == 0);
 
-    uint32_t l1_index = L1_INDEX(va);
-    uint32_t l2_index = L2_INDEX(va);
+    u32_t l1_index = L1_INDEX(va);
+    u32_t l2_index = L2_INDEX(va);
 
     // prevent unmap of recursive mapping region
     if (l1_index == 1023) {
@@ -113,8 +113,8 @@ vmm_del_mapping(uintptr_t mnt, uintptr_t va)
 int
 vmm_lookup(uintptr_t va, v_mapping* mapping)
 {
-    uint32_t l1_index = L1_INDEX(va);
-    uint32_t l2_index = L2_INDEX(va);
+    u32_t l1_index = L1_INDEX(va);
+    u32_t l2_index = L2_INDEX(va);
 
     x86_page_table* l1pt = (x86_page_table*)L1_BASE_VADDR;
     x86_pte_t l1pte = l1pt->entry[l1_index];
@@ -137,8 +137,8 @@ vmm_lookup(uintptr_t va, v_mapping* mapping)
 void*
 vmm_v2p(void* va)
 {
-    uint32_t l1_index = L1_INDEX(va);
-    uint32_t l2_index = L2_INDEX(va);
+    u32_t l1_index = L1_INDEX(va);
+    u32_t l2_index = L2_INDEX(va);
 
     x86_page_table* l1pt = (x86_page_table*)L1_BASE_VADDR;
     x86_pte_t l1pte = l1pt->entry[l1_index];

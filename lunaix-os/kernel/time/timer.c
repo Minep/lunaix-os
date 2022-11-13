@@ -40,11 +40,11 @@ static volatile struct lx_timer_context* timer_ctx = NULL;
 
 // Don't optimize them! Took me an half hour to figure that out...
 
-static volatile uint32_t rtc_counter = 0;
+static volatile u32_t rtc_counter = 0;
 static volatile uint8_t apic_timer_done = 0;
 
-static volatile uint32_t sched_ticks = 0;
-static volatile uint32_t sched_ticks_counter = 0;
+static volatile u32_t sched_ticks = 0;
+static volatile u32_t sched_ticks_counter = 0;
 
 static struct cake_pile* timer_pile;
 
@@ -64,7 +64,7 @@ timer_init_context()
 }
 
 void
-timer_init(uint32_t frequency)
+timer_init(u32_t frequency)
 {
     timer_init_context();
 
@@ -79,8 +79,8 @@ timer_init(uint32_t frequency)
     //       mapping config.
 
     // grab ourselves these irq numbers
-    uint32_t iv_rtc = isrm_bindirq(PC_AT_IRQ_RTC, temp_intr_routine_rtc_tick);
-    uint32_t iv_timer = isrm_ivexalloc(temp_intr_routine_apic_timer);
+    u32_t iv_rtc = isrm_bindirq(PC_AT_IRQ_RTC, temp_intr_routine_rtc_tick);
+    u32_t iv_timer = isrm_ivexalloc(temp_intr_routine_apic_timer);
 
     // Setup a one-shot timer, we will use this to measure the bus speed. So we
     // can then calibrate apic timer to work at *nearly* accurate hz
@@ -154,7 +154,7 @@ timer_init(uint32_t frequency)
 }
 
 struct lx_timer*
-timer_run_second(uint32_t second,
+timer_run_second(u32_t second,
                  void (*callback)(void*),
                  void* payload,
                  uint8_t flags)
@@ -164,7 +164,7 @@ timer_run_second(uint32_t second,
 }
 
 struct lx_timer*
-timer_run_ms(uint32_t millisecond,
+timer_run_ms(u32_t millisecond,
              void (*callback)(void*),
              void* payload,
              uint8_t flags)

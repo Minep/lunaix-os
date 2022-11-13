@@ -113,7 +113,7 @@ tty_set_cursor(uint8_t x, uint8_t y)
     if (x >= TTY_WIDTH || y >= TTY_HEIGHT) {
         x = y = 0;
     }
-    uint32_t pos = y * TTY_WIDTH + x;
+    u32_t pos = y * TTY_WIDTH + x;
     io_outb(0x3D4, 14);
     io_outb(0x3D5, pos / 256);
     io_outb(0x3D4, 15);

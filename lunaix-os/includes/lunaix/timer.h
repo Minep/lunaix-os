@@ -8,7 +8,7 @@
 
 #define TIMER_MODE_PERIODIC 0x1
 
-typedef uint32_t ticks_t;
+typedef u32_t ticks_t;
 
 struct lx_timer_context
 {
@@ -22,7 +22,7 @@ struct lx_timer_context
      * @brief Desired system running frequency
      *
      */
-    uint32_t running_frequency;
+    u32_t running_frequency;
     /**
      * @brief Ticks per hertz
      *
@@ -46,16 +46,16 @@ struct lx_timer
  * @param frequency The frequency that timer should run in Hz.
  */
 void
-timer_init(uint32_t frequency);
+timer_init(u32_t frequency);
 
 struct lx_timer*
-timer_run_second(uint32_t second,
+timer_run_second(u32_t second,
                  void (*callback)(void*),
                  void* payload,
                  uint8_t flags);
 
 struct lx_timer*
-timer_run_ms(uint32_t millisecond,
+timer_run_ms(u32_t millisecond,
              void (*callback)(void*),
              void* payload,
              uint8_t flags);

@@ -17,18 +17,18 @@
 #define IDDEV_OFFLPP 106
 #define IDDEV_OFFCAPABILITIES 49
 
-static uint32_t cdb_size[] = { SCSI_CDB12, SCSI_CDB16, 0, 0 };
+static u32_t cdb_size[] = { SCSI_CDB12, SCSI_CDB16, 0, 0 };
 
 void
 ahci_parse_dev_info(struct hba_device* dev_info, uint16_t* data)
 {
-    dev_info->max_lba = *((uint32_t*)(data + IDDEV_OFFMAXLBA));
-    dev_info->block_size = *((uint32_t*)(data + IDDEV_OFFLSECSIZE));
+    dev_info->max_lba = *((u32_t*)(data + IDDEV_OFFMAXLBA));
+    dev_info->block_size = *((u32_t*)(data + IDDEV_OFFLSECSIZE));
     dev_info->cbd_size = cdb_size[(*data & 0x3)];
     dev_info->wwn = *(uint64_t*)(data + IDDEV_OFFWWN);
     dev_info->block_per_sec = 1 << (*(data + IDDEV_OFFLPP) & 0xf);
     dev_info->alignment_offset = *(data + IDDEV_OFFALIGN) & 0x3fff;
-    dev_info->capabilities = *((uint32_t*)(data + IDDEV_OFFCAPABILITIES));
+    dev_info->capabilities = *((u32_t*)(data + IDDEV_OFFCAPABILITIES));
 
     if (!dev_info->block_size) {
         dev_info->block_size = 512;

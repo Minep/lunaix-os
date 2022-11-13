@@ -36,7 +36,7 @@ _init_page(ptd_t* ptd)
 
     // 对低1MiB空间进行对等映射（Identity
     // mapping），也包括了我们的VGA，方便内核操作。
-    for (uint32_t i = 0; i < 256; i++) {
+    for (u32_t i = 0; i < 256; i++) {
         SET_PTE(ptd,
                 PG_TABLE_IDENTITY,
                 i,
@@ -46,7 +46,7 @@ _init_page(ptd_t* ptd)
     // 对等映射我们的hhk_init，这样一来，当分页与地址转换开启后，我们依然能够照常执行最终的
     // jmp 指令来跳转至
     //  内核的入口点
-    for (uint32_t i = 0; i < HHK_PAGE_COUNT; i++) {
+    for (u32_t i = 0; i < HHK_PAGE_COUNT; i++) {
         SET_PTE(ptd,
                 PG_TABLE_IDENTITY,
                 256 + i,
@@ -57,14 +57,14 @@ _init_page(ptd_t* ptd)
 
     // 这里是一些计算，主要是计算应当映射进的 页目录 与 页表 的条目索引（Entry
     // Index）
-    uint32_t kernel_pde_index = L1_INDEX(sym_val(__kernel_start));
-    uint32_t kernel_pte_index = L2_INDEX(sym_val(__kernel_start));
-    uint32_t kernel_pg_counts = KERNEL_PAGE_COUNT;
+    u32_t kernel_pde_index = L1_INDEX(sym_val(__kernel_start));
+    u32_t kernel_pte_index = L2_INDEX(sym_val(__kernel_start));
+    u32_t kernel_pg_counts = KERNEL_PAGE_COUNT;
 
     // 将内核所需要的页表注册进页目录
     //  当然，就现在而言，我们的内核只占用不到50个页（每个页表包含1024个页）
     //  这里分配了3个页表（12MiB），未雨绸缪。
-    for (uint32_t i = 0; i < PG_TABLE_STACK - PG_TABLE_KERNEL; i++) {
+    for (u32_t i = 0; i < PG_TABLE_STACK - PG_TABLE_KERNEL; i++) {
         SET_PDE(ptd,
                 kernel_pde_index + i,
                 NEW_L1_ENTRY(PG_PREM_URW, PT_ADDR(ptd, PG_TABLE_KERNEL + i)))
@@ -82,7 +82,7 @@ _init_page(ptd_t* ptd)
     uintptr_t kernel_pm = V2P(&__kernel_start);
 
     // 重映射内核至高半区地址（>=0xC0000000）
-    for (uint32_t i = 0; i < kernel_pg_counts; i++) {
+    for (u32_t i = 0; i < kernel_pg_counts; i++) {
         // FIXME: 只是用作用户模式（R3）测试！
         //        在实际中，内核代码除了极少部分需要暴露给R3（如从信号返回），其余的应为R0。
         SET_PTE(ptd,
@@ -95,7 +95,7 @@ _init_page(ptd_t* ptd)
     SET_PDE(ptd, PG_MAX_ENTRIES - 1, NEW_L1_ENTRY(T_SELF_REF_PERM, ptd));
 }
 
-uint32_t
+u32_t
 __save_subset(uint8_t* destination, uint8_t* base, unsigned int size)
 {
     unsigned int i = 0;
@@ -108,7 +108,7 @@ __save_subset(uint8_t* destination, uint8_t* base, unsigned int size)
 void
 _save_multiboot_info(multiboot_info_t* info, uint8_t* destination)
 {
-    uint32_t current = 0;
+    u32_t current = 0;
     uint8_t* info_b = (uint8_t*)info;
     for (; current < sizeof(multiboot_info_t); current++) {
         *(destination + current) = *(info_b + current);
@@ -129,13 +129,13 @@ _save_multiboot_info(multiboot_info_t* info, uint8_t* destination)
 }
 
 void
-_hhk_init(ptd_t* ptd, uint32_t kpg_size)
+_hhk_init(ptd_t* ptd, u32_t kpg_size)
 {
 
     // 初始化 kpg 全为0
     //      P.s. 真没想到GRUB会在这里留下一堆垃圾！ 老子的页表全乱套了！
     uint8_t* kpg = (uint8_t*)ptd;
-    for (uint32_t i = 0; i < kpg_size; i++) {
+    for (u32_t i = 0; i < kpg_size; i++) {
         *(kpg + i) = 0;
     }
 

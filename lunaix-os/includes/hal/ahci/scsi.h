@@ -21,8 +21,8 @@ struct scsi_cdb12
 {
     uint8_t opcode;
     uint8_t misc1;
-    uint32_t lba_be;
-    uint32_t length;
+    u32_t lba_be;
+    u32_t length;
     uint8_t misc2;
     uint8_t ctrl;
 } __attribute__((packed));
@@ -31,9 +31,9 @@ struct scsi_cdb16
 {
     uint8_t opcode;
     uint8_t misc1;
-    uint32_t lba_be_hi;
-    uint32_t lba_be_lo;
-    uint32_t length;
+    u32_t lba_be_hi;
+    u32_t lba_be_lo;
+    u32_t length;
     uint8_t misc2;
     uint8_t ctrl;
 } __attribute__((packed));
@@ -41,19 +41,19 @@ struct scsi_cdb16
 void
 scsi_create_packet12(struct scsi_cdb12* cdb,
                      uint8_t opcode,
-                     uint32_t lba,
-                     uint32_t alloc_size);
+                     u32_t lba,
+                     u32_t alloc_size);
 
 void
 scsi_create_packet16(struct scsi_cdb16* cdb,
                      uint8_t opcode,
                      uint64_t lba,
-                     uint32_t alloc_size);
+                     u32_t alloc_size);
 
 void
 scsi_submit(struct hba_device* dev, struct blkio_req* io_req);
 
 void
-scsi_parse_capacity(struct hba_device* device, uint32_t* parameter);
+scsi_parse_capacity(struct hba_device* device, u32_t* parameter);
 
 #endif /* __LUNAIX_ATAPI_H */

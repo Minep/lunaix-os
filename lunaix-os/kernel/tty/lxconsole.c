@@ -39,8 +39,8 @@ print_control_code(const char cntrl)
 int
 __lxconsole_listener(struct input_device* dev)
 {
-    uint32_t key = dev->current_pkt.sys_code;
-    uint32_t type = dev->current_pkt.pkt_type;
+    u32_t key = dev->current_pkt.sys_code;
+    u32_t type = dev->current_pkt.pkt_type;
     kbd_kstate_t state = key >> 16;
     ttychr = key & 0xff;
     key = key & 0xffff;
@@ -86,7 +86,7 @@ done:
 }
 
 int
-__tty_exec_cmd(struct device* dev, uint32_t req, va_list args)
+__tty_exec_cmd(struct device* dev, u32_t req, va_list args)
 {
     switch (req) {
         case TIOCGPGRP:

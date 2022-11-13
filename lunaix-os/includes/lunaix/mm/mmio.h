@@ -1,12 +1,12 @@
 #ifndef __LUNAIX_MMIO_H
 #define __LUNAIX_MMIO_H
 
-#include <stdint.h>
+#include <lunaix/types.h>
 
 void*
-ioremap(uintptr_t paddr, uint32_t size);
+ioremap(uintptr_t paddr, u32_t size);
 
 void*
-iounmap(uintptr_t vaddr, uint32_t size);
+iounmap(uintptr_t vaddr, u32_t size);
 
 #endif /* __LUNAIX_MMIO_H */

@@ -12,8 +12,8 @@
 void
 scsi_create_packet12(struct scsi_cdb12* cdb,
                      uint8_t opcode,
-                     uint32_t lba,
-                     uint32_t alloc_size)
+                     u32_t lba,
+                     u32_t alloc_size)
 {
     memset(cdb, 0, sizeof(*cdb));
     cdb->opcode = opcode;
@@ -25,17 +25,17 @@ void
 scsi_create_packet16(struct scsi_cdb16* cdb,
                      uint8_t opcode,
                      uint64_t lba,
-                     uint32_t alloc_size)
+                     u32_t alloc_size)
 {
     memset(cdb, 0, sizeof(*cdb));
     cdb->opcode = opcode;
-    cdb->lba_be_hi = SCSI_FLIP((uint32_t)(lba >> 32));
-    cdb->lba_be_lo = SCSI_FLIP((uint32_t)lba);
+    cdb->lba_be_hi = SCSI_FLIP((u32_t)(lba >> 32));
+    cdb->lba_be_lo = SCSI_FLIP((u32_t)lba);
     cdb->length = SCSI_FLIP(alloc_size);
 }
 
 void
-scsi_parse_capacity(struct hba_device* device, uint32_t* parameter)
+scsi_parse_capacity(struct hba_device* device, u32_t* parameter)
 {
     if (device->cbd_size == SCSI_CDB16) {
         device->max_lba =
@@ -62,7 +62,7 @@ scsi_submit(struct hba_device* dev, struct blkio_req* io_req)
     header->options |= (HBA_CMDH_WRITE * (write == 1)) | HBA_CMDH_ATAPI;
 
     size_t size = vbuf_size(io_req->vbuf);
-    uint32_t count = ICEIL(size, port->device->block_size);
+    u32_t count = ICEIL(size, port->device->block_size);
 
     struct sata_reg_fis* fis = (struct sata_reg_fis*)table->command_fis;
     void* cdb = table->atapi_cmd;

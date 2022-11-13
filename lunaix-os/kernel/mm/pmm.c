@@ -30,7 +30,7 @@ pmm_mark_chunk_free(uintptr_t start_ppn, size_t page_count)
 
 void
 pmm_mark_chunk_occupied(pid_t owner,
-                        uint32_t start_ppn,
+                        u32_t start_ppn,
                         size_t page_count,
                         pp_attr_t attr)
 {
@@ -140,7 +140,7 @@ pmm_ref_page(pid_t owner, void* page)
 {
     (void*)owner; // TODO: do smth with owner
 
-    uint32_t ppn = (uintptr_t)page >> 12;
+    u32_t ppn = (uintptr_t)page >> 12;
 
     if (ppn >= PM_BMP_MAX_SIZE) {
         return 0;
@@ -158,7 +158,7 @@ pmm_ref_page(pid_t owner, void* page)
 struct pp_struct*
 pmm_query(void* pa)
 {
-    uint32_t ppn = (uintptr_t)pa >> 12;
+    u32_t ppn = (uintptr_t)pa >> 12;
 
     if (ppn >= PM_BMP_MAX_SIZE) {
         return NULL;

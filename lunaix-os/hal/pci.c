@@ -28,7 +28,7 @@ pci_probe_msi_info(struct pci_device* device);
 void
 pci_probe_device(int bus, int dev, int funct)
 {
-    uint32_t base = PCI_ADDRESS(bus, dev, funct);
+    u32_t base = PCI_ADDRESS(bus, dev, funct);
     pci_reg_t reg1 = pci_read_cspace(base, 0);
 
     // Vendor=0xffff则表示设备不存在
@@ -102,7 +102,7 @@ pci_probe()
 void
 pci_probe_bar_info(struct pci_device* device)
 {
-    uint32_t bar;
+    u32_t bar;
     struct pci_base_addr* ba;
     for (size_t i = 0; i < 6; i++) {
         ba = &device->bar[i];
@@ -132,7 +132,7 @@ pci_probe_msi_info(struct pci_device* device)
     }
 
     pci_reg_t cap_ptr = pci_read_cspace(device->cspace_base, 0x34) & 0xff;
-    uint32_t cap_hdr;
+    u32_t cap_hdr;
 
     while (cap_ptr) {
         cap_hdr = pci_read_cspace(device->cspace_base, cap_ptr);
@@ -242,7 +242,7 @@ pci_build_fsmapping()
 }
 
 size_t
-pci_bar_sizing(struct pci_device* dev, uint32_t* bar_out, uint32_t bar_num)
+pci_bar_sizing(struct pci_device* dev, u32_t* bar_out, u32_t bar_num)
 {
     pci_reg_t bar = pci_read_cspace(dev->cspace_base, PCI_REG_BAR(bar_num));
     if (!bar) {
@@ -265,10 +265,10 @@ void
 pci_setup_msi(struct pci_device* device, int vector)
 {
     // Dest: APIC#0, Physical Destination, No redirection
-    uint32_t msi_addr = (__APIC_BASE_PADDR);
+    u32_t msi_addr = (__APIC_BASE_PADDR);
 
     // Edge trigger, Fixed delivery
-    uint32_t msi_data = vector;
+    u32_t msi_data = vector;
 
     pci_write_cspace(
       device->cspace_base, PCI_MSI_ADDR(device->msi_loc), msi_addr);
@@ -294,7 +294,7 @@ pci_setup_msi(struct pci_device* device, int vector)
 struct pci_device*
 pci_get_device_by_id(uint16_t vendorId, uint16_t deviceId)
 {
-    uint32_t dev_info = vendorId | (deviceId << 16);
+    u32_t dev_info = vendorId | (deviceId << 16);
     struct pci_device *pos, *n;
     llist_for_each(pos, n, &pci_devices, dev_chain)
     {
@@ -307,7 +307,7 @@ pci_get_device_by_id(uint16_t vendorId, uint16_t deviceId)
 }
 
 struct pci_device*
-pci_get_device_by_class(uint32_t class)
+pci_get_device_by_class(u32_t class)
 {
     struct pci_device *pos, *n;
     llist_for_each(pos, n, &pci_devices, dev_chain)

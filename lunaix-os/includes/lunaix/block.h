@@ -44,7 +44,7 @@ struct lpt_header
 } __attribute__((packed));
 
 typedef u64_t partition_t;
-typedef uint32_t bdev_t;
+typedef u32_t bdev_t;
 typedef void (*devfs_exporter)(struct block_dev* bdev, void* fsnode);
 
 void

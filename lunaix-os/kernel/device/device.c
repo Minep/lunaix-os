@@ -15,7 +15,7 @@ struct device*
 device_add(struct device* parent,
            void* underlay,
            char* name_fmt,
-           uint32_t type,
+           u32_t type,
            va_list args)
 {
     struct device* dev = vzalloc(sizeof(struct device));

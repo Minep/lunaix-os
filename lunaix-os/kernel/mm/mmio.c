@@ -4,7 +4,7 @@
 #include <lunaix/spike.h>
 
 void*
-ioremap(uintptr_t paddr, uint32_t size)
+ioremap(uintptr_t paddr, u32_t size)
 {
     void* ptr = vmm_vmap(paddr, size, PG_PREM_RW | PG_DISABLE_CACHE);
     if (ptr) {
@@ -17,7 +17,7 @@ ioremap(uintptr_t paddr, uint32_t size)
 }
 
 void*
-iounmap(uintptr_t vaddr, uint32_t size)
+iounmap(uintptr_t vaddr, u32_t size)
 {
     for (size_t i = 0; i < size; i += PG_SIZE) {
         uintptr_t paddr = vmm_del_mapping(PD_REFERENCED, vaddr + i);

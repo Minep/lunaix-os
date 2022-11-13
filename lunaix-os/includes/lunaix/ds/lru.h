@@ -15,7 +15,7 @@ struct lru_zone
 {
     struct llist_header lead_node;
     struct llist_header zones;
-    uint32_t objects;
+    u32_t objects;
     evict_cb try_evict;
 };
 

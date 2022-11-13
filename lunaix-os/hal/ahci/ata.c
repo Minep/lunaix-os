@@ -9,7 +9,7 @@
 void
 sata_read_error(struct hba_port* port)
 {
-    uint32_t tfd = port->regs[HBA_RPxTFD];
+    u32_t tfd = port->regs[HBA_RPxTFD];
     port->device->last_result.sense_key = (tfd & 0xf000) >> 12;
     port->device->last_result.error = (tfd & 0x0f00) >> 8;
     port->device->last_result.status = tfd & 0x00ff;
