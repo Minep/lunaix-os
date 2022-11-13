@@ -68,15 +68,18 @@ iso9660_setup_dnode(struct v_dnode* dnode, struct v_inode* inode)
         return 0;
     }
 
+    struct iso_inode* isoino = inode->data;
+    if (!llist_empty(&isoino->drecaches)) {
+        dnode->data = &isoino->drecaches;
+        vfs_assign_inode(dnode, inode);
+        return 0;
+    }
+
     int errno = 0;
     struct device* dev = dnode->super_block->dev;
-    struct iso_inode* isoino = inode->data;
-    struct llist_header* lead = valloc(sizeof(*lead));
     void* records = valloc(ISO9660_BLKSZ);
     u32_t current_pos = -ISO9660_BLKSZ, max_pos = inode->fsize,
           blk = inode->lb_addr * ISO9660_BLKSZ, blk_offset = (u32_t)-1;
-
-    llist_init_head(lead);
 
     // As per 6.8.1, Directory structure shall NOT recorded in interleave mode.
     do {
@@ -105,13 +108,12 @@ iso9660_setup_dnode(struct v_dnode* dnode, struct v_inode* inode)
         struct iso_drecache* cache = cake_grab(drec_cache_pile);
 
         iso9660_fill_drecache(cache, drec, mdu->len);
-        llist_append(lead, &cache->caches);
+        llist_append(&isoino->drecaches, &cache->caches);
     cont:
         blk_offset += mdu->len;
     } while (current_pos + blk_offset < max_pos);
 
-    dnode->data = lead;
-    isoino->drecaches = lead;
+    dnode->data = &isoino->drecaches;
 
     vfs_assign_inode(dnode, inode);
 
@@ -126,10 +128,9 @@ int
 iso9660_dir_lookup(struct v_inode* this, struct v_dnode* dnode)
 {
     struct iso_inode* isoino = this->data;
-    struct llist_header* lead = isoino->drecaches;
     struct iso_drecache *pos, *n;
 
-    llist_for_each(pos, n, lead, caches)
+    llist_for_each(pos, n, &isoino->drecaches, caches)
     {
         if (HSTR_EQ(&dnode->name, &pos->name)) {
             goto found;

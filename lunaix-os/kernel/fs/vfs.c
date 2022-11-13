@@ -500,7 +500,12 @@ vfs_i_free(struct v_inode* inode)
         pcache_release(inode->pg_cache);
         vfree(inode->pg_cache);
     }
-    inode->ops->sync(inode);
+    // we don't need to sync inode.
+    // If an inode can be free, then it must be properly closed.
+    // Hence it must be synced already!
+    if (inode->destruct) {
+        inode->destruct(inode);
+    }
     hlist_delete(&inode->hash_list);
     cake_release(inode_pile, inode);
 }

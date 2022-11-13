@@ -218,6 +218,8 @@ struct v_inode
     struct pcache* pg_cache;
     struct v_inode_ops* ops;
     struct v_file_ops* default_fops;
+
+    void (*destruct)(struct v_inode* inode);
 };
 
 struct v_mount

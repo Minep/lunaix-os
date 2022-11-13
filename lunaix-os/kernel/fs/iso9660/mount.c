@@ -92,7 +92,7 @@ done:
 int
 iso9660_unmount(struct v_superblock* vsb)
 {
-    // TODO clean up
+    vfree(vsb->data);
 }
 
 void

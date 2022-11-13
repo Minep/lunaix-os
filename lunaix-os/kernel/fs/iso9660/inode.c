@@ -1,8 +1,11 @@
 #include <klibc/string.h>
 #include <lunaix/fs.h>
 #include <lunaix/fs/iso9660.h>
+#include <lunaix/mm/cake.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
+
+extern struct cake_pile* drec_cache_pile;
 
 static struct v_inode_ops iso_inode_ops = {
     .dir_lookup = iso9660_dir_lookup,
@@ -18,9 +21,26 @@ static struct v_file_ops iso_file_ops = { .close = iso9660_close,
                                           .readdir = iso9660_readdir };
 
 void
+iso9660_inode_destruct(struct v_inode* inode)
+{
+    struct iso_inode* isoino = inode->data;
+
+    struct iso_drecache *pos, *n;
+    llist_for_each(pos, n, &isoino->drecaches, caches)
+    {
+        cake_release(drec_cache_pile, pos);
+    }
+
+    vfree(isoino);
+}
+
+void
 iso9660_init_inode(struct v_superblock* vsb, struct v_inode* inode)
 {
-    inode->data = vzalloc(sizeof(struct iso_inode));
+    struct iso_inode* isoino = vzalloc(sizeof(struct iso_inode));
+    llist_init_head(&isoino->drecaches);
+    inode->data = isoino;
+    inode->destruct = iso9660_inode_destruct;
 }
 
 int

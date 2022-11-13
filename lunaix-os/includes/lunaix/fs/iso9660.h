@@ -272,7 +272,7 @@ struct iso_inode
     u32_t record_fmt;
     u32_t fu_size;
     u32_t gap_size;
-    struct llist_header* drecaches;
+    struct llist_header drecaches;
 };
 
 struct iso_drecache
