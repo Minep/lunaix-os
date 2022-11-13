@@ -10,7 +10,9 @@
 extern struct cake_pile* drec_cache_pile;
 
 void
-iso9660_fill_drecache(struct iso_drecache* cache, struct iso_drecord* drec)
+iso9660_fill_drecache(struct iso_drecache* cache,
+                      struct iso_drecord* drec,
+                      u32_t drec_len)
 {
     *cache = (struct iso_drecache){ .data_size = drec->data_size.le,
                                     .extent_addr = drec->extent_addr.le,
@@ -18,16 +20,44 @@ iso9660_fill_drecache(struct iso_drecache* cache, struct iso_drecord* drec)
                                     .fu_size = drec->fu_sz ? drec->fu_sz : 1,
                                     .gap_size = drec->gap_sz,
                                     .xattr_len = drec->xattr_len };
-    u32_t l = drec->name.len;
-    while (l < (u32_t)-1 && drec->name.content[l--] != ';')
-        ;
-    l++;
-    l = l ? l : drec->name.len;
-    l = MIN(l, ISO9660_IDLEN - 1);
+    u32_t padding = ((drec->name.len + sizeof(drec->name)) % 2) != 0;
+    u32_t su_offset = drec->name.len + sizeof(struct iso_drecord) + padding;
+    int su_len = drec_len - su_offset - 2, i = 0;
 
-    strncpy(cache->name_val, drec->name.content, l);
-    cache->name = HSTR(cache->name_val, l);
-    hstr_rehash(&cache->name, HSTR_FULL_HASH);
+    while (i < su_len) {
+        struct isosu_base* su_entry =
+          (struct isosu_base*)((void*)drec + su_offset + i);
+        switch (su_entry->signature) {
+            case ISORR_NM:
+                i += isorr_parse_nm(cache, (void*)su_entry);
+                break;
+            case ISORR_PX:
+                i += isorr_parse_px(cache, (void*)su_entry);
+                break;
+            case ISORR_TF:
+                i += isorr_parse_tf(cache, (void*)su_entry);
+                break;
+            case ISOSU_ST:
+                goto done;
+            default:
+                i += su_entry->length;
+                break;
+        }
+    }
+
+done:
+    if (!cache->name.len) {
+        // Load ISO9660 file id if no NM found.
+        u32_t l = drec->name.len;
+        while (l < (u32_t)-1 && drec->name.content[l--] != ';')
+            ;
+        l = (l + 1) ? l : drec->name.len;
+        l = MIN(l, ISO9660_IDLEN - 1);
+
+        strncpy(cache->name_val, drec->name.content, l);
+        cache->name = HSTR(cache->name_val, l);
+        hstr_rehash(&cache->name, HSTR_FULL_HASH);
+    }
 }
 
 int
@@ -74,7 +104,7 @@ iso9660_setup_dnode(struct v_dnode* dnode, struct v_inode* inode)
 
         struct iso_drecache* cache = cake_grab(drec_cache_pile);
 
-        iso9660_fill_drecache(cache, drec);
+        iso9660_fill_drecache(cache, drec, mdu->len);
         llist_append(lead, &cache->caches);
     cont:
         blk_offset += mdu->len;

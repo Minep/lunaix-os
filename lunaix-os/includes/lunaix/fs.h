@@ -275,6 +275,7 @@ struct pcache_pg
     void* pg;
     uint32_t flags;
     uint32_t fpos;
+    uint32_t len;
 };
 
 void

@@ -62,13 +62,18 @@ iso9660_fill_inode(struct v_inode* inode, struct iso_drecache* dir, int ino)
             return EIO;
         }
         isoino->record_fmt = xattr->record_fmt;
-        isoino->ctime = iso9660_dt2unix(&xattr->ctime);
-        isoino->mtime = iso9660_dt2unix(&xattr->mtime);
+
+        inode->ctime = iso9660_dt2unix(&xattr->ctime);
+        inode->mtime = iso9660_dt2unix(&xattr->mtime);
 
         inode->lb_addr += dir->xattr_len * dir->fu_size;
 
         vfree(xattr);
     }
+
+    inode->ctime = dir->ctime ? dir->ctime : inode->ctime;
+    inode->mtime = dir->mtime ? dir->mtime : inode->mtime;
+    inode->atime = dir->atime ? dir->atime : inode->atime;
 
     return 0;
 }

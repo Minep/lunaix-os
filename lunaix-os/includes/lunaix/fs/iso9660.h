@@ -14,6 +14,7 @@
 
 #include <lunaix/clock.h>
 #include <lunaix/device.h>
+#include <lunaix/fs.h>
 #include <lunaix/types.h>
 
 #define ISO_SIGNATURE_LO 0x30304443UL
@@ -135,36 +136,29 @@ struct iso_var_mdu
     u8_t content[0];
 } PACKED;
 
+struct iso_datetime2
+{
+    u8_t year;
+    u8_t month;
+    u8_t day;
+    u8_t hour;
+    u8_t min;
+    u8_t sec;
+    u8_t gmt;
+} PACKED;
+
 // (9.1) Directory Record [Embedded into Variable MDU]
 struct iso_drecord
 {
     u8_t xattr_len;
     iso_bbo32_t extent_addr;
     iso_bbo32_t data_size;
-    struct
-    {
-        u8_t year;
-        u8_t month;
-        u8_t day;
-        u8_t hour;
-        u8_t min;
-        u8_t sec;
-        u8_t gmt;
-    } PACKED mktime; // Time the record is made, see 9.1.5
+    struct iso_datetime2 PACKED mktime; // Time the record is made, see 9.1.5
     u8_t flags;
     u8_t fu_sz;  // size of file unit (FU)
     u8_t gap_sz; // size of gap if FU is interleaved.
     iso_bbo16_t vol_seq;
     struct iso_var_mdu name;
-} PACKED;
-
-// (9.4) L-Path Table Record. [Embedded into Variable MDU]
-struct iso_precord
-{
-    u8_t xattr_len;
-    u32_t extent_addr;
-    u8_t parent; // indexed into path table
-    u8_t id[0];  // length = iso_var_mdu::len
 } PACKED;
 
 struct iso_xattr
@@ -190,20 +184,91 @@ struct iso_xattr
     // It however marked as optional, hence we ignore it.
 } PACKED;
 
-struct iso_ptable
+///
+/// -------- IEEE P1281 SUSP ---------
+///
+
+#define ISOSU_ER 0x5245
+#define ISOSU_ST 0x5453
+
+struct isosu_base
 {
-    u32_t start_lba;
-    u32_t current_lba;
-    u32_t size;
-    u32_t range_lower;
-    u32_t range_upper;
-    void* ptable_part;
-};
+    u16_t signature;
+    u8_t length;
+    u8_t version;
+} PACKED;
+
+struct isosu_er
+{
+    struct isosu_base header;
+    u8_t id_len;
+    u8_t des_len;
+    u8_t src_len;
+    u8_t ext_ver;
+    u8_t id_des_src[0];
+} PACKED;
+
+///
+/// -------- Rock Ridge Extension --------
+///
+
+#define ISORR_PX 0x5850
+#define ISORR_PN 0x4e50
+#define ISORR_SL 0x4c53
+#define ISORR_NM 0x4d4e
+#define ISORR_TF 0x4654
+
+#define ISORR_NM_CONT 0x1
+
+#define ISORR_TF_CTIME 0x1
+#define ISORR_TF_MTIME 0x2
+#define ISORR_TF_ATIME 0x4
+#define ISORR_TF_LONG_FORM 0x80
+
+struct isorr_px
+{
+    struct isosu_base header;
+    iso_bbo32_t mode;
+    iso_bbo32_t link;
+    iso_bbo32_t uid;
+    iso_bbo32_t gid;
+    iso_bbo32_t sn;
+} PACKED;
+
+struct isorr_pn
+{
+    struct isosu_base header;
+    iso_bbo32_t dev_hi;
+    iso_bbo32_t dev_lo;
+} PACKED;
+
+struct isorr_sl
+{
+    struct isosu_base header;
+    u8_t flags;
+    char symlink[0];
+} PACKED;
+
+struct isorr_nm
+{
+    struct isosu_base header;
+    u8_t flags;
+    char name[0];
+} PACKED;
+
+struct isorr_tf
+{
+    struct isosu_base header;
+    u8_t flags;
+    char times[0];
+} PACKED;
+
+///
+/// -------- VFS integration ---------
+///
 
 struct iso_inode
 {
-    time_t ctime;
-    time_t mtime;
     u32_t record_fmt;
     u32_t fu_size;
     u32_t gap_size;
@@ -216,9 +281,13 @@ struct iso_drecache
     u32_t extent_addr;
     u32_t data_size;
     u32_t xattr_len;
+    u32_t fno;
     u32_t fu_size;
     u32_t gap_size;
     u32_t flags;
+    time_t ctime;
+    time_t atime;
+    time_t mtime;
     struct hstr name;
     char name_val[ISO9660_IDLEN];
 };
@@ -238,6 +307,9 @@ iso9660_fill_inode(struct v_inode* inode, struct iso_drecache* dir, int ino);
 time_t
 iso9660_dt2unix(struct iso_datetime* isodt);
 
+time_t
+iso9660_dt22unix(struct iso_datetime2* isodt2);
+
 void
 iso9660_init();
 
@@ -245,7 +317,9 @@ int
 iso9660_setup_dnode(struct v_dnode* dnode, struct v_inode* inode);
 
 void
-iso9660_fill_drecache(struct iso_drecache* cache, struct iso_drecord* drec);
+iso9660_fill_drecache(struct iso_drecache* cache,
+                      struct iso_drecord* drec,
+                      u32_t len);
 
 int
 iso9660_dir_lookup(struct v_inode* this, struct v_dnode* dnode);
@@ -267,5 +341,14 @@ iso9660_write(struct v_inode* inode, void* buffer, size_t len, size_t fpos);
 
 int
 iso9660_seek(struct v_inode* inode, size_t offset);
+
+int
+isorr_parse_px(struct iso_drecache* cache, void* px_start);
+
+int
+isorr_parse_nm(struct iso_drecache* cache, void* nm_start);
+
+int
+isorr_parse_tf(struct iso_drecache* cache, void* tf_start);
 
 #endif /* __LUNAIX_ISO9660_H */

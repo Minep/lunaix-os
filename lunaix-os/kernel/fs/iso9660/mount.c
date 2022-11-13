@@ -57,8 +57,8 @@ iso9660_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
     vsb->ops.read_capacity = iso9660_rd_capacity;
 
     struct v_inode* rootino = vfs_i_alloc(vsb);
-    struct iso_drecord* dir =
-      iso9660_get_drecord((struct iso_var_mdu*)vprim->root_record);
+    struct iso_var_mdu* mdu = (struct iso_var_mdu*)vprim->root_record;
+    struct iso_drecord* dir = iso9660_get_drecord(mdu);
 
     if (!dir) {
         vfree(isovsb);
@@ -67,7 +67,7 @@ iso9660_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
     }
 
     struct iso_drecache drecache;
-    iso9660_fill_drecache(&drecache, dir);
+    iso9660_fill_drecache(&drecache, dir, mdu->len);
 
     if ((errno = iso9660_fill_inode(rootino, &drecache, 0)) < 0) {
         vfree(isovsb);

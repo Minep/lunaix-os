@@ -115,6 +115,7 @@ pcache_write(struct v_inode* inode, void* data, uint32_t len, uint32_t fpos)
 
         pcache_set_dirty(pcache, pg);
 
+        pg->len = pg_off + wr_bytes;
         buf_off += wr_bytes;
         fpos += wr_bytes;
     }
@@ -146,8 +147,13 @@ pcache_read(struct v_inode* inode, void* data, uint32_t len, uint32_t fpos)
             } else if (errno < 0) {
                 break;
             }
+            pg->len = errno;
         }
-        uint32_t rd_bytes = MIN(PG_SIZE - pg_off, len - buf_off);
+        uint32_t rd_bytes = MIN(pg->len - pg_off, len - buf_off);
+
+        if (!rd_bytes)
+            break;
+
         memcpy((data + buf_off), pg->pg + pg_off, rd_bytes);
 
         buf_off += rd_bytes;

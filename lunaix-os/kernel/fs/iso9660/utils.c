@@ -22,3 +22,14 @@ iso9660_dt2unix(struct iso_datetime* isodt)
                        TWO_DIGIT(isodt->min),
                        TWO_DIGIT(isodt->sec));
 }
+
+time_t
+iso9660_dt22unix(struct iso_datetime2* isodt2)
+{
+    return time_tounix(isodt2->year + 1900,
+                       isodt2->month,
+                       isodt2->day,
+                       isodt2->hour,
+                       isodt2->min,
+                       isodt2->sec);
+}
