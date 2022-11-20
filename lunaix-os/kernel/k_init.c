@@ -93,6 +93,7 @@ _kernel_init()
     vfs_mount("/task", "taskfs", NULL, MNT_RO);
 
     lxconsole_spawn_ttydev();
+    device_init_builtin();
 
     syscall_install();
 

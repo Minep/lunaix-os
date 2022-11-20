@@ -95,7 +95,6 @@ struct v_superblock
     struct device* dev;
     struct v_dnode* root;
     struct filesystem* fs;
-    u32_t iobuf_size;
     struct hbucket* i_cache;
     void* data;
     struct

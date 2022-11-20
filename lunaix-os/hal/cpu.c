@@ -1,5 +1,6 @@
 #include <cpuid.h>
 #include <hal/cpu.h>
+#include <hal/rnd.h>
 #include <stdint.h>
 
 void
@@ -69,4 +70,12 @@ void
 cpu_wrmsr(u32_t msr_idx, u32_t reg_high, u32_t reg_low)
 {
     asm volatile("wrmsr" : : "d"(reg_high), "a"(reg_low), "c"(msr_idx));
+}
+
+int
+rnd_is_supported()
+{
+    reg32 eax, ebx, ecx, edx;
+    __get_cpuid(0x01, &eax, &ebx, &ecx, &edx);
+    return (ecx & (1 << 30));
 }

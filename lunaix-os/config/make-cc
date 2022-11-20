@@ -2,7 +2,7 @@ CC := i686-elf-gcc
 AS := i686-elf-as
 
 
-ARCH_OPT := -D__ARCH_IA32
+ARCH_OPT := -D__ARCH_IA32 -include flags.h
 O := -O2
 W := -Wall -Wextra -Wno-unknown-pragmas \
 		-Wno-unused-function \

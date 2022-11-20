@@ -38,10 +38,25 @@ __mount_reset(struct twimap* map)
 }
 
 void
+__version_rd(struct twimap* map)
+{
+    twimap_printf(map,
+                  "LunaixOS version %s (%s-gnu-gcc %s) %s %s",
+                  LUNAIX_VER,
+                  PLATFORM_TARGET,
+                  __VERSION__,
+                  __DATE__,
+                  __TIME__);
+}
+
+void
 vfs_export_attributes()
 {
     struct twimap* map = twifs_mapping(NULL, NULL, "mounts");
     map->read = __mount_read;
     map->go_next = __mount_next;
     map->reset = __mount_reset;
+
+    map = twifs_mapping(NULL, NULL, "version");
+    map->read = __version_rd;
 }

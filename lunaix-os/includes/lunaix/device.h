@@ -66,4 +66,7 @@ device_getbyname(struct device* root_dev, const char* name, size_t len);
 struct device*
 device_getbyoffset(struct device* root_dev, int pos);
 
+void
+device_init_builtin();
+
 #endif /* __LUNAIX_DEVICE_H */
