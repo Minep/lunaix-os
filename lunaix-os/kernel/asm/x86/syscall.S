@@ -59,6 +59,8 @@
         .long __lxsys_getpgid
         .long __lxsys_setpgid       /* 50 */
         .long __lxsys_syslog
+        .long __lxsys_mmap
+        .long __lxsys_munmap
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
             .long 0

@@ -66,10 +66,10 @@ intr_routine_page_fault(const isr_param* param)
         goto segv_term;
     }
 
-    if (!(*pte)) {
-        // Invalid location
-        goto segv_term;
-    }
+    // if (!(*pte)) {
+    //     // Invalid location
+    //     goto segv_term;
+    // }
 
     uintptr_t loc = *pte & ~0xfff;
 
@@ -78,7 +78,33 @@ intr_routine_page_fault(const isr_param* param)
     if ((hit_region->attr & REGION_WRITE) && (*pte & 0xfff) && !loc) {
         cpu_invplg(pte);
         uintptr_t pa = pmm_alloc_page(__current->pid, 0);
+        if (!pa) {
+            goto oom;
+        }
+
         *pte = *pte | pa | PG_PRESENT;
+        goto resolved;
+    }
+
+    // if mfile is set, then it is a mem map
+    if (hit_region->mfile) {
+        struct v_file* file = hit_region->mfile;
+        u32_t offset =
+          (ptr - hit_region->start) & (PG_SIZE - 1) + hit_region->offset;
+        uintptr_t pa = pmm_alloc_page(__current->pid, 0);
+
+        if (!pa) {
+            goto oom;
+        }
+
+        cpu_invplg(pte);
+        *pte = *pte | pa | PG_PRESENT;
+        int errno = file->ops->read_page(
+          file->inode, ptr & (PG_SIZE - 1), PG_SIZE, offset);
+        if (errno < 0) {
+            kprintf(KERROR "fail to read page (%d)\n", errno);
+            goto segv_term;
+        }
         goto resolved;
     }
 
@@ -87,6 +113,8 @@ intr_routine_page_fault(const isr_param* param)
     while (1)
         ;
 
+oom:
+    kprintf(KERROR "out of memory\n");
 segv_term:
     kprintf(KERROR "(pid: %d) Segmentation fault on %p (%p:%p)\n",
             __current->pid,

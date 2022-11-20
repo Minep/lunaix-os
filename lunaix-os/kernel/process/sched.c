@@ -330,7 +330,7 @@ alloc_process()
     proc->fxstate =
       vzalloc_dma(512); // FXSAVE需要十六位对齐地址，使用DMA块（128位对齐）
 
-    llist_init_head(&proc->mm.regions.head);
+    llist_init_head(&proc->mm.regions);
     llist_init_head(&proc->tasks);
     llist_init_head(&proc->children);
     llist_init_head(&proc->grp_member);
@@ -401,7 +401,7 @@ destroy_process(pid_t pid)
     vfree_dma(proc->fxstate);
 
     struct mm_region *pos, *n;
-    llist_for_each(pos, n, &proc->mm.regions.head, head)
+    llist_for_each(pos, n, &proc->mm.regions, head)
     {
         vfree(pos);
     }

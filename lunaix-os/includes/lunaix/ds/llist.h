@@ -51,6 +51,12 @@ llist_prepend(struct llist_header* head, struct llist_header* elem)
 }
 
 static inline void
+llist_insert_after(struct llist_header* head, struct llist_header* elem)
+{
+    __llist_add(elem, head, head->next);
+}
+
+static inline void
 llist_delete(struct llist_header* elem)
 {
     elem->prev->next = elem->next;

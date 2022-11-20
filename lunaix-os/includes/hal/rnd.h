@@ -13,7 +13,7 @@ rnd_fill(void* data, size_t len)
                  "subl $4, %1\n"
                  "jnz 1b" ::"r"((ptr_t)data),
                  "r"((len & ~0x3))
-                 : "%al");
+                 : "%eax");
 }
 
 int

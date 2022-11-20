@@ -3,6 +3,8 @@
 
 #include <lunaix/ds/llist.h>
 #include <lunaix/ds/mutex.h>
+#include <lunaix/fs.h>
+#include <lunaix/types.h>
 
 typedef struct
 {
@@ -48,9 +50,11 @@ typedef struct
 struct mm_region
 {
     struct llist_header head;
-    unsigned long start;
-    unsigned long end;
-    unsigned int attr;
+    struct v_file* mfile;
+    u32_t offset;
+    ptr_t start;
+    ptr_t end;
+    u32_t attr;
 };
 
 #endif /* __LUNAIX_MM_H */

@@ -28,7 +28,7 @@
 struct proc_mm
 {
     heap_context_t u_heap;
-    struct mm_region regions;
+    struct llist_header regions;
 };
 
 struct proc_sigstate

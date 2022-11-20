@@ -60,6 +60,9 @@
 
 #define __SYSCALL_syslog 51
 
+#define __SYSCALL_mmap 52
+#define __SYSCALL_munmap 53
+
 #define __SYSCALL_MAX 0x100
 
 #ifndef __ASM__
@@ -92,6 +95,11 @@ syscall_install();
 #define __DEFINE_LXSYSCALL4(rettype, name, t1, p1, t2, p2, t3, p3, t4, p4)     \
     asmlinkage rettype __lxsys_##name(                                         \
       __PARAM_MAP4(t1, p1, t2, p2, t3, p3, t4, p4))
+
+#define __DEFINE_LXSYSCALL5(                                                   \
+  rettype, name, t1, p1, t2, p2, t3, p3, t4, p4, t5, p5)                       \
+    asmlinkage rettype __lxsys_##name(                                         \
+      __PARAM_MAP5(t1, p1, t2, p2, t3, p3, t4, p4, t5, p5))
 
 #define __SYSCALL_INTERRUPTIBLE(code)                                          \
     asm("sti");                                                                \
@@ -134,6 +142,14 @@ syscall_install();
     static rettype name(__PARAM_MAP4(t1, p1, t2, p2, t3, p3, t4, p4))          \
     {                                                                          \
         asm("\n" ::"b"(p1), "c"(p2), "d"(p3), "D"(p4));                        \
+        ___DOINT33(__SYSCALL_##name, rettype)                                  \
+    }
+
+#define __LXSYSCALL5(rettype, name, t1, p1, t2, p2, t3, p3, t4, p4, t5, p5)    \
+    static rettype name(__PARAM_MAP5(t1, p1, t2, p2, t3, p3, t4, p4, t5, p5))  \
+    {                                                                          \
+        asm("movl %0, %%ebp\n" ::"r"(p5), "b"(p1), "c"(p2), "d"(p3), "D"(p4)   \
+            : "%ebp");                                                         \
         ___DOINT33(__SYSCALL_##name, rettype)                                  \
     }
 

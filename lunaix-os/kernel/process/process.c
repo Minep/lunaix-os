@@ -211,7 +211,7 @@ dup_proc()
     // 根据 mm_region 进一步配置页表
 
     struct mm_region *pos, *n;
-    llist_for_each(pos, n, &pcb->mm.regions.head, head)
+    llist_for_each(pos, n, &pcb->mm.regions, head)
     {
         // 如果写共享，则不作处理。
         if ((pos->attr & REGION_WSHARED)) {

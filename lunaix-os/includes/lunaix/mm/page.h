@@ -46,10 +46,10 @@
 #define HAS_FLAGS(entry, flags) ((PG_ENTRY_FLAGS(entry) & (flags)) == flags)
 #define CONTAINS_FLAGS(entry, flags) (PG_ENTRY_FLAGS(entry) & (flags))
 
-#define PG_PREM_R PG_PRESENT
-#define PG_PREM_RW PG_PRESENT | PG_WRITE
-#define PG_PREM_UR PG_PRESENT | PG_ALLOW_USER
-#define PG_PREM_URW PG_PRESENT | PG_WRITE | PG_ALLOW_USER
+#define PG_PREM_R (PG_PRESENT)
+#define PG_PREM_RW (PG_PRESENT | PG_WRITE)
+#define PG_PREM_UR (PG_PRESENT | PG_ALLOW_USER)
+#define PG_PREM_URW (PG_PRESENT | PG_WRITE | PG_ALLOW_USER)
 
 // 用于对PD进行循环映射，因为我们可能需要对PD进行频繁操作，我们在这里禁用TLB缓存
 #define T_SELF_REF_PERM PG_PREM_RW | PG_DISABLE_CACHE | PG_WRITE_THROUGH
