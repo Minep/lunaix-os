@@ -266,11 +266,11 @@ vfs_pclose(struct v_file* file, pid_t pid)
         atomic_fetch_sub(&file->dnode->ref_count, 1);
         file->inode->open_count--;
 
-        // Prevent dead lock.
-        // This happened when process is terminated while blocking on read.
-        // In that case, the process is still holding the inode lock and it will
-        // never get released.
         /*
+         * Prevent dead lock.
+         * This happened when process is terminated while blocking on read.
+         * In that case, the process is still holding the inode lock and it
+             will never get released.
          * The unlocking should also include ownership check.
          *
          * To see why, consider two process both open the same file both with
@@ -569,18 +569,17 @@ vfs_do_open(const char* path, int options)
 {
     int errno, fd;
     struct v_dnode *dentry, *file;
-    struct v_file* ofile = 0;
+    struct v_file* ofile = NULL;
 
     errno = __vfs_try_locate_file(
       path, &dentry, &file, (options & FO_CREATE) ? FLOCATE_CREATE_EMPTY : 0);
 
-    if (errno || (errno = vfs_open(file, &ofile))) {
-        return errno;
-    }
-
-    struct v_inode* o_inode = ofile->inode;
-
     if (!errno && !(errno = vfs_alloc_fdslot(&fd))) {
+
+        if (errno || (errno = vfs_open(file, &ofile))) {
+            return errno;
+        }
+
         struct v_fd* fd_s = cake_grab(fd_pile);
         memset(fd_s, 0, sizeof(*fd_s));
 
