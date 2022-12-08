@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="../README.md"><b>简体中文</b></a> | <span><b>English</b></span>
+  <a href="../README.md"><b>简体中文</b></a> | <a href="#the-lunaixos-project"><b>English</b></a>
 </p>
 
 # The LunaixOS Project
