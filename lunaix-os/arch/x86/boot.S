@@ -78,7 +78,7 @@
         movl %eax, %cr3
 
         movl %cr0, %eax
-        orl $0x80010000, %eax   /* 开启分页与地址转换 (CR0.PG=1, CR0.WP=1) */
+        orl $0x80000000, %eax   /* 开启分页与地址转换 (CR0.PG=1, CR0.WP=0) */
         andl $0xfffffffb, %eax
         orl $0x2, %eax          /* 启用x87 FPU (CR0.MP=1, CR0.EM=0) */
         movl %eax, %cr0

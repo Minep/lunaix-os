@@ -9,7 +9,6 @@
 #include <lunaix/ds/llist.h>
 #include <lunaix/ds/lru.h>
 #include <lunaix/ds/mutex.h>
-#include <lunaix/process.h>
 #include <lunaix/status.h>
 #include <stdatomic.h>
 
@@ -35,9 +34,6 @@
 #define VFS_PATH_DELIM '/'
 
 #define FSTYPE_ROFS 0x1
-
-#define DO_STATUS(errno) SYSCALL_ESTATUS(__current->k_status = errno)
-#define DO_STATUS_OR_RETURN(errno) ({ errno < 0 ? DO_STATUS(errno) : errno; })
 
 #define TEST_FD(fd) (fd >= 0 && fd < VFS_MAX_FD)
 

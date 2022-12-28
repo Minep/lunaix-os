@@ -6,6 +6,8 @@
 #include <lunaix/signal.h>
 #include <lunaix/status.h>
 
+#include <usr/sys/mann.h>
+
 #include <klibc/string.h>
 #include <ulibc/stdio.h>
 
@@ -101,7 +103,7 @@ do_ls(const char* path)
     } else {
         struct dirent ent = { .d_offset = 0 };
         int status;
-        while ((status = readdir(fd, &ent)) == 1) {
+        while ((status = sys_readdir(fd, &ent)) == 1) {
             if (ent.d_type == DT_DIR) {
                 printf(" \033[3m%s\033[39;49m\n", ent.d_name);
             } else {
@@ -113,6 +115,25 @@ do_ls(const char* path)
             sh_printerr();
 
         close(fd);
+    }
+}
+
+void
+do_mcat(const char* file)
+{
+    int fd = open(file, 0);
+    if (fd < 0) {
+        sh_printerr();
+    } else {
+        ptr_t p = mmap(NULL, 2048, 0, 0, fd, 0);
+        if ((int)p < 0) {
+            sh_printerr();
+        } else {
+            printf("%s\n", p);
+        }
+        munmap(p, 1);
+        close(fd);
+        printf("\n");
     }
 }
 
@@ -159,6 +180,11 @@ sh_loop()
         } else if (streq(cmd, "cat")) {
             if (!(p = fork())) {
                 do_cat(argpart);
+                _exit(0);
+            }
+        } else if (streq(cmd, "mcat")) {
+            if (!(p = fork())) {
+                do_mcat(argpart);
                 _exit(0);
             }
         } else {

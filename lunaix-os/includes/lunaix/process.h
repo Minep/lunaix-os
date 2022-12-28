@@ -6,6 +6,7 @@
 #include <lunaix/ds/waitq.h>
 #include <lunaix/fs.h>
 #include <lunaix/mm/mm.h>
+#include <lunaix/mm/region.h>
 #include <lunaix/signal.h>
 #include <lunaix/timer.h>
 #include <lunaix/types.h>
@@ -28,7 +29,7 @@
 struct proc_mm
 {
     heap_context_t u_heap;
-    struct llist_header regions;
+    vm_regions_t regions;
 };
 
 struct proc_sigstate

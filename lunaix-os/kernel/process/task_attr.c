@@ -1,4 +1,5 @@
 #include <lunaix/fs/taskfs.h>
+#include <lunaix/process.h>
 
 void
 __read_pending_sig(struct twimap* map)

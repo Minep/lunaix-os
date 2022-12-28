@@ -30,7 +30,7 @@
         .long __lxsys_close         /* 20 */
         .long __lxsys_read
         .long __lxsys_write
-        .long __lxsys_readdir
+        .long __lxsys_sys_readdir
         .long __lxsys_mkdir
         .long __lxsys_lseek         /* 25 */
         .long __lxsys_geterrno
@@ -59,7 +59,7 @@
         .long __lxsys_getpgid
         .long __lxsys_setpgid       /* 50 */
         .long __lxsys_syslog
-        .long __lxsys_mmap
+        .long __lxsys_sys_mmap
         .long __lxsys_munmap
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
@@ -86,8 +86,7 @@
         popl  %ebp
         ret
     1:
-        pushl 24(%ebp)      /* esi - #6 arg */
-        pushl 20(%ebp)      /* ebp - #5 arg */
+        pushl 24(%ebp)      /* esi - #5 arg */
         pushl 16(%ebp)      /* edi - #4 arg */
         pushl 12(%ebp)      /* edx - #3 arg */
         pushl 8(%ebp)       /* ecx - #2 arg */
@@ -97,7 +96,7 @@
 
         movl %eax, (%ebp)    /* save the return value */
 
-        addl $24, %esp      /* remove the parameters from stack */
+        addl $20, %esp      /* remove the parameters from stack */
 
         popl %ebp
         

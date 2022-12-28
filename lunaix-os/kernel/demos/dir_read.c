@@ -23,7 +23,7 @@ _readdir_main()
 
     struct dirent ent = { .d_offset = 0 };
 
-    while (readdir(fd, &ent) == 1) {
+    while (sys_readdir(fd, &ent) == 1) {
         printf("%s\n", ent.d_name);
     }
 

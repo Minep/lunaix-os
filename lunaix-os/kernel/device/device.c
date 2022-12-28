@@ -6,6 +6,7 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 #include <lunaix/syscall.h>
+#include <lunaix/syscall_utils.h>
 
 static DEFINE_LLIST(root_list);
 

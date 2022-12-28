@@ -142,9 +142,12 @@ init_proc_user_space(struct proc_info* pcb)
 
     /*---  分配用户栈  ---*/
 
+    struct mm_region* stack_vm;
+
+    stack_vm = region_create(
+      USTACK_END, USTACK_TOP, REGION_RW | REGION_RSHARED | REGION_ANON);
     // 注册用户栈区域
-    region_add(
-      &pcb->mm.regions, USTACK_END, USTACK_TOP, REGION_RW | REGION_RSHARED);
+    region_add(&pcb->mm.regions, stack_vm);
 
     // 预留地址空间，具体物理页将由Page Fault Handler按需分配。
     for (uintptr_t i = PG_ALIGN(USTACK_END); i < USTACK_TOP; i += PG_SIZE) {

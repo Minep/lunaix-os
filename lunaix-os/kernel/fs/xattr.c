@@ -1,7 +1,11 @@
 #include <klibc/string.h>
 #include <lunaix/fs.h>
 #include <lunaix/mm/valloc.h>
+#include <lunaix/process.h>
 #include <lunaix/syscall.h>
+#include <lunaix/syscall_utils.h>
+
+#define DO_STATUS(errno) SYSCALL_ESTATUS(__current->k_status = errno)
 
 struct v_xattr_entry*
 xattr_new(struct hstr* name)

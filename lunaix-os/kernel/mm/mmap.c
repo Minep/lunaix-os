@@ -1,6 +1,5 @@
 #include <lunaix/mm/mmap.h>
 #include <lunaix/mm/pmm.h>
-#include <lunaix/mm/region.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
@@ -9,12 +8,13 @@
 
 void*
 mem_map(ptr_t mnt,
-        struct llist_header* regions,
+        vm_regions_t* regions,
         void* addr,
         struct v_file* file,
-        u32_t offset,
+        off_t offset,
         size_t length,
-        u32_t proct)
+        u32_t proct,
+        u32_t options)
 {
     if (!length || (length & (PG_SIZE - 1)) || (offset & (PG_SIZE - 1))) {
         __current->k_status = EINVAL;
@@ -44,9 +44,12 @@ found:
     addr = last_end;
     ptr_t end = addr + length;
 
-    struct mm_region* region = region_add(regions, addr, end, proct);
+    struct mm_region* region =
+      region_create(addr, end, proct | (options & 0x1f));
     region->mfile = file;
     region->offset = offset;
+
+    region_add(regions, region);
 
     u32_t attr = PG_ALLOW_USER;
     if ((proct & REGION_WRITE)) {
@@ -61,7 +64,7 @@ found:
 }
 
 void*
-mem_unmap(ptr_t mnt, struct llist_header* regions, void* addr, size_t length)
+mem_unmap(ptr_t mnt, vm_regions_t* regions, void* addr, size_t length)
 {
     length = ROUNDUP(length, PG_SIZE);
     ptr_t cur_addr = ROUNDDOWN((ptr_t)addr, PG_SIZE);
@@ -69,7 +72,7 @@ mem_unmap(ptr_t mnt, struct llist_header* regions, void* addr, size_t length)
 
     llist_for_each(pos, n, regions, head)
     {
-        if (pos->start >= cur_addr) {
+        if (pos->start <= cur_addr) {
             break;
         }
     }
@@ -86,6 +89,9 @@ mem_unmap(ptr_t mnt, struct llist_header* regions, void* addr, size_t length)
             llist_insert_after(&pos->head, &region->head);
             l = length;
         }
+
+        // TODO for shared mappings, sync page content if modified. (also
+        // implement msync)
 
         for (size_t i = 0; i < l; i += PG_SIZE) {
             ptr_t pa = vmm_del_mapping(mnt, cur_addr + i);
@@ -106,19 +112,13 @@ mem_unmap(ptr_t mnt, struct llist_header* regions, void* addr, size_t length)
     }
 }
 
-__DEFINE_LXSYSCALL5(void*,
-                    mmap,
-                    void*,
-                    addr,
-                    size_t,
-                    length,
-                    int,
-                    proct,
-                    int,
-                    fd,
-                    size_t,
-                    offset)
+__DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
 {
+    int proct = va_arg(lst, int);
+    int fd = va_arg(lst, u32_t);
+    off_t offset = va_arg(lst, off_t);
+    int options = va_arg(lst, int);
+
     int errno = 0;
     struct v_fd* vfd;
     if ((errno = vfs_getfd(fd, &vfd))) {
@@ -126,13 +126,16 @@ __DEFINE_LXSYSCALL5(void*,
         return (void*)-1;
     }
 
+    length = ROUNDUP(length, PG_SIZE);
+
     return mem_map(PD_REFERENCED,
                    &__current->mm.regions,
                    addr,
                    vfd->file,
                    offset,
                    length,
-                   proct);
+                   proct,
+                   options);
 }
 
 __DEFINE_LXSYSCALL2(void, munmap, void*, addr, size_t, length)

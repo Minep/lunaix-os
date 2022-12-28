@@ -2,8 +2,8 @@
 #define __LUNAIX_TYPES_H
 
 #include <stdarg.h>
-#include <stddef.h>
 #include <stdint.h>
+#include <usr/sys/types.h>
 
 #define PEXITTERM 0x100
 #define PEXITSTOP 0x200
@@ -31,9 +31,7 @@ typedef unsigned short u16_t;
 typedef unsigned int u32_t;
 typedef unsigned long long u64_t;
 typedef unsigned long ptr_t;
-typedef signed long ssize_t;
 
-typedef int32_t pid_t;
 typedef int64_t lba_t;
 
 #endif /* __LUNAIX_TYPES_H */

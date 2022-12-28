@@ -53,6 +53,7 @@
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
 #include <lunaix/syscall.h>
+#include <lunaix/syscall_utils.h>
 
 #include <lunaix/fs/twifs.h>
 
@@ -630,7 +631,7 @@ __vfs_readdir_callback(struct dir_context* dctx,
     dent->d_type = dtype;
 }
 
-__DEFINE_LXSYSCALL2(int, readdir, int, fd, struct dirent*, dent)
+__DEFINE_LXSYSCALL2(int, sys_readdir, int, fd, struct dirent*, dent)
 {
     struct v_fd* fd_s;
     int errno;

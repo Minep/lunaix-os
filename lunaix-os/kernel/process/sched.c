@@ -400,6 +400,7 @@ destroy_process(pid_t pid)
     vfree(proc->fdtable);
     vfree_dma(proc->fxstate);
 
+    // TODO unmap all regions
     struct mm_region *pos, *n;
     llist_for_each(pos, n, &proc->mm.regions, head)
     {

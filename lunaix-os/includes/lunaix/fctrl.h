@@ -10,7 +10,7 @@ __LXSYSCALL2(int, open, const char*, path, int, options)
 __LXSYSCALL1(int, mkdir, const char*, path)
 __LXSYSCALL2(int, unlinkat, int, fd, const char*, pathname)
 
-__LXSYSCALL2(int, readdir, int, fd, struct dirent*, dent)
+__LXSYSCALL2(int, sys_readdir, int, fd, struct dirent*, dent)
 
 __LXSYSCALL4(int,
              readlinkat,

@@ -1,5 +1,6 @@
 #include <lunaix/fs.h>
 #include <lunaix/mm/valloc.h>
+#include <lunaix/process.h>
 #include <lunaix/spike.h>
 
 #include <klibc/string.h>

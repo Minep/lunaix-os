@@ -3,6 +3,7 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
+#include <lunaix/syscall_utils.h>
 #include <lunaix/syslog.h>
 #include <lunaix/types.h>
 

@@ -23,6 +23,7 @@
 
 #define PG_DIRTY(pte) ((pte & (1 << 6)) >> 6)
 #define PG_ACCESSED(pte) ((pte & (1 << 5)) >> 5)
+#define PG_PRESENTED(pte) ((pte)&PG_PRESENT)
 
 #define IS_CACHED(entry) ((entry & 0x1))
 
