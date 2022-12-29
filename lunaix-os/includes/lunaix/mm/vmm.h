@@ -67,13 +67,24 @@ uintptr_t
 vmm_del_mapping(uintptr_t mnt, uintptr_t va);
 
 /**
- * @brief 查找一个映射
+ * @brief 在当前虚拟地址空间里查找一个映射
  *
  * @param va 虚拟地址
- * @return v_mapping 映射相关属性
+ * @param mapping 映射相关属性
  */
 int
 vmm_lookup(uintptr_t va, v_mapping* mapping);
+
+/**
+ * @brief 在指定的虚拟地址空间里查找一个映射
+ *
+ * @param mnt 地址空间锚定点
+ * @param va 虚拟地址
+ * @param mapping 映射相关属性
+ * @return int
+ */
+int
+vmm_lookupat(ptr_t mnt, uintptr_t va, v_mapping* mapping);
 
 /**
  * @brief (COW) 为虚拟页创建副本。
@@ -119,7 +130,23 @@ vmm_next_free(uintptr_t start, int options);
 void*
 vmm_vmap(uintptr_t paddr, size_t size, pt_attr attr);
 
+/**
+ * @brief 将当前地址空间的虚拟地址转译为物理地址。
+ *
+ * @param va 虚拟地址
+ * @return void*
+ */
 void*
 vmm_v2p(void* va);
+
+/**
+ * @brief 将指定地址空间的虚拟地址转译为物理地址
+ *
+ * @param mnt 地址空间锚定点
+ * @param va 虚拟地址
+ * @return void*
+ */
+void*
+vmm_v2pat(ptr_t mnt, void* va);
 
 #endif /* __LUNAIX_VMM_H */

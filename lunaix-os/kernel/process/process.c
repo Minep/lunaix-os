@@ -17,7 +17,7 @@ void*
 __dup_pagetable(pid_t pid, uintptr_t mount_point)
 {
     void* ptd_pp = pmm_alloc_page(pid, PP_FGPERSIST);
-    vmm_set_mapping(PD_REFERENCED, PG_MOUNT_1, ptd_pp, PG_PREM_RW, VMAP_NULL);
+    vmm_set_mapping(VMS_SELF, PG_MOUNT_1, ptd_pp, PG_PREM_RW, VMAP_NULL);
 
     x86_page_table* ptd = PG_MOUNT_1;
     x86_page_table* pptd = (x86_page_table*)(mount_point | (0x3FF << 12));
@@ -36,8 +36,7 @@ __dup_pagetable(pid_t pid, uintptr_t mount_point)
 
         // 复制L2页表
         void* pt_pp = pmm_alloc_page(pid, PP_FGPERSIST);
-        vmm_set_mapping(
-          PD_REFERENCED, PG_MOUNT_2, pt_pp, PG_PREM_RW, VMAP_NULL);
+        vmm_set_mapping(VMS_SELF, PG_MOUNT_2, pt_pp, PG_PREM_RW, VMAP_NULL);
 
         x86_page_table* ppt = (x86_page_table*)(mount_point | (i << 12));
         x86_page_table* pt = PG_MOUNT_2;
@@ -87,7 +86,7 @@ __del_pagetable(pid_t pid, uintptr_t mount_point)
 void*
 vmm_dup_vmspace(pid_t pid)
 {
-    return __dup_pagetable(pid, PD_REFERENCED);
+    return __dup_pagetable(pid, VMS_SELF);
 }
 
 __DEFINE_LXSYSCALL(pid_t, fork)
@@ -138,33 +137,33 @@ __DEFINE_LXSYSCALL2(int, setpgid, pid_t, pid, pid_t, pgid)
 void
 init_proc_user_space(struct proc_info* pcb)
 {
-    vmm_mount_pd(PD_MOUNT_1, pcb->page_table);
+    vmm_mount_pd(VMS_MOUNT_1, pcb->page_table);
 
     /*---  分配用户栈  ---*/
 
     struct mm_region* stack_vm;
 
-    stack_vm = region_create(
-      USTACK_END, USTACK_TOP, REGION_RW | REGION_RSHARED | REGION_ANON);
+    stack_vm = region_create_range(
+      USTACK_END, USTACK_SIZE, REGION_RW | REGION_RSHARED | REGION_ANON);
     // 注册用户栈区域
     region_add(&pcb->mm.regions, stack_vm);
 
     // 预留地址空间，具体物理页将由Page Fault Handler按需分配。
     for (uintptr_t i = PG_ALIGN(USTACK_END); i < USTACK_TOP; i += PG_SIZE) {
-        vmm_set_mapping(PD_MOUNT_1, i, 0, PG_ALLOW_USER | PG_WRITE, VMAP_NULL);
+        vmm_set_mapping(VMS_MOUNT_1, i, 0, PG_ALLOW_USER | PG_WRITE, VMAP_NULL);
     }
 
     // TODO other uspace initialization stuff
 
-    vmm_unmount_pd(PD_MOUNT_1);
+    vmm_unmount_pd(VMS_MOUNT_1);
 }
 
 void
 __mark_region(uintptr_t start_vpn, uintptr_t end_vpn, int attr)
 {
     for (size_t i = start_vpn; i <= end_vpn; i++) {
-        x86_pte_t* curproc = &PTE_MOUNTED(PD_REFERENCED, i);
-        x86_pte_t* newproc = &PTE_MOUNTED(PD_MOUNT_1, i);
+        x86_pte_t* curproc = &PTE_MOUNTED(VMS_SELF, i);
+        x86_pte_t* newproc = &PTE_MOUNTED(VMS_MOUNT_1, i);
         cpu_invplg(newproc);
 
         if ((attr & REGION_MODE_MASK) == REGION_RSHARED) {
@@ -209,7 +208,7 @@ dup_proc()
     __copy_fdtable(pcb);
     region_copy(&__current->mm.regions, &pcb->mm.regions);
 
-    setup_proc_mem(pcb, PD_REFERENCED);
+    setup_proc_mem(pcb, VMS_SELF);
 
     // 根据 mm_region 进一步配置页表
 
@@ -226,7 +225,7 @@ dup_proc()
         __mark_region(start_vpn, end_vpn, pos->attr);
     }
 
-    vmm_unmount_pd(PD_MOUNT_1);
+    vmm_unmount_pd(VMS_MOUNT_1);
 
     // 正如同fork，返回两次。
     pcb->intr_ctx.registers.eax = 0;
@@ -245,11 +244,11 @@ setup_proc_mem(struct proc_info* proc, uintptr_t usedMnt)
     pid_t pid = proc->pid;
     void* pt_copy = __dup_pagetable(pid, usedMnt);
 
-    vmm_mount_pd(PD_MOUNT_1, pt_copy); // 将新进程的页表挂载到挂载点#2
+    vmm_mount_pd(VMS_MOUNT_1, pt_copy); // 将新进程的页表挂载到挂载点#2
 
     // copy the kernel stack
     for (size_t i = KSTACK_START >> 12; i <= KSTACK_TOP >> 12; i++) {
-        volatile x86_pte_t* ppte = &PTE_MOUNTED(PD_MOUNT_1, i);
+        volatile x86_pte_t* ppte = &PTE_MOUNTED(VMS_MOUNT_1, i);
 
         /*
             This is a fucking nightmare, the TLB caching keep the rewrite to PTE

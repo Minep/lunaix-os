@@ -9,30 +9,33 @@
 
 #define PTE_NULL 0
 
-#define P2V(paddr) ((uintptr_t)(paddr) + KERNEL_MM_BASE)
-#define V2P(vaddr) ((uintptr_t)(vaddr)-KERNEL_MM_BASE)
+#define P2V(paddr) ((ptr_t)(paddr) + KERNEL_MM_BASE)
+#define V2P(vaddr) ((ptr_t)(vaddr)-KERNEL_MM_BASE)
 
-#define PG_ALIGN(addr) ((uintptr_t)(addr)&0xFFFFF000UL)
+#define PG_ALIGN(addr) ((ptr_t)(addr)&0xFFFFF000UL)
+#define PG_ALIGNED(addr) (!((ptr_t)(addr)&0x00000FFFUL))
 
-#define L1_INDEX(vaddr) (u32_t)(((uintptr_t)(vaddr)&0xFFC00000UL) >> 22)
-#define L2_INDEX(vaddr) (u32_t)(((uintptr_t)(vaddr)&0x003FF000UL) >> 12)
-#define PG_OFFSET(vaddr) (u32_t)((uintptr_t)(vaddr)&0x00000FFFUL)
+#define L1_INDEX(vaddr) (u32_t)(((ptr_t)(vaddr)&0xFFC00000UL) >> 22)
+#define L2_INDEX(vaddr) (u32_t)(((ptr_t)(vaddr)&0x003FF000UL) >> 12)
+#define PG_OFFSET(vaddr) (u32_t)((ptr_t)(vaddr)&0x00000FFFUL)
 
 #define GET_PT_ADDR(pde) PG_ALIGN(pde)
 #define GET_PG_ADDR(pte) PG_ALIGN(pte)
 
-#define PG_DIRTY(pte) ((pte & (1 << 6)) >> 6)
-#define PG_ACCESSED(pte) ((pte & (1 << 5)) >> 5)
-#define PG_PRESENTED(pte) ((pte)&PG_PRESENT)
-
 #define IS_CACHED(entry) ((entry & 0x1))
 
 #define PG_PRESENT (0x1)
+#define PG_DIRTY (1 << 6)
+#define PG_ACCESSED (1 << 5)
 #define PG_WRITE (0x1 << 1)
 #define PG_ALLOW_USER (0x1 << 2)
 #define PG_WRITE_THROUGH (1 << 3)
 #define PG_DISABLE_CACHE (1 << 4)
 #define PG_PDE_4MB (1 << 7)
+
+#define PG_IS_DIRTY(pte) ((pte)&PG_DIRTY)
+#define PG_IS_ACCESSED(pte) ((pte)&PG_ACCESSED)
+#define PG_IS_PRESENT(pte) ((pte)&PG_PRESENT)
 
 #define NEW_L1_ENTRY(flags, pt_addr)                                           \
     (PG_ALIGN(pt_addr) | (((flags) | PG_WRITE_THROUGH) & 0xfff))
@@ -76,11 +79,11 @@ typedef u32_t x86_pte_t;
 typedef struct
 {
     // 虚拟页地址
-    uintptr_t va;
+    ptr_t va;
     // 物理页码（如果不存在映射，则为0）
     u32_t pn;
     // 物理页地址（如果不存在映射，则为0）
-    uintptr_t pa;
+    ptr_t pa;
     // 映射的flags
     uint16_t flags;
     // PTE地址
@@ -96,17 +99,17 @@ extern void __pg_mount_point;
 
 /* 四个页挂载点，两个页目录挂载点： 用于临时创建&编辑页表 */
 #define PG_MOUNT_RANGE(l1_index) (701 <= l1_index && l1_index <= 703)
-#define PD_MOUNT_1 (KERNEL_MM_BASE + MEM_4MB)
-#define PG_MOUNT_BASE (PD_MOUNT_1 + MEM_4MB)
+#define VMS_MOUNT_1 (KERNEL_MM_BASE + MEM_4MB)
+#define PG_MOUNT_BASE (VMS_MOUNT_1 + MEM_4MB)
 #define PG_MOUNT_1 (PG_MOUNT_BASE)
 #define PG_MOUNT_2 (PG_MOUNT_BASE + 0x1000)
 #define PG_MOUNT_3 (PG_MOUNT_BASE + 0x2000)
 #define PG_MOUNT_4 (PG_MOUNT_BASE + 0x3000)
 
-#define PD_REFERENCED L2_BASE_VADDR
+#define VMS_SELF L2_BASE_VADDR
 
 #define CURPROC_PTE(vpn)                                                       \
-    (&((x86_page_table*)(PD_MOUNT_1 | (((vpn)&0xffc00) << 2)))                 \
+    (&((x86_page_table*)(VMS_MOUNT_1 | (((vpn)&0xffc00) << 2)))                \
         ->entry[(vpn)&0x3ff])
 #define PTE_MOUNTED(mnt, vpn)                                                  \
     (((x86_page_table*)((mnt) | (((vpn)&0xffc00) << 2)))->entry[(vpn)&0x3ff])

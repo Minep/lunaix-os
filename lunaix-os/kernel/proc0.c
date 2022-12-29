@@ -212,7 +212,7 @@ init_platform()
 
     // clean up
     for (size_t i = 0; i < (uintptr_t)(&__init_hhk_end); i += PG_SIZE) {
-        vmm_del_mapping(PD_REFERENCED, (void*)i);
+        vmm_del_mapping(VMS_SELF, (void*)i);
         pmm_free_page(KERNEL_PID, (void*)i);
     }
 }
@@ -256,7 +256,7 @@ __do_reserved_memory(int unlock)
                     // Don't fuck up our kernel space!
                     break;
                 }
-                vmm_set_mapping(PD_REFERENCED, _pa, _pa, PG_PREM_R, VMAP_NULL);
+                vmm_set_mapping(VMS_SELF, _pa, _pa, PG_PREM_R, VMAP_NULL);
                 pmm_mark_page_occupied(
                   KERNEL_PID, _pa >> PG_SIZE_BITS, PP_FGLOCKED);
             }
@@ -269,7 +269,7 @@ __do_reserved_memory(int unlock)
                     mmap.type);
             for (; j < pg_num; j++) {
                 uintptr_t _pa = pa + (j << PG_SIZE_BITS);
-                vmm_del_mapping(PD_REFERENCED, _pa);
+                vmm_del_mapping(VMS_SELF, _pa);
                 if (mmap.type == MULTIBOOT_MEMORY_ACPI_RECLAIMABLE) {
                     pmm_mark_page_free(_pa >> PG_SIZE_BITS);
                 }

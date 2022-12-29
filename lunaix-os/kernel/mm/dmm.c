@@ -50,7 +50,7 @@ dmm_init(heap_context_t* heap)
     heap->brk = heap->start;
     mutex_init(&heap->lock);
 
-    return vmm_set_mapping(PD_REFERENCED,
+    return vmm_set_mapping(VMS_SELF,
                            heap->brk,
                            0,
                            PG_WRITE | PG_ALLOW_USER,
@@ -86,7 +86,7 @@ lxsbrk(heap_context_t* heap, size_t size, int user)
     if (diff) {
         // if next do require new pages to be mapped
         for (size_t i = 0; i < diff; i += PG_SIZE) {
-            vmm_set_mapping(PD_REFERENCED,
+            vmm_set_mapping(VMS_SELF,
                             PG_ALIGN(current_brk) + PG_SIZE + i,
                             0,
                             PG_WRITE | user,

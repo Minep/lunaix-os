@@ -3,7 +3,7 @@
 #include <lunaix/spike.h>
 
 #define VMAP_START PG_MOUNT_BASE + MEM_4MB
-#define VMAP_END PD_REFERENCED
+#define VMAP_END VMS_SELF
 
 static uintptr_t start = VMAP_START;
 
@@ -56,8 +56,7 @@ vmm_vmap(uintptr_t paddr, size_t size, pt_attr attr)
 done:
     uintptr_t alloc_begin = current_addr - examed_size;
     for (size_t i = 0; i < size; i += PG_SIZE) {
-        vmm_set_mapping(
-          PD_REFERENCED, alloc_begin + i, paddr + i, PG_PREM_RW, 0);
+        vmm_set_mapping(VMS_SELF, alloc_begin + i, paddr + i, PG_PREM_RW, 0);
         pmm_ref_page(KERNEL_PID, paddr + i);
     }
     start = alloc_begin + size;

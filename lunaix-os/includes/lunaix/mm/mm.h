@@ -20,21 +20,22 @@ typedef struct
  * @brief 私有区域，该区域中的页无法进行任何形式的共享。
  *
  */
-#define REGION_PRIVATE MAP_PRIVATE
+#define REGION_PRIVATE MAP_EXCLUSIVE
 
 /**
  * @brief
  * 读共享区域，该区域中的页可以被两个进程之间读共享，但任何写操作须应用Copy-On-Write
+ * 等价于 POSIX 的 MAP_PRIVATE
  *
  */
-#define REGION_RSHARED MAP_RSHARED
+#define REGION_RSHARED MAP_PRIVATE
 
 /**
  * @brief
  * 写共享区域，该区域中的页可以被两个进程之间读共享，任何的写操作无需执行Copy-On-Write
- *
+ * 等价于 POSIX 的 MAP_SHARED
  */
-#define REGION_WSHARED MAP_WSHARED
+#define REGION_WSHARED MAP_SHARED
 
 #define REGION_PERM_MASK 0x1c
 #define REGION_MODE_MASK 0x3

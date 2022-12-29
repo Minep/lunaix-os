@@ -68,7 +68,7 @@ vmm_set_mapping(uintptr_t mnt,
         }
     }
 
-    if (mnt == PD_REFERENCED) {
+    if (mnt == VMS_SELF) {
         cpu_invplg(va);
     }
 
@@ -113,15 +113,21 @@ vmm_del_mapping(uintptr_t mnt, uintptr_t va)
 int
 vmm_lookup(uintptr_t va, v_mapping* mapping)
 {
+    return vmm_lookupat(VMS_SELF, va, mapping);
+}
+
+int
+vmm_lookupat(ptr_t mnt, uintptr_t va, v_mapping* mapping)
+{
     u32_t l1_index = L1_INDEX(va);
     u32_t l2_index = L2_INDEX(va);
 
-    x86_page_table* l1pt = (x86_page_table*)L1_BASE_VADDR;
+    x86_page_table* l1pt = (x86_page_table*)(mnt | 1023 << 12);
     x86_pte_t l1pte = l1pt->entry[l1_index];
 
     if (l1pte) {
         x86_pte_t* l2pte =
-          &((x86_page_table*)L2_VADDR(l1_index))->entry[l2_index];
+          &((x86_page_table*)(mnt | (l1_index << 12)))->entry[l2_index];
         if (l2pte) {
             mapping->flags = PG_ENTRY_FLAGS(*l2pte);
             mapping->pa = PG_ENTRY_ADDR(*l2pte);
@@ -146,6 +152,25 @@ vmm_v2p(void* va)
     if (l1pte) {
         x86_pte_t* l2pte =
           &((x86_page_table*)L2_VADDR(l1_index))->entry[l2_index];
+        if (l2pte) {
+            return PG_ENTRY_ADDR(*l2pte) | ((uintptr_t)va & 0xfff);
+        }
+    }
+    return 0;
+}
+
+void*
+vmm_v2pat(ptr_t mnt, void* va)
+{
+    u32_t l1_index = L1_INDEX(va);
+    u32_t l2_index = L2_INDEX(va);
+
+    x86_page_table* l1pt = (x86_page_table*)(mnt | 1023 << 12);
+    x86_pte_t l1pte = l1pt->entry[l1_index];
+
+    if (l1pte) {
+        x86_pte_t* l2pte =
+          &((x86_page_table*)(mnt | (l1_index << 12)))->entry[l2_index];
         if (l2pte) {
             return PG_ENTRY_ADDR(*l2pte) | ((uintptr_t)va & 0xfff);
         }

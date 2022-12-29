@@ -7,6 +7,7 @@
 #include <lunaix/fs/taskfs.h>
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/kalloc.h>
+#include <lunaix/mm/mmap.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
@@ -400,18 +401,18 @@ destroy_process(pid_t pid)
     vfree(proc->fdtable);
     vfree_dma(proc->fxstate);
 
-    // TODO unmap all regions
+    vmm_mount_pd(VMS_MOUNT_1, proc->page_table);
+
     struct mm_region *pos, *n;
     llist_for_each(pos, n, &proc->mm.regions, head)
     {
+        mem_sync_pages(VMS_MOUNT_1, pos, pos->start, pos->end - pos->start, 0);
         vfree(pos);
     }
 
-    vmm_mount_pd(PD_MOUNT_1, proc->page_table);
+    __del_pagetable(pid, VMS_MOUNT_1);
 
-    __del_pagetable(pid, PD_MOUNT_1);
-
-    vmm_unmount_pd(PD_MOUNT_1);
+    vmm_unmount_pd(VMS_MOUNT_1);
 
     cake_release(proc_pile, proc);
 

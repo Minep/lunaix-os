@@ -148,7 +148,7 @@ spawn_proc0()
     // 为内核创建一个专属栈空间。
     for (size_t i = 0; i < (KSTACK_SIZE >> PG_SIZE_BITS); i++) {
         uintptr_t pa = pmm_alloc_page(KERNEL_PID, 0);
-        vmm_set_mapping(PD_REFERENCED,
+        vmm_set_mapping(VMS_SELF,
                         KSTACK_START + (i << PG_SIZE_BITS),
                         pa,
                         PG_PREM_RW,
@@ -210,11 +210,11 @@ setup_memory(multiboot_memory_map_t* map, size_t map_size)
     pmm_mark_chunk_occupied(KERNEL_PID, 0, pg_count, PP_FGLOCKED);
 
     for (uintptr_t i = &__usrtext_start; i < &__usrtext_end; i += PG_SIZE) {
-        vmm_set_mapping(PD_REFERENCED, i, V2P(i), PG_PREM_UR, VMAP_NULL);
+        vmm_set_mapping(VMS_SELF, i, V2P(i), PG_PREM_UR, VMAP_NULL);
     }
 
     // reserve higher half
     for (size_t i = L1_INDEX(KERNEL_MM_BASE); i < 1023; i++) {
-        assert(vmm_set_mapping(PD_REFERENCED, i << 22, 0, 0, VMAP_NOMAP));
+        assert(vmm_set_mapping(VMS_SELF, i << 22, 0, 0, VMAP_NOMAP));
     }
 }

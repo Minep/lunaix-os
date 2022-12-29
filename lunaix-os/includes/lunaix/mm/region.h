@@ -8,6 +8,9 @@ typedef struct llist_header vm_regions_t;
 struct mm_region*
 region_create(ptr_t start, ptr_t end, u32_t attr);
 
+struct mm_region*
+region_create_range(ptr_t start, size_t length, u32_t attr);
+
 void
 region_add(vm_regions_t* lead, struct mm_region* vmregion);
 

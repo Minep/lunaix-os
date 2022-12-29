@@ -6,7 +6,7 @@
 #include <klibc/stdio.h>
 #include <klibc/string.h>
 
-#define TWIMAP_BUFFER_SIZE 1024
+#define TWIMAP_BUFFER_SIZE 4096
 
 void
 __twimap_default_reset(struct twimap* map)
@@ -62,6 +62,11 @@ twimap_read(struct twimap* map, void* buffer, size_t len, size_t fpos)
         acc_size += rdlen;
     }
 
+    if (acc_size <= len - 1) {
+        // pad zero
+        *(char*)(buffer + acc_size + 1) = 0;
+    }
+
     vfree(map->buffer);
     return acc_size;
 }
@@ -75,7 +80,7 @@ twimap_printf(struct twimap* mapping, const char* fmt, ...)
     char* buf = mapping->buffer + mapping->size_acc;
 
     mapping->size_acc +=
-      __ksprintf_internal(buf, fmt, TWIMAP_BUFFER_SIZE, args);
+      __ksprintf_internal(buf, fmt, TWIMAP_BUFFER_SIZE, args) - 1;
 
     va_end(args);
 }
@@ -112,6 +117,7 @@ twimap_create(void* data)
 
 struct v_file_ops twimap_file_ops = { .close = default_file_close,
                                       .read = __twimap_file_read,
+                                      .read_page = __twimap_file_read,
                                       .readdir = default_file_readdir,
                                       .seek = default_file_seek,
                                       .write = default_file_write };

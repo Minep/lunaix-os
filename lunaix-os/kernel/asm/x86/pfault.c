@@ -53,15 +53,15 @@ intr_routine_page_fault(const isr_param* param)
         goto segv_term;
     }
 
-    volatile x86_pte_t* pte = &PTE_MOUNTED(PD_REFERENCED, ptr >> 12);
-    if (PG_PRESENTED(*pte)) {
+    volatile x86_pte_t* pte = &PTE_MOUNTED(VMS_SELF, ptr >> 12);
+    if (PG_IS_PRESENT(*pte)) {
         if ((hit_region->attr & COW_MASK) == COW_MASK) {
             // normal page fault, do COW
             cpu_invplg(pte);
             uintptr_t pa =
               (uintptr_t)vmm_dup_page(__current->pid, PG_ENTRY_ADDR(*pte));
             pmm_free_page(__current->pid, *pte & ~0xFFF);
-            *pte = (*pte & 0xFFF) | pa | PG_WRITE;
+            *pte = (*pte & 0xFFF & ~PG_DIRTY) | pa | PG_WRITE;
             goto resolved;
         }
         // impossible cases or accessing privileged page
@@ -71,7 +71,7 @@ intr_routine_page_fault(const isr_param* param)
     // an anonymous page and not present
     //   -> a new page need to be alloc
     if ((hit_region->attr & REGION_ANON)) {
-        if (!PG_PRESENTED(*pte)) {
+        if (!PG_IS_PRESENT(*pte)) {
             cpu_invplg(pte);
             uintptr_t pa = pmm_alloc_page(__current->pid, 0);
             if (!pa) {
@@ -81,12 +81,12 @@ intr_routine_page_fault(const isr_param* param)
             *pte = *pte | pa | PG_PRESENT;
             goto resolved;
         }
-        // permission denied on anon page
+        // permission denied on anon page (e.g., write on readonly page)
         goto segv_term;
     }
 
     // if mfile is set (Non-anonymous), then it is a mem map
-    if (hit_region->mfile && !PG_PRESENTED(*pte)) {
+    if (hit_region->mfile && !PG_IS_PRESENT(*pte)) {
         struct v_file* file = hit_region->mfile;
         u32_t offset =
           (ptr - hit_region->start) & (PG_SIZE - 1) + hit_region->offset;
@@ -99,7 +99,7 @@ intr_routine_page_fault(const isr_param* param)
         cpu_invplg(pte);
         *pte = (*pte & 0xFFF) | pa | PG_PRESENT;
 
-        ptr = ptr & ~(PG_SIZE - 1);
+        ptr = PG_ALIGN(ptr);
         memset(ptr, 0, PG_SIZE);
 
         int errno = file->ops->read_page(file->inode, ptr, PG_SIZE, offset);
@@ -107,6 +107,8 @@ intr_routine_page_fault(const isr_param* param)
             kprintf(KERROR "fail to read page (%d)\n", errno);
             goto segv_term;
         }
+
+        *pte &= ~PG_DIRTY;
 
         goto resolved;
     }

@@ -20,7 +20,7 @@ void*
 iounmap(uintptr_t vaddr, u32_t size)
 {
     for (size_t i = 0; i < size; i += PG_SIZE) {
-        uintptr_t paddr = vmm_del_mapping(PD_REFERENCED, vaddr + i);
+        uintptr_t paddr = vmm_del_mapping(VMS_SELF, vaddr + i);
         pmm_free_page(KERNEL_PID, paddr);
     }
 }

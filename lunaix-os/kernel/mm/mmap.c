@@ -5,9 +5,14 @@
 #include <lunaix/spike.h>
 
 #include <lunaix/syscall.h>
+#include <lunaix/syscall_utils.h>
 
-void*
-mem_map(ptr_t mnt,
+// any size beyond this is bullshit
+#define BS_SIZE (2 << 30)
+
+int
+mem_map(void** addr_out,
+        ptr_t mnt,
         vm_regions_t* regions,
         void* addr,
         struct v_file* file,
@@ -16,19 +21,18 @@ mem_map(ptr_t mnt,
         u32_t proct,
         u32_t options)
 {
-    if (!length || (length & (PG_SIZE - 1)) || (offset & (PG_SIZE - 1))) {
-        __current->k_status = EINVAL;
-        return (void*)-1;
-    }
-
-    // read_page is not supported
-    if (!file->ops->read_page) {
-        __current->k_status = ENODEV;
-        return (void*)-1;
-    }
-
     ptr_t last_end = USER_START;
     struct mm_region *pos, *n;
+
+    if ((options & MAP_FIXED)) {
+        pos = region_get(regions, addr);
+        if (!pos) {
+            last_end = addr;
+            goto found;
+        }
+        return EEXIST;
+    }
+
     llist_for_each(pos, n, regions, head)
     {
         if (pos->start - last_end >= length && last_end >= addr) {
@@ -37,15 +41,13 @@ mem_map(ptr_t mnt,
         last_end = pos->end;
     }
 
-    __current->k_status = ENOMEM;
-    return (void*)-1;
+    return ENOMEM;
 
 found:
     addr = last_end;
-    ptr_t end = addr + length;
 
     struct mm_region* region =
-      region_create(addr, end, proct | (options & 0x1f));
+      region_create_range(addr, length, proct | (options & 0x1f));
     region->mfile = file;
     region->offset = offset;
 
@@ -60,10 +62,66 @@ found:
         vmm_set_mapping(mnt, addr + i, 0, attr, 0);
     }
 
-    return addr;
+    *addr_out = addr;
+    return 0;
 }
 
-void*
+void
+mem_sync_pages(ptr_t mnt,
+               struct mm_region* region,
+               ptr_t start,
+               ptr_t length,
+               int options)
+{
+    if (!region->mfile || !(region->attr & REGION_WSHARED)) {
+        return;
+    }
+
+    v_mapping mapping;
+    for (size_t i = 0; i < length; i += PG_SIZE) {
+        if (!vmm_lookupat(mnt, start + i, &mapping)) {
+            continue;
+        }
+        if (PG_IS_DIRTY(*mapping.pte)) {
+            size_t offset = mapping.va - region->start + region->offset;
+            struct v_inode* inode = region->mfile->inode;
+            region->mfile->ops->write_page(inode, mapping.va, PG_SIZE, offset);
+            *mapping.pte &= ~PG_DIRTY;
+            cpu_invplg(mapping.va);
+        } else if ((options & MS_INVALIDATE)) {
+            *mapping.pte &= ~PG_PRESENT;
+            cpu_invplg(mapping.va);
+        }
+    }
+}
+
+int
+mem_msync(ptr_t mnt,
+          vm_regions_t* regions,
+          ptr_t addr,
+          size_t length,
+          int options)
+{
+    struct mm_region* pos = list_entry(regions->next, struct mm_region, head);
+    while (length && (ptr_t)&pos->head != (ptr_t)regions) {
+        if (pos->end >= addr && pos->start <= addr) {
+            size_t l = MIN(length, pos->end - addr);
+            mem_sync_pages(mnt, pos, addr, l, options);
+
+            addr += l;
+            length -= l;
+        }
+        pos = list_entry(pos->head.next, struct mm_region, head);
+    }
+
+    if (length) {
+        return ENOMEM;
+    }
+
+    return 0;
+}
+
+int
 mem_unmap(ptr_t mnt, vm_regions_t* regions, void* addr, size_t length)
 {
     length = ROUNDUP(length, PG_SIZE);
@@ -90,8 +148,7 @@ mem_unmap(ptr_t mnt, vm_regions_t* regions, void* addr, size_t length)
             l = length;
         }
 
-        // TODO for shared mappings, sync page content if modified. (also
-        // implement msync)
+        mem_sync_pages(mnt, pos, cur_addr, l, 0);
 
         for (size_t i = 0; i < l; i += PG_SIZE) {
             ptr_t pa = vmm_del_mapping(mnt, cur_addr + i);
@@ -118,27 +175,60 @@ __DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
     int fd = va_arg(lst, u32_t);
     off_t offset = va_arg(lst, off_t);
     int options = va_arg(lst, int);
-
     int errno = 0;
+    void* result = (void*)-1;
+
+    if (!length || length > BS_SIZE || !PG_ALIGNED(addr)) {
+        errno = EINVAL;
+        goto done;
+    }
+
     struct v_fd* vfd;
     if ((errno = vfs_getfd(fd, &vfd))) {
-        __current->k_status = errno;
-        return (void*)-1;
+        goto done;
+    }
+
+    struct v_file* file = vfd->file;
+
+    if (!(options & MAP_ANON)) {
+        if (!file->ops->read_page) {
+            errno = ENODEV;
+            goto done;
+        }
+    } else {
+        file = NULL;
     }
 
     length = ROUNDUP(length, PG_SIZE);
 
-    return mem_map(PD_REFERENCED,
-                   &__current->mm.regions,
-                   addr,
-                   vfd->file,
-                   offset,
-                   length,
-                   proct,
-                   options);
+    errno = mem_map(&result,
+                    VMS_SELF,
+                    &__current->mm.regions,
+                    addr,
+                    file,
+                    offset,
+                    length,
+                    proct,
+                    options);
+
+done:
+    __current->k_status = errno;
+    return result;
 }
 
 __DEFINE_LXSYSCALL2(void, munmap, void*, addr, size_t, length)
 {
-    return mem_unmap(PD_REFERENCED, &__current->mm.regions, addr, length);
+    return mem_unmap(VMS_SELF, &__current->mm.regions, addr, length);
+}
+
+__DEFINE_LXSYSCALL3(int, msync, void*, addr, size_t, length, int, flags)
+{
+    if (!PG_ALIGNED(addr) || ((flags & MS_ASYNC) && (flags & MS_SYNC))) {
+        return DO_STATUS(EINVAL);
+    }
+
+    int status =
+      mem_msync(VMS_SELF, &__current->mm.regions, addr, length, flags);
+
+    return DO_STATUS(status);
 }

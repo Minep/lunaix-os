@@ -9,13 +9,18 @@
 #define PROT_EXEC (1 << 4)
 
 // identity mapped to region attributes
+
 #define MAP_WSHARED 0x2
 #define MAP_RSHARED 0x1
-#define MAP_SHARED (MAP_WSHARED | MAP_RSHARED)
-#define MAP_PRIVATE 0x0
+#define MAP_SHARED MAP_WSHARED
+#define MAP_PRIVATE MAP_RSHARED
+#define MAP_EXCLUSIVE 0x0
 #define MAP_ANON (1 << 5)
 #define MAP_STACK 0 // no effect in Lunaix
+
 // other MAP_* goes should beyond 0x20
+
+#define MAP_FIXED 0x40
 
 #define MS_ASYNC 0x1
 #define MS_SYNC 0x2

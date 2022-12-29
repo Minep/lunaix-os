@@ -1,12 +1,31 @@
+#include <lunaix/mm/page.h>
 #include <lunaix/mm/region.h>
 #include <lunaix/mm/valloc.h>
+#include <lunaix/spike.h>
 
 #include <klibc/string.h>
 
 struct mm_region*
 region_create(ptr_t start, ptr_t end, u32_t attr)
 {
-    return valloc(sizeof(struct mm_region));
+    assert_msg(PG_ALIGNED(start), "not page aligned");
+    assert_msg(PG_ALIGNED(end), "not page aligned");
+    struct mm_region* region = valloc(sizeof(struct mm_region));
+    *region =
+      (struct mm_region){ .attr = attr, .start = start, .end = end - 1 };
+    return region;
+}
+
+struct mm_region*
+region_create_range(ptr_t start, size_t length, u32_t attr)
+{
+    assert_msg(PG_ALIGNED(start), "not page aligned");
+    assert_msg(PG_ALIGNED(length), "not page aligned");
+    struct mm_region* region = valloc(sizeof(struct mm_region));
+    *region = (struct mm_region){ .attr = attr,
+                                  .start = start,
+                                  .end = start + length - 1 };
+    return region;
 }
 
 void
@@ -14,7 +33,7 @@ region_add(vm_regions_t* lead, struct mm_region* vmregion)
 {
     if (llist_empty(lead)) {
         llist_append(lead, &vmregion->head);
-        return vmregion;
+        return;
     }
 
     ptr_t cur_end = 0;
