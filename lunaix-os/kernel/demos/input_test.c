@@ -1,9 +1,10 @@
-#include <lunaix/fctrl.h>
-#include <lunaix/foptions.h>
 #include <lunaix/input.h>
-#include <lunaix/lunaix.h>
-#include <lunaix/lunistd.h>
+
 #include <ulibc/stdio.h>
+#include <usr/errno.h>
+#include <usr/fcntl.h>
+#include <usr/sys/lunaix.h>
+#include <usr/unistd.h>
 
 #define STDIN 1
 #define STDOUT 0
@@ -14,7 +15,7 @@ input_test()
     int fd = open("/dev/input/i8042-kbd", 0);
 
     if (fd < 0) {
-        printf("fail to open (%d)", geterrno());
+        printf("fail to open (%d)", errno);
         return;
     }
 

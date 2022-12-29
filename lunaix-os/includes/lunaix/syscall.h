@@ -112,49 +112,48 @@ syscall_install();
     return (rettype)v;
 
 #define __LXSYSCALL(rettype, name)                                             \
-    static rettype name()                                                      \
+    rettype name()                                                             \
     {                                                                          \
         ___DOINT33(__SYSCALL_##name, rettype)                                  \
     }
 
 #define __LXSYSCALL1(rettype, name, t1, p1)                                    \
-    static rettype name(__PARAM_MAP1(t1, p1))                                  \
+    rettype name(__PARAM_MAP1(t1, p1))                                         \
     {                                                                          \
         asm("" ::"b"(p1));                                                     \
         ___DOINT33(__SYSCALL_##name, rettype)                                  \
     }
 
 #define __LXSYSCALL2(rettype, name, t1, p1, t2, p2)                            \
-    static rettype name(__PARAM_MAP2(t1, p1, t2, p2))                          \
+    rettype name(__PARAM_MAP2(t1, p1, t2, p2))                                 \
     {                                                                          \
         asm("\n" ::"b"(p1), "c"(p2));                                          \
         ___DOINT33(__SYSCALL_##name, rettype)                                  \
     }
 
 #define __LXSYSCALL3(rettype, name, t1, p1, t2, p2, t3, p3)                    \
-    static rettype name(__PARAM_MAP3(t1, p1, t2, p2, t3, p3))                  \
+    rettype name(__PARAM_MAP3(t1, p1, t2, p2, t3, p3))                         \
     {                                                                          \
         asm("\n" ::"b"(p1), "c"(p2), "d"(p3));                                 \
         ___DOINT33(__SYSCALL_##name, rettype)                                  \
     }
 
 #define __LXSYSCALL4(rettype, name, t1, p1, t2, p2, t3, p3, t4, p4)            \
-    static rettype name(__PARAM_MAP4(t1, p1, t2, p2, t3, p3, t4, p4))          \
+    rettype name(__PARAM_MAP4(t1, p1, t2, p2, t3, p3, t4, p4))                 \
     {                                                                          \
         asm("\n" ::"b"(p1), "c"(p2), "d"(p3), "D"(p4));                        \
         ___DOINT33(__SYSCALL_##name, rettype)                                  \
     }
 
 #define __LXSYSCALL5(rettype, name, t1, p1, t2, p2, t3, p3, t4, p4, t5, p5)    \
-    static rettype name(__PARAM_MAP5(t1, p1, t2, p2, t3, p3, t4, p4, t5, p5))  \
+    rettype name(__PARAM_MAP5(t1, p1, t2, p2, t3, p3, t4, p4, t5, p5))         \
     {                                                                          \
         asm("" ::"r"(p5), "b"(p1), "c"(p2), "d"(p3), "D"(p4), "S"(p5));        \
         ___DOINT33(__SYSCALL_##name, rettype)                                  \
     }
 
 #define __LXSYSCALL2_VARG(rettype, name, t1, p1, t2, p2)                       \
-    __attribute__((noinline)) static rettype name(                             \
-      __PARAM_MAP2(t1, p1, t2, p2), ...)                                       \
+    __attribute__((noinline)) rettype name(__PARAM_MAP2(t1, p1, t2, p2), ...)  \
     {                                                                          \
         /* No inlining! This depends on the call frame assumption */           \
         void* _last = (void*)&p2 + sizeof(void*);                              \

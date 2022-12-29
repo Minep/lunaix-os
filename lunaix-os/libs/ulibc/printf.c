@@ -1,7 +1,8 @@
 #include <klibc/stdio.h>
-#include <lunaix/lunistd.h>
 #include <lunaix/spike.h>
 #include <ulibc/stdio.h>
+
+#include <usr/unistd.h>
 
 // This is VERY bad implementation as it mixes both kernel and user space
 // code together. It is here however, just for the convenience of our testing

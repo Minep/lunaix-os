@@ -1,11 +1,8 @@
 #include <lunaix/block.h>
 #include <lunaix/common.h>
-#include <lunaix/fctrl.h>
 #include <lunaix/foptions.h>
 #include <lunaix/fs.h>
 #include <lunaix/fs/twifs.h>
-#include <lunaix/lunaix.h>
-#include <lunaix/lunistd.h>
 #include <lunaix/lxconsole.h>
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/pmm.h>
@@ -17,6 +14,10 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
 #include <lunaix/types.h>
+
+#include <usr/fcntl.h>
+#include <usr/sys/lunaix.h>
+#include <usr/unistd.h>
 
 #include <sdbg/protocol.h>
 

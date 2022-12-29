@@ -1,4 +1,3 @@
-#include <lunaix/dirent.h>
 #include <lunaix/fs/taskfs.h>
 #include <lunaix/fs/twimap.h>
 #include <lunaix/mm/valloc.h>
@@ -7,6 +6,8 @@
 
 #include <klibc/stdio.h>
 #include <klibc/string.h>
+
+#include <usr/sys/dirent_defs.h>
 
 #define COUNTER_MASK ((1 << 16) - 1)
 

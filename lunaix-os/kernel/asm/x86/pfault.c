@@ -1,11 +1,11 @@
 #include <arch/x86/interrupts.h>
 #include <lunaix/common.h>
-#include <lunaix/lxsignal.h>
 #include <lunaix/mm/mm.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/region.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/sched.h>
+#include <lunaix/signal.h>
 #include <lunaix/status.h>
 #include <lunaix/syslog.h>
 

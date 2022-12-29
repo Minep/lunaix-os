@@ -1,8 +1,8 @@
-#include <lunaix/fctrl.h>
-#include <lunaix/foptions.h>
-#include <lunaix/lunaix.h>
-#include <lunaix/lunistd.h>
 #include <ulibc/stdio.h>
+#include <usr/errno.h>
+#include <usr/fcntl.h>
+#include <usr/sys/lunaix.h>
+#include <usr/unistd.h>
 
 void
 _iotest_main()
@@ -13,8 +13,8 @@ _iotest_main()
     char read_out[256];
 
     // 切换工作目录至 /dev
-    int errno = chdir("/dev");
-    if (errno) {
+    int status = chdir("/dev");
+    if (status) {
         write(stdout, "fail to chdir", 15);
         return;
     }
@@ -29,7 +29,7 @@ _iotest_main()
     int fd = open("./sda", 0);
 
     if (fd < 0) {
-        printf("fail to open (%d)\n", geterrno());
+        printf("fail to open (%d)\n", errno);
         return;
     }
 

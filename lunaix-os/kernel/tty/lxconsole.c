@@ -8,10 +8,9 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/sched.h>
+#include <lunaix/signal.h>
 #include <lunaix/tty/console.h>
 #include <lunaix/tty/tty.h>
-
-#include <lunaix/lxsignal.h>
 
 static struct console lx_console;
 

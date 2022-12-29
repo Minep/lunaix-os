@@ -1,9 +1,10 @@
-#include <lunaix/lunaix.h>
-#include <lunaix/lunistd.h>
-#include <lunaix/signal.h>
 #include <lunaix/spike.h>
-#include <lunaix/types.h>
+
 #include <ulibc/stdio.h>
+
+#include <usr/signal.h>
+#include <usr/sys/lunaix.h>
+#include <usr/unistd.h>
 
 void __USER__
 sigchild_handler(int signum)
@@ -29,9 +30,9 @@ sigalrm_handler(int signum)
 void __USER__
 _signal_demo_main()
 {
-    signal(_SIGCHLD, sigchild_handler);
-    signal(_SIGSEGV, sigsegv_handler);
-    signal(_SIGALRM, sigalrm_handler);
+    signal(SIGCHLD, sigchild_handler);
+    signal(SIGSEGV, sigsegv_handler);
+    signal(SIGALRM, sigalrm_handler);
 
     alarm(5);
 
@@ -51,7 +52,7 @@ _signal_demo_main()
     for (int i = 0; i < 5; i++) {
         pid_t pid = 0;
         if (!(pid = fork())) {
-            signal(_SIGSEGV, sigsegv_handler);
+            signal(SIGSEGV, sigsegv_handler);
             sleep(i);
             if (i == 3) {
                 i = *(int*)0xdeadc0de; // seg fault!

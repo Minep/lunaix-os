@@ -1,12 +1,11 @@
-#include <klibc/string.h>
-#include <lunaix/lunistd.h>
-#include <lunaix/lxsignal.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/signal.h>
 #include <lunaix/spike.h>
 #include <lunaix/status.h>
 #include <lunaix/syscall.h>
+
+#include <klibc/string.h>
 
 extern struct scheduler sched_ctx; /* kernel/sched.c */
 

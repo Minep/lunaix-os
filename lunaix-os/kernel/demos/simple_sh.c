@@ -1,12 +1,12 @@
-#include <lunaix/fctrl.h>
-#include <lunaix/foptions.h>
 #include <lunaix/ioctl.h>
-#include <lunaix/lunaix.h>
-#include <lunaix/lunistd.h>
-#include <lunaix/signal.h>
 #include <lunaix/status.h>
 
+#include <usr/fcntl.h>
+#include <usr/signal.h>
+#include <usr/sys/dirent.h>
+#include <usr/sys/lunaix.h>
 #include <usr/sys/mann.h>
+#include <usr/unistd.h>
 
 #include <klibc/string.h>
 #include <ulibc/stdio.h>
@@ -101,7 +101,7 @@ do_ls(const char* path)
     if (fd < 0) {
         sh_printerr();
     } else {
-        struct dirent ent = { .d_offset = 0 };
+        struct lx_dirent ent = { .d_offset = 0 };
         int status;
         while ((status = sys_readdir(fd, &ent)) == 1) {
             if (ent.d_type == DT_DIR) {
@@ -125,7 +125,7 @@ do_mcat(const char* file)
     if (fd < 0) {
         sh_printerr();
     } else {
-        ptr_t p = mmap(NULL, 2048, 0, 0, fd, 0);
+        void* p = mmap(NULL, 2048, 0, 0, fd, 0);
         if ((int)p < 0) {
             sh_printerr();
         } else {
@@ -143,7 +143,7 @@ sh_loop()
     char buf[512];
     char *cmd, *argpart;
     pid_t p;
-    signal(_SIGINT, sigint_handle);
+    signal(SIGINT, sigint_handle);
 
     // set our shell as foreground process
     // (unistd.h:tcsetpgrp is essentially a wrapper of this)

@@ -44,7 +44,6 @@
 */
 
 #include <klibc/string.h>
-#include <lunaix/dirent.h>
 #include <lunaix/foptions.h>
 #include <lunaix/fs.h>
 #include <lunaix/mm/cake.h>
@@ -56,6 +55,8 @@
 #include <lunaix/syscall_utils.h>
 
 #include <lunaix/fs/twifs.h>
+
+#include <usr/sys/dirent_defs.h>
 
 static struct cake_pile* dnode_pile;
 static struct cake_pile* inode_pile;
@@ -625,13 +626,13 @@ __vfs_readdir_callback(struct dir_context* dctx,
                        const int len,
                        const int dtype)
 {
-    struct dirent* dent = (struct dirent*)dctx->cb_data;
+    struct lx_dirent* dent = (struct lx_dirent*)dctx->cb_data;
     strncpy(dent->d_name, name, DIRENT_NAME_MAX_LEN);
     dent->d_nlen = len;
     dent->d_type = dtype;
 }
 
-__DEFINE_LXSYSCALL2(int, sys_readdir, int, fd, struct dirent*, dent)
+__DEFINE_LXSYSCALL2(int, sys_readdir, int, fd, struct lx_dirent*, dent)
 {
     struct v_fd* fd_s;
     int errno;

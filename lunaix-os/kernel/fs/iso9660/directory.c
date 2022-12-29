@@ -1,4 +1,3 @@
-#include <lunaix/dirent.h>
 #include <lunaix/fs.h>
 #include <lunaix/fs/iso9660.h>
 #include <lunaix/mm/cake.h>
@@ -6,6 +5,8 @@
 #include <lunaix/spike.h>
 
 #include <klibc/string.h>
+
+#include <usr/sys/dirent_defs.h>
 
 extern struct cake_pile* drec_cache_pile;
 

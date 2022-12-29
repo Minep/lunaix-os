@@ -1,8 +1,9 @@
 #include <lunaix/device.h>
-#include <lunaix/dirent.h>
 #include <lunaix/fs.h>
 #include <lunaix/fs/devfs.h>
 #include <lunaix/spike.h>
+
+#include <usr/sys/dirent_defs.h>
 
 extern struct v_inode_ops devfs_inode_ops;
 extern struct v_file_ops devfs_file_ops;
