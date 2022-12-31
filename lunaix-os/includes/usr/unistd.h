@@ -108,4 +108,7 @@ fgetxattr(int fd, const char* name, void* value, size_t len);
 int
 fsetxattr(int fd, const char* name, void* value, size_t len);
 
+int
+execve(const char* filename, const char* argv[], const char* envp[]);
+
 #endif /* __LUNAIX_UNISTD_H */

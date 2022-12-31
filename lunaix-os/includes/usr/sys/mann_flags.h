@@ -21,9 +21,11 @@
 // other MAP_* goes should beyond 0x20
 
 #define MAP_FIXED 0x40
+#define MAP_FIXED_NOREPLACE 0x80
 
 #define MS_ASYNC 0x1
 #define MS_SYNC 0x2
 #define MS_INVALIDATE 0x4
+#define MS_INVALIDATE_ALL 0x8
 
 #endif /* __LUNAIX_MANN_FLAGS_H */

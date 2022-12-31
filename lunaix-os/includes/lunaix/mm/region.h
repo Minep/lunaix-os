@@ -15,7 +15,10 @@ void
 region_add(vm_regions_t* lead, struct mm_region* vmregion);
 
 void
-region_release_all(vm_regions_t* lead);
+region_release(pid_t pid, struct mm_region* region);
+
+void
+region_release_all(pid_t pid, vm_regions_t* lead);
 
 struct mm_region*
 region_get(vm_regions_t* lead, unsigned long vaddr);

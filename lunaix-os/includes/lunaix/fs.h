@@ -397,6 +397,9 @@ void
 vfs_ref_dnode(struct v_dnode* dnode);
 
 void
+vfs_ref_file(struct v_file* file);
+
+void
 vfs_unref_dnode(struct v_dnode* dnode);
 
 int

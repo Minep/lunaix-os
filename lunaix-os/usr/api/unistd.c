@@ -115,3 +115,12 @@ __LXSYSCALL4(int,
 __LXSYSCALL2(int, unlinkat, int, fd, const char*, pathname)
 
 __LXSYSCALL1(int, mkdir, const char*, path)
+
+__LXSYSCALL3(int,
+             execve,
+             const char*,
+             filename,
+             const char**,
+             argv,
+             const char**,
+             envp)

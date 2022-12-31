@@ -61,6 +61,7 @@
         .long __lxsys_syslog
         .long __lxsys_sys_mmap
         .long __lxsys_munmap
+        .long __lxsys_execve
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
             .long 0

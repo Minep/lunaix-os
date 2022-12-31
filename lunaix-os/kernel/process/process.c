@@ -1,6 +1,7 @@
 #include <klibc/string.h>
 #include <lunaix/clock.h>
 #include <lunaix/common.h>
+#include <lunaix/mm/mmap.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/region.h>
 #include <lunaix/mm/valloc.h>
@@ -141,16 +142,17 @@ init_proc_user_space(struct proc_info* pcb)
 
     /*---  分配用户栈  ---*/
 
-    struct mm_region* stack_vm;
+    struct mm_region* mapped;
+    struct mmap_param param = { .vms_mnt = VMS_MOUNT_1,
+                                .regions = &pcb->mm.regions,
+                                .length = USTACK_SIZE,
+                                .proct = PROT_READ | PROT_WRITE,
+                                .flags = MAP_ANON | MAP_PRIVATE | MAP_FIXED,
+                                .type = REGION_TYPE_STACK };
 
-    stack_vm = region_create_range(
-      USTACK_END, USTACK_SIZE, REGION_RW | REGION_RSHARED | REGION_ANON);
-    // 注册用户栈区域
-    region_add(&pcb->mm.regions, stack_vm);
-
-    // 预留地址空间，具体物理页将由Page Fault Handler按需分配。
-    for (uintptr_t i = PG_ALIGN(USTACK_END); i < USTACK_TOP; i += PG_SIZE) {
-        vmm_set_mapping(VMS_MOUNT_1, i, 0, PG_ALLOW_USER | PG_WRITE, VMAP_NULL);
+    int status = 0;
+    if ((status = mem_map(NULL, &mapped, USTACK_END, NULL, &param))) {
+        kprint_panic("fail to alloc user stack: %d", status);
     }
 
     // TODO other uspace initialization stuff

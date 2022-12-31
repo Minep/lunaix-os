@@ -5,16 +5,23 @@
 #include <lunaix/mm/region.h>
 #include <lunaix/types.h>
 
+struct mmap_param
+{
+    ptr_t vms_mnt;
+    vm_regions_t* regions;
+    off_t offset;
+    size_t length;
+    u32_t proct;
+    u32_t flags;
+    u32_t type;
+};
+
 int
 mem_map(void** addr_out,
-        ptr_t mnt,
-        vm_regions_t* regions,
+        struct mm_region** created,
         void* addr,
         struct v_file* file,
-        off_t offset,
-        size_t length,
-        u32_t proct,
-        u32_t options);
+        struct mmap_param* param);
 
 int
 mem_unmap(ptr_t mnt, vm_regions_t* regions, void* addr, size_t length);

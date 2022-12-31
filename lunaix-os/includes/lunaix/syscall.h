@@ -63,6 +63,8 @@
 #define __SYSCALL_sys_mmap 52
 #define __SYSCALL_munmap 53
 
+#define __SYSCALL_execve 54
+
 #define __SYSCALL_MAX 0x100
 
 #ifndef __ASM__

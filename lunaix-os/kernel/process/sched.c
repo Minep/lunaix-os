@@ -407,7 +407,7 @@ destroy_process(pid_t pid)
     llist_for_each(pos, n, &proc->mm.regions, head)
     {
         mem_sync_pages(VMS_MOUNT_1, pos, pos->start, pos->end - pos->start, 0);
-        vfree(pos);
+        region_release(pid, pos);
     }
 
     __del_pagetable(pid, VMS_MOUNT_1);

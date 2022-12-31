@@ -53,13 +53,27 @@ region_add(vm_regions_t* lead, struct mm_region* vmregion)
 }
 
 void
-region_release_all(vm_regions_t* lead)
+region_release(pid_t pid, struct mm_region* region)
+{
+    if (region->destruct_region) {
+        region->destruct_region(region);
+    }
+
+    if (region->mfile) {
+        vfs_pclose(region->mfile, pid);
+    }
+
+    vfree(region);
+}
+
+void
+region_release_all(pid_t pid, vm_regions_t* lead)
 {
     struct mm_region *pos, *n;
 
     llist_for_each(pos, n, lead, head)
     {
-        vfree(pos);
+        region_release(pid, pos);
     }
 }
 

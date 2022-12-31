@@ -102,9 +102,15 @@ intr_routine_page_fault(const isr_param* param)
         ptr = PG_ALIGN(ptr);
         memset(ptr, 0, PG_SIZE);
 
-        int errno = file->ops->read_page(file->inode, ptr, PG_SIZE, offset);
+        int errno = 0;
+        if (hit_region->init_page) {
+            errno = hit_region->init_page(hit_region, ptr, offset);
+        } else {
+            errno = file->ops->read_page(file->inode, ptr, PG_SIZE, offset);
+        }
+
         if (errno < 0) {
-            kprintf(KERROR "fail to read page (%d)\n", errno);
+            kprintf(KERROR "fail to populate page (%d)\n", errno);
             goto segv_term;
         }
 

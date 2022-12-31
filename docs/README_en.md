@@ -25,7 +25,7 @@ The following list presents all features it does have in current stage.
 + Memory management & demand paging
 + PS/2 Keyboard support
 + Muti-tasking and task management
-+ 47 commonly used POSIX syscall（[See Appendix 1](#appendix1)）
++ 50 commonly used POSIX syscall（[See Appendix 1](#appendix1)）
 + User Space
 + Signal
 + PCI 3.0
@@ -209,9 +209,12 @@ The following list also enumerated such materials the author has used:
 2. `setxattr(2)`※
 2. `fgetxattr(2)`※
 2. `fsetxattr(2)`※
-2. `ioctl(2)`※
+2. `ioctl(2)`
 2. `getpgid(2)`
 2. `setpgid(2)`
+2. `mmap(2)`
+2. `munmap(2)`
+2. `execve(2)`※
 
 **LunaixOS**
 

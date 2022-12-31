@@ -81,6 +81,9 @@ spin()
     if (!(cond)) {                                                             \
         __assert_fail(msg, __FILE__, __LINE__);                                \
     }
+
+#define fail(msg) __assert_fail(msg, __FILE__, __LINE__);
+
 void
 __assert_fail(const char* expr, const char* file, unsigned int line)
   __attribute__((noinline, noreturn));

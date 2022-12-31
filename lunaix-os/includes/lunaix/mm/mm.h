@@ -46,10 +46,11 @@ typedef struct
 #define REGION_ANON MAP_ANON
 #define REGION_RW REGION_READ | REGION_WRITE
 
-#define REGION_TYPE_CODE (1 << 16);
-#define REGION_TYPE_GENERAL (2 << 16);
-#define REGION_TYPE_HEAP (3 << 16);
-#define REGION_TYPE_STACK (4 << 16);
+#define REGION_TYPE_CODE (1 << 16)
+#define REGION_TYPE_GENERAL (2 << 16)
+#define REGION_TYPE_HEAP (3 << 16)
+#define REGION_TYPE_STACK (4 << 16)
+#define REGION_TYPE_VARS (5 << 16)
 
 struct mm_region
 {
@@ -59,6 +60,10 @@ struct mm_region
     ptr_t start;
     ptr_t end;
     u32_t attr;
+
+    void* data;
+    int (*init_page)(struct mm_region*, void*, off_t);
+    void (*destruct_region)(struct mm_region*);
 };
 
 #endif /* __LUNAIX_MM_H */

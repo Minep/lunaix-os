@@ -8,34 +8,63 @@
 #include <lunaix/syscall_utils.h>
 
 // any size beyond this is bullshit
-#define BS_SIZE (2 << 30)
+#define BS_SIZE (KERNEL_MM_BASE - UMMAP_START)
+
+int
+mem_has_overlap(vm_regions_t* regions, ptr_t start, size_t len)
+{
+    ptr_t end = start + end - 1;
+    struct mm_region *pos, *n;
+    llist_for_each(pos, n, regions, head)
+    {
+        if (pos->end >= start && pos->start < start) {
+            return 1;
+        }
+
+        if (pos->end <= end && pos->start >= start) {
+            return 1;
+        }
+
+        if (pos->end >= end && pos->start < end) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
 
 int
 mem_map(void** addr_out,
-        ptr_t mnt,
-        vm_regions_t* regions,
+        struct mm_region** created,
         void* addr,
         struct v_file* file,
-        off_t offset,
-        size_t length,
-        u32_t proct,
-        u32_t options)
+        struct mmap_param* param)
 {
     ptr_t last_end = USER_START;
     struct mm_region *pos, *n;
 
-    if ((options & MAP_FIXED)) {
-        pos = region_get(regions, addr);
-        if (!pos) {
-            last_end = addr;
-            goto found;
+    if ((param->flags & MAP_FIXED_NOREPLACE)) {
+        if (mem_has_overlap(param->regions, addr, param->length)) {
+            return EEXIST;
         }
-        return EEXIST;
+        last_end = addr;
+        goto found;
     }
 
-    llist_for_each(pos, n, regions, head)
+    if ((param->flags & MAP_FIXED)) {
+        int status =
+          mem_unmap(param->vms_mnt, param->regions, addr, param->length);
+        if (status) {
+            return status;
+        }
+        last_end = addr;
+        goto found;
+    }
+
+    llist_for_each(pos, n, param->regions, head)
     {
-        if (pos->start - last_end >= length && last_end >= addr) {
+        if (pos->start - last_end > param->length && last_end > addr) {
+            last_end += 1;
             goto found;
         }
         last_end = pos->end;
@@ -46,23 +75,37 @@ mem_map(void** addr_out,
 found:
     addr = last_end;
 
-    struct mm_region* region =
-      region_create_range(addr, length, proct | (options & 0x1f));
-    region->mfile = file;
-    region->offset = offset;
+    if (addr >= KERNEL_MM_BASE || addr < USER_START) {
+        return ENOMEM;
+    }
 
-    region_add(regions, region);
+    struct mm_region* region = region_create_range(
+      addr,
+      param->length,
+      ((param->proct | param->flags) & 0x1f) | (param->type & ~0xffff));
+
+    region->mfile = file;
+    region->offset = param->offset;
+
+    region_add(param->regions, region);
 
     u32_t attr = PG_ALLOW_USER;
-    if ((proct & REGION_WRITE)) {
+    if ((param->proct & REGION_WRITE)) {
         attr |= PG_WRITE;
     }
 
-    for (u32_t i = 0; i < length; i += PG_SIZE) {
-        vmm_set_mapping(mnt, addr + i, 0, attr, 0);
+    for (u32_t i = 0; i < param->length; i += PG_SIZE) {
+        vmm_set_mapping(param->vms_mnt, addr + i, 0, attr, 0);
     }
 
-    *addr_out = addr;
+    vfs_ref_file(file);
+
+    if (addr_out) {
+        *addr_out = addr;
+    }
+    if (created) {
+        *created = region;
+    }
     return 0;
 }
 
@@ -82,16 +125,27 @@ mem_sync_pages(ptr_t mnt,
         if (!vmm_lookupat(mnt, start + i, &mapping)) {
             continue;
         }
+
         if (PG_IS_DIRTY(*mapping.pte)) {
             size_t offset = mapping.va - region->start + region->offset;
             struct v_inode* inode = region->mfile->inode;
             region->mfile->ops->write_page(inode, mapping.va, PG_SIZE, offset);
             *mapping.pte &= ~PG_DIRTY;
-            cpu_invplg(mapping.va);
+            cpu_invplg(mapping.pte);
         } else if ((options & MS_INVALIDATE)) {
-            *mapping.pte &= ~PG_PRESENT;
-            cpu_invplg(mapping.va);
+            goto invalidate;
         }
+
+        if (options & MS_INVALIDATE_ALL) {
+            goto invalidate;
+        }
+
+        continue;
+
+    invalidate:
+        *mapping.pte &= ~PG_PRESENT;
+        pmm_free_page(KERNEL_PID, mapping.pa);
+        cpu_invplg(mapping.pte);
     }
 }
 
@@ -160,13 +214,15 @@ mem_unmap(ptr_t mnt, vm_regions_t* regions, void* addr, size_t length)
         n = container_of(pos->head.next, typeof(*pos), head);
         if (pos->end == pos->start) {
             llist_delete(&pos->head);
-            vfree(pos);
+            region_release(__current->pid, pos);
         }
 
         pos = n;
         length -= l;
         cur_addr += length;
     }
+
+    return 0;
 }
 
 __DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
@@ -180,6 +236,13 @@ __DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
 
     if (!length || length > BS_SIZE || !PG_ALIGNED(addr)) {
         errno = EINVAL;
+        goto done;
+    }
+
+    if (!addr) {
+        addr = UMMAP_START;
+    } else if (addr < UMMAP_START || addr + length >= UMMAP_END) {
+        errno = ENOMEM;
         goto done;
     }
 
@@ -199,17 +262,15 @@ __DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
         file = NULL;
     }
 
-    length = ROUNDUP(length, PG_SIZE);
+    struct mmap_param param = { .flags = options,
+                                .length = ROUNDUP(length, PG_SIZE),
+                                .offset = offset,
+                                .type = REGION_TYPE_GENERAL,
+                                .proct = proct,
+                                .regions = &__current->mm.regions,
+                                .vms_mnt = VMS_SELF };
 
-    errno = mem_map(&result,
-                    VMS_SELF,
-                    &__current->mm.regions,
-                    addr,
-                    file,
-                    offset,
-                    length,
-                    proct,
-                    options);
+    errno = mem_map(&result, NULL, addr, file, &param);
 
 done:
     __current->k_status = errno;

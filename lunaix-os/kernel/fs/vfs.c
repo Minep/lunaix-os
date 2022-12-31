@@ -1226,6 +1226,12 @@ done:
 }
 
 void
+vfs_ref_file(struct v_file* file)
+{
+    atomic_fetch_add(&file->ref_count, 1);
+}
+
+void
 vfs_ref_dnode(struct v_dnode* dnode)
 {
     atomic_fetch_add(&dnode->ref_count, 1);

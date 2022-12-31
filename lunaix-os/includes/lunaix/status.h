@@ -30,5 +30,7 @@
 #define ENOTDEV -24
 #define EOVERFLOW -25
 #define ENOTBLK -26
+#define ENOEXEC -27
+#define E2BIG -28
 
 #endif /* __LUNAIX_CODE_H */

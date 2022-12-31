@@ -8,9 +8,11 @@
 #define MEM_1MB 0x100000
 #define MEM_4MB 0x400000
 
+#define USER_START 0x400000
+
 #define KSTACK_SIZE MEM_1MB
-#define KSTACK_START ((0x3FFFFFU - KSTACK_SIZE) + 1)
-#define KSTACK_TOP 0x3FFFF0U
+#define KSTACK_START (USER_START - KSTACK_SIZE)
+#define KSTACK_TOP ((USER_START - 1) & ~0xf)
 
 #define KERNEL_MM_BASE 0xC0000000
 
@@ -26,11 +28,11 @@
 #define UDATA_SEG 0x23
 #define TSS_SEG 0x28
 
-#define USER_START 0x400000
-#define USTACK_SIZE 0x100000
+#define USTACK_SIZE MEM_4MB
 #define USTACK_TOP 0x9ffffff0
 #define USTACK_END (0x9fffffff - USTACK_SIZE + 1)
-#define UMMAP_AREA 0x4D000000
+#define UMMAP_START 0x4D000000
+#define UMMAP_END (USTACK_END - MEM_4MB)
 
 #ifndef __ASM__
 #include <stddef.h>
