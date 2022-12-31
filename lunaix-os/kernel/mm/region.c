@@ -24,7 +24,7 @@ region_create_range(ptr_t start, size_t length, u32_t attr)
     struct mm_region* region = valloc(sizeof(struct mm_region));
     *region = (struct mm_region){ .attr = attr,
                                   .start = start,
-                                  .end = start + length - 1 };
+                                  .end = PG_ALIGN(start + length - 1) };
     return region;
 }
 
@@ -40,7 +40,7 @@ region_add(vm_regions_t* lead, struct mm_region* vmregion)
     struct mm_region *pos = (struct mm_region*)lead,
                      *n = list_entry(lead->next, struct mm_region, head);
     do {
-        if (vmregion->start >= cur_end && vmregion->end <= n->start) {
+        if (vmregion->start > cur_end && vmregion->end < n->start) {
             break;
         }
         cur_end = n->end;
@@ -53,44 +53,55 @@ region_add(vm_regions_t* lead, struct mm_region* vmregion)
 }
 
 void
-region_release(pid_t pid, struct mm_region* region)
+region_release(struct mm_region* region)
 {
     if (region->destruct_region) {
         region->destruct_region(region);
     }
 
     if (region->mfile) {
-        vfs_pclose(region->mfile, pid);
+        vfs_pclose(region->mfile, region->proc_vms->pid);
+    }
+
+    if (region->index) {
+        *region->index = NULL;
     }
 
     vfree(region);
 }
 
 void
-region_release_all(pid_t pid, vm_regions_t* lead)
+region_release_all(vm_regions_t* lead)
 {
     struct mm_region *pos, *n;
 
     llist_for_each(pos, n, lead, head)
     {
-        region_release(pid, pos);
+        region_release(pos);
     }
 }
 
 void
-region_copy(vm_regions_t* src, vm_regions_t* dest)
+region_copy(struct proc_mm* src, struct proc_mm* dest)
 {
-    if (!src) {
-        return;
-    }
-
     struct mm_region *pos, *n, *dup;
 
-    llist_for_each(pos, n, src, head)
+    llist_for_each(pos, n, &src->regions, head)
     {
         dup = valloc(sizeof(struct mm_region));
         memcpy(dup, pos, sizeof(*pos));
-        region_add(dest, dup);
+
+        dup->proc_vms = dest;
+
+        if (dup->mfile) {
+            vfs_ref_file(dup->mfile);
+        }
+
+        if (dup->region_copied) {
+            dup->region_copied(dup);
+        }
+
+        region_add(&dest->regions, dup);
     }
 }
 
@@ -103,9 +114,11 @@ region_get(vm_regions_t* lead, unsigned long vaddr)
 
     struct mm_region *pos, *n;
 
+    vaddr = PG_ALIGN(vaddr);
+
     llist_for_each(pos, n, lead, head)
     {
-        if (pos->start <= vaddr && vaddr < pos->end) {
+        if (pos->start <= vaddr && vaddr <= pos->end) {
             return pos;
         }
     }

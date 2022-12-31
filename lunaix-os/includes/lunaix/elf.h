@@ -23,6 +23,7 @@ typedef unsigned int elf32_wrd_t;
 
 #define EV_CURRENT 1
 
+// [0x7f, 'E', 'L', 'F']
 #define ELFMAGIC 0x464c457fU
 #define ELFCLASS32 1
 #define ELFCLASS64 2
@@ -68,8 +69,9 @@ struct elf32_phdr
 static inline int
 elf_check_exec(struct elf32_ehdr* ehdr)
 {
-    return (*(u32_t*)(ehdr->e_ident) == ELFMAGIC) ||
-           ehdr->e_ident[EI_CLASS] == ELFCLASS32 ||
-           ehdr->e_ident[EI_DATA] == ELFDATA2LSB || ehdr->e_type == ET_EXEC;
+    return *(u32_t*)(ehdr->e_ident) == ELFMAGIC &&
+           ehdr->e_ident[EI_CLASS] == ELFCLASS32 &&
+           ehdr->e_ident[EI_DATA] == ELFDATA2LSB && ehdr->e_type == ET_EXEC &&
+           ehdr->e_machine == EM_386;
 }
 #endif /* __LUNAIX_ELF_H */

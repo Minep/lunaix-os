@@ -40,68 +40,76 @@ mem_map(void** addr_out,
         struct v_file* file,
         struct mmap_param* param)
 {
-    ptr_t last_end = USER_START;
+    assert_msg(addr, "addr can not be NULL");
+
+    ptr_t last_end = USER_START, found_loc = (ptr_t)addr;
     struct mm_region *pos, *n;
 
+    vm_regions_t* vm_regions = &param->pvms->regions;
+
     if ((param->flags & MAP_FIXED_NOREPLACE)) {
-        if (mem_has_overlap(param->regions, addr, param->length)) {
+        if (mem_has_overlap(vm_regions, found_loc, param->mlen)) {
             return EEXIST;
         }
-        last_end = addr;
         goto found;
     }
 
     if ((param->flags & MAP_FIXED)) {
         int status =
-          mem_unmap(param->vms_mnt, param->regions, addr, param->length);
+          mem_unmap(param->vms_mnt, vm_regions, found_loc, param->mlen);
         if (status) {
             return status;
         }
-        last_end = addr;
         goto found;
     }
 
-    llist_for_each(pos, n, param->regions, head)
+    llist_for_each(pos, n, vm_regions, head)
     {
-        if (pos->start - last_end > param->length && last_end > addr) {
-            last_end += 1;
-            goto found;
+        if (last_end < found_loc) {
+            size_t avail_space = pos->start - found_loc;
+            if ((int)avail_space > 0 && avail_space > param->mlen) {
+                goto found;
+            }
+            found_loc = pos->end + PG_SIZE;
         }
-        last_end = pos->end;
+
+        last_end = pos->end + PG_SIZE;
     }
 
     return ENOMEM;
 
 found:
-    addr = last_end;
-
-    if (addr >= KERNEL_MM_BASE || addr < USER_START) {
+    if (found_loc >= KERNEL_MM_BASE || found_loc < USER_START) {
         return ENOMEM;
     }
 
     struct mm_region* region = region_create_range(
-      addr,
-      param->length,
-      ((param->proct | param->flags) & 0x1f) | (param->type & ~0xffff));
+      found_loc,
+      param->mlen,
+      ((param->proct | param->flags) & 0x3f) | (param->type & ~0xffff));
 
     region->mfile = file;
-    region->offset = param->offset;
+    region->foff = param->offset;
+    region->flen = param->flen;
+    region->proc_vms = param->pvms;
 
-    region_add(param->regions, region);
+    region_add(vm_regions, region);
 
     u32_t attr = PG_ALLOW_USER;
     if ((param->proct & REGION_WRITE)) {
         attr |= PG_WRITE;
     }
 
-    for (u32_t i = 0; i < param->length; i += PG_SIZE) {
-        vmm_set_mapping(param->vms_mnt, addr + i, 0, attr, 0);
+    for (u32_t i = 0; i < param->mlen; i += PG_SIZE) {
+        vmm_set_mapping(param->vms_mnt, found_loc + i, 0, attr, 0);
     }
 
-    vfs_ref_file(file);
+    if (file) {
+        vfs_ref_file(file);
+    }
 
     if (addr_out) {
-        *addr_out = addr;
+        *addr_out = found_loc;
     }
     if (created) {
         *created = region;
@@ -127,7 +135,7 @@ mem_sync_pages(ptr_t mnt,
         }
 
         if (PG_IS_DIRTY(*mapping.pte)) {
-            size_t offset = mapping.va - region->start + region->offset;
+            size_t offset = mapping.va - region->start + region->foff;
             struct v_inode* inode = region->mfile->inode;
             region->mfile->ops->write_page(inode, mapping.va, PG_SIZE, offset);
             *mapping.pte &= ~PG_DIRTY;
@@ -175,16 +183,32 @@ mem_msync(ptr_t mnt,
     return 0;
 }
 
+void
+mem_unmap_region(ptr_t mnt, struct mm_region* region)
+{
+    size_t len = ROUNDUP(region->end - region->start, PG_SIZE);
+    mem_sync_pages(mnt, region, region->start, len, 0);
+
+    for (size_t i = region->start; i <= region->end; i += PG_SIZE) {
+        ptr_t pa = vmm_del_mapping(mnt, i);
+        if (pa) {
+            pmm_free_page(__current->pid, pa);
+        }
+    }
+    llist_delete(&region->head);
+    region_release(region);
+}
+
 int
 mem_unmap(ptr_t mnt, vm_regions_t* regions, void* addr, size_t length)
 {
     length = ROUNDUP(length, PG_SIZE);
-    ptr_t cur_addr = ROUNDDOWN((ptr_t)addr, PG_SIZE);
+    ptr_t cur_addr = PG_ALIGN(addr);
     struct mm_region *pos, *n;
 
     llist_for_each(pos, n, regions, head)
     {
-        if (pos->start <= cur_addr) {
+        if (pos->start <= cur_addr && pos->end >= cur_addr) {
             break;
         }
     }
@@ -207,14 +231,14 @@ mem_unmap(ptr_t mnt, vm_regions_t* regions, void* addr, size_t length)
         for (size_t i = 0; i < l; i += PG_SIZE) {
             ptr_t pa = vmm_del_mapping(mnt, cur_addr + i);
             if (pa) {
-                pmm_free_page(__current->pid, pa);
+                pmm_free_page(pos->proc_vms->pid, pa);
             }
         }
 
         n = container_of(pos->head.next, typeof(*pos), head);
         if (pos->end == pos->start) {
             llist_delete(&pos->head);
-            region_release(__current->pid, pos);
+            region_release(pos);
         }
 
         pos = n;
@@ -263,11 +287,11 @@ __DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
     }
 
     struct mmap_param param = { .flags = options,
-                                .length = ROUNDUP(length, PG_SIZE),
+                                .mlen = ROUNDUP(length, PG_SIZE),
                                 .offset = offset,
                                 .type = REGION_TYPE_GENERAL,
                                 .proct = proct,
-                                .regions = &__current->mm.regions,
+                                .pvms = &__current->mm,
                                 .vms_mnt = VMS_SELF };
 
     errno = mem_map(&result, NULL, addr, file, &param);

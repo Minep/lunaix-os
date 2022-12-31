@@ -136,6 +136,12 @@ __DEFINE_LXSYSCALL2(int, setpgid, pid_t, pid, pid_t, pgid)
 }
 
 void
+__stack_copied(struct mm_region* region)
+{
+    mm_index((void**)&region->proc_vms->stack, region);
+}
+
+void
 init_proc_user_space(struct proc_info* pcb)
 {
     vmm_mount_pd(VMS_MOUNT_1, pcb->page_table);
@@ -144,8 +150,8 @@ init_proc_user_space(struct proc_info* pcb)
 
     struct mm_region* mapped;
     struct mmap_param param = { .vms_mnt = VMS_MOUNT_1,
-                                .regions = &pcb->mm.regions,
-                                .length = USTACK_SIZE,
+                                .pvms = &pcb->mm,
+                                .mlen = USTACK_SIZE,
                                 .proct = PROT_READ | PROT_WRITE,
                                 .flags = MAP_ANON | MAP_PRIVATE | MAP_FIXED,
                                 .type = REGION_TYPE_STACK };
@@ -154,6 +160,9 @@ init_proc_user_space(struct proc_info* pcb)
     if ((status = mem_map(NULL, &mapped, USTACK_END, NULL, &param))) {
         kprint_panic("fail to alloc user stack: %d", status);
     }
+
+    mapped->region_copied = __stack_copied;
+    mm_index((void**)&pcb->mm.heap, mapped);
 
     // TODO other uspace initialization stuff
 
@@ -196,7 +205,6 @@ pid_t
 dup_proc()
 {
     struct proc_info* pcb = alloc_process();
-    pcb->mm.u_heap = __current->mm.u_heap;
     pcb->intr_ctx = __current->intr_ctx;
     pcb->parent = __current;
 
@@ -208,7 +216,7 @@ dup_proc()
     }
 
     __copy_fdtable(pcb);
-    region_copy(&__current->mm.regions, &pcb->mm.regions);
+    region_copy(&__current->mm, &pcb->mm);
 
     setup_proc_mem(pcb, VMS_SELF);
 

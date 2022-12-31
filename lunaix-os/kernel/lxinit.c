@@ -1,7 +1,6 @@
 #include <hal/cpu.h>
 #include <lunaix/clock.h>
 #include <lunaix/lxconsole.h>
-#include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>

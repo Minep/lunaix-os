@@ -89,7 +89,7 @@ intr_routine_page_fault(const isr_param* param)
     if (hit_region->mfile && !PG_IS_PRESENT(*pte)) {
         struct v_file* file = hit_region->mfile;
         u32_t offset =
-          (ptr - hit_region->start) & (PG_SIZE - 1) + hit_region->offset;
+          (ptr - hit_region->start) & (PG_SIZE - 1) + hit_region->foff;
         uintptr_t pa = pmm_alloc_page(__current->pid, 0);
 
         if (!pa) {

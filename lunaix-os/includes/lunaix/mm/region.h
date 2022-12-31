@@ -3,8 +3,6 @@
 
 #include <lunaix/mm/mm.h>
 
-typedef struct llist_header vm_regions_t;
-
 struct mm_region*
 region_create(ptr_t start, ptr_t end, u32_t attr);
 
@@ -15,15 +13,15 @@ void
 region_add(vm_regions_t* lead, struct mm_region* vmregion);
 
 void
-region_release(pid_t pid, struct mm_region* region);
+region_release(struct mm_region* region);
 
 void
-region_release_all(pid_t pid, vm_regions_t* lead);
+region_release_all(vm_regions_t* lead);
 
 struct mm_region*
 region_get(vm_regions_t* lead, unsigned long vaddr);
 
 void
-region_copy(vm_regions_t* src, vm_regions_t* dest);
+region_copy(struct proc_mm* src, struct proc_mm* dest);
 
 #endif /* __LUNAIX_REGION_H */

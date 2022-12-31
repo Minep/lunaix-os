@@ -10,9 +10,8 @@
 int
 __elf_populate_mapped(struct mm_region* region, void* pg, off_t offset)
 {
-    struct elf32_phdr* phdr = (struct elf32_phdr*)region->data;
-    size_t segsz = phdr->p_filesz;
-    size_t segoff = offset - phdr->p_offset;
+    size_t segsz = region->flen;
+    size_t segoff = offset - region->foff;
 
     if (segoff >= segsz) {
         return 0;
@@ -27,12 +26,6 @@ __elf_populate_mapped(struct mm_region* region, void* pg, off_t offset)
     } else {
         return file->ops->read(file->inode, pg, rdlen, offset);
     }
-}
-
-void
-__elf_destruct_mapped(struct mm_region* region)
-{
-    vfree(region->data);
 }
 
 int
@@ -53,22 +46,22 @@ elf_map_segment(struct ld_param* ldparam,
 
     struct mm_region* seg_reg;
     struct mmap_param param = { .vms_mnt = ldparam->vms_mnt,
-                                .regions = &ldparam->proc->mm.regions,
+                                .pvms = &ldparam->proc->mm,
                                 .proct = proct,
                                 .offset = phdr->p_offset,
-                                .length = ROUNDUP(phdr->p_memsz, PG_SIZE),
-                                .flags =
-                                  MAP_FIXED | MAP_PRIVATE | REGION_TYPE_CODE };
+                                .mlen = ROUNDUP(phdr->p_memsz, PG_SIZE),
+                                .flen = phdr->p_filesz,
+                                .flags = MAP_FIXED | MAP_PRIVATE,
+                                .type = REGION_TYPE_CODE };
 
     int status = mem_map(NULL, &seg_reg, PG_ALIGN(phdr->p_va), elfile, &param);
 
     if (!status) {
-        struct elf32_phdr* phdr_ = valloc(sizeof(SIZE_PHDR));
-        *phdr_ = *phdr;
-        seg_reg->data = phdr;
-
         seg_reg->init_page = __elf_populate_mapped;
-        seg_reg->destruct_region = __elf_destruct_mapped;
+
+        size_t next_addr = phdr->p_memsz + phdr->p_va;
+        ldparam->info.end = MAX(ldparam->info.end, ROUNDUP(next_addr, PG_SIZE));
+        ldparam->info.mem_sz += phdr->p_memsz;
     }
 
     return status;
@@ -91,16 +84,28 @@ elf_setup_mapping(struct ld_param* ldparam,
     tbl_sz = 1 << ILOG2(tbl_sz);
     phdrs = elfile->ops->read(elfile->inode, phdrs, tbl_sz, ehdr->e_phoff);
 
+    if (PG_ALIGN(phdrs[0].p_va) != USER_START) {
+        status = ENOEXEC;
+        goto done;
+    }
+
     size_t entries = tbl_sz / SIZE_PHDR;
     for (size_t i = 0; i < entries; i++) {
         struct elf32_phdr* phdr = &phdrs[i];
 
         if (phdr->p_type == PT_LOAD) {
-            status = elf_map_segment(ldparam, elfile, phdr);
+            if (phdr->p_align == PG_SIZE) {
+                status = elf_map_segment(ldparam, elfile, phdr);
+            } else {
+                // surprising alignment!
+                status = ENOEXEC;
+            }
         }
         // TODO process other types of segments
 
         if (status) {
+            // errno in the middle of mapping restructuring, it is impossible
+            // to recover!
             ldparam->status |= LD_STAT_FKUP;
             goto done;
         }
@@ -130,7 +135,7 @@ elf_load(struct ld_param* ldparam, struct v_file* elfile)
         goto done;
     }
 
-    ldparam->ehdr_out = *ehdr;
+    ldparam->info.ehdr_out = *ehdr;
 
 done:
     vfree(ehdr);

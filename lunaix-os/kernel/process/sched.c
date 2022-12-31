@@ -6,7 +6,6 @@
 
 #include <lunaix/fs/taskfs.h>
 #include <lunaix/mm/cake.h>
-#include <lunaix/mm/kalloc.h>
 #include <lunaix/mm/mmap.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/valloc.h>
@@ -18,6 +17,8 @@
 #include <lunaix/status.h>
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
+
+#include <klibc/string.h>
 
 volatile struct proc_info* __current;
 
@@ -325,6 +326,7 @@ alloc_process()
 
     proc->state = PS_CREATED;
     proc->pid = i;
+    proc->mm.pid = i;
     proc->created = clock_systime();
     proc->pgid = proc->pid;
     proc->fdtable = vzalloc(sizeof(struct v_fdtable));
@@ -407,7 +409,7 @@ destroy_process(pid_t pid)
     llist_for_each(pos, n, &proc->mm.regions, head)
     {
         mem_sync_pages(VMS_MOUNT_1, pos, pos->start, pos->end - pos->start, 0);
-        region_release(pid, pos);
+        region_release(pos);
     }
 
     __del_pagetable(pid, VMS_MOUNT_1);

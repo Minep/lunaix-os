@@ -26,12 +26,6 @@
 
 #define PROC_FINPAUSE 1
 
-struct proc_mm
-{
-    heap_context_t u_heap;
-    vm_regions_t regions;
-};
-
 struct proc_sigstate
 {
     isr_param proc_regs;

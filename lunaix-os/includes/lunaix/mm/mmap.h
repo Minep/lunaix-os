@@ -7,13 +7,14 @@
 
 struct mmap_param
 {
-    ptr_t vms_mnt;
-    vm_regions_t* regions;
-    off_t offset;
-    size_t length;
-    u32_t proct;
-    u32_t flags;
-    u32_t type;
+    ptr_t vms_mnt;        // vm mount point
+    struct proc_mm* pvms; // process vm
+    off_t offset;         // mapped file offset
+    size_t mlen;          // mapped memory length
+    size_t flen;          // mapped file length
+    u32_t proct;          // protections
+    u32_t flags;          // other options
+    u32_t type;           // region type
 };
 
 int
@@ -25,6 +26,9 @@ mem_map(void** addr_out,
 
 int
 mem_unmap(ptr_t mnt, vm_regions_t* regions, void* addr, size_t length);
+
+void
+mem_unmap_region(ptr_t mnt, struct mm_region* region);
 
 void
 mem_sync_pages(ptr_t mnt,
