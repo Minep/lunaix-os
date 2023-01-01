@@ -1,8 +1,8 @@
 #ifndef __LUNAIX_SYS_SIGNAL_H
 #define __LUNAIX_SYS_SIGNAL_H
 
-#include <usr/signal_defs.h>
-#include <usr/sys/types.h>
+#include <signal_defs.h>
+#include <sys/types.h>
 
 int
 signal(int signum, sighandler_t handler);

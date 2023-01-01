@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_SYS_UNISTD_H
 #define __LUNAIX_SYS_UNISTD_H
 
-#include <usr/sys/types.h>
+#include <sys/types.h>
 
 pid_t
 fork();

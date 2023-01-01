@@ -1,5 +1,5 @@
 #include <lunaix/syscall.h>
-#include <usr/sys/mount.h>
+#include <sys/mount.h>
 
 __LXSYSCALL4(int,
              mount,

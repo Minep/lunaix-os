@@ -3,6 +3,7 @@
 #include <lunaix/foptions.h>
 #include <lunaix/fs.h>
 #include <lunaix/fs/twifs.h>
+#include <lunaix/ld.h>
 #include <lunaix/lxconsole.h>
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/pmm.h>
@@ -14,10 +15,6 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
 #include <lunaix/types.h>
-
-#include <usr/fcntl.h>
-#include <usr/sys/lunaix.h>
-#include <usr/unistd.h>
 
 #include <sdbg/protocol.h>
 
@@ -32,12 +29,7 @@
 
 #include <klibc/string.h>
 
-#include <ulibc/stdio.h>
-
 LOG_MODULE("PROC0")
-
-extern void
-_lxinit_main(); /* lxinit.c */
 
 void
 init_platform();
@@ -51,84 +43,59 @@ unlock_reserved_memory();
 void
 __do_reserved_memory(int unlock);
 
-#define USE_DEMO
-// #define DEMO_SIGNAL
-// #define DEMO_READDIR
-// #define DEMO_IOTEST
-// #define DEMO_INPUT_TEST
-#define DEMO_SIMPLE_SH
-
-extern void
-_pconsole_main();
-
-extern void
-_signal_demo_main();
-
-extern void
-_lxinit_main();
-
-extern void
-_readdir_main();
-
-extern void
-_iotest_main();
-
-extern void
-input_test();
-
-extern void
-sh_main();
-
-void __USER__
-__setup_dir()
+int
+mount_bootmedium()
 {
-    int errno;
-    mkdir("/mnt");
-    mkdir("/mnt/lunaix-os");
-
-    if ((errno = mount("/dev/sdb", "/mnt/lunaix-os", "iso9660", 0))) {
-        syslog(2, "fail mounting boot medium. (%d)\n", errno);
+    struct v_dnode* dnode;
+    int errno = 0;
+    if ((errno = vfs_walk_proc("/dev/sdb", &dnode, NULL, 0))) {
+        kprintf(KERROR "fail to acquire device. (%d)", errno);
+        return 0;
     }
+
+    struct device* dev = (struct device*)dnode->inode->data;
+    if ((errno = vfs_mount("/mnt/lunaix-os", "iso9660", dev, 0))) {
+        kprintf(KERROR "fail to boot medium. (%d)", errno);
+        return 0;
+    }
+
+    return 1;
 }
 
-void __USER__
-__proc0_usr()
+int
+exec_initd()
 {
-    // 打开tty设备(控制台)，作为标准输入输出。
-    //  tty设备属于序列设备（Sequential Device），该类型设备的上层读写
-    //  无须经过Lunaix的缓存层，而是直接下发到底层驱动。（不受FO_DIRECT的影响）
-    int fdstdout = open("/dev/tty", 0);
-    int fdstdin = dup2(stdout, 1);
+    int errno = 0;
+    struct ld_param param;
+    char filename[] = "/mnt/lunaix-os/usr/initd";
 
-    __setup_dir();
+    ld_create_param(&param, __current, VMS_SELF);
 
-    pid_t p;
-
-    if (!(p = fork())) {
-#ifndef USE_DEMO
-        _exit(0);
-#elif defined DEMO_SIGNAL
-        _signal_demo_main();
-#elif defined DEMO_READDIR
-        _readdir_main();
-#elif defined DEMO_IOTEST
-        _iotest_main();
-#elif defined DEMO_INPUT_TEST
-        input_test();
-#elif defined DEMO_SIMPLE_SH
-        sh_main();
-#else
-        _lxinit_main();
-#endif
-        printf("==== test end ====\n");
-        _exit(0);
+    if ((errno = exec_load_byname(&param, filename, NULL, NULL))) {
+        goto fail;
     }
 
-    waitpid(p, 0, 0);
+    // user space
+    asm volatile("movw %0, %%ax\n"
+                 "movw %%ax, %%es\n"
+                 "movw %%ax, %%ds\n"
+                 "movw %%ax, %%fs\n"
+                 "movw %%ax, %%gs\n"
+                 "pushl %0\n"
+                 "pushl %1\n"
+                 "pushl %2\n"
+                 "pushl %3\n"
+                 "retf" ::"i"(UDATA_SEG),
+                 "r"(param.info.stack_top),
+                 "i"(UCODE_SEG),
+                 "r"(param.info.entry)
+                 : "eax", "memory");
 
-    while (1) {
-        yield();
-    }
+    fail("should not reach");
+
+fail:
+    kprintf(KERROR "fail to load initd. (%d)", errno);
+    return 0;
 }
 
 /**
@@ -146,21 +113,12 @@ __proc0()
 
     init_proc_user_space(__current);
 
-    // user space
-    asm volatile("movw %0, %%ax\n"
-                 "movw %%ax, %%es\n"
-                 "movw %%ax, %%ds\n"
-                 "movw %%ax, %%fs\n"
-                 "movw %%ax, %%gs\n"
-                 "pushl %0\n"
-                 "pushl %1\n"
-                 "pushl %2\n"
-                 "pushl %3\n"
-                 "retf" ::"i"(UDATA_SEG),
-                 "i"(USTACK_TOP & ~0xf),
-                 "i"(UCODE_SEG),
-                 "r"(__proc0_usr)
-                 : "eax", "memory");
+    if (!mount_bootmedium() || !exec_initd()) {
+        while (1) {
+            asm("hlt");
+        }
+        // should not reach
+    }
 }
 
 extern uint8_t __kernel_start;            /* link/linker.ld */

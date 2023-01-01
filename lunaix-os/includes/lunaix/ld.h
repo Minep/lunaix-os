@@ -16,6 +16,9 @@ struct ld_info
     ptr_t base;
     ptr_t end;
     ptr_t mem_sz;
+
+    ptr_t stack_top;
+    ptr_t entry;
 };
 
 struct ld_param
@@ -39,6 +42,18 @@ struct usr_exec_param
 #ifndef __USR_WRAPPER__
 int
 elf_load(struct ld_param* ldparam, struct v_file* elfile);
+
+int
+exec_load_byname(struct ld_param* param,
+                 const char* filename,
+                 const char** argv,
+                 const char** envp);
+
+int
+exec_load(struct ld_param* param,
+          struct v_file* executable,
+          const char** argv,
+          const char** envp);
 
 void
 ld_create_param(struct ld_param* param, struct proc_info* proc, ptr_t vms);

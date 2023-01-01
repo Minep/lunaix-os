@@ -1,5 +1,5 @@
 #include <lunaix/syscall.h>
-#include <usr/unistd.h>
+#include <unistd.h>
 
 __LXSYSCALL(pid_t, fork)
 

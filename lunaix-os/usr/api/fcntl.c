@@ -1,4 +1,4 @@
 #include <lunaix/syscall.h>
-#include <usr/fcntl.h>
+#include <fcntl.h>
 
 __LXSYSCALL2(int, open, const char*, path, int, options)

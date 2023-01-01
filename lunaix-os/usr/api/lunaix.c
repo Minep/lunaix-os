@@ -1,5 +1,5 @@
 #include <lunaix/syscall.h>
-#include <usr/sys/lunaix.h>
+#include <sys/lunaix.h>
 
 __LXSYSCALL(void, yield);
 

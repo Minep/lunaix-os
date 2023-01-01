@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_SYS_LUNAIX_H
 #define __LUNAIX_SYS_LUNAIX_H
 
-#include <usr/sys/types.h>
+#include <sys/types.h>
 
 void
 yield();

@@ -1,4 +1,4 @@
 #include <lunaix/syscall.h>
-#include <usr/errno.h>
+#include <errno.h>
 
 __LXSYSCALL(int, geterrno);

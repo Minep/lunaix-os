@@ -1,5 +1,5 @@
 #include <lunaix/syscall.h>
-#include <usr/signal.h>
+#include <signal.h>
 
 __LXSYSCALL2(int, signal, int, signum, sighandler_t, handler);
 

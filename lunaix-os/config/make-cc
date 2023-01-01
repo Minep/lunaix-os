@@ -1,5 +1,6 @@
 CC := i686-elf-gcc
 AS := i686-elf-as
+AR := i686-elf-ar
 
 
 ARCH_OPT := -D__ARCH_IA32 -include flags.h

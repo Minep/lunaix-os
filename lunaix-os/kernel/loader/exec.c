@@ -13,6 +13,11 @@
 size_t
 exec_str_size(const char** str_arr, size_t* length)
 {
+    if (!str_arr) {
+        *length = 0;
+        return 0;
+    }
+
     const char* chr = *str_arr;
     size_t sz = 0, len = 0;
 
@@ -58,10 +63,10 @@ __exec_remap_heap(struct ld_param* param, struct proc_mm* pvms)
 }
 
 int
-exec_loadto(struct ld_param* param,
-            struct v_file* executable,
-            const char** argv,
-            const char** envp)
+exec_load(struct ld_param* param,
+          struct v_file* executable,
+          const char** argv,
+          const char** envp)
 {
     int errno = 0;
 
@@ -88,7 +93,6 @@ exec_loadto(struct ld_param* param,
                                    .mlen = MAX_VAR_PAGES * PG_SIZE };
 
     void* mapped;
-    isr_param* intr_ctx = &param->proc->intr_ctx;
 
     if ((errno = __exec_remap_heap(param, pvms))) {
         goto done;
@@ -103,8 +107,10 @@ exec_loadto(struct ld_param* param,
 
         // make some handy infos available to user space
         ptr_t arg_start = mapped + sizeof(struct usr_exec_param);
-        memcpy(arg_start, (void*)argv, sz_argv);
-        memcpy(arg_start + sz_argv, (void*)envp, sz_envp);
+        if (argv)
+            memcpy(arg_start, (void*)argv, sz_argv);
+        if (envp)
+            memcpy(arg_start + sz_argv, (void*)envp, sz_envp);
 
         struct usr_exec_param* param = mapped;
         *param = (struct usr_exec_param){ .argc = argv_len,
@@ -114,15 +120,38 @@ exec_loadto(struct ld_param* param,
                                           .info = param->info };
         ptr_t* ustack = (ptr_t*)USTACK_TOP;
         ustack[-1] = (ptr_t)mapped;
-        intr_ctx->esp = &ustack[-1];
+        param->info.stack_top = &ustack[-1];
     } else {
         // TODO need to find a way to inject argv and envp remotely
         fail("not implemented");
     }
 
-    intr_ctx->eip = param->info.ehdr_out.e_entry;
-    // we will jump to new entry point (_u_start) upon syscall's
-    // return so execve 'will not return' from the perspective of it's invoker
+    param->info.entry = param->info.ehdr_out.e_entry;
+done:
+    return errno;
+}
+
+int
+exec_load_byname(struct ld_param* param,
+                 const char* filename,
+                 const char** argv,
+                 const char** envp)
+{
+    int errno = 0;
+    struct v_dnode* dnode;
+    struct v_file* file;
+
+    if ((errno = vfs_walk_proc(filename, &dnode, NULL, 0))) {
+        goto done;
+    }
+
+    if ((errno = vfs_open(dnode, &file))) {
+        goto done;
+    }
+
+    if ((errno = exec_load(param, file, argv, envp))) {
+        vfs_pclose(file, __current->pid);
+    }
 
 done:
     return errno;
@@ -138,23 +167,10 @@ __DEFINE_LXSYSCALL3(int,
                     envp[])
 {
     int errno = 0;
-    struct v_dnode* dnode;
-    struct v_file* file;
-
-    if ((errno = vfs_walk_proc(filename, &dnode, NULL, 0))) {
-        goto done;
-    }
-
-    if ((errno = vfs_open(dnode, &file))) {
-        goto done;
-    }
-
     struct ld_param ldparam;
     ld_create_param(&ldparam, __current, VMS_SELF);
 
-    if ((errno = exec_loadto(&ldparam, file, argv, envp))) {
-        vfs_pclose(file, __current->pid);
-
+    if ((errno = exec_load_byname(&ldparam, filename, argv, envp))) {
         if ((ldparam.status & LD_STAT_FKUP)) {
             // we fucked up our address space.
             terminate_proc(11451);
@@ -162,6 +178,13 @@ __DEFINE_LXSYSCALL3(int,
             fail("should not reach");
         }
     }
+
+    isr_param* intr_ctx = &__current->intr_ctx;
+    intr_ctx->esp = ldparam.info.stack_top;
+    intr_ctx->eip = ldparam.info.entry;
+
+    // we will jump to new entry point (_u_start) upon syscall's
+    // return so execve 'will not return' from the perspective of it's invoker
 
 done:
     return errno;

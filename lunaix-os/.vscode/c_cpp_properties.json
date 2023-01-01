@@ -3,7 +3,8 @@
         {
             "name": "OS-DEV",
             "includePath": [
-                "${workspaceFolder}/includes"
+                "${workspaceFolder}/includes",
+                "${workspaceFolder}/usr/includes"
             ],
             "compilerArgs": [
                 "-ffreestanding",

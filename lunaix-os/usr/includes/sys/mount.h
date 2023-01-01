@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_SYS_MOUNT_H
 #define __LUNAIX_SYS_MOUNT_H
 
-#include <usr/sys/types.h>
+#include <sys/types.h>
 
 int
 mount(const char* source, const char* target, const char* fstype, int flags);

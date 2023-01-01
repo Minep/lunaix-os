@@ -1,5 +1,5 @@
 #include <lunaix/syscall.h>
-#include <usr/sys/mann.h>
+#include <sys/mann.h>
 
 __LXSYSCALL2_VARG(void*, sys_mmap, void*, addr, size_t, length);
 

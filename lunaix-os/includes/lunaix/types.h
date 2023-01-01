@@ -3,7 +3,7 @@
 
 #include <stdarg.h>
 #include <stdint.h>
-#include <usr/sys/types.h>
+#include <sys/types.h>
 
 #define PACKED __attribute__((packed))
 

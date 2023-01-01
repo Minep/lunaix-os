@@ -6,7 +6,7 @@
 #include <lunaix/fs.h>
 #include <lunaix/types.h>
 
-#include <usr/sys/mann_flags.h>
+#include <sys/mann_flags.h>
 
 /**
  * @brief 私有区域，该区域中的页无法进行任何形式的共享。
