@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_SYS_DIRENT_H
-#define __LUNAIX_SYS_DIRENT_H
+#ifndef __LUNAIX_SYS_LXDIRENT_H
+#define __LUNAIX_SYS_LXDIRENT_H
 
 #include <sys/dirent_defs.h>
 

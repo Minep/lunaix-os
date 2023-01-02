@@ -1,4 +1,5 @@
 #include <fcntl.h>
+#include <stdio.h>
 #include <sys/lunaix.h>
 #include <unistd.h>
 
@@ -17,7 +18,16 @@ main(int argc, const char** argv)
         return 0;
     }
 
-    syslog(0, "(%p) user space!\n", main);
+    printf("(%p) user space!\n", main);
+
+    pid_t pid;
+    if (!(pid = fork())) {
+        int err = execve("/mnt/lunaix-os/usr/ls", NULL, NULL);
+        printf("fail to execute (%d)\n", err);
+        _exit(err);
+    }
+
+    waitpid(pid, NULL, 0);
 
     return 0;
 }
