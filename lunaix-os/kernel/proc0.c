@@ -67,7 +67,7 @@ exec_initd()
 {
     int errno = 0;
     struct ld_param param;
-    char filename[] = "/mnt/lunaix-os/usr/initd";
+    char filename[] = "/mnt/lunaix-os/usr/init";
 
     ld_create_param(&param, __current, VMS_SELF);
 

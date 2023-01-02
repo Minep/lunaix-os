@@ -162,7 +162,7 @@ init_proc_user_space(struct proc_info* pcb)
     }
 
     mapped->region_copied = __stack_copied;
-    mm_index((void**)&pcb->mm.heap, mapped);
+    mm_index((void**)&pcb->mm.stack, mapped);
 
     // TODO other uspace initialization stuff
 

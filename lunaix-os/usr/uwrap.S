@@ -4,6 +4,7 @@
 .section .text
     .global _u_start
     _u_start:
+        movl $2, %eax
         call usr_pre_init
         jnz 1f
 

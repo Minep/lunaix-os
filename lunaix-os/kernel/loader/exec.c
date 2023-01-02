@@ -60,6 +60,8 @@ __exec_remap_heap(struct ld_param* param, struct proc_mm* pvms)
 
     heap->region_copied = __heap_copied;
     mm_index((void**)&pvms->heap, heap);
+
+    return status;
 }
 
 int
@@ -112,15 +114,17 @@ exec_load(struct ld_param* param,
         if (envp)
             memcpy(arg_start + sz_argv, (void*)envp, sz_envp);
 
-        struct usr_exec_param* param = mapped;
-        *param = (struct usr_exec_param){ .argc = argv_len,
-                                          .argv = arg_start,
-                                          .envc = envp_len,
-                                          .envp = arg_start + sz_argv,
-                                          .info = param->info };
         ptr_t* ustack = (ptr_t*)USTACK_TOP;
+        struct usr_exec_param* exec_param = mapped;
+
         ustack[-1] = (ptr_t)mapped;
         param->info.stack_top = &ustack[-1];
+
+        *exec_param = (struct usr_exec_param){ .argc = argv_len,
+                                               .argv = arg_start,
+                                               .envc = envp_len,
+                                               .envp = arg_start + sz_argv,
+                                               .info = param->info };
     } else {
         // TODO need to find a way to inject argv and envp remotely
         fail("not implemented");

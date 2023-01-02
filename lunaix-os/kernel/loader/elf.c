@@ -8,23 +8,24 @@
 #include <lunaix/spike.h>
 
 int
-__elf_populate_mapped(struct mm_region* region, void* pg, off_t offset)
+__elf_populate_mapped(struct mm_region* region, void* pg, off_t segfoff)
 {
     size_t segsz = region->flen;
-    size_t segoff = offset - region->foff;
+    size_t segmoff = segfoff - region->foff;
 
-    if (segoff >= segsz) {
+    if (segmoff >= segsz) {
         return 0;
     }
 
     struct v_file* file = region->mfile;
-    size_t rdlen = MIN(segsz - segoff, PG_SIZE);
+    size_t rdlen = MIN(segsz - segmoff, PG_SIZE);
 
     if (rdlen == PG_SIZE) {
         // This is because we want to exploit any optimization on read_page
-        return file->ops->read_page(file->inode, pg, PG_SIZE, offset);
+        return file->ops->read_page(file->inode, pg, PG_SIZE, segfoff);
     } else {
-        return file->ops->read(file->inode, pg, rdlen, offset);
+        // we don't want to over-read the segment!
+        return file->ops->read(file->inode, pg, rdlen, segfoff);
     }
 }
 
@@ -82,7 +83,11 @@ elf_setup_mapping(struct ld_param* ldparam,
     }
 
     tbl_sz = 1 << ILOG2(tbl_sz);
-    phdrs = elfile->ops->read(elfile->inode, phdrs, tbl_sz, ehdr->e_phoff);
+    status = elfile->ops->read(elfile->inode, phdrs, tbl_sz, ehdr->e_phoff);
+
+    if (status < 0) {
+        goto done;
+    }
 
     if (PG_ALIGN(phdrs[0].p_va) != USER_START) {
         status = ENOEXEC;
@@ -122,7 +127,7 @@ elf_load(struct ld_param* ldparam, struct v_file* elfile)
     struct elf32_ehdr* ehdr = valloc(SIZE_EHDR);
     int status = elfile->ops->read(elfile->inode, ehdr, SIZE_EHDR, 0);
 
-    if (status) {
+    if (status < 0) {
         goto done;
     }
 
