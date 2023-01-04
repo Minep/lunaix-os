@@ -38,7 +38,7 @@ intr_routine_page_fault(const isr_param* param)
         goto segv_term;
     }
 
-    if (!SEL_RPL(param->cs)) {
+    if (!SEL_RPL(param->execp->cs)) {
         // 如果是内核页错误……
         if (do_kernel(&mapping)) {
             return;
@@ -130,8 +130,8 @@ segv_term:
     kprintf(KERROR "(pid: %d) Segmentation fault on %p (%p:%p)\n",
             __current->pid,
             ptr,
-            param->cs,
-            param->eip);
+            param->execp->cs,
+            param->execp->eip);
     __SIGSET(__current->sig_pending, _SIGSEGV);
     schedule();
     // should not reach

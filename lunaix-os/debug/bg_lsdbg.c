@@ -29,9 +29,11 @@ lunaix_sdbg_loop(isr_param* param)
     char c;
 
     if (sdbg_state == SDBG_STATE_WAIT_BRK) {
-        (param)->eflags &= ~(1 << 8);
+        (param)->execp->eflags &= ~(1 << 8);
         sdbg_state = SDBG_STATE_INSESSION;
-        sdbg_printf("[%p:%p] Break point reached.\n", param->cs, param->eip);
+        sdbg_printf("[%p:%p] Break point reached.\n",
+                    param->execp->cs,
+                    param->execp->eip);
     }
 
     while (1) {
@@ -44,12 +46,14 @@ lunaix_sdbg_loop(isr_param* param)
         switch (c) {
             case SDBG_CLNT_HI:
                 if (sdbg_state == SDBG_STATE_START) {
-                    sdbg_printf(
-                      "[%p:%p] Session started.\n", param->cs, param->eip);
+                    sdbg_printf("[%p:%p] Session started.\n",
+                                param->execp->cs,
+                                param->execp->eip);
                     sdbg_state = SDBG_STATE_INSESSION;
                 } else {
-                    sdbg_printf(
-                      "[%p:%p] Session resumed.\n", param->cs, param->eip);
+                    sdbg_printf("[%p:%p] Session resumed.\n",
+                                param->execp->cs,
+                                param->execp->eip);
                 }
                 break;
             case SDBG_CLNT_RREG:
@@ -57,7 +61,7 @@ lunaix_sdbg_loop(isr_param* param)
                 serial_tx_buffer(SERIAL_COM1, (char*)param, sizeof(isr_param));
                 break;
             case SDBG_CLNT_STEP:
-                ((isr_param*)param)->eflags |= (1 << 8); // set TF flags
+                ((isr_param*)param)->execp->eflags |= (1 << 8); // set TF flags
                 sdbg_state = SDBG_STATE_WAIT_BRK;
                 return;
             case SDBG_CLNT_BRKP:
