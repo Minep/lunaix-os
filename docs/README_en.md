@@ -142,6 +142,7 @@ The following list also enumerated such materials the author has used:
 + [ECMA-119 (ISO9660)](https://www.ecma-international.org/publications-and-standards/standards/ecma-119/)
 + Rock Ridge Interchange Protocol (RRIP: IEEE P1282)
 + System Use Sharing Protocol (SUSP: IEEE P1281)
++ Tool Interface Standard (TIS) Portable Formats Specification (Version 1.1)
 
 **DISCLAIMER: All rights of PCI-related specification is reserved by PCI-SIG. It is provided ONLY for learning purpose. Any commercial use should purchase a copy from PCI-SIG**
 
@@ -186,7 +187,7 @@ The following list also enumerated such materials the author has used:
 2. `write(2)`
 2. `open(2)`
 2. `close(2)`
-2. `mkdir(2)`※
+2. `mkdir(2)`
 2. `lseek(2)`
 2. `readdir(2)`
 2. `readlink(2)`※
@@ -214,7 +215,7 @@ The following list also enumerated such materials the author has used:
 2. `setpgid(2)`
 2. `mmap(2)`
 2. `munmap(2)`
-2. `execve(2)`※
+2. `execve(2)`
 
 **LunaixOS**
 

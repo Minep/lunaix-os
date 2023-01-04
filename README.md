@@ -144,6 +144,7 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 + [ECMA-119 (ISO9660)](https://www.ecma-international.org/publications-and-standards/standards/ecma-119/)
 + Rock Ridge Interchange Protocol (RRIP: IEEE P1282)
 + System Use Sharing Protocol (SUSP: IEEE P1281)
++ Tool Interface Standard (TIS) Portable Formats Specification (Version 1.1)
 
 **免责声明：PCI相关的标准最终解释权归PCI-SIG所有。此处提供的副本仅供个人学习使用。任何商用目的须向PCI-SIG购买。**
 
@@ -190,7 +191,7 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 2. `write(2)`
 2. `open(2)`
 2. `close(2)`
-2. `mkdir(2)`※
+2. `mkdir(2)`
 2. `lseek(2)`
 2. `readdir(2)`
 2. `readlink(2)`※
@@ -218,7 +219,7 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 2. `setpgid(2)`
 2. `mmap(2)`
 2. `munmap(2)`
-2. `execve(2)`※
+2. `execve(2)`
 
 **LunaixOS自有**
 
