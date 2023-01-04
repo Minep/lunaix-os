@@ -46,7 +46,7 @@ region_add(vm_regions_t* lead, struct mm_region* vmregion)
         cur_end = n->end;
         pos = n;
         n = list_entry(n->head.next, struct mm_region, head);
-    } while ((ptr_t)&pos->head != (ptr_t)lead);
+    } while ((ptr_t)&n->head != (ptr_t)lead);
 
     // XXX caution. require mm_region::head to be the lead of struct
     llist_insert_after(&pos->head, &vmregion->head);

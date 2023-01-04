@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-void
+int
 printf(const char* fmt, ...)
 {
     char buf[1024];

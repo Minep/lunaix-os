@@ -16,7 +16,7 @@ $(OBJECT_DIR)/%.S.o: %.S
 $(OBJECT_DIR)/%.c.o: %.c 
 	@mkdir -p $(@D)
 	@echo "  CC    $<"
-	@$(CC) $(INCLUDES) -c $< -o $@ $(CFLAGS)
+	@$(CC) $(INCLUDES) $(CFLAGS) -g -c $< -o $@ 
 
 $(BIN_DIR)/$(USR_LIB): $(OBJS)
 	@echo "  AR    $@"

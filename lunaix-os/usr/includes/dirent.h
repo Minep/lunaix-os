@@ -6,7 +6,7 @@
 typedef struct
 {
     int dirfd;
-    int prev_res;
+    struct lx_dirent _lxd;
 } DIR;
 
 struct dirent
@@ -16,7 +16,10 @@ struct dirent
 };
 
 DIR*
-opendir(const char* dir);
+opendir(const char* dirp);
+
+int
+closedir(DIR* dirp);
 
 struct dirent*
 readdir(DIR* dir);

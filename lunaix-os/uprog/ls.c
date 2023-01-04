@@ -26,5 +26,7 @@ main(int argc, const char* argv[])
         }
     }
 
+    closedir(dir);
+
     return 0;
 }

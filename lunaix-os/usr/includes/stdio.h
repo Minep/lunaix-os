@@ -4,10 +4,7 @@
 #define stdout 0
 #define stdin 1
 
-void
+int
 printf(const char* fmt, ...);
-
-const char*
-strchr(const char* str, int character);
 
 #endif /* __LUNAIX_USTDIO_H */

@@ -19,6 +19,16 @@
         .skip 128
     tmp_stack:
 
+/*
+    This perhaps the ugliest part in the project. 
+    It contains code to handle arbitrary depth of 
+    nested interrupt and all those corner cases and 
+    nasty gotchas.
+
+    Be aware the twists, offsets and hidden dependencies!
+
+*/
+
 .section .text
     .global interrupt_wrapper
     interrupt_wrapper:

@@ -67,13 +67,13 @@ mem_map(void** addr_out,
     {
         if (last_end < found_loc) {
             size_t avail_space = pos->start - found_loc;
-            if ((int)avail_space > 0 && avail_space > param->mlen) {
+            if (pos->start > found_loc && avail_space > param->mlen) {
                 goto found;
             }
             found_loc = pos->end + PG_SIZE;
         }
 
-        last_end = pos->end + PG_SIZE;
+        last_end = pos->end;
     }
 
     return ENOMEM;
@@ -213,7 +213,7 @@ mem_unmap(ptr_t mnt, vm_regions_t* regions, void* addr, size_t length)
         }
     }
 
-    while (&pos->head != regions && cur_addr > pos->start) {
+    while (&pos->head != regions && cur_addr >= pos->start) {
         u32_t l = pos->end - cur_addr;
         pos->end = cur_addr;
 

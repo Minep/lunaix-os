@@ -79,6 +79,7 @@ intr_routine_page_fault(const isr_param* param)
             }
 
             *pte = *pte | pa | PG_PRESENT;
+            memset(PG_ALIGN(ptr), 0, PG_SIZE);
             goto resolved;
         }
         // permission denied on anon page (e.g., write on readonly page)
@@ -88,8 +89,10 @@ intr_routine_page_fault(const isr_param* param)
     // if mfile is set (Non-anonymous), then it is a mem map
     if (hit_region->mfile && !PG_IS_PRESENT(*pte)) {
         struct v_file* file = hit_region->mfile;
-        u32_t offset =
-          ((ptr - hit_region->start) & (PG_SIZE - 1)) + hit_region->foff;
+
+        ptr = PG_ALIGN(ptr);
+
+        u32_t offset = (ptr - hit_region->start) + hit_region->foff;
         uintptr_t pa = pmm_alloc_page(__current->pid, 0);
 
         if (!pa) {
@@ -99,7 +102,6 @@ intr_routine_page_fault(const isr_param* param)
         cpu_invplg(pte);
         *pte = (*pte & 0xFFF) | pa | PG_PRESENT;
 
-        ptr = PG_ALIGN(ptr);
         memset(ptr, 0, PG_SIZE);
 
         int errno = 0;

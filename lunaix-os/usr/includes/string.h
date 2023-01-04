@@ -12,4 +12,7 @@ strnlen(const char* str, size_t max_len);
 char*
 strncpy(char* dest, const char* src, size_t n);
 
+const char*
+strchr(const char* str, int character);
+
 #endif /* __LUNAIX_STRING_H */

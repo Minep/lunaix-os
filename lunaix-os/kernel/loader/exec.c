@@ -47,7 +47,7 @@ __exec_remap_heap(struct ld_param* param, struct proc_mm* pvms)
 
     struct mmap_param map_param = { .pvms = pvms,
                                     .vms_mnt = param->vms_mnt,
-                                    .flags = MAP_ANON | MAP_PRIVATE | MAP_FIXED,
+                                    .flags = MAP_ANON | MAP_PRIVATE,
                                     .type = REGION_TYPE_HEAP,
                                     .proct = PROT_READ | PROT_WRITE,
                                     .mlen = DEFAULT_HEAP_PAGES * PG_SIZE };
@@ -181,11 +181,12 @@ __DEFINE_LXSYSCALL3(int,
             schedule();
             fail("should not reach");
         }
+        goto done;
     }
 
-    isr_param* intr_ctx = &__current->intr_ctx;
-    intr_ctx->esp = ldparam.info.stack_top;
-    intr_ctx->eip = ldparam.info.entry;
+    volatile struct exec_param* execp = __current->intr_ctx.execp;
+    execp->esp = ldparam.info.stack_top;
+    execp->eip = ldparam.info.entry;
 
     // we will jump to new entry point (_u_start) upon syscall's
     // return so execve 'will not return' from the perspective of it's invoker

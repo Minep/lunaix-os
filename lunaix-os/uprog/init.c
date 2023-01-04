@@ -18,7 +18,7 @@ main(int argc, const char** argv)
         return 0;
     }
 
-    printf("(%p) user space!\n", main);
+    printf("(%p) user space!\n", (void*)main);
 
     pid_t pid;
     if (!(pid = fork())) {
