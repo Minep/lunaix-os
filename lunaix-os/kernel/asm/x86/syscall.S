@@ -69,10 +69,11 @@
 .section .text
     syscall_hndlr:
         pushl %ebp
-        movl 8(%esp), %ebp
+        movl 8(%esp), %ebp          // isr_param*
 
-        movl  (%ebp), %eax          /* eax: call code as well as the return value from syscall */
-        cmpl  $__SYSCALL_MAX, %eax
+        addl $4, %ebp
+        movl (%ebp), %eax          /* eax: call code as well as the return value from syscall */
+        cmpl $__SYSCALL_MAX, %eax
         jae 2f
 
         shll $2, %eax

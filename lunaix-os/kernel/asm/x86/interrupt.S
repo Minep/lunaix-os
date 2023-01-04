@@ -9,6 +9,8 @@
     .global debug_resv
     debug_resv:
         .skip 16
+    tmp_store:
+        .skip 4
 #endif
 
 .section .bss
@@ -22,30 +24,35 @@
     interrupt_wrapper:
         /*
          Stack layout (layout of struct isr_param)
-    msa:   [ss]
-           [esp]
-           eflags     > offset = 48 + 16 = 64
-           cs
-           eip
-           err_code   
-           vector     > offset = 28 + 16 + 4 = 48
+    msa:   [ss]             > 76
+           [esp]            > 72
+           eflags           > 68
+           cs               > 64
+           eip              > 60
+           err_code         > 56
+           vector           > offset = 52
+           [saved_prev_ctx] > offset = 0
+           ---
            esp
            gs
            fs
            es
-           ds         > offset = 7 * 4 = 28
+           ds         > offset = 7 * 4 = 28 + 4
            esi
            ebp
            edi
            edx
            ecx
            ebx
-    lsa:   eax        > offset = 0
+           eax
+    lsa:   depth       > offset = 0
 
             las: Least Significant Address
             msa: Most Significant Address
         */
         cld
+
+        subl $52, %esp
         pushl %esp
 
         subl $16, %esp
@@ -62,7 +69,12 @@
         pushl %ebx
         pushl %eax
 
-        movl 60(%esp), %eax   /* 取出 %cs */
+        movl __current, %eax
+        movl 8(%eax), %eax
+        incl %eax
+        pushl %eax          # nested intr: current depth
+
+        movl 116(%esp), %eax   /* 取出 %cs */
         andl $0x3, %eax          /* 判断 RPL */
         jz 1f
 
@@ -74,14 +86,14 @@
 
         # 保存用户栈顶指针。这是因为我们允许系统调用内进行上下文切换，而这样一来，我们就失去了用户栈的信息，
         # 这样一来，就无法设置信号上下文。这主要是为了实现了pause()而做的准备
-        movl (__current), %eax
+        movl __current, %eax
 
         # 保存x87FPU的状态
-        movl 64(%eax), %ebx
+        movl 68(%eax), %ebx
         fxsave (%ebx)
 
-        movl 68(%esp), %ebx     # 取出esp
-        movl %ebx, 56(%eax)     # 存入__current->ustack_top
+        movl 124(%esp), %ebx     # 取出esp
+        movl %ebx, 60(%eax)     # 存入__current->ustack_top
 
     1:
         movl %esp, %eax
@@ -99,17 +111,18 @@
 
 #ifdef __ASM_INTR_DIAGNOSIS
         movl %eax, (debug_resv + 8)
-        movl 44(%esp), %eax
-        movl 8(%eax), %eax
+        movl 48(%esp), %eax
+        movl 60(%eax), %eax
         movl %eax, (debug_resv + 4) # eip
 #endif
-        movl (__current), %eax
-        movl 64(%eax), %eax
+        movl __current, %eax
+        movl 68(%eax), %eax
         
         test %eax, %eax     # do we have stored x87 context?
         jz 1f 
         fxrstor (%eax)      
 1:
+        popl %eax   # discard isr_param::depth
         popl %eax
         popl %ebx
         popl %ecx
@@ -125,24 +138,40 @@
 
         movl 16(%esp), %esp
 
+        movl %eax, tmp_store
+        movl __current, %eax
+        # nested intr: restore saved context
+        popl 8(%eax)       # depth
+        popl 12(%eax)      # eax
+        popl 16(%eax)      # ebx
+        popl 20(%eax)      # ecx
+        popl 24(%eax)      # edx
+        popl 28(%eax)      # edi
+        popl 32(%eax)      # ebp
+        popl 36(%eax)      # esi
+        popl 40(%eax)      # ds
+        popl 44(%eax)      # es
+        popl 48(%eax)      # fs
+        popl 52(%eax)      # gs
+        popl 56(%eax)      # esp
+
         addl $8, %esp
 
-        pushl %eax
 #ifdef __ASM_INTR_DIAGNOSIS
-        movl 4(%esp), %eax
+        movl (%esp), %eax
         movl %eax, debug_resv
 #endif
         # 处理TSS.ESP的一些边界条件。如果是正常iret（即从内核模式*优雅地*退出）
         # 那么TSS.ESP0应该为iret进行弹栈后，%esp的值。
         # 所以这里的边界条件是：如返回用户模式，iret会额外弹出8个字节（ss,esp）
-        movl 8(%esp), %eax
+        movl 4(%esp), %eax
         andl $3, %eax
         setnz %al
         shll $3, %eax
-        addl $16, %eax
+        addl $12, %eax
         addl %esp, %eax
         movl %eax, (_tss + 4)
-        popl %eax
+        movl tmp_store, %eax
         iret
 
     .global switch_to
@@ -152,8 +181,8 @@
 
         popl %ebx               # next
         movl __current, %eax    
-        movl 60(%eax), %ecx     # __current->pagetable
-        movl 60(%ebx), %eax     # next->pagetable
+        movl 64(%eax), %ecx     # __current->pagetable
+        movl 64(%ebx), %eax     # next->pagetable
         
         cmpl %ecx, %eax         # if(next->pagtable != __current->pagetable) {
         jz 1f
@@ -182,7 +211,8 @@
 
         pushl $UDATA_SEG        # proc_sig->prev_context.proc_regs.ss
         pushl %eax              # esp
-        pushl 64(%ebx)          # proc_sig->prev_context.proc_regs.eflags
+        movl 48(%ebx), %ebx
+        pushl 68(%ebx)          # proc_sig->prev_context.proc_regs.execp->eflags
         pushl $UCODE_SEG        # cs
         pushl $sig_wrapper      # eip for sig wrapper
 
@@ -202,7 +232,7 @@
         pushl %eax              # Addr to proc_sig structure 
         pushl 4(%eax)           # proc_sig->sig_num     ---- 16 bytes aligned
 
-        call (%eax)             # invoke signal handler
+        call *(%eax)             # invoke signal handler
 
         # invoke the sigreturn syscall to exit the signal wrapper
         movl $__SYSCALL_sigreturn, %eax

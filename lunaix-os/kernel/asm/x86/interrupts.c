@@ -19,9 +19,10 @@ extern x86_page_table* __kernel_ptd;
 void
 intr_handler(isr_param* param)
 {
+    param->execp->saved_prev_ctx = __current->intr_ctx;
     __current->intr_ctx = *param;
 
-    struct exec_param* execp = __current->intr_ctx.execp;
+    volatile struct exec_param* execp = __current->intr_ctx.execp;
 
     if (execp->vector <= 255) {
         isr_cb subscriber = isrm_get(execp->vector);

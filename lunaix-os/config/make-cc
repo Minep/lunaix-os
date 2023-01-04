@@ -16,7 +16,10 @@ OFLAGS := -fno-gcse\
 		  -fno-cse-follow-jumps\
 		  -fno-cse-skip-blocks\
 		  -fno-optimize-strlen\
-		  -fno-tree-builtin-call-dce 
+		  -fno-inline-functions-called-once \
+		  -fno-inline-functions \
+		  -fno-inline-small-functions \
+		  -fno-indirect-inlining
 
 CFLAGS := -std=gnu99 -ffreestanding $(O) $(OFLAGS) $(W) $(ARCH_OPT)
 LDFLAGS := -ffreestanding $(O) -nostdlib -lgcc
