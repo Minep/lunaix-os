@@ -22,7 +22,8 @@ sdbg_loop(const isr_param* param)
     // synchronized way. And we don't want these irq queue up at our APIC and
     // confuse the CPU after ACK with APIC.
     serial_disable_irq(SERIAL_COM1);
-    if (param->vector == 1 || param->vector == 3) {
+    struct exec_param* execp = param->execp;
+    if (execp->vector == 1 || execp->vector == 3) {
         goto cont;
     }
 
@@ -74,10 +75,11 @@ done:
 void
 sdbg_imm(const isr_param* param)
 {
+    struct exec_param* execp = param->execp;
     kprintf(KDEBUG "Quick debug mode\n");
     kprintf(KDEBUG "cs=%p eip=%p eax=%p ebx=%p\n",
-            param->cs,
-            param->eip,
+            execp->cs,
+            execp->eip,
             param->registers.eax,
             param->registers.ebx);
     kprintf(KDEBUG "ecx=%p edx=%p edi=%p esi=%p\n",
@@ -86,12 +88,12 @@ sdbg_imm(const isr_param* param)
             param->registers.edi,
             param->registers.esi);
     kprintf(KDEBUG "u.esp=%p k.esp=%p ebp=%p ps=%p\n",
-            param->registers.esp,
             param->esp,
+            execp->esp,
             param->registers.ebp,
-            param->eflags);
+            execp->eflags);
     kprintf(KDEBUG "ss=%p ds=%p es=%p fs=%p gs=%p\n",
-            param->ss,
+            execp->ss,
             param->registers.ds,
             param->registers.es,
             param->registers.fs,

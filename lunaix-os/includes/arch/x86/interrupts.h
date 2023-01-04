@@ -5,6 +5,18 @@
 
 #ifndef __ASM__
 #include <hal/cpu.h>
+
+struct exec_param
+{
+    unsigned int vector;
+    unsigned int err_code;
+    unsigned int eip;
+    unsigned int cs;
+    unsigned int eflags;
+    unsigned int esp;
+    unsigned int ss;
+} __attribute__((packed));
+
 typedef struct
 {
     struct
@@ -20,16 +32,14 @@ typedef struct
         reg32 es;
         reg32 fs;
         reg32 gs;
-        reg32 esp;
+        // reg32 esp;
     } __attribute__((packed)) registers;
 
-    unsigned int vector;
-    unsigned int err_code;
-    unsigned int eip;
-    unsigned int cs;
-    unsigned int eflags;
-    unsigned int esp;
-    unsigned int ss;
+    union
+    {
+        reg32 esp;
+        struct exec_param* execp;
+    };
 } __attribute__((packed)) isr_param;
 
 void

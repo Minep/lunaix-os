@@ -15,7 +15,7 @@ __ahci_hba_isr(const isr_param* param)
     struct ahci_driver *pos, *n;
     llist_for_each(pos, n, &ahcis, ahci_drvs)
     {
-        if (pos->id == param->vector) {
+        if (pos->id == param->execp->vector) {
             hba = &pos->hba;
             goto proceed;
         }

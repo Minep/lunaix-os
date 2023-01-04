@@ -1211,7 +1211,7 @@ void
 gdbstub_loop(isr_param* param)
 {
     /* Translate vector to signal */
-    switch (param->vector) {
+    switch (param->execp->vector) {
         case 1:
             gdb_state.signum = 5;
             break;
@@ -1227,14 +1227,14 @@ gdbstub_loop(isr_param* param)
     gdb_state.registers[GDB_CPU_I386_REG_ECX] = param->registers.ecx;
     gdb_state.registers[GDB_CPU_I386_REG_EDX] = param->registers.edx;
     gdb_state.registers[GDB_CPU_I386_REG_EBX] = param->registers.ebx;
-    gdb_state.registers[GDB_CPU_I386_REG_ESP] = param->registers.esp;
+    gdb_state.registers[GDB_CPU_I386_REG_ESP] = param->esp;
     gdb_state.registers[GDB_CPU_I386_REG_EBP] = param->registers.ebp;
     gdb_state.registers[GDB_CPU_I386_REG_ESI] = param->registers.esi;
     gdb_state.registers[GDB_CPU_I386_REG_EDI] = param->registers.edi;
-    gdb_state.registers[GDB_CPU_I386_REG_PC] = param->eip;
-    gdb_state.registers[GDB_CPU_I386_REG_CS] = param->cs;
-    gdb_state.registers[GDB_CPU_I386_REG_PS] = param->eflags;
-    gdb_state.registers[GDB_CPU_I386_REG_SS] = param->ss;
+    gdb_state.registers[GDB_CPU_I386_REG_PC] = param->execp->eip;
+    gdb_state.registers[GDB_CPU_I386_REG_CS] = param->execp->cs;
+    gdb_state.registers[GDB_CPU_I386_REG_PS] = param->execp->eflags;
+    gdb_state.registers[GDB_CPU_I386_REG_SS] = param->execp->ss;
     gdb_state.registers[GDB_CPU_I386_REG_DS] = param->registers.ds;
     gdb_state.registers[GDB_CPU_I386_REG_ES] = param->registers.es;
     gdb_state.registers[GDB_CPU_I386_REG_FS] = param->registers.fs;
@@ -1247,14 +1247,14 @@ gdbstub_loop(isr_param* param)
     param->registers.ecx = gdb_state.registers[GDB_CPU_I386_REG_ECX];
     param->registers.edx = gdb_state.registers[GDB_CPU_I386_REG_EDX];
     param->registers.ebx = gdb_state.registers[GDB_CPU_I386_REG_EBX];
-    param->registers.esp = gdb_state.registers[GDB_CPU_I386_REG_ESP];
+    param->esp = gdb_state.registers[GDB_CPU_I386_REG_ESP];
     param->registers.ebp = gdb_state.registers[GDB_CPU_I386_REG_EBP];
     param->registers.esi = gdb_state.registers[GDB_CPU_I386_REG_ESI];
     param->registers.edi = gdb_state.registers[GDB_CPU_I386_REG_EDI];
-    param->eip = gdb_state.registers[GDB_CPU_I386_REG_PC];
-    param->cs = gdb_state.registers[GDB_CPU_I386_REG_CS];
-    param->eflags = gdb_state.registers[GDB_CPU_I386_REG_PS];
-    param->ss = gdb_state.registers[GDB_CPU_I386_REG_SS];
+    param->execp->eip = gdb_state.registers[GDB_CPU_I386_REG_PC];
+    param->execp->cs = gdb_state.registers[GDB_CPU_I386_REG_CS];
+    param->execp->eflags = gdb_state.registers[GDB_CPU_I386_REG_PS];
+    param->execp->ss = gdb_state.registers[GDB_CPU_I386_REG_SS];
     param->registers.ds = gdb_state.registers[GDB_CPU_I386_REG_DS];
     param->registers.es = gdb_state.registers[GDB_CPU_I386_REG_ES];
     param->registers.fs = gdb_state.registers[GDB_CPU_I386_REG_FS];

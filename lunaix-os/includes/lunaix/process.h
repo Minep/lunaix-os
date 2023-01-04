@@ -57,9 +57,9 @@ struct proc_info
     pid_t pid;                // offset = 0
     struct proc_info* parent; // offset = 4
     isr_param intr_ctx;       // offset = 8
-    uintptr_t ustack_top;     // offset = 84
-    void* page_table;         // offset = 88
-    void* fxstate;            // offset = 92
+    uintptr_t ustack_top;     // offset = 84 -> 56
+    void* page_table;         // offset = 88 -> 60
+    void* fxstate;            // offset = 92 -> 64
 
     /* ---- critical section end ---- */
 

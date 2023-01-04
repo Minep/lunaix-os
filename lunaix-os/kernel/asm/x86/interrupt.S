@@ -77,11 +77,11 @@
         movl (__current), %eax
 
         # 保存x87FPU的状态
-        movl 92(%eax), %ebx
+        movl 64(%eax), %ebx
         fxsave (%ebx)
 
         movl 68(%esp), %ebx     # 取出esp
-        movl %ebx, 84(%eax)     # 存入__current->ustack_top
+        movl %ebx, 56(%eax)     # 存入__current->ustack_top
 
     1:
         movl %esp, %eax
@@ -99,11 +99,12 @@
 
 #ifdef __ASM_INTR_DIAGNOSIS
         movl %eax, (debug_resv + 8)
-        movl 56(%esp), %eax
-        movl %eax, (debug_resv + 4)
+        movl 44(%esp), %eax
+        movl 8(%eax), %eax
+        movl %eax, (debug_resv + 4) # eip
 #endif
         movl (__current), %eax
-        movl 92(%eax), %eax
+        movl 64(%eax), %eax
         
         test %eax, %eax     # do we have stored x87 context?
         jz 1f 
@@ -151,8 +152,8 @@
 
         popl %ebx               # next
         movl __current, %eax    
-        movl 88(%eax), %ecx     # __current->pagetable
-        movl 88(%ebx), %eax     # next->pagetable
+        movl 60(%eax), %ecx     # __current->pagetable
+        movl 60(%ebx), %eax     # next->pagetable
         
         cmpl %ecx, %eax         # if(next->pagtable != __current->pagetable) {
         jz 1f
