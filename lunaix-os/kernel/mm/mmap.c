@@ -11,9 +11,8 @@
 #define BS_SIZE (KERNEL_MM_BASE - UMMAP_START)
 
 int
-mem_has_overlap(vm_regions_t* regions, ptr_t start, size_t len)
+mem_has_overlap(vm_regions_t* regions, ptr_t start, ptr_t end)
 {
-    ptr_t end = start + end - 1;
     struct mm_region *pos, *n;
     llist_for_each(pos, n, regions, head)
     {
@@ -34,6 +33,29 @@ mem_has_overlap(vm_regions_t* regions, ptr_t start, size_t len)
 }
 
 int
+mem_adjust_inplace(vm_regions_t* regions,
+                   struct mm_region* region,
+                   ptr_t newend)
+{
+    ssize_t len = newend - region->start;
+    if (len == 0) {
+        return 0;
+    }
+
+    if (len < 0) {
+        return EINVAL;
+    }
+
+    if (mem_has_overlap(regions, region->start, newend)) {
+        return ENOMEM;
+    }
+
+    region->end = newend;
+
+    return 0;
+}
+
+int
 mem_map(void** addr_out,
         struct mm_region** created,
         void* addr,
@@ -48,7 +70,7 @@ mem_map(void** addr_out,
     vm_regions_t* vm_regions = &param->pvms->regions;
 
     if ((param->flags & MAP_FIXED_NOREPLACE)) {
-        if (mem_has_overlap(vm_regions, found_loc, param->mlen)) {
+        if (mem_has_overlap(vm_regions, found_loc, param->mlen + found_loc)) {
             return EEXIST;
         }
         goto found;

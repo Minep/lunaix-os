@@ -3,9 +3,9 @@
 
 __LXSYSCALL(pid_t, fork)
 
-__LXSYSCALL1(int, sbrk, void*, addr)
+__LXSYSCALL1(int, brk, void*, addr)
 
-__LXSYSCALL1(void*, brk, unsigned long, size)
+__LXSYSCALL1(void*, sbrk, ssize_t, size)
 
 __LXSYSCALL(pid_t, getpid)
 

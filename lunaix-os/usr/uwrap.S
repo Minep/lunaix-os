@@ -1,6 +1,11 @@
 #define __ASM__
 #include <lunaix/syscall.h>
 
+.section .data
+    .global environ
+    environ:
+        .long 0
+
 .section .text
     .global _u_start
     _u_start:

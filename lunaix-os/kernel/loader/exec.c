@@ -7,6 +7,7 @@
 #include <lunaix/spike.h>
 #include <lunaix/status.h>
 #include <lunaix/syscall.h>
+#include <lunaix/syscall_utils.h>
 
 #include <klibc/string.h>
 
@@ -50,7 +51,7 @@ __exec_remap_heap(struct ld_param* param, struct proc_mm* pvms)
                                     .flags = MAP_ANON | MAP_PRIVATE,
                                     .type = REGION_TYPE_HEAP,
                                     .proct = PROT_READ | PROT_WRITE,
-                                    .mlen = DEFAULT_HEAP_PAGES * PG_SIZE };
+                                    .mlen = PG_SIZE };
     int status = 0;
     struct mm_region* heap;
     if ((status = mem_map(NULL, &heap, param->info.end, NULL, &map_param))) {
@@ -192,5 +193,5 @@ __DEFINE_LXSYSCALL3(int,
     // return so execve 'will not return' from the perspective of it's invoker
 
 done:
-    return errno;
+    return DO_STATUS(errno);
 }

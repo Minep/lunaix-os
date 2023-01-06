@@ -18,6 +18,11 @@ struct mmap_param
 };
 
 int
+mem_adjust_inplace(vm_regions_t* regions,
+                   struct mm_region* region,
+                   ptr_t newend);
+
+int
 mem_map(void** addr_out,
         struct mm_region** created,
         void* addr,

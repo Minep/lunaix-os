@@ -3,6 +3,8 @@
 
 #include <sys/types.h>
 
+extern const char** environ;
+
 pid_t
 fork();
 
@@ -19,10 +21,10 @@ pid_t
 setpgid(pid_t pid, pid_t pgid);
 
 int
-sbrk(void* addr);
+brk(void* addr);
 
 void*
-brk(size_t size);
+sbrk(ssize_t size);
 
 void
 _exit(int status);
