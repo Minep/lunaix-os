@@ -215,7 +215,10 @@ __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
 
     struct proc_info* root_proc = sched_ctx._procs[0];
     __current->sleep.wakeup_time = clock_systime() + seconds * 1000;
-    llist_append(&root_proc->sleep.sleepers, &__current->sleep.sleepers);
+
+    if (llist_empty(&__current->sleep.sleepers)) {
+        llist_append(&root_proc->sleep.sleepers, &__current->sleep.sleepers);
+    }
 
     __current->intr_ctx.registers.eax = seconds;
 
