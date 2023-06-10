@@ -108,8 +108,8 @@ if [[ $1 = "-d" ]] || [[ $1 = "--download" ]] || [[ ! -d "$shell_folder"/tools ]
             exit 255
         fi
         echo 'Downloading cross-compiler...'
-        purple "=> gcc-10.4"
-        if  wget -T 5 -c --quiet --show-progress -P "$shell_folder"/tools/src https://ftp.gnu.org/gnu/gcc/gcc-10.4.0/gcc-10.4.0.tar.gz; then
+        purple "=> gcc-12.2.0"
+        if  wget -T 5 -c --quiet --show-progress -P "$shell_folder"/tools/src https://ftp.gnu.org/gnu/gcc/gcc-12.2.0/gcc-12.2.0.tar.gz; then
             green "gcc download success"
         else
             red 'gcc download fail, exiting... Re-run `bash init.sh -d` to continue gcc download'
@@ -249,8 +249,8 @@ if [[ $1 = "-c" ]] || [[ $1 = "--compile" ]] || [[ $1 = "-fc" ]] || [[ $1 = '--f
     green "Compile options: $binutils_configure"
     echo "Extracting..."
     sleep 3s
-    if ! (tar xzf "$shell_folder"/tools/src/gcc-10.4.0.tar.gz); then
-        red "extract gcc-10.4.0.tar.gz fail, exiting..."
+    if ! (tar xzf "$shell_folder"/tools/src/gcc-12.2.0.tar.gz); then
+        red "extract gcc-12.2.0.tar.gz fail, exiting..."
         exit 255
     fi
     if ! (mkdir -p build-gcc); then
@@ -258,24 +258,24 @@ if [[ $1 = "-c" ]] || [[ $1 = "--compile" ]] || [[ $1 = "-fc" ]] || [[ $1 = '--f
         exit 255
     fi
     cd "$shell_folder"/tools/src/build-gcc || (red 'cd to build-gcc fail' ;exit)
-    if ! (../gcc-10.4.0/configure --target=$TARGET --prefix="$PREFIX" $gcc_configure 2>&1 | tee "$log"/gcc-configure.log); then
-        red "gcc-10.4.0 configure fail, exiting..."
+    if ! (../gcc-12.2.0/configure --target=$TARGET --prefix="$PREFIX" $gcc_configure 2>&1 | tee "$log"/gcc-configure.log); then
+        red "gcc-12.2.0 configure fail, exiting..."
         exit 255
     fi
     if ! (make -j "$(nproc)" all-gcc 2>&1 | tee "$log"/gcc-make-all-gcc.log); then
-        red "gcc-10.4.0 all-gcc make fail, exiting..."
+        red "gcc-12.2.0 all-gcc make fail, exiting..."
         exit 255
     fi
     if ! (make -j "$(nproc)" all-target-libgcc 2>&1 | tee "$log"/gcc-make-all-target-libgcc.log); then
-        red "gcc-10.4.0 all-target-libgcc make fail, exiting..."
+        red "gcc-12.2.0 all-target-libgcc make fail, exiting..."
         exit 255
     fi
     if ! (make install-gcc 2>&1 | tee "$log"/gcc-make-install-gcc.log); then
-        red "gcc-10.4.0 all-gcc make install fail, exiting..."
+        red "gcc-12.2.0 all-gcc make install fail, exiting..."
         exit 255
-    fi 
+    fi
     if ! (make install-target-libgcc 2>&1 | tee "$log"/gcc-make-install-target-libgcc.log); then
-        red "gcc-10.4.0 all-target-libgcc make install fail, exiting..."
+        red "gcc-12.2.0 all-target-libgcc make install fail, exiting..."
         exit 255
     fi
     green "gcc successfully compiled and installed"
