@@ -13,6 +13,7 @@
 #define IDDEV_OFFSERIALNUM 10
 #define IDDEV_OFFMODELNUM 27
 #define IDDEV_OFFADDSUPPORT 69
+#define IDDEV_OFFA48SUPPORT 83
 #define IDDEV_OFFALIGN 209
 #define IDDEV_OFFLPP 106
 #define IDDEV_OFFCAPABILITIES 49
@@ -34,7 +35,8 @@ ahci_parse_dev_info(struct hba_device* dev_info, uint16_t* data)
         dev_info->block_size = 512;
     }
 
-    if ((*(data + IDDEV_OFFADDSUPPORT) & 0x8)) {
+    if ((*(data + IDDEV_OFFADDSUPPORT) & 0x8) &&
+        (*(data + IDDEV_OFFA48SUPPORT) & 0x400)) {
         dev_info->max_lba = *((uint64_t*)(data + IDDEV_OFFMAXLBA_EXT));
         dev_info->flags |= HBA_DEV_FEXTLBA;
     }
