@@ -21,11 +21,11 @@
 #define ISO_SIGNATURE_HI 0x31
 
 // Volume Types
-#define ISO_VOLBOOT 0   // Boot Record
-#define ISO_VOLPRIM 1   // Primary
-#define ISO_VOLSUPP 2   // Supplementary
-#define ISO_VOLPART 3   // Partition
-#define ISO_VOLTERM 255 // Volume descriptor set terminator
+#define ISO_VOLBOOT 0     // Boot Record
+#define ISO_VOLPRIM 1     // Primary
+#define ISO_VOLSUPP 2     // Supplementary
+#define ISO_VOLPART 3     // Partition
+#define ISO_VOLTERM 255   // Volume descriptor set terminator
 
 #define ISO_FHIDDEN 0x1   // a hidden file
 #define ISO_FDIR 0x2      // a directory file
@@ -36,6 +36,7 @@
 
 #define ISO9660_BLKSZ 2048
 #define ISO9660_IDLEN 256
+#define ISO9660_READ_OFF (ISO9660_BLKSZ * 16)
 
 // NOTES:
 // Each Descriptor sized 1 logical block (2048 bytes in common cases)
@@ -155,8 +156,8 @@ struct iso_drecord
     iso_bbo32_t data_size;
     struct iso_datetime2 PACKED mktime; // Time the record is made, see 9.1.5
     u8_t flags;
-    u8_t fu_sz;  // size of file unit (FU)
-    u8_t gap_sz; // size of gap if FU is interleaved.
+    u8_t fu_sz;                         // size of file unit (FU)
+    u8_t gap_sz;                        // size of gap if FU is interleaved.
     iso_bbo16_t vol_seq;
     struct iso_var_mdu name;
 } PACKED;

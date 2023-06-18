@@ -26,11 +26,11 @@ exec_str_size(const char** str_arr, size_t* length)
         sz += strlen(chr);
         len++;
 
-        chr = *(str_arr + sz);
+        chr = *(str_arr++);
     }
 
     *length = len;
-    return sz + 1;
+    return sz + sizeof(char*);
 }
 
 void
@@ -116,7 +116,7 @@ exec_load(struct ld_param* param,
             memcpy(arg_start + sz_argv, (void*)envp, sz_envp);
 
         ptr_t* ustack = (ptr_t*)USTACK_TOP;
-        struct usr_exec_param* exec_param = mapped;
+        struct usr_exec_param* exec_param = (struct usr_exec_param*)mapped;
 
         ustack[-1] = (ptr_t)mapped;
         param->info.stack_top = &ustack[-1];

@@ -60,7 +60,11 @@ parse_cmdline(char* line, char** cmd, char** arg_part)
         l++;
     }
     *cmd = line;
-    *arg_part = strltrim_safe(line + l);
+    if (c) {
+        *arg_part = strltrim_safe(line + l);
+    } else {
+        *arg_part = NULL;
+    }
 }
 
 void
@@ -134,25 +138,34 @@ sh_loop()
     // stdout (by default, unless user did smth) is the tty we are currently at
     ioctl(stdout, TIOCSPGRP, getpgid());
 
+    char* argv[] = { 0, 0 };
+
     while (1) {
         getcwd(pwd, 512);
         printf("[\033[2m%s\033[39;49m]$ ", pwd);
         size_t sz = read(stdin, buf, 511);
+
         if (sz < 0) {
             printf("fail to read user input (%d)\n", geterrno());
             return;
         }
+
         buf[sz] = '\0';
-        parse_cmdline(buf, &cmd, &argpart);
+
+        // currently, this shell only support single argument
+        parse_cmdline(buf, &cmd, &argv[0]);
+
         if (cmd[0] == 0) {
             printf("\n");
             goto cont;
         }
+
         // cmd=="exit"
         if (*(unsigned int*)cmd == 0x74697865U) {
             break;
         }
-        sh_exec(cmd, NULL);
+
+        sh_exec(cmd, (const char**)&argv);
     cont:
         printf("\n");
     }

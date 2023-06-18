@@ -2,6 +2,7 @@
 #include <lunaix/common.h>
 #include <lunaix/foptions.h>
 #include <lunaix/fs.h>
+#include <lunaix/fs/probe_boot.h>
 #include <lunaix/fs/twifs.h>
 #include <lunaix/ld.h>
 #include <lunaix/lxconsole.h>
@@ -48,14 +49,14 @@ mount_bootmedium()
 {
     struct v_dnode* dnode;
     int errno = 0;
-    if ((errno = vfs_walk_proc("/dev/sdb", &dnode, NULL, 0))) {
+    struct device* dev = probe_boot_medium();
+    if (!dev) {
         kprintf(KERROR "fail to acquire device. (%d)", errno);
         return 0;
     }
 
-    struct device* dev = (struct device*)dnode->inode->data;
     if ((errno = vfs_mount("/mnt/lunaix-os", "iso9660", dev, 0))) {
-        kprintf(KERROR "fail to boot medium. (%d)", errno);
+        kprintf(KERROR "fail to mount boot medium. (%d)", errno);
         return 0;
     }
 

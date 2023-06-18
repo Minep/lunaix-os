@@ -31,7 +31,7 @@ $(BUILD_DIR)/$(OS_ISO): $(BIN_DIR)/$(OS_BIN)
 	@./config-grub.sh ${OS_NAME} $(ISO_GRUB_DIR)/grub.cfg
 	@cp $(BIN_DIR)/$(OS_BIN) $(ISO_BOOT_DIR)
 	@cp -r $(USR_DIR) $(ISO_DIR)
-	@grub-mkrescue -o $(BUILD_DIR)/$(OS_ISO) $(ISO_DIR)
+	@grub-mkrescue -o $(BUILD_DIR)/$(OS_ISO) $(ISO_DIR) -- -volid "$(OS_ID) $(OS_VER)" -system_id "$(OS_NAME)"
 
 all: $(BUILD_DIR)/$(OS_ISO)
 

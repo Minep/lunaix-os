@@ -24,6 +24,7 @@ LOG_MODULE("BLOCK")
 static struct cake_pile* lbd_pile;
 static struct block_dev** dev_registry;
 static struct twifs_node* blk_sysroot;
+static struct device* blk_parent_dev;
 
 int free_slot = 0;
 
@@ -41,6 +42,7 @@ block_init()
     dev_registry = vcalloc(sizeof(struct block_dev*), MAX_DEV);
     free_slot = 0;
     blk_sysroot = twifs_dir_node(NULL, "block");
+    blk_parent_dev = device_addcat(NULL, "block");
 }
 
 int
@@ -314,7 +316,8 @@ __block_register(struct block_dev* bdev)
         return 0;
     }
 
-    struct device* dev = device_addvol(NULL, bdev, "sd%c", 'a' + free_slot);
+    struct device* dev =
+      device_addvol(blk_parent_dev, bdev, "sd%c", 'a' + free_slot);
     dev->write = __block_write;
     dev->write_page = __block_write_page;
     dev->read = __block_read;
