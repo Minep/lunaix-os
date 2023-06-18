@@ -128,6 +128,8 @@ exec_load(struct ld_param* param,
                                                .info = param->info };
     } else {
         // TODO need to find a way to inject argv and envp remotely
+        //      this is for the support of kernel level implementation of
+        //      posix_spawn
         fail("not implemented");
     }
 

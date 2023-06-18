@@ -8,32 +8,12 @@
 #include <lunaix/spike.h>
 
 int
-__elf_populate_mapped(struct mm_region* region, void* pg, off_t segfoff)
-{
-    size_t segsz = region->flen;
-    size_t segmoff = segfoff - region->foff;
-
-    if (segmoff >= segsz) {
-        return 0;
-    }
-
-    struct v_file* file = region->mfile;
-    size_t rdlen = MIN(segsz - segmoff, PG_SIZE);
-
-    if (rdlen == PG_SIZE) {
-        // This is because we want to exploit any optimization on read_page
-        return file->ops->read_page(file->inode, pg, PG_SIZE, segfoff);
-    } else {
-        // we don't want to over-read the segment!
-        return file->ops->read(file->inode, pg, rdlen, segfoff);
-    }
-}
-
-int
 elf_map_segment(struct ld_param* ldparam,
                 struct v_file* elfile,
                 struct elf32_phdr* phdr)
 {
+    assert(PG_ALIGNED(phdr->p_offset));
+
     int proct = 0;
     if ((phdr->p_flags & PF_R)) {
         proct |= PROT_READ;
@@ -45,21 +25,19 @@ elf_map_segment(struct ld_param* ldparam,
         proct |= PROT_EXEC;
     }
 
-    struct mm_region* seg_reg;
     struct mmap_param param = { .vms_mnt = ldparam->vms_mnt,
                                 .pvms = &ldparam->proc->mm,
                                 .proct = proct,
-                                .offset = phdr->p_offset,
+                                .offset = PG_ALIGN(phdr->p_offset),
                                 .mlen = ROUNDUP(phdr->p_memsz, PG_SIZE),
-                                .flen = phdr->p_filesz,
+                                .flen = phdr->p_filesz + PG_MOD(phdr->p_va),
                                 .flags = MAP_FIXED | MAP_PRIVATE,
                                 .type = REGION_TYPE_CODE };
 
+    struct mm_region* seg_reg;
     int status = mem_map(NULL, &seg_reg, PG_ALIGN(phdr->p_va), elfile, &param);
 
     if (!status) {
-        seg_reg->init_page = __elf_populate_mapped;
-
         size_t next_addr = phdr->p_memsz + phdr->p_va;
         ldparam->info.end = MAX(ldparam->info.end, ROUNDUP(next_addr, PG_SIZE));
         ldparam->info.mem_sz += phdr->p_memsz;

@@ -22,7 +22,7 @@ main(int argc, const char** argv)
 
     pid_t pid;
     if (!(pid = fork())) {
-        int err = execve("/mnt/lunaix-os/usr/ls", NULL, NULL);
+        int err = execve("/mnt/lunaix-os/usr/sh", NULL, NULL);
         printf("fail to execute (%d)\n", err);
         _exit(err);
     }

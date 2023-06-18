@@ -65,8 +65,6 @@ struct mm_region
     void** index; // fast reference, to accelerate access to this very region.
 
     void* data;
-    // When a page is mapped and required initialize
-    int (*init_page)(struct mm_region*, void*, off_t);
     // when a region is copied
     void (*region_copied)(struct mm_region*);
     // when a region is unmapped

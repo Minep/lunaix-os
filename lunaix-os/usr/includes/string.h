@@ -18,4 +18,7 @@ strchr(const char* str, int character);
 char*
 strcpy(char* dest, const char* src);
 
+int
+strcmp(const char* s1, const char* s2);
+
 #endif /* __LUNAIX_STRING_H */

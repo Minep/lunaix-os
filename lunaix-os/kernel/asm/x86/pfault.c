@@ -92,7 +92,8 @@ intr_routine_page_fault(const isr_param* param)
 
         ptr = PG_ALIGN(ptr);
 
-        u32_t offset = (ptr - hit_region->start) + hit_region->foff;
+        u32_t mseg_off = (ptr - hit_region->start);
+        u32_t mfile_off = mseg_off + hit_region->foff;
         uintptr_t pa = pmm_alloc_page(__current->pid, 0);
 
         if (!pa) {
@@ -105,10 +106,8 @@ intr_routine_page_fault(const isr_param* param)
         memset(ptr, 0, PG_SIZE);
 
         int errno = 0;
-        if (hit_region->init_page) {
-            errno = hit_region->init_page(hit_region, ptr, offset);
-        } else {
-            errno = file->ops->read_page(file->inode, ptr, PG_SIZE, offset);
+        if (mseg_off < hit_region->flen) {
+            errno = file->ops->read_page(file->inode, ptr, PG_SIZE, mfile_off);
         }
 
         if (errno < 0) {

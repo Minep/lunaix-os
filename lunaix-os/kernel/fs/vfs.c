@@ -821,7 +821,7 @@ vfs_get_path(struct v_dnode* dnode, char* buf, size_t size, int depth)
 
     size_t cpy_size = MIN(dnode->name.len, size - len);
     strncpy(buf + len, dnode->name.value, cpy_size);
-    len += cpy_size;
+    len += cpy_size + !!cpy_size;
 
     return len;
 }
@@ -1322,7 +1322,7 @@ __DEFINE_LXSYSCALL2(char*, getcwd, char*, buf, size_t, size)
         }
     }
 
-    buf[len + 1] = '\0';
+    buf[len] = '\0';
 
     ret_ptr = buf;
 

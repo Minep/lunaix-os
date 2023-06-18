@@ -55,3 +55,13 @@ strcpy(char* dest, const char* src)
     dest[i] = '\0';
     return dest;
 }
+
+int
+strcmp(const char* a, const char* b)
+{
+    while (*a && *a == *b) {
+        a++;
+        b++;
+    }
+    return *a - *b;
+}

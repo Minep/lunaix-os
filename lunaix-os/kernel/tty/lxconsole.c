@@ -1,3 +1,14 @@
+/**
+ * @file lxconsole.c
+ * @author Lunaixsky (lunaxisky@qq.com)
+ * @brief Provides simple terminal support
+ * @version 0.1
+ * @date 2023-06-18
+ *
+ * @copyright Copyright (c) 2023
+ *
+ */
+
 #include <klibc/string.h>
 #include <lunaix/device.h>
 #include <lunaix/input.h>

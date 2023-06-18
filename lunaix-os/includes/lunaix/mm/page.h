@@ -13,6 +13,7 @@
 #define V2P(vaddr) ((ptr_t)(vaddr)-KERNEL_MM_BASE)
 
 #define PG_ALIGN(addr) ((ptr_t)(addr)&0xFFFFF000UL)
+#define PG_MOD(addr) ((ptr_t)(addr) & ~PG_SIZE)
 #define PG_ALIGNED(addr) (!((ptr_t)(addr)&0x00000FFFUL))
 
 #define L1_INDEX(vaddr) (u32_t)(((ptr_t)(vaddr)&0xFFC00000UL) >> 22)

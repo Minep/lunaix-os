@@ -139,6 +139,15 @@ found:
     return 0;
 }
 
+int
+mem_remap(void** addr_out,
+          struct mm_region** remapped,
+          void* addr,
+          struct v_file* file,
+          struct mmap_param* param)
+{
+}
+
 void
 mem_sync_pages(ptr_t mnt,
                struct mm_region* region,
@@ -288,8 +297,10 @@ __DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
     if (!addr) {
         addr = UMMAP_START;
     } else if (addr < UMMAP_START || addr + length >= UMMAP_END) {
-        errno = ENOMEM;
-        goto done;
+        if (!(options & (MAP_FIXED | MAP_FIXED_NOREPLACE))) {
+            errno = ENOMEM;
+            goto done;
+        }
     }
 
     struct v_fd* vfd;

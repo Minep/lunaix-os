@@ -22,7 +22,6 @@ void* default_handlers[_SIG_NUM] = {
     [_SIGINT] = default_sighandler_term,
 };
 
-volatile struct proc_sigstate __temp_save;
 // Referenced in kernel/asm/x86/interrupt.S
 void*
 signal_dispatch()
@@ -79,6 +78,7 @@ signal_dispatch()
 
         解决办法就是先吧intr_ctx拷贝到一个静态分配的区域里，然后再注入到用户栈。
     */
+    static volatile struct proc_sigstate __temp_save;
     __temp_save.proc_regs = __current->intr_ctx;
     memcpy(__temp_save.fxstate, __current->fxstate, 512);
 

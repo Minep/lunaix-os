@@ -47,11 +47,6 @@ SECTIONS {
     }
     __usrtext_end = ALIGN(4K);
 
-    .bss BLOCK(4K) : AT ( ADDR(.bss) - 0xC0000000 ) {
-        build/obj/kernel/*.o (.bss)
-        build/obj/hal/*.o (.bss)
-    }
-
     .data BLOCK(4k) : AT ( ADDR(.data) - 0xC0000000 ) {
         build/obj/kernel/*.o (.data)
         build/obj/hal/*.o (.data)
@@ -64,6 +59,11 @@ SECTIONS {
 
     .kpg BLOCK(4K) : AT ( ADDR(.kpg) - 0xC0000000 ) {
         build/obj/arch/x86/*.o (.kpg)
+    }
+
+    .bss BLOCK(4K) : AT ( ADDR(.bss) - 0xC0000000 ) {
+        build/obj/kernel/*.o (.bss)
+        build/obj/hal/*.o (.bss)
     }
 
     __kernel_end = ALIGN(4K);

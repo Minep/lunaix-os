@@ -22,7 +22,7 @@
     case, our rootfs will be something like ext2.
 
     RamFS vs. TwiFS: Indeed, they are both fs that lives in RAM so
-    there is no foundmentally differences. However, TwiFS is designed
+    there is no foundmental differences. However, TwiFS is designed
     to be a 'virtual FIlesystem for KERnel space' (FIKER), so other
     kernel sub-modules can just create node and attach their own
     implementation of read/write, without brothering to create a
