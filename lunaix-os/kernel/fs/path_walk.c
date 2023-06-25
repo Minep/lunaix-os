@@ -43,8 +43,8 @@ __vfs_walk(struct v_dnode* start,
     assert(start);
 
     struct v_dnode* dnode;
-    struct v_inode* current_inode;
     struct v_dnode* current_level = start;
+    struct v_inode* current_inode = current_level->inode;
 
     struct hstr name = HSTR(fname_buffer, 0);
 
@@ -78,38 +78,6 @@ __vfs_walk(struct v_dnode* start,
                 hstrcpy(component, &name);
             }
             break;
-        }
-
-        current_inode = current_level->inode;
-
-        if ((current_inode->itype & VFS_IFSYMLINK) &&
-            !(walk_options & VFS_WALK_NOFOLLOW)) {
-            const char* link;
-
-            lock_inode(current_inode);
-            if ((errno =
-                   current_inode->ops->read_symlink(current_inode, &link))) {
-                unlock_inode(current_inode);
-                goto error;
-            }
-            unlock_inode(current_inode);
-
-            errno = __vfs_walk(current_level->parent,
-                               link,
-                               &dnode,
-                               NULL,
-                               0,
-                               depth + 1,
-                               fname_buffer + name.len + 1);
-
-            if (errno) {
-                goto error;
-            }
-
-            // reposition the resolved subtree pointed by symlink
-            // vfs_dcache_rehash(current_level->parent, dnode);
-            current_level = dnode;
-            current_inode = dnode->inode;
         }
 
         lock_dnode(current_level);
@@ -149,6 +117,43 @@ __vfs_walk(struct v_dnode* start,
 
         j = 0;
         current_level = dnode;
+        current_inode = current_level->inode;
+
+        if ((current_inode->itype & VFS_IFSYMLINK) &&
+            !(walk_options & VFS_WALK_NOFOLLOW)) {
+            const char* link;
+
+            if (!current_inode->ops->read_symlink) {
+                errno = ENOTSUP;
+                goto error;
+            }
+
+            lock_inode(current_inode);
+            if ((errno =
+                   current_inode->ops->read_symlink(current_inode, &link))) {
+                unlock_inode(current_inode);
+                goto error;
+            }
+            unlock_inode(current_inode);
+
+            errno = __vfs_walk(current_level->parent,
+                               link,
+                               &dnode,
+                               NULL,
+                               0,
+                               depth + 1,
+                               fname_buffer + name.len + 1);
+
+            if (errno) {
+                goto error;
+            }
+
+            // reposition the resolved subtree pointed by symlink
+            // vfs_dcache_rehash(current_level->parent, dnode);
+            current_level = dnode;
+            current_inode = dnode->inode;
+        }
+
     cont:
         current = lookahead;
     };

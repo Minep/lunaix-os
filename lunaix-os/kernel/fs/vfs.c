@@ -515,6 +515,7 @@ vfs_i_free(struct v_inode* inode)
 /* ---- System call definition and support ---- */
 
 #define FLOCATE_CREATE_EMPTY 1
+#define FLOCATE_CREATE_ONLY 2
 
 int
 vfs_getfd(int fd, struct v_fd** fd_s)
@@ -541,7 +542,13 @@ __vfs_try_locate_file(const char* path,
     }
 
     errno = vfs_walk(*fdir, name.value, file, NULL, 0);
-    if (errno != ENOENT || !(options & FLOCATE_CREATE_EMPTY)) {
+
+    if (errno != ENOENT && (options & FLOCATE_CREATE_ONLY)) {
+        return EEXIST;
+    }
+
+    if (errno != ENOENT ||
+        !(options & (FLOCATE_CREATE_EMPTY | FLOCATE_CREATE_ONLY))) {
         return errno;
     }
 
@@ -821,7 +828,7 @@ vfs_get_path(struct v_dnode* dnode, char* buf, size_t size, int depth)
 
     size_t cpy_size = MIN(dnode->name.len, size - len);
     strncpy(buf + len, dnode->name.value, cpy_size);
-    len += cpy_size + !!cpy_size;
+    len += cpy_size;
 
     return len;
 }
@@ -1201,25 +1208,26 @@ __DEFINE_LXSYSCALL2(int,
                     link_target)
 {
     int errno;
-    struct v_dnode* dnode;
-    if ((errno = vfs_walk_proc(pathname, &dnode, NULL, 0))) {
+    struct v_dnode *dnode, *file;
+    if ((errno = __vfs_try_locate_file(
+           pathname, &dnode, &file, FLOCATE_CREATE_ONLY))) {
         goto done;
     }
 
-    if (errno = vfs_check_writable(dnode)) {
+    if (errno = vfs_check_writable(file)) {
         goto done;
     }
 
-    if (!dnode->inode->ops->set_symlink) {
+    if (!file->inode->ops->set_symlink) {
         errno = ENOTSUP;
         goto done;
     }
 
-    lock_inode(dnode->inode);
+    lock_inode(file->inode);
 
-    errno = dnode->inode->ops->set_symlink(dnode->inode, link_target);
+    errno = file->inode->ops->set_symlink(file->inode, link_target);
 
-    unlock_inode(dnode->inode);
+    unlock_inode(file->inode);
 
 done:
     return DO_STATUS(errno);
