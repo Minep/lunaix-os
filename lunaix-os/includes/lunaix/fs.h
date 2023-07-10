@@ -21,9 +21,19 @@
 #define VFS_IFVOLDEV 0x8
 #define VFS_IFSYMLINK 0x10
 
+// Walk, mkdir if component encountered is non-exists.
 #define VFS_WALK_MKPARENT 0x1
+
+// Walk, relative to current FS.
 #define VFS_WALK_FSRELATIVE 0x2
+
+/*
+    Terminate the walk on the immediate parent,
+    name of child (last component) is returned through `component`
+*/
 #define VFS_WALK_PARENT 0x4
+
+// Do not follow the symbolic link
 #define VFS_WALK_NOFOLLOW 0x8
 
 #define VFS_HASHTABLE_BITS 10

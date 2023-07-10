@@ -1054,8 +1054,6 @@ __vfs_do_unlink(struct v_dnode* dnode)
     if (inode->open_count) {
         errno = EBUSY;
     } else if (!(inode->itype & VFS_IFDIR)) {
-        // The underlying unlink implementation should handle
-        //  symlink case
         errno = inode->ops->unlink(inode);
         if (!errno) {
             vfs_d_free(dnode);
@@ -1108,10 +1106,8 @@ __DEFINE_LXSYSCALL2(int, link, const char*, oldpath, const char*, newpath)
     errno = __vfs_try_locate_file(oldpath, &dentry, &to_link, 0);
     if (!errno) {
         errno = __vfs_try_locate_file(
-          newpath, &name_dentry, &name_file, FLOCATE_CREATE_EMPTY);
+          newpath, &name_dentry, &name_file, FLOCATE_CREATE_ONLY);
         if (!errno) {
-            errno = EEXIST;
-        } else if (name_file) {
             errno = vfs_link(to_link, name_file);
         }
     }

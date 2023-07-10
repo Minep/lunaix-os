@@ -13,6 +13,7 @@ typedef unsigned int elf32_wrd_t;
 #define ET_EXEC 2
 
 #define PT_LOAD 1
+#define PT_INTERP 3
 
 #define PF_X 0x1
 #define PF_W 0x2
@@ -63,15 +64,60 @@ struct elf32_phdr
     elf32_wrd_t p_align;
 };
 
+struct elf32
+{
+    void* elf_file;
+    struct elf32_ehdr eheader;
+    struct elf32_phdr* pheaders;
+};
+
+#define declare_elf32(elf, elf_vfile)                                          \
+    struct elf32 elf = { .elf_file = elf_vfile, .pheaders = (void*)0 }
+
+int
+elf32_open(struct elf32* elf, const char* path);
+
+int
+elf32_openat(struct elf32* elf, void* elf_vfile);
+
+int
+elf32_static_linked(const struct elf32* elf);
+
+int
+elf32_close(struct elf32* elf);
+
+/**
+ * @brief Try to find the PT_INTERP section. If found, copy it's content to
+ * path_out
+ *
+ * @param elf Opened elf32 descriptor
+ * @param path_out
+ * @param len size of path_out buffer
+ * @return int
+ */
+int
+elf32_find_loader(const struct elf32* elf, char* path_out, size_t len);
+
+int
+elf32_read_ehdr(struct elf32* elf);
+
+int
+elf32_read_phdr(struct elf32* elf);
+
+/**
+ * @brief Estimate how much memeory will be acquired if we load all loadable
+ * sections.、
+ *
+ * @param elf
+ * @return size_t
+ */
+size_t
+elf32_loadable_memsz(const struct elf32* elf);
+
+int
+elf32_load(struct load_context* ldctx, const struct elf32* elf);
+
 #define SIZE_EHDR sizeof(struct elf32_ehdr)
 #define SIZE_PHDR sizeof(struct elf32_phdr)
 
-static inline int
-elf_check_exec(struct elf32_ehdr* ehdr)
-{
-    return *(u32_t*)(ehdr->e_ident) == ELFMAGIC &&
-           ehdr->e_ident[EI_CLASS] == ELFCLASS32 &&
-           ehdr->e_ident[EI_DATA] == ELFDATA2LSB && ehdr->e_type == ET_EXEC &&
-           ehdr->e_machine == EM_386;
-}
 #endif /* __LUNAIX_ELF_H */

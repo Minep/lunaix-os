@@ -303,20 +303,19 @@ __DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
         }
     }
 
-    struct v_fd* vfd;
-    if ((errno = vfs_getfd(fd, &vfd))) {
-        goto done;
-    }
-
-    struct v_file* file = vfd->file;
+    struct v_file* file = NULL;
 
     if (!(options & MAP_ANON)) {
+        struct v_fd* vfd;
+        if ((errno = vfs_getfd(fd, &vfd))) {
+            goto done;
+        }
+
+        file = vfd->file;
         if (!file->ops->read_page) {
             errno = ENODEV;
             goto done;
         }
-    } else {
-        file = NULL;
     }
 
     struct mmap_param param = { .flags = options,

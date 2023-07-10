@@ -1,7 +1,7 @@
 /* 高半核入口点 - 0xC0000000 */
 
 #define __ASM__
-#include <lunaix/common.h>
+#include <arch/x86/i386_asm.h>
 
 .section .text
     .global hhk_entry_

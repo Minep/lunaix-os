@@ -32,5 +32,6 @@
 #define ENOTBLK -26
 #define ENOEXEC -27
 #define E2BIG -28
+#define ELIBBAD -29
 
 #endif /* __LUNAIX_CODE_H */

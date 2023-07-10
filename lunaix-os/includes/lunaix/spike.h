@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_SPIKE_H
 #define __LUNAIX_SPIKE_H
 
-// Some helper functions. As helpful as Spike the Dragon! :)
+/** Some helper functions. As helpful as Spike the Dragon! :) **/
 
 // 除法 v/(2^k) 向上取整
 #define CEIL(v, k) (((v) + (1 << (k)) - 1) >> (k))
@@ -19,6 +19,8 @@
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+#define likely(x) __builtin_expect((x), 1)
 
 /**
  * @brief Fast log base 2 for integer, utilizing constant unfolding.
@@ -91,7 +93,7 @@ __assert_fail(const char* expr, const char* file, unsigned int line)
 #define assert(cond) (void)(cond);          // assert nothing
 #define assert_msg(cond, msg) (void)(cond); // assert nothing
 
-#endif // __LUNAIXOS_NASSERT__
+#endif                                      // __LUNAIXOS_NASSERT__
 
 void
 panick(const char* msg);

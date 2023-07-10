@@ -8,17 +8,7 @@
 
 .section .text
     .global _u_start
-    _u_start:
-        movl (%esp), %eax
-        pushl %eax
-        call usr_pre_init
-        jnz 1f
-
-        popl %eax
-
-        pushl 4(%eax)   // argv
-        pushl (%eax)    // argc
-        
+    _u_start:        
         xorl %eax, %eax
         call main
         

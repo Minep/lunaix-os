@@ -95,6 +95,16 @@ vfree(void* ptr)
     __vfree(ptr, piles, CLASS_LEN(piles_names));
 }
 
+void
+vfree_safe(void* ptr)
+{
+    if (!ptr) {
+        return;
+    }
+
+    __vfree(ptr, piles, CLASS_LEN(piles_names));
+}
+
 void*
 valloc_dma(unsigned int size)
 {

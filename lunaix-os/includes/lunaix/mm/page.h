@@ -107,6 +107,9 @@ extern void __pg_mount_point;
 #define PG_MOUNT_3 (PG_MOUNT_BASE + 0x2000)
 #define PG_MOUNT_4 (PG_MOUNT_BASE + 0x3000)
 
+/*
+    当前进程内存空间挂载点
+*/
 #define VMS_SELF L2_BASE_VADDR
 
 #define CURPROC_PTE(vpn)                                                       \

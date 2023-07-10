@@ -17,9 +17,10 @@ default_sighandler_term(int signum)
 
 void* default_handlers[_SIG_NUM] = {
     // TODO: 添加默认handler
-    [_SIGINT] = default_sighandler_term,  [_SIGTERM] = default_sighandler_term,
-    [_SIGKILL] = default_sighandler_term, [_SIGSEGV] = default_sighandler_term,
     [_SIGINT] = default_sighandler_term,
+    [_SIGTERM] = default_sighandler_term,
+    [_SIGKILL] = default_sighandler_term,
+    [_SIGSEGV] = default_sighandler_term,
 };
 
 // Referenced in kernel/asm/x86/interrupt.S
@@ -41,6 +42,10 @@ signal_dispatch()
         // SIG0 is reserved
         return 0;
     }
+
+    // TODO: SIG{INT|TERM|KILL|SEGV} should have highest priority.
+    //       Terminate the process right here if any of unmaskable signal is
+    //       set.
 
     if (!__current->sig_handler[sig_selected] &&
         !default_handlers[sig_selected]) {

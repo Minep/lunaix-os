@@ -13,6 +13,9 @@ vcalloc(unsigned int size, unsigned int count);
 void
 vfree(void* ptr);
 
+void
+vfree_safe(void* ptr);
+
 void*
 valloc_dma(unsigned int size);
 

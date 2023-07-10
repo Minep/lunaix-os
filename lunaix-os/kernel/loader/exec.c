@@ -1,7 +1,9 @@
+#include <arch/abi.h>
 #include <lunaix/elf.h>
+#include <lunaix/exec.h>
 #include <lunaix/fs.h>
-#include <lunaix/ld.h>
 #include <lunaix/mm/mmap.h>
+#include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
@@ -10,6 +12,14 @@
 #include <lunaix/syscall_utils.h>
 
 #include <klibc/string.h>
+
+void
+exec_container(struct exec_container* param, struct proc_info* proc, ptr_t vms)
+{
+    *param = (struct exec_container){ .proc = proc,
+                                      .vms_mnt = vms,
+                                      .executable = { .container = param } };
+}
 
 size_t
 exec_str_size(const char** str_arr, size_t* length)
@@ -33,63 +43,82 @@ exec_str_size(const char** str_arr, size_t* length)
     return sz + sizeof(char*);
 }
 
-void
-__heap_copied(struct mm_region* region)
-{
-    mm_index((void**)&region->proc_vms->heap, region);
-}
+// externed from mm/dmm.c
+extern int
+create_heap(struct proc_mm* pvms, ptr_t addr);
 
 int
-__exec_remap_heap(struct ld_param* param, struct proc_mm* pvms)
-{
-    if (pvms->heap) {
-        mem_unmap_region(param->vms_mnt, pvms->heap);
-    }
-
-    struct mmap_param map_param = { .pvms = pvms,
-                                    .vms_mnt = param->vms_mnt,
-                                    .flags = MAP_ANON | MAP_PRIVATE,
-                                    .type = REGION_TYPE_HEAP,
-                                    .proct = PROT_READ | PROT_WRITE,
-                                    .mlen = PG_SIZE };
-    int status = 0;
-    struct mm_region* heap;
-    if ((status = mem_map(NULL, &heap, param->info.end, NULL, &map_param))) {
-        param->status |= LD_STAT_FKUP;
-        return status;
-    }
-
-    heap->region_copied = __heap_copied;
-    mm_index((void**)&pvms->heap, heap);
-
-    return status;
-}
-
-int
-exec_load(struct ld_param* param,
+exec_load(struct exec_container* container,
           struct v_file* executable,
           const char** argv,
           const char** envp)
 {
     int errno = 0;
+    char* ldpath = NULL;
 
     size_t argv_len, envp_len;
     size_t sz_argv = exec_str_size(argv, &argv_len);
     size_t sz_envp = exec_str_size(envp, &envp_len);
-    size_t total_sz = ROUNDUP(sz_argv + sz_envp, PG_SIZE);
+    size_t var_sz = ROUNDUP(sz_envp, PG_SIZE);
 
-    if (total_sz / PG_SIZE > MAX_VAR_PAGES) {
+    char* argv_extra[2] = { executable->dnode->name.value, 0 };
+
+    if (var_sz / PG_SIZE > MAX_VAR_PAGES) {
         errno = E2BIG;
         goto done;
     }
 
-    if ((errno = elf_load(param, executable))) {
+    struct elf32 elf;
+
+    if ((errno = elf32_openat(&elf, executable))) {
         goto done;
     }
 
-    struct proc_mm* pvms = &param->proc->mm;
+    if (!elf32_check_exec(&elf)) {
+        errno = ENOEXEC;
+        goto done;
+    }
+
+    ldpath = valloc(512);
+    errno = elf32_find_loader(&elf, ldpath, 512);
+
+    if (errno < 0) {
+        vfree(ldpath);
+        goto done;
+    }
+
+    if (errno != NO_LOADER) {
+        // TODO load loader
+        argv_extra[1] = ldpath;
+
+        // close old elf
+        if ((errno = elf32_close(&elf))) {
+            goto done;
+        }
+
+        // open the loader instead
+        if ((errno = elf32_open(&elf, ldpath))) {
+            goto done;
+        }
+
+        // Is this the valid loader?
+        if (!elf32_static_linked(&elf) || !elf32_check_exec(&elf)) {
+            errno = ELIBBAD;
+            goto done_close_elf32;
+        }
+
+        // TODO: relocate loader
+    }
+
+    if ((errno = elf32_load(&container->executable, &elf))) {
+        goto done_close_elf32;
+    }
+
+    struct proc_mm* pvms = &container->proc->mm;
+
+    // A dedicated place for process variables (e.g. envp)
     struct mmap_param map_vars = { .pvms = pvms,
-                                   .vms_mnt = param->vms_mnt,
+                                   .vms_mnt = container->vms_mnt,
                                    .flags = MAP_ANON | MAP_PRIVATE | MAP_FIXED,
                                    .type = REGION_TYPE_VARS,
                                    .proct = PROT_READ,
@@ -97,49 +126,79 @@ exec_load(struct ld_param* param,
 
     void* mapped;
 
-    if ((errno = __exec_remap_heap(param, pvms))) {
-        goto done;
+    if (pvms->heap) {
+        mem_unmap_region(container->vms_mnt, pvms->heap);
+        pvms->heap = NULL;
+    }
+
+    if (!argv_extra[1]) {
+        // If loading a statically linked file, then heap remapping we can do,
+        // otherwise delayed.
+        create_heap(container->vms_mnt, PG_ALIGN(container->executable.end));
     }
 
     if ((errno = mem_map(&mapped, NULL, UMMAP_END, NULL, &map_vars))) {
-        goto done;
+        goto done_close_elf32;
     }
 
-    if (param->vms_mnt == VMS_SELF) {
+    if (container->vms_mnt == VMS_SELF) {
         // we are loading executable into current addr space
 
         // make some handy infos available to user space
-        ptr_t arg_start = mapped + sizeof(struct usr_exec_param);
-        if (argv)
-            memcpy(arg_start, (void*)argv, sz_argv);
         if (envp)
-            memcpy(arg_start + sz_argv, (void*)envp, sz_envp);
+            memcpy(mapped, (void*)envp, sz_envp);
 
-        ptr_t* ustack = (ptr_t*)USTACK_TOP;
-        struct usr_exec_param* exec_param = (struct usr_exec_param*)mapped;
+        void* ustack = (void*)USTACK_TOP;
 
-        ustack[-1] = (ptr_t)mapped;
-        param->info.stack_top = &ustack[-1];
+        if (argv) {
+            ustack = (void*)((ptr_t)ustack - sz_argv);
+            memcpy(ustack, (void*)argv, sz_argv);
+        }
 
-        *exec_param = (struct usr_exec_param){ .argc = argv_len,
-                                               .argv = arg_start,
-                                               .envc = envp_len,
-                                               .envp = arg_start + sz_argv,
-                                               .info = param->info };
+        for (size_t i = 0; i < 2 && argv_extra[i]; i++, argv_len++) {
+            char* extra_arg = argv_extra[i];
+            size_t str_len = strlen(extra_arg);
+
+            ustack = (void*)((ptr_t)ustack - str_len);
+            memcpy(ustack, (void*)extra_arg, str_len);
+        }
+
+        // four args (arg{c|v}, env{c|p}) for main
+        struct uexec_param* exec_param = &((struct uexec_param*)ustack)[-1];
+
+        container->stack_top = (ptr_t)exec_param;
+
+        *exec_param = (struct uexec_param){
+            .argc = argv_len, .argv = ustack, .envc = envp_len, .envp = mapped
+        };
+
     } else {
-        // TODO need to find a way to inject argv and envp remotely
-        //      this is for the support of kernel level implementation of
-        //      posix_spawn
+        /*
+            TODO need to find a way to inject argv and envp remotely
+                 this is for the support of kernel level implementation of
+                 posix_spawn
+
+            IDEA
+                1. Allocate a orphaned physical page (i.e., do not belong to any
+                VMA)
+                2. Mounted to a temporary mount point in current VMA, (i.e.,
+                PG_MOUNT_*)
+                3. Do setup there.
+                4. Unmount then mounted to the foreign VMA as the first stack
+                page.
+        */
         fail("not implemented");
     }
 
-    param->info.entry = param->info.ehdr_out.e_entry;
+done_close_elf32:
+    elf32_close(&elf);
 done:
+    vfree_safe(ldpath);
     return errno;
 }
 
 int
-exec_load_byname(struct ld_param* param,
+exec_load_byname(struct exec_container* container,
                  const char* filename,
                  const char** argv,
                  const char** envp)
@@ -156,12 +215,26 @@ exec_load_byname(struct ld_param* param,
         goto done;
     }
 
-    if ((errno = exec_load(param, file, argv, envp))) {
-        vfs_pclose(file, __current->pid);
-    }
+    errno = exec_load(container, file, argv, envp);
 
 done:
     return errno;
+}
+
+int
+exec_kexecve(const char* filename, const char* argv[], const char* envp)
+{
+    int errno = 0;
+    struct exec_container container;
+    exec_container(&container, __current, VMS_SELF);
+
+    errno = exec_load_byname(&container, filename, argv, envp);
+
+    if (errno) {
+        return errno;
+    }
+
+    j_usr(container.stack_top, container.entry);
 }
 
 __DEFINE_LXSYSCALL3(int,
@@ -174,26 +247,26 @@ __DEFINE_LXSYSCALL3(int,
                     envp[])
 {
     int errno = 0;
-    struct ld_param ldparam;
-    ld_create_param(&ldparam, __current, VMS_SELF);
+    struct exec_container container;
+    exec_container(&container, __current, VMS_SELF);
 
-    if ((errno = exec_load_byname(&ldparam, filename, argv, envp))) {
-        if ((ldparam.status & LD_STAT_FKUP)) {
-            // we fucked up our address space.
-            terminate_proc(11451);
-            schedule();
-            fail("should not reach");
-        }
+    if (!(errno = exec_load_byname(&container, filename, argv, envp))) {
         goto done;
     }
 
-    volatile struct exec_param* execp = __current->intr_ctx.execp;
-    execp->esp = ldparam.info.stack_top;
-    execp->eip = ldparam.info.entry;
-
     // we will jump to new entry point (_u_start) upon syscall's
     // return so execve 'will not return' from the perspective of it's invoker
+    volatile struct exec_param* execp = __current->intr_ctx.execp;
+    execp->esp = container.stack_top;
+    execp->eip = container.entry;
 
 done:
-    return DO_STATUS(errno);
+    // set return value
+    store_retval(DO_STATUS(errno));
+
+    // Always yield the process that want execve!
+    schedule();
+
+    // this will never get executed!
+    return -1;
 }

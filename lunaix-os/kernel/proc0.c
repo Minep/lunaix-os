@@ -1,10 +1,10 @@
 #include <lunaix/block.h>
 #include <lunaix/common.h>
+#include <lunaix/exec.h>
 #include <lunaix/foptions.h>
 #include <lunaix/fs.h>
 #include <lunaix/fs/probe_boot.h>
 #include <lunaix/fs/twifs.h>
-#include <lunaix/ld.h>
 #include <lunaix/lxconsole.h>
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/pmm.h>
@@ -67,30 +67,10 @@ int
 exec_initd()
 {
     int errno = 0;
-    struct ld_param param;
-    char filename[] = "/mnt/lunaix-os/usr/init";
 
-    ld_create_param(&param, __current, VMS_SELF);
-
-    if ((errno = exec_load_byname(&param, filename, NULL, NULL))) {
+    if (exec_kexecve("/mnt/lunaix-os/usr/init", NULL, NULL)) {
         goto fail;
     }
-
-    // user space
-    asm volatile("movw %0, %%ax\n"
-                 "movw %%ax, %%es\n"
-                 "movw %%ax, %%ds\n"
-                 "movw %%ax, %%fs\n"
-                 "movw %%ax, %%gs\n"
-                 "pushl %0\n"
-                 "pushl %1\n"
-                 "pushl %2\n"
-                 "pushl %3\n"
-                 "retf" ::"i"(UDATA_SEG),
-                 "r"(param.info.stack_top),
-                 "i"(UCODE_SEG),
-                 "r"(param.info.entry)
-                 : "eax", "memory");
 
     fail("should not reach");
 

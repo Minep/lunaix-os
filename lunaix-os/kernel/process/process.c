@@ -1,3 +1,4 @@
+#include <arch/abi.h>
 #include <klibc/string.h>
 #include <lunaix/clock.h>
 #include <lunaix/common.h>
@@ -238,7 +239,7 @@ dup_proc()
     vmm_unmount_pd(VMS_MOUNT_1);
 
     // 正如同fork，返回两次。
-    pcb->intr_ctx.registers.eax = 0;
+    store_retval_to(pcb, 0);
 
     commit_process(pcb);
 

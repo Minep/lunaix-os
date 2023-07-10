@@ -1,62 +1,67 @@
-#ifndef __LUNAIX_LOADER_H
-#define __LUNAIX_LOADER_H
+#ifndef __LUNAIX_EXEC_H
+#define __LUNAIX_EXEC_H
 
 #include <lunaix/elf.h>
+#include <lunaix/fs.h>
 #include <lunaix/process.h>
 #include <lunaix/types.h>
 
-#define LD_STAT_FKUP 0x1U
+#define NO_LOADER 0
+#define DEFAULT_LOADER "usr/ld"
 
 #define MAX_VAR_PAGES 8
 #define DEFAULT_HEAP_PAGES 16
 
-struct ld_info
+struct exec_context;
+
+struct load_context
 {
-    struct elf32_ehdr ehdr_out;
+    struct exec_container* container;
     ptr_t base;
     ptr_t end;
     ptr_t mem_sz;
 
-    ptr_t stack_top;
     ptr_t entry;
 };
 
-struct ld_param
+struct exec_container
 {
     struct proc_info* proc;
     ptr_t vms_mnt;
 
-    struct ld_info info;
+    struct load_context executable;
+
+    ptr_t stack_top;
+    ptr_t entry; // mapped to one of {executable|loader}.entry
+
     int status;
 };
 
-struct usr_exec_param
+struct uexec_param
 {
     int argc;
     char** argv;
     int envc;
     char** envp;
-    struct ld_info info;
 } PACKED;
 
 #ifndef __USR_WRAPPER__
-int
-elf_load(struct ld_param* ldparam, struct v_file* elfile);
 
 int
-exec_load_byname(struct ld_param* param,
+exec_load_byname(struct exec_container* container,
                  const char* filename,
                  const char** argv,
                  const char** envp);
 
 int
-exec_load(struct ld_param* param,
+exec_load(struct exec_container* container,
           struct v_file* executable,
           const char** argv,
           const char** envp);
 
-void
-ld_create_param(struct ld_param* param, struct proc_info* proc, ptr_t vms);
+int
+exec_kexecve(const char* filename, const char* argv[], const char* envp);
+
 #endif
 
 #endif /* __LUNAIX_LOADER_H */
