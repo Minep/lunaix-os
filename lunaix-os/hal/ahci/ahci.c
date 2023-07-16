@@ -73,7 +73,7 @@ __hba_reset_port(hba_reg_t* port_reg)
     }
     // 如果port未响应，则继续执行重置
     port_reg[HBA_RPxSCTL] = (port_reg[HBA_RPxSCTL] & ~0xf) | 1;
-    io_delay(100000); //等待至少一毫秒，差不多就行了
+    io_delay(100000); // 等待至少一毫秒，差不多就行了
     port_reg[HBA_RPxSCTL] &= ~0xf;
 }
 
@@ -128,7 +128,9 @@ ahci_driver_init(struct pci_device* ahci_dev)
     hba->ports_bmp = pmap;
 
     /* ------ HBA端口配置 ------ */
-    uintptr_t clb_pg_addr, fis_pg_addr, clb_pa, fis_pa;
+    ptr_t clb_pg_addr = 0, fis_pg_addr = 0;
+    ptr_t clb_pa = 0, fis_pa = 0;
+
     for (size_t i = 0, fisp = 0, clbp = 0; i < 32;
          i++, pmap >>= 1, fisp = (fisp + 1) % 16, clbp = (clbp + 1) % 4) {
         if (!(pmap & 0x1)) {
@@ -147,25 +149,27 @@ ahci_driver_init(struct pci_device* ahci_dev)
         if (!clbp) {
             // 每页最多4个命令队列
             clb_pa = pmm_alloc_page(KERNEL_PID, PP_FGLOCKED);
-            clb_pg_addr = ioremap(clb_pa, 0x1000);
-            memset(clb_pg_addr, 0, 0x1000);
+            clb_pg_addr = (ptr_t)ioremap(clb_pa, 0x1000);
+            memset((void*)clb_pg_addr, 0, 0x1000);
         }
         if (!fisp) {
             // 每页最多16个FIS
             fis_pa = pmm_alloc_page(KERNEL_PID, PP_FGLOCKED);
-            fis_pg_addr = ioremap(fis_pa, 0x1000);
-            memset(fis_pg_addr, 0, 0x1000);
+            fis_pg_addr = (ptr_t)ioremap(fis_pa, 0x1000);
+            memset((void*)fis_pg_addr, 0, 0x1000);
         }
 
         /* 重定向CLB与FIS */
         port_regs[HBA_RPxCLB] = clb_pa + clbp * HBA_CLB_SIZE;
         port_regs[HBA_RPxFB] = fis_pa + fisp * HBA_FIS_SIZE;
 
-        *port = (struct hba_port){ .regs = port_regs,
-                                   .ssts = port_regs[HBA_RPxSSTS],
-                                   .cmdlst = clb_pg_addr + clbp * HBA_CLB_SIZE,
-                                   .fis = fis_pg_addr + fisp * HBA_FIS_SIZE,
-                                   .hba = hba };
+        *port = (struct hba_port){
+            .regs = port_regs,
+            .ssts = port_regs[HBA_RPxSSTS],
+            .cmdlst = (struct hba_cmdh*)(clb_pg_addr + clbp * HBA_CLB_SIZE),
+            .fis = (void*)(fis_pg_addr + fisp * HBA_FIS_SIZE),
+            .hba = hba
+        };
 
         /* 初始化端口，并置于就绪状态 */
         port_regs[HBA_RPxCI] = 0;
@@ -226,9 +230,9 @@ __get_free_slot(struct hba_port* port)
 
 void
 sata_create_fis(struct sata_reg_fis* cmd_fis,
-                uint8_t command,
-                uint64_t lba,
-                uint16_t sector_count)
+                u8_t command,
+                lba_t lba,
+                u16_t sector_count)
 {
     cmd_fis->head.type = SATA_REG_FIS_H2D;
     cmd_fis->head.options = SATA_REG_FIS_COMMAND;
@@ -249,10 +253,13 @@ sata_create_fis(struct sata_reg_fis* cmd_fis,
 int
 hba_bind_sbuf(struct hba_cmdh* cmdh, struct hba_cmdt* cmdt, struct membuf mbuf)
 {
-    assert_msg(mbuf.size <= 0x400000, "HBA: Buffer too big");
+    assert_msg(mbuf.size <= 0x400000U, "HBA: Buffer too big");
     cmdh->prdt_len = 1;
-    cmdt->entries[0] = (struct hba_prdte){ .data_base = vmm_v2p(mbuf.buffer),
-                                           .byte_count = mbuf.size - 1 };
+    cmdt->entries[0] =
+      (struct hba_prdte){ .data_base = vmm_v2p((ptr_t)mbuf.buffer),
+                          .byte_count = mbuf.size - 1 };
+
+    return 0;
 }
 
 int
@@ -263,15 +270,17 @@ hba_bind_vbuf(struct hba_cmdh* cmdh, struct hba_cmdt* cmdt, struct vecbuf* vbuf)
 
     do {
         assert_msg(i < HBA_MAX_PRDTE, "HBA: Too many PRDTEs");
-        assert_msg(pos->buf.size <= 0x400000, "HBA: Buffer too big");
+        assert_msg(pos->buf.size <= 0x400000U, "HBA: Buffer too big");
 
         cmdt->entries[i++] =
-          (struct hba_prdte){ .data_base = vmm_v2p(pos->buf.buffer),
+          (struct hba_prdte){ .data_base = vmm_v2p((ptr_t)pos->buf.buffer),
                               .byte_count = pos->buf.size - 1 };
         pos = list_entry(pos->components.next, struct vecbuf, components);
     } while (pos != vbuf);
 
     cmdh->prdt_len = i + 1;
+
+    return 0;
 }
 
 int
@@ -289,7 +298,7 @@ hba_prepare_cmd(struct hba_port* port,
     memset(cmd_header, 0, sizeof(*cmd_header));
 
     // 将命令表挂到命令头上
-    cmd_header->cmd_table_base = vmm_v2p(cmd_table);
+    cmd_header->cmd_table_base = vmm_v2p((ptr_t)cmd_table);
     cmd_header->options =
       HBA_CMDH_FIS_LEN(sizeof(struct sata_reg_fis)) | HBA_CMDH_CLR_BUSY;
 
@@ -310,7 +319,7 @@ ahci_init_device(struct hba_port* port)
     port->regs[HBA_RPxIE] &= ~HBA_MY_IE;
 
     // 预备DMA接收缓存，用于存放HBA传回的数据
-    uint16_t* data_in = (uint16_t*)valloc_dma(512);
+    u16_t* data_in = (u16_t*)valloc_dma(512);
 
     int slot = hba_prepare_cmd(port, &cmd_table, &cmd_header);
     hba_bind_sbuf(

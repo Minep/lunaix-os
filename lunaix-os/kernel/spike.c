@@ -15,14 +15,14 @@ __assert_fail(const char* expr, const char* file, unsigned int line)
     //  kernel/asm/x86/interrupts.c)
     asm("int %0" ::"i"(LUNAIX_SYS_PANIC), "D"(buffer));
 
-    spin(); // never reach
+    DO_SPIN // never reach
 }
 
 void
 panick(const char* msg)
 {
     asm("int %0" ::"i"(LUNAIX_SYS_PANIC), "D"(msg));
-    spin();
+    DO_SPIN
 }
 
 void
@@ -34,5 +34,5 @@ panickf(const char* fmt, ...)
     va_end(args);
 
     asm("int %0" ::"i"(LUNAIX_SYS_PANIC), "D"(buffer));
-    spin();
+    DO_SPIN
 }

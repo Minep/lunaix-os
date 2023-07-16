@@ -34,6 +34,19 @@ tty_init(void* vga_buf)
 }
 
 void
+tty_set_cursor(u8_t x, u8_t y)
+{
+    if (x >= TTY_WIDTH || y >= TTY_HEIGHT) {
+        x = y = 0;
+    }
+    u32_t pos = y * TTY_WIDTH + x;
+    io_outb(0x3D4, 14);
+    io_outb(0x3D5, pos / 256);
+    io_outb(0x3D4, 15);
+    io_outb(0x3D5, pos % 256);
+}
+
+void
 tty_set_theme(vga_attribute fg, vga_attribute bg)
 {
     tty_theme_color = (bg << 4 | fg) << 8;
@@ -51,7 +64,7 @@ tty_flush_buffer(struct fifo_buf* buf)
     int state = 0;
     int g[2] = { 0, 0 };
     vga_attribute current_theme = tty_theme_color;
-    while (fifo_readone_async(buf, &chr)) {
+    while (fifo_readone_async(buf, (u8_t*)&chr)) {
         if (state == 0 && chr == '\033') {
             state = 1;
         } else if (state == 1 && chr == '[') {
@@ -105,19 +118,6 @@ tty_flush_buffer(struct fifo_buf* buf)
         }
     }
     tty_set_cursor(x, y);
-}
-
-void
-tty_set_cursor(uint8_t x, uint8_t y)
-{
-    if (x >= TTY_WIDTH || y >= TTY_HEIGHT) {
-        x = y = 0;
-    }
-    u32_t pos = y * TTY_WIDTH + x;
-    io_outb(0x3D4, 14);
-    io_outb(0x3D5, pos / 256);
-    io_outb(0x3D4, 15);
-    io_outb(0x3D5, pos % 256);
 }
 
 void

@@ -39,7 +39,7 @@ apic_init()
     // As we are going to use APIC, disable the old 8259 PIC
     pic_disable();
 
-    _apic_base = ioremap(__APIC_BASE_PADDR, 4096);
+    _apic_base = (ptr_t)ioremap(__APIC_BASE_PADDR, 4096);
 
     // Hardware enable the APIC
     // By setting bit 11 of IA32_APIC_BASE register

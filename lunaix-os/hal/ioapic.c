@@ -7,7 +7,7 @@
 #define IOAPIC_REG_SEL *((volatile u32_t*)(_ioapic_base + IOAPIC_IOREGSEL))
 #define IOAPIC_REG_WIN *((volatile u32_t*)(_ioapic_base + IOAPIC_IOWIN))
 
-static volatile uintptr_t _ioapic_base;
+static volatile ptr_t _ioapic_base;
 
 void
 ioapic_init()
@@ -16,27 +16,28 @@ ioapic_init()
 
     acpi_context* acpi_ctx = acpi_get_context();
 
-    _ioapic_base = ioremap(acpi_ctx->madt.ioapic->ioapic_addr & ~0xfff, 4096);
+    _ioapic_base =
+      (ptr_t)ioremap(acpi_ctx->madt.ioapic->ioapic_addr & ~0xfff, 4096);
 }
 
 void
-ioapic_write(uint8_t sel, u32_t val)
+ioapic_write(u8_t sel, u32_t val)
 {
     IOAPIC_REG_SEL = sel;
     IOAPIC_REG_WIN = val;
 }
 
 u32_t
-ioapic_read(uint8_t sel)
+ioapic_read(u8_t sel)
 {
     IOAPIC_REG_SEL = sel;
     return IOAPIC_REG_WIN;
 }
 
 void
-ioapic_redirect(uint8_t irq, uint8_t vector, uint8_t dest, u32_t flags)
+ioapic_redirect(u8_t irq, u8_t vector, u8_t dest, u32_t flags)
 {
-    uint8_t reg_sel = IOAPIC_IOREDTBL_BASE + irq * 2;
+    u8_t reg_sel = IOAPIC_IOREDTBL_BASE + irq * 2;
 
     // Write low 32 bits
     ioapic_write(reg_sel, (vector | flags) & 0x1FFFF);

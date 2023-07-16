@@ -3,10 +3,10 @@
 
 #include <lunaix/types.h>
 
-static inline uint8_t
+static inline u8_t
 io_inb(int port)
 {
-    uint8_t data;
+    u8_t data;
     asm volatile("inb %w1,%0" : "=a"(data) : "d"(port));
     return data;
 }
@@ -22,10 +22,10 @@ io_insb(int port, void* addr, int cnt)
                  : "memory", "cc");
 }
 
-static inline uint16_t
+static inline u16_t
 io_inw(int port)
 {
-    uint16_t data;
+    u16_t data;
     asm volatile("inw %w1,%0" : "=a"(data) : "d"(port));
     return data;
 }
@@ -61,7 +61,7 @@ io_insl(int port, void* addr, int cnt)
 }
 
 static inline void
-io_outb(int port, uint8_t data)
+io_outb(int port, u8_t data)
 {
     asm volatile("outb %0, %w1" : : "a"(data), "d"(port));
 }
@@ -78,7 +78,7 @@ io_outsb(int port, const void* addr, int cnt)
 }
 
 static inline void
-io_outw(int port, uint16_t data)
+io_outw(int port, u16_t data)
 {
     asm volatile("outw %0,%w1" : : "a"(data), "d"(port));
 }

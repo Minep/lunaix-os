@@ -19,35 +19,35 @@
 
 struct scsi_cdb12
 {
-    uint8_t opcode;
-    uint8_t misc1;
+    u8_t opcode;
+    u8_t misc1;
     u32_t lba_be;
     u32_t length;
-    uint8_t misc2;
-    uint8_t ctrl;
+    u8_t misc2;
+    u8_t ctrl;
 } __attribute__((packed));
 
 struct scsi_cdb16
 {
-    uint8_t opcode;
-    uint8_t misc1;
+    u8_t opcode;
+    u8_t misc1;
     u32_t lba_be_hi;
     u32_t lba_be_lo;
     u32_t length;
-    uint8_t misc2;
-    uint8_t ctrl;
+    u8_t misc2;
+    u8_t ctrl;
 } __attribute__((packed));
 
 void
 scsi_create_packet12(struct scsi_cdb12* cdb,
-                     uint8_t opcode,
+                     u8_t opcode,
                      u32_t lba,
                      u32_t alloc_size);
 
 void
 scsi_create_packet16(struct scsi_cdb16* cdb,
-                     uint8_t opcode,
-                     uint64_t lba,
+                     u8_t opcode,
+                     lba_t lba,
                      u32_t alloc_size);
 
 void

@@ -30,11 +30,13 @@ create_heap(struct proc_mm* pvms, ptr_t addr)
 
     heap->region_copied = __heap_copied;
     mm_index((void**)&pvms->heap, heap);
+
+    return status;
 }
 
 __DEFINE_LXSYSCALL1(void*, sbrk, ssize_t, incr)
 {
-    struct proc_mm* pvms = &__current->mm;
+    struct proc_mm* pvms = (struct proc_mm*)&__current->mm;
     struct mm_region* heap = pvms->heap;
 
     assert(heap);
@@ -47,11 +49,11 @@ __DEFINE_LXSYSCALL1(void*, sbrk, ssize_t, incr)
 
 __DEFINE_LXSYSCALL1(int, brk, void*, addr)
 {
-    struct proc_mm* pvms = &__current->mm;
+    struct proc_mm* pvms = (struct proc_mm*)&__current->mm;
     struct mm_region* heap = pvms->heap;
 
     if (!heap) {
-        return DO_STATUS(create_heap(pvms, addr));
+        return DO_STATUS(create_heap(pvms, (ptr_t)addr));
     }
 
     assert(heap);

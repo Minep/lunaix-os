@@ -292,7 +292,7 @@ pci_setup_msi(struct pci_device* device, int vector)
 }
 
 struct pci_device*
-pci_get_device_by_id(uint16_t vendorId, uint16_t deviceId)
+pci_get_device_by_id(u16_t vendorId, u16_t deviceId)
 {
     u32_t dev_info = vendorId | (deviceId << 16);
     struct pci_device *pos, *n;

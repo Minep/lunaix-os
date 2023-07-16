@@ -1,3 +1,4 @@
+#include <klibc/string.h>
 #include <lunaix/fs/iso9660.h>
 
 int

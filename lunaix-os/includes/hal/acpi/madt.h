@@ -13,8 +13,8 @@
  */
 typedef struct
 {
-    uint8_t type;
-    uint8_t length;
+    u8_t type;
+    u8_t length;
 } ACPI_TABLE_PACKED acpi_ics_hdr_t;
 
 /**
@@ -26,8 +26,8 @@ typedef struct
 typedef struct
 {
     acpi_ics_hdr_t header;
-    uint8_t processor_id;
-    uint8_t apic_id;
+    u8_t processor_id;
+    u8_t apic_id;
     u32_t flags;
 } ACPI_TABLE_PACKED acpi_apic_t;
 
@@ -41,8 +41,8 @@ typedef struct
 typedef struct
 {
     acpi_ics_hdr_t header;
-    uint8_t ioapic_id;
-    uint8_t reserved;
+    u8_t ioapic_id;
+    u8_t reserved;
     u32_t ioapic_addr;
     // The global system interrupt offset for this IOAPIC. (Kind of IRQ offset
     // for a slave IOAPIC)
@@ -61,13 +61,13 @@ typedef struct
 typedef struct
 {
     acpi_ics_hdr_t header;
-    uint8_t bus;
+    u8_t bus;
     // source, which is the original IRQ back in the era of IBM PC/AT, the 8259
     // PIC
-    uint8_t source;
+    u8_t source;
     // global system interrupt. The override of source in APIC mode
     u32_t gsi;
-    uint16_t flags;
+    u16_t flags;
 } ACPI_TABLE_PACKED acpi_intso_t;
 
 typedef struct

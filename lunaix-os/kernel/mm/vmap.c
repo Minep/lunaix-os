@@ -5,16 +5,16 @@
 #define VMAP_START PG_MOUNT_BASE + MEM_4MB
 #define VMAP_END VMS_SELF
 
-static uintptr_t start = VMAP_START;
+static ptr_t start = VMAP_START;
 
 void*
-vmm_vmap(uintptr_t paddr, size_t size, pt_attr attr)
+vmm_vmap(ptr_t paddr, size_t size, pt_attr attr)
 {
     // next fit
     assert_msg((paddr & 0xfff) == 0, "vmap: bad alignment");
     size = ROUNDUP(size, PG_SIZE);
 
-    uintptr_t current_addr = start;
+    ptr_t current_addr = start;
     size_t examed_size = 0, wrapped = 0;
     x86_page_table* pd = (x86_page_table*)L1_BASE_VADDR;
 
@@ -54,7 +54,7 @@ vmm_vmap(uintptr_t paddr, size_t size, pt_attr attr)
     return NULL;
 
 done:
-    uintptr_t alloc_begin = current_addr - examed_size;
+    ptr_t alloc_begin = current_addr - examed_size;
     for (size_t i = 0; i < size; i += PG_SIZE) {
         vmm_set_mapping(VMS_SELF, alloc_begin + i, paddr + i, PG_PREM_RW, 0);
         pmm_ref_page(KERNEL_PID, paddr + i);

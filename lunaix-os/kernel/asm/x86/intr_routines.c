@@ -22,7 +22,8 @@ extern u32_t debug_resv;
 void
 __print_panic_msg(const char* msg, const isr_param* param)
 {
-    struct exec_param* execp = param->execp;
+    volatile struct exec_param* execp = param->execp;
+
     kprint_panic("  INT %u: (%x) [%p: %p] %s",
                  execp->vector,
                  execp->err_code,

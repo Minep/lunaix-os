@@ -26,14 +26,14 @@ typedef struct
 {
     u32_t signature_l;
     u32_t signature_h;
-    uint8_t chksum;
+    u8_t chksum;
     char oem_id[6];
     // Revision
-    uint8_t rev;
+    u8_t rev;
     acpi_rsdt_t* rsdt;
     u32_t length;
     acpi_sdthdr_t* xsdt;
-    uint8_t x_chksum;
+    u8_t x_chksum;
     char reserved[3]; // Reserved field
 } __attribute__((packed)) acpi_rsdp_t;
 
@@ -56,7 +56,7 @@ acpi_init(multiboot_info_t* mb_info);
 acpi_context*
 acpi_get_context();
 
-uint8_t
-acpi_gistranslate(uint8_t old_irq);
+u8_t
+acpi_gistranslate(u8_t old_irq);
 
 #endif /* __LUNAIX_ACPI_ACPI_H */

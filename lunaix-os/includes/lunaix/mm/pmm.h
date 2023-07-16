@@ -36,7 +36,7 @@ struct pp_struct
  * @param ppn page number
  */
 void
-pmm_mark_page_free(uintptr_t ppn);
+pmm_mark_page_free(ptr_t ppn);
 
 /**
  * @brief 标注物理页为已占用
@@ -44,7 +44,7 @@ pmm_mark_page_free(uintptr_t ppn);
  * @param ppn
  */
 void
-pmm_mark_page_occupied(pid_t owner, uintptr_t ppn, pp_attr_t attr);
+pmm_mark_page_occupied(pid_t owner, ptr_t ppn, pp_attr_t attr);
 
 /**
  * @brief 标注多个连续的物理页为可用
@@ -53,7 +53,7 @@ pmm_mark_page_occupied(pid_t owner, uintptr_t ppn, pp_attr_t attr);
  * @param page_count 数量
  */
 void
-pmm_mark_chunk_free(uintptr_t start_ppn, size_t page_count);
+pmm_mark_chunk_free(ptr_t start_ppn, size_t page_count);
 
 /**
  * @brief 标注多个连续的物理页为已占用
@@ -72,7 +72,7 @@ pmm_mark_chunk_occupied(pid_t owner,
  *
  * @return void* 可用的页地址，否则为 NULL
  */
-void*
+ptr_t
 pmm_alloc_page(pid_t owner, pp_attr_t attr);
 
 /**
@@ -81,9 +81,9 @@ pmm_alloc_page(pid_t owner, pp_attr_t attr);
  * @param owner
  * @param num_pages 区域大小，单位为页
  * @param attr
- * @return void*
+ * @return ptr_t
  */
-void*
+ptr_t
 pmm_alloc_cpage(pid_t owner, size_t num_pages, pp_attr_t attr);
 
 /**
@@ -92,10 +92,10 @@ pmm_alloc_cpage(pid_t owner, size_t num_pages, pp_attr_t attr);
  * @param mem_upper_lim 最大可用内存地址
  */
 void
-pmm_init(uintptr_t mem_upper_lim);
+pmm_init(ptr_t mem_upper_lim);
 
 struct pp_struct*
-pmm_query(void* pa);
+pmm_query(ptr_t pa);
 
 /**
  * @brief 释放一个已分配的物理页，假若页地址不存在，则无操作。
@@ -104,9 +104,9 @@ pmm_query(void* pa);
  * @return 是否成功
  */
 int
-pmm_free_page(pid_t owner, void* page);
+pmm_free_page(pid_t owner, ptr_t page);
 
 int
-pmm_ref_page(pid_t owner, void* page);
+pmm_ref_page(pid_t owner, ptr_t page);
 
 #endif /* __LUNAIX_PMM_H */

@@ -2,7 +2,7 @@
 #define __LUNAIX_TYPES_H
 
 #include <stdarg.h>
-#include <stdint.h>
+#include <stddef.h>
 #include <sys/types.h>
 
 #define PACKED __attribute__((packed))
@@ -17,6 +17,11 @@ typedef unsigned int u32_t;
 typedef unsigned long long u64_t;
 typedef unsigned long ptr_t;
 
-typedef int64_t lba_t;
+typedef signed long ssize_t;
+typedef int pid_t;
+typedef unsigned long size_t;
+typedef unsigned long off_t;
+
+typedef u64_t lba_t;
 
 #endif /* __LUNAIX_TYPES_H */

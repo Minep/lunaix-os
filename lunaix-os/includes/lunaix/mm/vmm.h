@@ -49,11 +49,7 @@ vmm_init_pd();
  * @return int
  */
 int
-vmm_set_mapping(uintptr_t mnt,
-                uintptr_t va,
-                uintptr_t pa,
-                pt_attr attr,
-                int options);
+vmm_set_mapping(ptr_t mnt, ptr_t va, ptr_t pa, pt_attr attr, int options);
 
 /**
  * @brief 删除一个映射
@@ -63,8 +59,8 @@ vmm_set_mapping(uintptr_t mnt,
  * @param va
  * @return int
  */
-uintptr_t
-vmm_del_mapping(uintptr_t mnt, uintptr_t va);
+ptr_t
+vmm_del_mapping(ptr_t mnt, ptr_t va);
 
 /**
  * @brief 在当前虚拟地址空间里查找一个映射
@@ -73,7 +69,7 @@ vmm_del_mapping(uintptr_t mnt, uintptr_t va);
  * @param mapping 映射相关属性
  */
 int
-vmm_lookup(uintptr_t va, v_mapping* mapping);
+vmm_lookup(ptr_t va, v_mapping* mapping);
 
 /**
  * @brief 在指定的虚拟地址空间里查找一个映射
@@ -84,7 +80,7 @@ vmm_lookup(uintptr_t va, v_mapping* mapping);
  * @return int
  */
 int
-vmm_lookupat(ptr_t mnt, uintptr_t va, v_mapping* mapping);
+vmm_lookupat(ptr_t mnt, ptr_t va, v_mapping* mapping);
 
 /**
  * @brief (COW) 为虚拟页创建副本。
@@ -92,33 +88,33 @@ vmm_lookupat(ptr_t mnt, uintptr_t va, v_mapping* mapping);
  * @return void* 包含虚拟页副本的物理页地址。
  *
  */
-void*
-vmm_dup_page(pid_t pid, void* pa);
+ptr_t
+vmm_dup_page(pid_t pid, ptr_t pa);
 
-void*
+ptr_t
 vmm_dup_vmspace(pid_t pid);
 
 /**
  * @brief 挂载另一个虚拟地址空间至当前虚拟地址空间
  *
  * @param pde 页目录的物理地址
- * @return void*
+ * @return ptr_t
  */
-void*
-vmm_mount_pd(uintptr_t mnt, void* pde);
+ptr_t
+vmm_mount_pd(ptr_t mnt, ptr_t pde);
 
 /**
  * @brief 卸载已挂载的虚拟地址空间
  *
  */
-void*
-vmm_unmount_pd(uintptr_t mnt);
+ptr_t
+vmm_unmount_pd(ptr_t mnt);
 
 void*
-vmm_ioremap(uintptr_t paddr, size_t size);
+vmm_ioremap(ptr_t paddr, size_t size);
 
 void*
-vmm_next_free(uintptr_t start, int options);
+vmm_next_free(ptr_t start, int options);
 
 /**
  * @brief 将连续的物理地址空间映射到内核虚拟地址空间
@@ -128,7 +124,7 @@ vmm_next_free(uintptr_t start, int options);
  * @return void*
  */
 void*
-vmm_vmap(uintptr_t paddr, size_t size, pt_attr attr);
+vmm_vmap(ptr_t paddr, size_t size, pt_attr attr);
 
 /**
  * @brief 将当前地址空间的虚拟地址转译为物理地址。
@@ -136,8 +132,8 @@ vmm_vmap(uintptr_t paddr, size_t size, pt_attr attr);
  * @param va 虚拟地址
  * @return void*
  */
-void*
-vmm_v2p(void* va);
+ptr_t
+vmm_v2p(ptr_t va);
 
 /**
  * @brief 将指定地址空间的虚拟地址转译为物理地址
@@ -146,7 +142,7 @@ vmm_v2p(void* va);
  * @param va 虚拟地址
  * @return void*
  */
-void*
-vmm_v2pat(ptr_t mnt, void* va);
+ptr_t
+vmm_v2pat(ptr_t mnt, ptr_t va);
 
 #endif /* __LUNAIX_VMM_H */

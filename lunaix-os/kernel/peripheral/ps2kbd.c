@@ -86,8 +86,8 @@ static struct input_device* kbd_idev;
 void
 intr_ps2_kbd_handler(const isr_param* param);
 
-static uint8_t
-ps2_issue_cmd_wretry(char cmd, uint16_t arg);
+static u8_t
+ps2_issue_cmd_wretry(char cmd, u16_t arg);
 
 void
 ps2_device_post_cmd(char cmd, char arg)
@@ -207,7 +207,6 @@ ps2_kbd_init()
      */
     isrm_bindirq(PC_AT_IRQ_KBD, intr_ps2_kbd_handler);
 
-done:
     cpu_enable_interrupt();
 }
 
@@ -231,7 +230,7 @@ ps2_process_cmd(void* arg)
 
     // 处理队列排头的指令
     struct ps2_cmd* pending_cmd = &cmd_q.cmd_queue[cmd_q.queue_ptr];
-    char result;
+    u8_t result;
     int attempts = 0;
 
     // 尝试将命令发送至PS/2键盘（通过PS/2控制器）
@@ -251,7 +250,7 @@ ps2_process_cmd(void* arg)
 }
 
 void
-kbd_buffer_key_event(kbd_keycode_t key, uint8_t scancode, kbd_kstate_t state)
+kbd_buffer_key_event(kbd_keycode_t key, u8_t scancode, kbd_kstate_t state)
 {
     /*
         forgive me on these ugly bit-level tricks,
@@ -306,7 +305,7 @@ intr_ps2_kbd_handler(const isr_param* param)
     // check. But DO NOT. This chunk is in right place and right order. Moving
     // it at your own risk This is to ensure we've cleared the output buffer
     // everytime, so it won't pile up across irqs.
-    uint8_t scancode = io_inb(PS2_PORT_ENC_DATA);
+    u8_t scancode = io_inb(PS2_PORT_ENC_DATA);
     kbd_keycode_t key;
 
     /*
@@ -403,8 +402,8 @@ intr_ps2_kbd_handler(const isr_param* param)
     }
 }
 
-static uint8_t
-ps2_issue_cmd(char cmd, uint16_t arg)
+static u8_t
+ps2_issue_cmd(char cmd, u16_t arg)
 {
     ps2_post_cmd(PS2_PORT_CTRL_CMDREG, cmd, arg);
 
@@ -416,10 +415,10 @@ ps2_issue_cmd(char cmd, uint16_t arg)
     return io_inb(PS2_PORT_ENC_CMDREG);
 }
 
-static uint8_t
-ps2_issue_cmd_wretry(char cmd, uint16_t arg)
+static u8_t
+ps2_issue_cmd_wretry(char cmd, u16_t arg)
 {
-    uint8_t r, c = 0;
+    u8_t r, c = 0;
     while ((r = ps2_issue_cmd(cmd, arg)) == PS2_RESULT_NAK && c < 5) {
         c++;
     }
@@ -430,7 +429,7 @@ ps2_issue_cmd_wretry(char cmd, uint16_t arg)
 }
 
 static void
-ps2_post_cmd(uint8_t port, char cmd, uint16_t arg)
+ps2_post_cmd(u8_t port, char cmd, u16_t arg)
 {
     // 等待PS/2输入缓冲区清空，这样我们才可以写入命令
     while (io_inb(PS2_PORT_CTRL_STATUS) & PS2_STATUS_IFULL)
@@ -443,13 +442,13 @@ ps2_post_cmd(uint8_t port, char cmd, uint16_t arg)
         // 所有参数一律通过0x60传入。
         while (io_inb(PS2_PORT_CTRL_STATUS) & PS2_STATUS_IFULL)
             ;
-        io_outb(PS2_PORT_ENC_CMDREG, (uint8_t)(arg & 0x00ff));
+        io_outb(PS2_PORT_ENC_CMDREG, (u8_t)(arg & 0x00ff));
         io_delay(PS2_DELAY);
     }
 }
 
-static uint8_t
-ps2_issue_dev_cmd(char cmd, uint16_t arg)
+static u8_t
+ps2_issue_dev_cmd(char cmd, u16_t arg)
 {
     ps2_post_cmd(PS2_PORT_ENC_CMDREG, cmd, arg);
 

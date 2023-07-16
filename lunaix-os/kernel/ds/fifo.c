@@ -44,7 +44,7 @@ fifo_backone(struct fifo_buf* fbuf)
 }
 
 size_t
-fifo_putone(struct fifo_buf* fbuf, uint8_t data)
+fifo_putone(struct fifo_buf* fbuf, u8_t data)
 {
     mutex_lock(&fbuf->lock);
 
@@ -53,7 +53,7 @@ fifo_putone(struct fifo_buf* fbuf, uint8_t data)
         return 0;
     }
 
-    uint8_t* dest = fbuf->data;
+    u8_t* dest = fbuf->data;
     dest[fbuf->wr_pos] = data;
     fbuf->wr_pos = (fbuf->wr_pos + 1) % fbuf->size;
     fbuf->free_len--;
@@ -64,13 +64,13 @@ fifo_putone(struct fifo_buf* fbuf, uint8_t data)
 }
 
 size_t
-fifo_readone_async(struct fifo_buf* fbuf, uint8_t* data)
+fifo_readone_async(struct fifo_buf* fbuf, u8_t* data)
 {
     if (fbuf->free_len == fbuf->size) {
         return 0;
     }
 
-    uint8_t* dest = fbuf->data;
+    u8_t* dest = fbuf->data;
     *data = dest[fbuf->rd_pos];
     fbuf->rd_pos = (fbuf->rd_pos + 1) % fbuf->size;
     fbuf->free_len++;

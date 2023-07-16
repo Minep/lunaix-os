@@ -32,6 +32,9 @@ int
 __tty_read(struct device* dev, void* buf, size_t offset, size_t len);
 
 void
+console_write(struct console* console, u8_t* data, size_t size);
+
+void
 console_flush();
 
 static waitq_t lx_reader;
@@ -162,6 +165,8 @@ __tty_write(struct device* dev, void* buf, size_t offset, size_t len)
 {
     struct console* console = (struct console*)dev->underlay;
     console_write(console, buf, len);
+
+    return len;
 }
 
 int
@@ -204,6 +209,7 @@ __tty_read(struct device* dev, void* buf, size_t offset, size_t len)
             break;
         }
     }
+
     return count + fifo_read(&console->input, buf + count, len - count);
 }
 
@@ -285,15 +291,15 @@ console_flush()
 }
 
 void
-console_write(struct console* console, uint8_t* data, size_t size)
+console_write(struct console* console, u8_t* data, size_t size)
 {
     struct fifo_buf* fbuf = &console->output;
     mutex_lock(&console->output.lock);
     fifo_set_rdptr(fbuf, console->wnd_start);
 
-    uint8_t* buffer = fbuf->data;
-    uintptr_t ptr = fbuf->wr_pos;
-    uintptr_t rd_ptr = fbuf->rd_pos;
+    u8_t* buffer = fbuf->data;
+    ptr_t ptr = fbuf->wr_pos;
+    ptr_t rd_ptr = fbuf->rd_pos;
 
     char c;
     for (size_t i = 0; i < size; i++) {
@@ -331,13 +337,13 @@ console_write(struct console* console, uint8_t* data, size_t size)
 void
 console_write_str(char* str)
 {
-    console_write(&lx_console, str, strlen(str));
+    console_write(&lx_console, (u8_t*)str, strlen(str));
 }
 
 void
 console_write_char(char str)
 {
-    console_write(&lx_console, &str, 1);
+    console_write(&lx_console, (u8_t*)&str, 1);
 }
 
 void

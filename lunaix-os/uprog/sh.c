@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/lunaix.h>
 #include <unistd.h>
 
 char pwd[512];
@@ -143,7 +144,7 @@ sh_loop()
     while (1) {
         getcwd(pwd, 512);
         printf("[\033[2m%s\033[39;49m]$ ", pwd);
-        size_t sz = read(stdin, buf, 511);
+        int sz = read(stdin, buf, 511);
 
         if (sz < 0) {
             printf("fail to read user input (%d)\n", geterrno());

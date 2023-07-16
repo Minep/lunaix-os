@@ -28,7 +28,7 @@ __print_panic_msg(const char* msg, const isr_param* param);
 void
 intr_routine_page_fault(const isr_param* param)
 {
-    uintptr_t ptr = cpu_rcr2();
+    ptr_t ptr = cpu_rcr2();
     if (!ptr) {
         goto segv_term;
     }
@@ -39,14 +39,11 @@ intr_routine_page_fault(const isr_param* param)
     }
 
     if (!SEL_RPL(param->execp->cs)) {
-        // 如果是内核页错误……
-        if (do_kernel(&mapping)) {
-            return;
-        }
-        // 如果不是，那么看看内核是不是需要用户页。
+        // TODO if kernel pfault
     }
 
-    struct mm_region* hit_region = region_get(&__current->mm.regions, ptr);
+    vm_regions_t* vmr = (vm_regions_t*)&__current->mm.regions;
+    struct mm_region* hit_region = region_get(vmr, ptr);
 
     if (!hit_region) {
         // 当你凝视深渊时……
@@ -57,11 +54,13 @@ intr_routine_page_fault(const isr_param* param)
     if (PG_IS_PRESENT(*pte)) {
         if ((hit_region->attr & COW_MASK) == COW_MASK) {
             // normal page fault, do COW
-            cpu_invplg(pte);
-            uintptr_t pa =
-              (uintptr_t)vmm_dup_page(__current->pid, PG_ENTRY_ADDR(*pte));
+            cpu_invplg((ptr_t)pte);
+
+            ptr_t pa = (ptr_t)vmm_dup_page(__current->pid, PG_ENTRY_ADDR(*pte));
+
             pmm_free_page(__current->pid, *pte & ~0xFFF);
             *pte = (*pte & 0xFFF & ~PG_DIRTY) | pa | PG_WRITE;
+
             goto resolved;
         }
         // impossible cases or accessing privileged page
@@ -72,14 +71,15 @@ intr_routine_page_fault(const isr_param* param)
     //   -> a new page need to be alloc
     if ((hit_region->attr & REGION_ANON)) {
         if (!PG_IS_PRESENT(*pte)) {
-            cpu_invplg(pte);
-            uintptr_t pa = pmm_alloc_page(__current->pid, 0);
+            cpu_invplg((ptr_t)pte);
+
+            ptr_t pa = pmm_alloc_page(__current->pid, 0);
             if (!pa) {
                 goto oom;
             }
 
             *pte = *pte | pa | PG_PRESENT;
-            memset(PG_ALIGN(ptr), 0, PG_SIZE);
+            memset((void*)PG_ALIGN(ptr), 0, PG_SIZE);
             goto resolved;
         }
         // permission denied on anon page (e.g., write on readonly page)
@@ -94,20 +94,21 @@ intr_routine_page_fault(const isr_param* param)
 
         u32_t mseg_off = (ptr - hit_region->start);
         u32_t mfile_off = mseg_off + hit_region->foff;
-        uintptr_t pa = pmm_alloc_page(__current->pid, 0);
+        ptr_t pa = pmm_alloc_page(__current->pid, 0);
 
         if (!pa) {
             goto oom;
         }
 
-        cpu_invplg(pte);
+        cpu_invplg((ptr_t)pte);
         *pte = (*pte & 0xFFF) | pa | PG_PRESENT;
 
-        memset(ptr, 0, PG_SIZE);
+        memset((void*)ptr, 0, PG_SIZE);
 
         int errno = 0;
         if (mseg_off < hit_region->flen) {
-            errno = file->ops->read_page(file->inode, ptr, PG_SIZE, mfile_off);
+            errno =
+              file->ops->read_page(file->inode, (void*)ptr, PG_SIZE, mfile_off);
         }
 
         if (errno < 0) {
@@ -142,16 +143,4 @@ segv_term:
 resolved:
     cpu_invplg(ptr);
     return;
-}
-
-int
-do_kernel(v_mapping* mapping)
-{
-    uintptr_t addr = mapping->va;
-
-    // TODO
-
-    return 0;
-done:
-    return 1;
 }

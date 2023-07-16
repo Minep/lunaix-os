@@ -21,10 +21,10 @@ int
 fifo_backone(struct fifo_buf* fbuf);
 
 size_t
-fifo_putone(struct fifo_buf* fbuf, uint8_t data);
+fifo_putone(struct fifo_buf* fbuf, u8_t data);
 
 size_t
-fifo_readone_async(struct fifo_buf* fbuf, uint8_t* data);
+fifo_readone_async(struct fifo_buf* fbuf, u8_t* data);
 
 void
 fifo_set_rdptr(struct fifo_buf* fbuf, size_t rdptr);

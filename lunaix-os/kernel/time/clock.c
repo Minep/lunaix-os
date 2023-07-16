@@ -4,6 +4,8 @@
 #include <lunaix/spike.h>
 #include <lunaix/timer.h>
 
+#include <klibc/string.h>
+
 static volatile time_t sys_time;
 
 void
@@ -101,7 +103,7 @@ clock_walltime(datetime_t* datetime)
         datetime->second = rtc_read_reg(RTC_REG_SEC);
     } while (!clock_datatime_eq(datetime, &current));
 
-    uint8_t regbv = rtc_read_reg(RTC_REG_B);
+    u8_t regbv = rtc_read_reg(RTC_REG_B);
 
     // Convert from bcd to binary when needed
     if (!RTC_BIN_ENCODED(regbv)) {
@@ -115,7 +117,7 @@ clock_walltime(datetime_t* datetime)
 
     // To 24 hour format
     if (!RTC_24HRS_ENCODED(regbv) && (datetime->hour >> 7)) {
-        datetime->hour = (12 + datetime->hour & 0x80);
+        datetime->hour = 12 + (datetime->hour & 0x80);
     }
 
     datetime->year += RTC_CURRENT_CENTRY * 100;

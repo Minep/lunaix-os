@@ -41,7 +41,7 @@
     'mountibility' for other fs.
 */
 
-volatile static inode_t ino = 0;
+static volatile inode_t ino = 0;
 
 extern const struct v_inode_ops ramfs_inode_ops;
 extern const struct v_file_ops ramfs_file_ops;
@@ -119,8 +119,8 @@ void
 ramfs_inode_init(struct v_superblock* vsb, struct v_inode* inode)
 {
     inode->id = ino++;
-    inode->ops = &ramfs_inode_ops;
-    inode->default_fops = &ramfs_file_ops;
+    inode->ops = (struct v_inode_ops*)&ramfs_inode_ops;
+    inode->default_fops = (struct v_file_ops*)&ramfs_file_ops;
 }
 
 int
@@ -192,8 +192,10 @@ ramfs_unlink(struct v_inode* this)
     if ((rinode->flags & RAMF_SYMLINK)) {
         rinode->flags &= ~RAMF_SYMLINK;
         this->itype &= ~VFS_IFSYMLINK;
+
         vfree(rinode->symlink);
-        return;
+
+        return 0;
     }
 
     // TODO

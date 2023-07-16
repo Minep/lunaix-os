@@ -93,6 +93,8 @@ int
 iso9660_unmount(struct v_superblock* vsb)
 {
     vfree(vsb->data);
+
+    return 0;
 }
 
 void

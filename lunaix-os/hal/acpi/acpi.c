@@ -58,6 +58,8 @@ acpi_init(multiboot_info_t* mb_info)
     }
 
     kprintf(KINFO "ACPI: %s\n", ctx->oem_id);
+
+    return 0;
 }
 
 acpi_context*
@@ -70,8 +72,8 @@ acpi_get_context()
 int
 acpi_rsdp_validate(acpi_rsdp_t* rsdp)
 {
-    uint8_t sum = 0;
-    uint8_t* rsdp_ptr = (uint8_t*)rsdp;
+    u8_t sum = 0;
+    u8_t* rsdp_ptr = (u8_t*)rsdp;
     for (size_t i = 0; i < 20; i++) {
         sum += *(rsdp_ptr + i);
     }
@@ -79,14 +81,14 @@ acpi_rsdp_validate(acpi_rsdp_t* rsdp)
     return sum == 0;
 }
 
-uint8_t
-acpi_gistranslate(uint8_t old_irq)
+u8_t
+acpi_gistranslate(u8_t old_irq)
 {
     if (old_irq >= 24) {
         return old_irq;
     }
     acpi_intso_t* int_override = ctx->madt.irq_exception[old_irq];
-    return int_override ? (uint8_t)int_override->gsi : old_irq;
+    return int_override ? (u8_t)int_override->gsi : old_irq;
 }
 
 #define VIRTUAL_BOX_PROBLEM
@@ -110,7 +112,7 @@ acpi_locate_rsdp(multiboot_info_t* mb_info)
             continue;
         }
 
-        uint8_t* mem_start = entry.addr_low & ~0xf;
+        u8_t* mem_start = entry.addr_low & ~0xf;
         size_t len = entry.len_low;
         for (size_t j = 0; j < len; j += 16) {
             u32_t sig_low = *((u32_t*)(mem_start + j));
@@ -123,13 +125,14 @@ acpi_locate_rsdp(multiboot_info_t* mb_info)
     }
 #else
     // You know what, I just search the entire 1MiB for Celestia's sake.
-    uint8_t* mem_start = 0x4000;
+    ptr_t mem_start = 0x4000;
     for (; mem_start < 0x100000; mem_start += 16) {
-        u32_t sig_low = *((u32_t*)(mem_start));
+        u32_t sig_low = *((u32_t*)mem_start);
         // XXX: do we need to compare this as well?
         // u32_t sig_high = *((u32_t*)(mem_start+j) + 1);
+
         if (sig_low == ACPI_RSDP_SIG_L) {
-            rsdp = (acpi_rsdp_t*)(mem_start);
+            rsdp = (acpi_rsdp_t*)mem_start;
             break;
         }
     }

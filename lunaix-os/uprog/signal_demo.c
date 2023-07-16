@@ -1,4 +1,7 @@
 #include <signal.h>
+#include <stdio.h>
+#include <sys/lunaix.h>
+#include <unistd.h>
 
 void
 sigchild_handler(int signum)

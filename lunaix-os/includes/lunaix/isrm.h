@@ -36,7 +36,7 @@ isrm_ivexalloc(isr_cb handler);
 int
 isrm_bindirq(int irq, isr_cb irq_handler);
 
-int
+void
 isrm_bindiv(int iv, isr_cb handler);
 
 isr_cb

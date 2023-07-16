@@ -10,8 +10,8 @@ typedef struct acpi_sdthdr
     u32_t signature;
     u32_t length;
     // Revision
-    uint8_t rev;
-    uint8_t chksum;
+    u8_t rev;
+    u8_t chksum;
     char oem_id[6];
     char oem_table_id[8];
     u32_t oem_rev;

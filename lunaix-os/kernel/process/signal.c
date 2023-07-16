@@ -9,6 +9,9 @@
 
 extern struct scheduler sched_ctx; /* kernel/sched.c */
 
+extern void
+_exit(int status);
+
 void __USER__
 default_sighandler_term(int signum)
 {
@@ -53,7 +56,7 @@ signal_dispatch()
         return 0;
     }
 
-    uintptr_t ustack = __current->ustack_top & ~0xf;
+    ptr_t ustack = __current->ustack_top & ~0xf;
 
     if ((int)(ustack - USTACK_END) < (int)sizeof(struct proc_sig)) {
         // 用户栈没有空间存放信号上下文
@@ -150,6 +153,9 @@ __DEFINE_LXSYSCALL1(int, sigreturn, struct proc_sig, *sig_ctx)
     __current->flags &= ~PROC_FINPAUSE;
     __SIGCLEAR(__current->sig_inprogress, sig_ctx->sig_num);
     schedule();
+
+    // never reach!
+    return 0;
 }
 
 __DEFINE_LXSYSCALL3(int,

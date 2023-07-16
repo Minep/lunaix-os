@@ -19,7 +19,7 @@ static const char flag_chars[] = "#0- +";
 #define FLAG_CAPS (1 << 9)
 
 int
-__vprintf_internal(char* buffer, char* fmt, size_t max_len, va_list vargs)
+__vprintf_internal(char* buffer, const char* fmt, size_t max_len, va_list vargs)
 {
     // This sprintf just a random implementation I found it on Internet . lol.
     //      Of course, with some modifications for porting to LunaixOS :)

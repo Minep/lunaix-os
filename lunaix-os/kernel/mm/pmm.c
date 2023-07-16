@@ -5,23 +5,23 @@
 // This is a very large array...
 static struct pp_struct pm_table[PM_BMP_MAX_SIZE];
 
-static uintptr_t max_pg;
+static ptr_t max_pg;
 
 void
-pmm_mark_page_free(uintptr_t ppn)
+pmm_mark_page_free(ptr_t ppn)
 {
     pm_table[ppn].ref_counts = 0;
 }
 
 void
-pmm_mark_page_occupied(pid_t owner, uintptr_t ppn, pp_attr_t attr)
+pmm_mark_page_occupied(pid_t owner, ptr_t ppn, pp_attr_t attr)
 {
     pm_table[ppn] =
       (struct pp_struct){ .owner = owner, .ref_counts = 1, .attr = attr };
 }
 
 void
-pmm_mark_chunk_free(uintptr_t start_ppn, size_t page_count)
+pmm_mark_chunk_free(ptr_t start_ppn, size_t page_count)
 {
     for (size_t i = start_ppn; i < start_ppn + page_count && i < max_pg; i++) {
         pm_table[i].ref_counts = 0;
@@ -46,7 +46,7 @@ pmm_mark_chunk_occupied(pid_t owner,
 volatile size_t pg_lookup_ptr;
 
 void
-pmm_init(uintptr_t mem_upper_lim)
+pmm_init(ptr_t mem_upper_lim)
 {
     max_pg = (PG_ALIGN(mem_upper_lim) >> 12);
 
@@ -59,7 +59,7 @@ pmm_init(uintptr_t mem_upper_lim)
     }
 }
 
-void*
+ptr_t
 pmm_alloc_cpage(pid_t owner, size_t num_pages, pp_attr_t attr)
 {
     size_t p1 = 0;
@@ -70,7 +70,7 @@ pmm_alloc_cpage(pid_t owner, size_t num_pages, pp_attr_t attr)
     }
 
     if (p2 == max_pg && p2 - p1 < num_pages) {
-        return NULL;
+        return NULLPTR;
     }
 
     pmm_mark_chunk_occupied(owner, p1, num_pages, attr);
@@ -78,11 +78,11 @@ pmm_alloc_cpage(pid_t owner, size_t num_pages, pp_attr_t attr)
     return p1 << 12;
 }
 
-void*
+ptr_t
 pmm_alloc_page(pid_t owner, pp_attr_t attr)
 {
     // Next fit approach. Maximize the throughput!
-    uintptr_t good_page_found = (uintptr_t)NULL;
+    ptr_t good_page_found = (ptr_t)NULL;
     size_t old_pg_ptr = pg_lookup_ptr;
     size_t upper_lim = max_pg;
     struct pp_struct* pm;
@@ -111,16 +111,16 @@ pmm_alloc_page(pid_t owner, pp_attr_t attr)
     if (!good_page_found) {
         __current->k_status = LXOUTOFMEM;
     }
-    return (void*)good_page_found;
+    return good_page_found;
 }
 
 int
-pmm_free_page(pid_t owner, void* page)
+pmm_free_page(pid_t owner, ptr_t page)
 {
-    struct pp_struct* pm = &pm_table[(intptr_t)page >> 12];
+    struct pp_struct* pm = &pm_table[page >> 12];
 
     // Is this a MMIO mapping or double free?
-    if (((intptr_t)page >> 12) >= max_pg || !(pm->ref_counts)) {
+    if ((page >> 12) >= max_pg || !(pm->ref_counts)) {
         return 0;
     }
 
@@ -136,11 +136,11 @@ pmm_free_page(pid_t owner, void* page)
 }
 
 int
-pmm_ref_page(pid_t owner, void* page)
+pmm_ref_page(pid_t owner, ptr_t page)
 {
-    (void*)owner; // TODO: do smth with owner
+    (void)owner; // TODO: do smth with owner
 
-    u32_t ppn = (uintptr_t)page >> 12;
+    u32_t ppn = page >> 12;
 
     if (ppn >= PM_BMP_MAX_SIZE) {
         return 0;
@@ -156,9 +156,9 @@ pmm_ref_page(pid_t owner, void* page)
 }
 
 struct pp_struct*
-pmm_query(void* pa)
+pmm_query(ptr_t pa)
 {
-    u32_t ppn = (uintptr_t)pa >> 12;
+    u32_t ppn = pa >> 12;
 
     if (ppn >= PM_BMP_MAX_SIZE) {
         return NULL;

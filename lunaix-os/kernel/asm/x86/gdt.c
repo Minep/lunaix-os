@@ -4,8 +4,8 @@
 
 #define GDT_ENTRY 6
 
-uint64_t _gdt[GDT_ENTRY];
-uint16_t _gdt_limit = sizeof(_gdt) - 1;
+u64_t _gdt[GDT_ENTRY];
+u16_t _gdt_limit = sizeof(_gdt) - 1;
 
 void
 _set_gdt_entry(u32_t index, u32_t base, u32_t limit, u32_t flags)
@@ -26,5 +26,5 @@ _init_gdt()
     _set_gdt_entry(2, 0, 0xfffff, SEG_R0_DATA);
     _set_gdt_entry(3, 0, 0xfffff, SEG_R3_CODE);
     _set_gdt_entry(4, 0, 0xfffff, SEG_R3_DATA);
-    _set_gdt_entry(5, &_tss, sizeof(struct x86_tss) - 1, SEG_TSS);
+    _set_gdt_entry(5, (u32_t)&_tss, sizeof(struct x86_tss) - 1, SEG_TSS);
 }

@@ -15,13 +15,13 @@
 
 LOG_MODULE("PROC")
 
-void*
-__dup_pagetable(pid_t pid, uintptr_t mount_point)
+ptr_t
+__dup_pagetable(pid_t pid, ptr_t mount_point)
 {
-    void* ptd_pp = pmm_alloc_page(pid, PP_FGPERSIST);
+    ptr_t ptd_pp = pmm_alloc_page(pid, PP_FGPERSIST);
     vmm_set_mapping(VMS_SELF, PG_MOUNT_1, ptd_pp, PG_PREM_RW, VMAP_NULL);
 
-    x86_page_table* ptd = PG_MOUNT_1;
+    x86_page_table* ptd = (x86_page_table*)PG_MOUNT_1;
     x86_page_table* pptd = (x86_page_table*)(mount_point | (0x3FF << 12));
 
     size_t kspace_l1inx = L1_INDEX(KERNEL_MM_BASE);
@@ -37,11 +37,11 @@ __dup_pagetable(pid_t pid, uintptr_t mount_point)
         }
 
         // 复制L2页表
-        void* pt_pp = pmm_alloc_page(pid, PP_FGPERSIST);
+        ptr_t pt_pp = pmm_alloc_page(pid, PP_FGPERSIST);
         vmm_set_mapping(VMS_SELF, PG_MOUNT_2, pt_pp, PG_PREM_RW, VMAP_NULL);
 
         x86_page_table* ppt = (x86_page_table*)(mount_point | (i << 12));
-        x86_page_table* pt = PG_MOUNT_2;
+        x86_page_table* pt = (x86_page_table*)PG_MOUNT_2;
 
         for (size_t j = 0; j < PG_MAX_ENTRIES; j++) {
             x86_pte_t pte = ppt->entry[j];
@@ -49,7 +49,7 @@ __dup_pagetable(pid_t pid, uintptr_t mount_point)
             pt->entry[j] = pte;
         }
 
-        ptd->entry[i] = (uintptr_t)pt_pp | PG_ENTRY_FLAGS(ptde);
+        ptd->entry[i] = (ptr_t)pt_pp | PG_ENTRY_FLAGS(ptde);
     }
 
     ptd->entry[PG_MAX_ENTRIES - 1] = NEW_L1_ENTRY(T_SELF_REF_PERM, ptd_pp);
@@ -58,7 +58,7 @@ __dup_pagetable(pid_t pid, uintptr_t mount_point)
 }
 
 void
-__del_pagetable(pid_t pid, uintptr_t mount_point)
+__del_pagetable(pid_t pid, ptr_t mount_point)
 {
     x86_page_table* pptd = (x86_page_table*)(mount_point | (0x3FF << 12));
 
@@ -85,7 +85,7 @@ __del_pagetable(pid_t pid, uintptr_t mount_point)
     pmm_free_page(pid, PG_ENTRY_ADDR(pptd->entry[PG_MAX_ENTRIES - 1]));
 }
 
-void*
+ptr_t
 vmm_dup_vmspace(pid_t pid)
 {
     return __dup_pagetable(pid, VMS_SELF);
@@ -171,17 +171,19 @@ init_proc_user_space(struct proc_info* pcb)
 }
 
 void
-__mark_region(uintptr_t start_vpn, uintptr_t end_vpn, int attr)
+__mark_region(ptr_t start_vpn, ptr_t end_vpn, int attr)
 {
     for (size_t i = start_vpn; i <= end_vpn; i++) {
         x86_pte_t* curproc = &PTE_MOUNTED(VMS_SELF, i);
         x86_pte_t* newproc = &PTE_MOUNTED(VMS_MOUNT_1, i);
-        cpu_invplg(newproc);
+
+        cpu_invplg((ptr_t)newproc);
 
         if ((attr & REGION_MODE_MASK) == REGION_RSHARED) {
             // 如果读共享，则将两者的都标注为只读，那么任何写入都将会应用COW策略。
-            cpu_invplg(curproc);
-            cpu_invplg(i << 12);
+            cpu_invplg((ptr_t)curproc);
+            cpu_invplg((ptr_t)(i << 12));
+
             *curproc = *curproc & ~PG_WRITE;
             *newproc = *newproc & ~PG_WRITE;
         } else {
@@ -231,8 +233,8 @@ dup_proc()
             continue;
         }
 
-        uintptr_t start_vpn = pos->start >> 12;
-        uintptr_t end_vpn = pos->end >> 12;
+        ptr_t start_vpn = pos->start >> 12;
+        ptr_t end_vpn = pos->end >> 12;
         __mark_region(start_vpn, end_vpn, pos->attr);
     }
 
@@ -249,11 +251,11 @@ dup_proc()
 extern void __kernel_end;
 
 void
-setup_proc_mem(struct proc_info* proc, uintptr_t usedMnt)
+setup_proc_mem(struct proc_info* proc, ptr_t usedMnt)
 {
     // copy the entire kernel page table
     pid_t pid = proc->pid;
-    void* pt_copy = __dup_pagetable(pid, usedMnt);
+    ptr_t pt_copy = __dup_pagetable(pid, usedMnt);
 
     vmm_mount_pd(VMS_MOUNT_1, pt_copy); // 将新进程的页表挂载到挂载点#2
 
@@ -269,12 +271,12 @@ setup_proc_mem(struct proc_info* proc, uintptr_t usedMnt)
             In the name of Celestia our glorious goddess, I will fucking HATE
            the TLB for the rest of my LIFE!
         */
-        cpu_invplg(ppte);
+        cpu_invplg((ptr_t)ppte);
 
         x86_pte_t p = *ppte;
-        void* ppa = vmm_dup_page(pid, PG_ENTRY_ADDR(p));
+        ptr_t ppa = vmm_dup_page(pid, PG_ENTRY_ADDR(p));
         pmm_free_page(pid, PG_ENTRY_ADDR(p));
-        *ppte = (p & 0xfff) | (uintptr_t)ppa;
+        *ppte = (p & 0xfff) | ppa;
     }
 
     // 我们不需要分配内核的区域，因为所有的内核代码和数据段只能通过系统调用来访问，任何非法的访问

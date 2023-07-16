@@ -21,12 +21,12 @@
 static u32_t cdb_size[] = { SCSI_CDB12, SCSI_CDB16, 0, 0 };
 
 void
-ahci_parse_dev_info(struct hba_device* dev_info, uint16_t* data)
+ahci_parse_dev_info(struct hba_device* dev_info, u16_t* data)
 {
     dev_info->max_lba = *((u32_t*)(data + IDDEV_OFFMAXLBA));
     dev_info->block_size = *((u32_t*)(data + IDDEV_OFFLSECSIZE));
     dev_info->cbd_size = cdb_size[(*data & 0x3)];
-    dev_info->wwn = *(uint64_t*)(data + IDDEV_OFFWWN);
+    dev_info->wwn = *(u64_t*)(data + IDDEV_OFFWWN);
     dev_info->block_per_sec = 1 << (*(data + IDDEV_OFFLPP) & 0xf);
     dev_info->alignment_offset = *(data + IDDEV_OFFALIGN) & 0x3fff;
     dev_info->capabilities = *((u32_t*)(data + IDDEV_OFFCAPABILITIES));
@@ -37,7 +37,7 @@ ahci_parse_dev_info(struct hba_device* dev_info, uint16_t* data)
 
     if ((*(data + IDDEV_OFFADDSUPPORT) & 0x8) &&
         (*(data + IDDEV_OFFA48SUPPORT) & 0x400)) {
-        dev_info->max_lba = *((uint64_t*)(data + IDDEV_OFFMAXLBA_EXT));
+        dev_info->max_lba = *((lba_t*)(data + IDDEV_OFFMAXLBA_EXT));
         dev_info->flags |= HBA_DEV_FEXTLBA;
     }
 
@@ -46,11 +46,11 @@ ahci_parse_dev_info(struct hba_device* dev_info, uint16_t* data)
 }
 
 void
-ahci_parsestr(char* str, uint16_t* reg_start, int size_word)
+ahci_parsestr(char* str, u16_t* reg_start, int size_word)
 {
     int j = 0;
     for (int i = 0; i < size_word; i++, j += 2) {
-        uint16_t reg = *(reg_start + i);
+        u16_t reg = *(reg_start + i);
         str[j] = (char)(reg >> 8);
         str[j + 1] = (char)(reg & 0xff);
     }

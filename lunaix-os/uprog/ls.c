@@ -5,7 +5,7 @@
 int
 main(int argc, const char* argv[])
 {
-    char* path = ".";
+    const char* path = ".";
     if (argc > 1) {
         path = argv[1];
     }

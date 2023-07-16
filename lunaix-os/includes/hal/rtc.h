@@ -23,23 +23,26 @@
 #define RTC_REG_C 0xC
 #define RTC_REG_D 0xD
 
-#define RTC_BIN_ENCODED(reg)    (reg & 0x04)
-#define RTC_24HRS_ENCODED(reg)  (reg & 0x02)
+#define RTC_BIN_ENCODED(reg) (reg & 0x04)
+#define RTC_24HRS_ENCODED(reg) (reg & 0x02)
 
-#define RTC_TIMER_BASE_FREQUENCY    1024
-#define RTC_TIMER_ON                0x40
+#define RTC_TIMER_BASE_FREQUENCY 1024
+#define RTC_TIMER_ON 0x40
 
-#define RTC_FREQUENCY_1024HZ    0b110
-#define RTC_DIVIDER_33KHZ       (0b010 << 4)
+#define RTC_FREQUENCY_1024HZ 0b110
+#define RTC_DIVIDER_33KHZ (0b010 << 4)
 
 void
 rtc_init();
 
-uint8_t
-rtc_read_reg(uint8_t reg_selector);
+u8_t
+rtc_read_reg(u8_t reg_selector);
+
+u8_t
+bcd2dec(u8_t bcd);
 
 void
-rtc_write_reg(uint8_t reg_selector, uint8_t val);
+rtc_write_reg(u8_t reg_selector, u8_t val);
 
 void
 rtc_enable_timer();

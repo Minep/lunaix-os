@@ -54,8 +54,8 @@ __twifs_new_node(struct twifs_node* parent,
 void
 __twifs_init_inode(struct v_superblock* vsb, struct v_inode* inode)
 {
-    inode->ops = &twifs_inode_ops;
-    inode->default_fops = &twifs_file_ops;
+    inode->ops = (struct v_inode_ops*)&twifs_inode_ops;
+    inode->default_fops = (struct v_file_ops*)&twifs_file_ops;
 }
 
 int

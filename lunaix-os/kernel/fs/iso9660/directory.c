@@ -52,10 +52,12 @@ done:
         u32_t l = drec->name.len;
         while (l < (u32_t)-1 && drec->name.content[l--] != ';')
             ;
+
         l = (l + 1) ? l : drec->name.len;
         l = MIN(l, ISO9660_IDLEN - 1);
 
-        strncpy(cache->name_val, drec->name.content, l);
+        strncpy(cache->name_val, (const char*)drec->name.content, l);
+
         cache->name = HSTR(cache->name_val, l);
         hstr_rehash(&cache->name, HSTR_FULL_HASH);
     }

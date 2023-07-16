@@ -4,7 +4,10 @@
 #include <stddef.h>
 
 size_t
-__ksprintf_internal(char* buffer, char* fmt, size_t max_len, va_list vargs);
+__ksprintf_internal(char* buffer,
+                    const char* fmt,
+                    size_t max_len,
+                    va_list vargs);
 
 size_t
 ksprintf(char* buffer, char* fmt, ...);

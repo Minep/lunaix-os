@@ -36,13 +36,13 @@ typedef struct
 struct exec_param
 {
     isr_param saved_prev_ctx;
-    unsigned int vector;
-    unsigned int err_code;
-    unsigned int eip;
-    unsigned int cs;
-    unsigned int eflags;
-    unsigned int esp;
-    unsigned int ss;
+    u32_t vector;
+    u32_t err_code;
+    u32_t eip;
+    u32_t cs;
+    u32_t eflags;
+    u32_t esp;
+    u32_t ss;
 } __attribute__((packed));
 
 #define ISR_PARAM_SIZE sizeof(isr_param)

@@ -8,12 +8,12 @@ typedef u32_t time_t;
 typedef struct
 {
     u32_t year; // use int32 as we need to store the 4-digit year
-    uint8_t month;
-    uint8_t day;
-    uint8_t weekday;
-    uint8_t hour;
-    uint8_t minute;
-    uint8_t second;
+    u8_t month;
+    u8_t day;
+    u8_t weekday;
+    u8_t hour;
+    u8_t minute;
+    u8_t second;
 } datetime_t;
 
 void

@@ -110,7 +110,7 @@ vfs_init()
     atomic_fetch_add(&vfs_sysroot->ref_count, 1);
 }
 
-inline struct hbucket*
+static inline struct hbucket*
 __dcache_hash(struct v_dnode* parent, u32_t* hash)
 {
     u32_t _hash = *hash;
@@ -436,7 +436,7 @@ vfs_d_free(struct v_dnode* dnode)
         vfs_dcache_remove(pos);
     }
 
-    vfree(dnode->name.value);
+    vfree((void*)dnode->name.value);
     cake_release(dnode_pile, dnode);
 }
 
@@ -490,7 +490,6 @@ vfs_i_alloc(struct v_superblock* sb)
     inode->atime = inode->ctime;
     inode->mtime = inode->ctime;
 
-done:
     lru_use_one(inode_lru, &inode->lru);
     return inode;
 }
@@ -1210,7 +1209,7 @@ __DEFINE_LXSYSCALL2(int,
         goto done;
     }
 
-    if (errno = vfs_check_writable(file)) {
+    if ((errno = vfs_check_writable(file))) {
         goto done;
     }
 
@@ -1283,7 +1282,7 @@ __DEFINE_LXSYSCALL1(int, chdir, const char*, path)
         goto done;
     }
 
-    errno = vfs_do_chdir(__current, dnode);
+    errno = vfs_do_chdir((struct proc_info*)__current, dnode);
 
 done:
     return DO_STATUS(errno);
@@ -1298,7 +1297,7 @@ __DEFINE_LXSYSCALL1(int, fchdir, int, fd)
         goto done;
     }
 
-    errno = vfs_do_chdir(__current, fd_s->file->dnode);
+    errno = vfs_do_chdir((struct proc_info*)__current, fd_s->file->dnode);
 
 done:
     return DO_STATUS(errno);
@@ -1344,7 +1343,7 @@ vfs_do_rename(struct v_dnode* current, struct v_dnode* target)
         return 0;
     }
 
-    if (errno = vfs_check_writable(current)) {
+    if ((errno = vfs_check_writable(current))) {
         return errno;
     }
 
@@ -1428,6 +1427,6 @@ __DEFINE_LXSYSCALL2(int, rename, const char*, oldpath, const char*, newpath)
     errno = vfs_do_rename(cur, target);
 
 done:
-    vfree(name.value);
+    vfree((void*)name.value);
     return DO_STATUS(errno);
 }

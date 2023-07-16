@@ -77,8 +77,8 @@ struct ps2_cmd_queue
  * @param cmd
  * @param args
  */
-static uint8_t
-ps2_issue_cmd(char cmd, uint16_t arg);
+static u8_t
+ps2_issue_cmd(char cmd, u16_t arg);
 
 /**
  * @brief 向PS/2控制器的编码器端口(0x60)发送指令并等待返回代码。
@@ -88,8 +88,8 @@ ps2_issue_cmd(char cmd, uint16_t arg);
  * @param cmd
  * @param args
  */
-static uint8_t
-ps2_issue_dev_cmd(char cmd, uint16_t arg);
+static u8_t
+ps2_issue_dev_cmd(char cmd, u16_t arg);
 
 /**
  * @brief 向PS/2控制器发送指令，不等待返回代码。
@@ -100,7 +100,7 @@ ps2_issue_dev_cmd(char cmd, uint16_t arg);
  * @return char
  */
 static void
-ps2_post_cmd(uint8_t port, char cmd, uint16_t arg);
+ps2_post_cmd(u8_t port, char cmd, u16_t arg);
 
 void
 ps2_device_post_cmd(char cmd, char arg);

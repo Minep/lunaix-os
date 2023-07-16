@@ -7,7 +7,7 @@
 #define SET_PDE(ptd, pde_index, pde) *((ptd_t*)ptd + pde_index) = pde;
 #define SET_PTE(ptd, pt_index, pte_index, pte)                                 \
     *(PT_ADDR(ptd, pt_index) + pte_index) = pte;
-#define sym_val(sym) (uintptr_t)(&sym)
+#define sym_val(sym) (ptr_t)(&sym)
 
 #define KERNEL_PAGE_COUNT                                                      \
     ((sym_val(__kernel_end) - sym_val(__kernel_start) + 0x1000 - 1) >> 12);
@@ -24,10 +24,10 @@
 #define PG_TABLE_STACK 8
 
 // Provided by linker (see linker.ld)
-extern uint8_t __kernel_start;
-extern uint8_t __kernel_end;
-extern uint8_t __init_hhk_end;
-extern uint8_t _k_stack;
+extern u8_t __kernel_start;
+extern u8_t __kernel_end;
+extern u8_t __init_hhk_end;
+extern u8_t _k_stack;
 
 void
 _init_page(ptd_t* ptd)
@@ -79,7 +79,7 @@ _init_page(ptd_t* ptd)
     }
 
     // 计算内核.text段的物理地址
-    uintptr_t kernel_pm = V2P(&__kernel_start);
+    ptr_t kernel_pm = V2P(&__kernel_start);
 
     // 重映射内核至高半区地址（>=0xC0000000）
     for (u32_t i = 0; i < kernel_pg_counts; i++) {
@@ -96,7 +96,7 @@ _init_page(ptd_t* ptd)
 }
 
 u32_t
-__save_subset(uint8_t* destination, uint8_t* base, unsigned int size)
+__save_subset(u8_t* destination, u8_t* base, unsigned int size)
 {
     unsigned int i = 0;
     for (; i < size; i++) {
@@ -106,25 +106,23 @@ __save_subset(uint8_t* destination, uint8_t* base, unsigned int size)
 }
 
 void
-_save_multiboot_info(multiboot_info_t* info, uint8_t* destination)
+_save_multiboot_info(multiboot_info_t* info, u8_t* destination)
 {
     u32_t current = 0;
-    uint8_t* info_b = (uint8_t*)info;
+    u8_t* info_b = (u8_t*)info;
     for (; current < sizeof(multiboot_info_t); current++) {
         *(destination + current) = *(info_b + current);
     }
 
-    ((multiboot_info_t*)destination)->mmap_addr =
-      (uintptr_t)destination + current;
+    ((multiboot_info_t*)destination)->mmap_addr = (ptr_t)destination + current;
     current += __save_subset(
-      destination + current, (uint8_t*)info->mmap_addr, info->mmap_length);
+      destination + current, (u8_t*)info->mmap_addr, info->mmap_length);
 
     if (present(info->flags, MULTIBOOT_INFO_DRIVE_INFO)) {
         ((multiboot_info_t*)destination)->drives_addr =
-          (uintptr_t)destination + current;
-        current += __save_subset(destination + current,
-                                 (uint8_t*)info->drives_addr,
-                                 info->drives_length);
+          (ptr_t)destination + current;
+        current += __save_subset(
+          destination + current, (u8_t*)info->drives_addr, info->drives_length);
     }
 }
 
@@ -134,7 +132,7 @@ _hhk_init(ptd_t* ptd, u32_t kpg_size)
 
     // 初始化 kpg 全为0
     //      P.s. 真没想到GRUB会在这里留下一堆垃圾！ 老子的页表全乱套了！
-    uint8_t* kpg = (uint8_t*)ptd;
+    u8_t* kpg = (u8_t*)ptd;
     for (u32_t i = 0; i < kpg_size; i++) {
         *(kpg + i) = 0;
     }

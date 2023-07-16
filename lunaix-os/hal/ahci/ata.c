@@ -28,7 +28,7 @@ sata_submit(struct hba_device* dev, struct blkio_req* io_req)
 
     header->options |= HBA_CMDH_WRITE * write;
 
-    uint16_t count = ICEIL(vbuf_size(io_req->vbuf), port->device->block_size);
+    u16_t count = ICEIL(vbuf_size(io_req->vbuf), port->device->block_size);
     struct sata_reg_fis* fis = (struct sata_reg_fis*)table->command_fis;
 
     if ((port->device->flags & HBA_DEV_FEXTLBA)) {

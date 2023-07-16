@@ -75,7 +75,7 @@ cpu_wrmsr(u32_t msr_idx, u32_t reg_high, u32_t reg_low)
 int
 rnd_is_supported()
 {
-    reg32 eax, ebx, ecx, edx;
+    reg32 eax = 0, ebx = 0, ecx = 0, edx = 0;
     __get_cpuid(0x01, &eax, &ebx, &ecx, &edx);
     return (ecx & (1 << 30));
 }

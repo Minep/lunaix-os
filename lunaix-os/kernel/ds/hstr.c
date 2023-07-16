@@ -4,7 +4,7 @@
 void
 hstrcpy(struct hstr* dest, struct hstr* src)
 {
-    strcpy(dest->value, src->value);
+    strcpy((char*)dest->value, src->value);
     dest->hash = src->hash;
     dest->len = src->len;
 }

@@ -77,7 +77,7 @@ struct pci_device
     u32_t class_info;
     u32_t cspace_base;
     u32_t msi_loc;
-    uint16_t intr_info;
+    u16_t intr_info;
     struct
     {
         struct pci_driver* type;
@@ -138,7 +138,7 @@ struct pci_device* pci_get_device_by_class(u32_t class);
  * @return struct pci_device*
  */
 struct pci_device*
-pci_get_device_by_id(uint16_t vendorId, uint16_t deviceId);
+pci_get_device_by_id(u16_t vendorId, u16_t deviceId);
 
 /**
  * @brief 初始化PCI设备的基地址寄存器。返回由该基地址代表的，
@@ -173,5 +173,11 @@ pci_add_driver(const char* name,
 
 int
 pci_bind_driver(struct pci_device* pci_dev);
+
+void
+pci_probe_bar_info(struct pci_device* device);
+
+void
+pci_probe_msi_info(struct pci_device* device);
 
 #endif /* __LUNAIX_PCI_H */

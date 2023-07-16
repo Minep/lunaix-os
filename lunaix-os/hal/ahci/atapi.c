@@ -11,7 +11,7 @@
 
 void
 scsi_create_packet12(struct scsi_cdb12* cdb,
-                     uint8_t opcode,
+                     u8_t opcode,
                      u32_t lba,
                      u32_t alloc_size)
 {
@@ -23,8 +23,8 @@ scsi_create_packet12(struct scsi_cdb12* cdb,
 
 void
 scsi_create_packet16(struct scsi_cdb16* cdb,
-                     uint8_t opcode,
-                     uint64_t lba,
+                     u8_t opcode,
+                     lba_t lba,
                      u32_t alloc_size)
 {
     memset(cdb, 0, sizeof(*cdb));
@@ -38,8 +38,8 @@ void
 scsi_parse_capacity(struct hba_device* device, u32_t* parameter)
 {
     if (device->cbd_size == SCSI_CDB16) {
-        device->max_lba =
-          SCSI_FLIP(*(parameter + 1)) | (SCSI_FLIP(*parameter) << 32);
+        device->max_lba = (lba_t)SCSI_FLIP(*(parameter + 1)) |
+                          ((lba_t)SCSI_FLIP(*parameter) << 32);
         device->block_size = SCSI_FLIP(*(parameter + 2));
     } else {
         // for READ_CAPACITY(10)
@@ -82,7 +82,7 @@ scsi_submit(struct hba_device* dev, struct blkio_req* io_req)
     }
 
     // field: cdb->misc1
-    *((uint8_t*)cdb + 1) = 3 << 5; // RPROTECT=011b 禁用保护检查
+    *((u8_t*)cdb + 1) = 3 << 5; // RPROTECT=011b 禁用保护检查
 
     // The async way...
     struct hba_cmd_state* cmds = valloc(sizeof(struct hba_cmd_state));

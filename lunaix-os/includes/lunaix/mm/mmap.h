@@ -25,12 +25,12 @@ mem_adjust_inplace(vm_regions_t* regions,
 int
 mem_map(void** addr_out,
         struct mm_region** created,
-        void* addr,
+        ptr_t addr,
         struct v_file* file,
         struct mmap_param* param);
 
 int
-mem_unmap(ptr_t mnt, vm_regions_t* regions, void* addr, size_t length);
+mem_unmap(ptr_t mnt, vm_regions_t* regions, ptr_t addr, size_t length);
 
 void
 mem_unmap_region(ptr_t mnt, struct mm_region* region);

@@ -4,13 +4,13 @@
 #define SCHED_TIME_SLICE 300
 
 #define PROC_TABLE_SIZE 8192
-#define MAX_PROCESS (PROC_TABLE_SIZE / sizeof(uintptr_t))
+#define MAX_PROCESS (PROC_TABLE_SIZE / sizeof(ptr_t))
 
 struct scheduler
 {
     struct proc_info** _procs;
     int procs_index;
-    unsigned int ptable_len;
+    int ptable_len;
 };
 
 void

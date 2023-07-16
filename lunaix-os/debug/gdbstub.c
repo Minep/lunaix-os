@@ -42,8 +42,8 @@
  ****************************************************************************/
 
 #ifndef GDBSTUB_DONT_DEFINE_STDINT_TYPES
-typedef unsigned char uint8_t;
-typedef unsigned short uint16_t;
+typedef unsigned char u8_t;
+typedef unsigned short u16_t;
 typedef unsigned long uint32_t;
 #endif
 
@@ -1176,16 +1176,16 @@ gdb_main(struct gdb_state* state)
 
 struct gdb_idtr
 {
-    uint16_t len;
+    u16_t len;
     uint32_t offset;
 } __attribute__((packed));
 
 struct gdb_idt_gate
 {
-    uint16_t offset_low;
-    uint16_t segment;
-    uint16_t flags;
-    uint16_t offset_high;
+    u16_t offset_low;
+    u16_t segment;
+    u16_t flags;
+    u16_t offset_high;
 } __attribute__((packed));
 
 /*****************************************************************************

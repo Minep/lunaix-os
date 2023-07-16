@@ -25,7 +25,7 @@ blkpart_parse(struct device* master, struct gpt_header* header)
     if (!bdev)
         return ENODEV;
 
-    int errno;
+    int errno = 0;
     u32_t ent_lba = (u32_t)header->ents_lba;
     struct gpt_entry* ents_parial = (struct gpt_entry*)valloc(GPT_BLKSIZE);
 

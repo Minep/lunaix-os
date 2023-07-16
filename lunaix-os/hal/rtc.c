@@ -13,7 +13,7 @@
 
 void
 rtc_init() {
-    uint8_t regA = rtc_read_reg(RTC_REG_A | WITH_NMI_DISABLED);
+    u8_t regA = rtc_read_reg(RTC_REG_A | WITH_NMI_DISABLED);
     regA = (regA & ~0x7f) | RTC_FREQUENCY_1024HZ | RTC_DIVIDER_33KHZ;
     rtc_write_reg(RTC_REG_A | WITH_NMI_DISABLED, regA);
 
@@ -21,22 +21,22 @@ rtc_init() {
     rtc_disable_timer();
 }
 
-uint8_t
-rtc_read_reg(uint8_t reg_selector)
+u8_t
+rtc_read_reg(u8_t reg_selector)
 {
     io_outb(RTC_INDEX_PORT, reg_selector);
     return io_inb(RTC_TARGET_PORT);
 }
 
 void
-rtc_write_reg(uint8_t reg_selector, uint8_t val)
+rtc_write_reg(u8_t reg_selector, u8_t val)
 {
     io_outb(RTC_INDEX_PORT, reg_selector);
     io_outb(RTC_TARGET_PORT, val);
 }
 
-uint8_t
-bcd2dec(uint8_t bcd)
+u8_t
+bcd2dec(u8_t bcd)
 {
     return ((bcd & 0xF0) >> 1) + ((bcd & 0xF0) >> 3) + (bcd & 0xf);
 }
@@ -44,12 +44,12 @@ bcd2dec(uint8_t bcd)
 
 void
 rtc_enable_timer() {
-    uint8_t regB = rtc_read_reg(RTC_REG_B | WITH_NMI_DISABLED);
+    u8_t regB = rtc_read_reg(RTC_REG_B | WITH_NMI_DISABLED);
     rtc_write_reg(RTC_REG_B | WITH_NMI_DISABLED, regB | RTC_TIMER_ON);
 }
 
 void
 rtc_disable_timer() {
-    uint8_t regB = rtc_read_reg(RTC_REG_B | WITH_NMI_DISABLED);
+    u8_t regB = rtc_read_reg(RTC_REG_B | WITH_NMI_DISABLED);
     rtc_write_reg(RTC_REG_B | WITH_NMI_DISABLED, regB & ~RTC_TIMER_ON);
 }

@@ -154,10 +154,10 @@ struct iso_drecord
     u8_t xattr_len;
     iso_bbo32_t extent_addr;
     iso_bbo32_t data_size;
-    struct iso_datetime2 PACKED mktime; // Time the record is made, see 9.1.5
+    struct iso_datetime2 mktime; // Time the record is made, see 9.1.5
     u8_t flags;
-    u8_t fu_sz;                         // size of file unit (FU)
-    u8_t gap_sz;                        // size of gap if FU is interleaved.
+    u8_t fu_sz;                  // size of file unit (FU)
+    u8_t gap_sz;                 // size of gap if FU is interleaved.
     iso_bbo16_t vol_seq;
     struct iso_var_mdu name;
 } PACKED;

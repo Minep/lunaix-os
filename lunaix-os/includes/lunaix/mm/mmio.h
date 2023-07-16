@@ -4,9 +4,9 @@
 #include <lunaix/types.h>
 
 void*
-ioremap(uintptr_t paddr, u32_t size);
+ioremap(ptr_t paddr, u32_t size);
 
-void*
-iounmap(uintptr_t vaddr, u32_t size);
+void
+iounmap(ptr_t vaddr, u32_t size);
 
 #endif /* __LUNAIX_MMIO_H */

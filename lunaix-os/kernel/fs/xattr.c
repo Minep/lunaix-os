@@ -15,7 +15,8 @@ xattr_new(struct hstr* name)
         return NULL;
     }
     *entry =
-      (struct v_xattr_entry){ .name = HHSTR(valloc(VFS_NAME_MAXLEN), 0, 0) };
+      (struct v_xattr_entry){ .name = HHSTR(valloc(VFS_NAME_MAXLEN), 0, 0),
+                              .value = NULL };
 
     hstrcpy(&entry->name, name);
     return entry;
@@ -24,7 +25,7 @@ xattr_new(struct hstr* name)
 void
 xattr_free(struct v_xattr_entry* entry)
 {
-    vfree(entry->name.value);
+    vfree((void*)entry->name.value);
     vfree(entry);
 }
 

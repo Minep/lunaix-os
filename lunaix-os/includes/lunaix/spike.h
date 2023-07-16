@@ -66,11 +66,14 @@
 
 #define __USER__ __attribute__((section(".usrtext")))
 
+#define DO_SPIN                                                                \
+    while (1)                                                                  \
+        ;
+
 inline static void
 spin()
 {
-    while (1)
-        ;
+    DO_SPIN
 }
 
 #ifndef __LUNAIXOS_NASSERT__

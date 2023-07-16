@@ -1,5 +1,5 @@
 #include <klibc/string.h>
-#include <stdint.h>
+#include <lunaix/types.h>
 
 void*
 memcpy(void* dest, const void* src, size_t num)
@@ -17,8 +17,8 @@ memcpy(void* dest, const void* src, size_t num)
 void*
 memmove(void* dest, const void* src, size_t num)
 {
-    uint8_t* dest_ptr = (uint8_t*)dest;
-    const uint8_t* src_ptr = (const uint8_t*)src;
+    u8_t* dest_ptr = (u8_t*)dest;
+    const u8_t* src_ptr = (const u8_t*)src;
     if (dest_ptr < src_ptr) {
         for (size_t i = 0; i < num; i++) {
             *(dest_ptr + i) = *(src_ptr + i);
@@ -45,8 +45,8 @@ memset(void* ptr, int value, size_t num)
 int
 memcmp(const void* ptr1, const void* ptr2, size_t num)
 {
-    uint8_t* p1 = (uint8_t*)ptr1;
-    uint8_t* p2 = (uint8_t*)ptr2;
+    u8_t* p1 = (u8_t*)ptr1;
+    u8_t* p2 = (u8_t*)ptr2;
     for (size_t i = 0; i < num; i++) {
         int diff = *(p1 + i) - *(p2 + i);
         if (diff != 0) {

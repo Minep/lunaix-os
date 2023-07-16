@@ -38,7 +38,7 @@ struct hbucket
 
 #define hashtable_init(table)                                                  \
     {                                                                          \
-        for (int i = 0; i < (sizeof(table) / sizeof(table[0])); i++) {         \
+        for (u32_t i = 0; i < (sizeof(table) / sizeof(table[0])); i++) {       \
             table[i].head = 0;                                                 \
         }                                                                      \
     }

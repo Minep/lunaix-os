@@ -64,7 +64,7 @@ exec_load(struct exec_container* container, struct v_file* executable)
     size_t sz_argv = exec_str_size(argv, &argv_len);
     size_t sz_envp = exec_str_size(envp, &envp_len);
     size_t var_sz = ROUNDUP(sz_envp, PG_SIZE);
-    char** argv_extra = container->argv_pp;
+    const char** argv_extra = container->argv_pp;
 
     argv_extra[0] = executable->dnode->name.value;
 
@@ -119,11 +119,11 @@ exec_load(struct exec_container* container, struct v_file* executable)
         }
 
         for (size_t i = 0; i < 2 && argv_extra[i]; i++, argv_len++) {
-            char* extra_arg = argv_extra[i];
+            const char* extra_arg = argv_extra[i];
             size_t str_len = strlen(extra_arg);
 
             ustack = (void*)((ptr_t)ustack - str_len);
-            memcpy(ustack, (void*)extra_arg, str_len);
+            memcpy(ustack, (const void*)extra_arg, str_len);
         }
 
         // four args (arg{c|v}, env{c|p}) for main
@@ -183,7 +183,9 @@ exec_kexecve(const char* filename, const char* argv[], const char* envp[])
 {
     int errno = 0;
     struct exec_container container;
-    exec_container(&container, __current, VMS_SELF, argv, envp);
+
+    exec_container(
+      &container, (struct proc_info*)__current, VMS_SELF, argv, envp);
 
     errno = exec_load_byname(&container, filename);
 
@@ -212,7 +214,9 @@ __DEFINE_LXSYSCALL3(int,
 {
     int errno = 0;
     struct exec_container container;
-    exec_container(&container, __current, VMS_SELF, argv, envp);
+
+    exec_container(
+      &container, (struct proc_info*)__current, VMS_SELF, argv, envp);
 
     if ((errno = exec_load_byname(&container, filename))) {
         goto done;

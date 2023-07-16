@@ -29,10 +29,10 @@ void
 ahci_init();
 
 void
-ahci_parse_dev_info(struct hba_device* dev_info, uint16_t* data);
+ahci_parse_dev_info(struct hba_device* dev_info, u16_t* data);
 
 void
-ahci_parsestr(char* str, uint16_t* reg_start, int size_word);
+ahci_parsestr(char* str, u16_t* reg_start, int size_word);
 
 /**
  * @brief Issue a HBA command (synchronized)

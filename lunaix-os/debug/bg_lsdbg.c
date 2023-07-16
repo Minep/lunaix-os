@@ -7,7 +7,7 @@
 
 LOG_MODULE("DBG");
 
-static volatile sdbg_state = 0;
+static volatile int sdbg_state = 0;
 
 void
 sdbg_printf(char* fmt, ...)
@@ -26,7 +26,7 @@ sdbg_printf(char* fmt, ...)
 void
 lunaix_sdbg_loop(isr_param* param)
 {
-    char c;
+    u8_t c;
 
     if (sdbg_state == SDBG_STATE_WAIT_BRK) {
         (param)->execp->eflags &= ~(1 << 8);
@@ -37,7 +37,7 @@ lunaix_sdbg_loop(isr_param* param)
     }
 
     while (1) {
-        c = serial_rx_byte(SERIAL_COM1);
+        c = (u8_t)serial_rx_byte(SERIAL_COM1);
         if (c == SDBG_CLNT_QUIT) {
             sdbg_state = SDBG_STATE_START;
             break;
@@ -66,9 +66,9 @@ lunaix_sdbg_loop(isr_param* param)
                 return;
             case SDBG_CLNT_BRKP:
                 // the break point address
-                // serial_rx_buffer(SERIAL_COM1, buffer, sizeof(uintptr_t));
+                // serial_rx_buffer(SERIAL_COM1, buffer, sizeof(ptr_t));
 
-                // asm("movl %0, %%dr0" ::"r"(*((uintptr_t*)buffer)));
+                // asm("movl %0, %%dr0" ::"r"(*((ptr_t*)buffer)));
 
                 sdbg_state = SDBG_STATE_WAIT_BRK;
                 return;

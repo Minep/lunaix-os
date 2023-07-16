@@ -6,7 +6,7 @@
 LOG_MODULE("UART")
 
 void
-serial_init_port(uintptr_t port)
+serial_init_port(ptr_t port)
 {
     // disable interrupt, use irq instead
     io_outb(COM_RIE(port), 0);
@@ -46,7 +46,7 @@ serial_init()
 }
 
 char
-serial_rx_byte(uintptr_t port)
+serial_rx_byte(ptr_t port)
 {
     while (!(io_inb(COM_RSLINE(port)) & 0x01))
         ;
@@ -55,7 +55,7 @@ serial_rx_byte(uintptr_t port)
 }
 
 void
-serial_rx_buffer(uintptr_t port, char* data, size_t len)
+serial_rx_buffer(ptr_t port, char* data, size_t len)
 {
     for (size_t i = 0; i < len; i++) {
         data[i] = serial_rx_byte(port);
@@ -63,7 +63,7 @@ serial_rx_buffer(uintptr_t port, char* data, size_t len)
 }
 
 void
-serial_tx_byte(uintptr_t port, char data)
+serial_tx_byte(ptr_t port, char data)
 {
     while (!(io_inb(COM_RSLINE(port)) & 0x20))
         ;
@@ -72,7 +72,7 @@ serial_tx_byte(uintptr_t port, char data)
 }
 
 void
-serial_tx_buffer(uintptr_t port, char* data, size_t len)
+serial_tx_buffer(ptr_t port, char* data, size_t len)
 {
     for (size_t i = 0; i < len; i++) {
         serial_tx_byte(port, data[i]);
@@ -80,7 +80,7 @@ serial_tx_buffer(uintptr_t port, char* data, size_t len)
 }
 
 void
-serial_clear_fifo(uintptr_t port)
+serial_clear_fifo(ptr_t port)
 {
     io_outb(COM_RIE(port), 0x0);
     io_outb(COM_RCFIFO(port), 0x00);
@@ -90,13 +90,13 @@ serial_clear_fifo(uintptr_t port)
 }
 
 void
-serial_disable_irq(uintptr_t port)
+serial_disable_irq(ptr_t port)
 {
     io_outb(COM_RIE(port), 0x0);
 }
 
 void
-serial_enable_irq(uintptr_t port)
+serial_enable_irq(ptr_t port)
 {
     io_outb(COM_RIE(port), 0x1);
 }

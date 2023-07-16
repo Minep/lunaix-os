@@ -69,7 +69,7 @@ struct elf32_phdr
 
 struct elf32
 {
-    void* elf_file;
+    const void* elf_file;
     struct elf32_ehdr eheader;
     struct elf32_phdr* pheaders;
 };
@@ -78,10 +78,13 @@ struct elf32
     struct elf32 elf = { .elf_file = elf_vfile, .pheaders = (void*)0 }
 
 int
+elf32_check_exec(const struct elf32* elf);
+
+int
 elf32_open(struct elf32* elf, const char* path);
 
 int
-elf32_openat(struct elf32* elf, void* elf_vfile);
+elf32_openat(struct elf32* elf, const void* elf_vfile);
 
 int
 elf32_static_linked(const struct elf32* elf);

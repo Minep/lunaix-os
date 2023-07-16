@@ -17,12 +17,12 @@ struct cake_pile
     struct llist_header full;
     struct llist_header partial;
     struct llist_header free;
-    unsigned int offset;
-    unsigned int piece_size;
-    unsigned int cakes_count;
-    unsigned int alloced_pieces;
-    unsigned int pieces_per_cake;
-    unsigned int pg_per_cake;
+    u32_t offset;
+    u32_t piece_size;
+    u32_t cakes_count;
+    u32_t alloced_pieces;
+    u32_t pieces_per_cake;
+    u32_t pg_per_cake;
     char pile_name[PILE_NAME_MAXLEN];
 
     pile_cb ctor;
@@ -30,7 +30,7 @@ struct cake_pile
 
 typedef unsigned int piece_index_t;
 
-#define EO_FREE_PIECE (-1)
+#define EO_FREE_PIECE ((u32_t)-1)
 
 struct cake_s
 {

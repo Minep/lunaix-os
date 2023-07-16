@@ -1,9 +1,10 @@
+#include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
 
-void*
-vmm_dup_page(pid_t pid, void* pa)
+ptr_t
+vmm_dup_page(pid_t pid, ptr_t pa)
 {
-    void* new_ppg = pmm_alloc_page(pid, 0);
+    ptr_t new_ppg = pmm_alloc_page(pid, 0);
     vmm_set_mapping(VMS_SELF, PG_MOUNT_3, new_ppg, PG_PREM_RW, VMAP_NULL);
     vmm_set_mapping(VMS_SELF, PG_MOUNT_4, pa, PG_PREM_RW, VMAP_NULL);
 

@@ -7,9 +7,10 @@ ARCH_OPT := -D__ARCH_IA32 -include flags.h
 O := -O2
 W := -Wall -Wextra -Wno-unknown-pragmas \
 		-Wno-unused-function \
+		-Wno-unused-variable\
 		-Wno-unused-but-set-variable \
 		-Wno-unused-parameter \
-		-Wno-unused-variable\
+		-Wno-discarded-qualifiers\
 		-Werror=incompatible-pointer-types
 
 OFLAGS := -fno-gcse\

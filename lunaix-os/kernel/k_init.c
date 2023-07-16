@@ -1,18 +1,20 @@
 #include <lunaix/common.h>
-#include <lunaix/tty/tty.h>
-
 #include <lunaix/device.h>
 #include <lunaix/foptions.h>
 #include <lunaix/input.h>
 #include <lunaix/isrm.h>
 #include <lunaix/lxconsole.h>
+#include <lunaix/mm/cake.h>
 #include <lunaix/mm/mmio.h>
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/pmm.h>
+#include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/spike.h>
+#include <lunaix/syscall.h>
+#include <lunaix/tty/tty.h>
 #include <lunaix/types.h>
 
 #include <arch/x86/boot/multiboot.h>
@@ -22,9 +24,9 @@
 #include <klibc/stdio.h>
 #include <klibc/string.h>
 
-extern uint8_t __kernel_start;
-extern uint8_t __kernel_end;
-extern uint8_t __init_hhk_end;
+extern u8_t __kernel_start;
+extern u8_t __kernel_end;
+extern u8_t __init_hhk_end;
 
 #define PP_KERN_SHARED (PP_FGSHARED | PP_TKERN)
 
@@ -143,7 +145,7 @@ spawn_proc0()
 
     // 为内核创建一个专属栈空间。
     for (size_t i = 0; i < (KSTACK_SIZE >> PG_SIZE_BITS); i++) {
-        uintptr_t pa = pmm_alloc_page(KERNEL_PID, 0);
+        ptr_t pa = pmm_alloc_page(KERNEL_PID, 0);
         vmm_set_mapping(VMS_SELF,
                         KSTACK_START + (i << PG_SIZE_BITS),
                         pa,
@@ -155,7 +157,7 @@ spawn_proc0()
       (struct exec_param*)(KSTACK_TOP - sizeof(struct exec_param));
 
     *execp = (struct exec_param){ .cs = KCODE_SEG,
-                                  .eip = (void*)__proc0,
+                                  .eip = (ptr_t)__proc0,
                                   .ss = KDATA_SEG,
                                   .eflags = cpu_reflags() };
     proc0->intr_ctx.execp = execp;
@@ -177,8 +179,8 @@ spawn_proc0()
     assert_msg(0, "Unexpected Return");
 }
 
-extern void __usrtext_start;
-extern void __usrtext_end;
+extern u8_t __usrtext_start;
+extern u8_t __usrtext_end;
 
 // 按照 Memory map 标识可用的物理页
 void
@@ -190,7 +192,7 @@ setup_memory(multiboot_memory_map_t* map, size_t map_size)
         multiboot_memory_map_t mmap = map[i];
         if (mmap.type == MULTIBOOT_MEMORY_AVAILABLE) {
             // 整数向上取整除法
-            uintptr_t pg = map[i].addr_low + 0x0fffU;
+            ptr_t pg = map[i].addr_low + 0x0fffU;
             pmm_mark_chunk_free(pg >> PG_SIZE_BITS,
                                 map[i].len_low >> PG_SIZE_BITS);
         }
@@ -200,7 +202,8 @@ setup_memory(multiboot_memory_map_t* map, size_t map_size)
     size_t pg_count = V2P(&__kernel_end) >> PG_SIZE_BITS;
     pmm_mark_chunk_occupied(KERNEL_PID, 0, pg_count, PP_FGLOCKED);
 
-    for (uintptr_t i = &__usrtext_start; i < &__usrtext_end; i += PG_SIZE) {
+    for (ptr_t i = (ptr_t)&__usrtext_start; i < (ptr_t)&__usrtext_end;
+         i += PG_SIZE) {
         vmm_set_mapping(VMS_SELF, i, V2P(i), PG_PREM_UR, VMAP_NULL);
     }
 

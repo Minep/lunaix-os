@@ -30,19 +30,26 @@ __ivalloc_within(size_t a, size_t b, isr_cb handler)
 {
     a = (a - IV_BASE) / 8;
     b = (b - IV_BASE) / 8;
+
     for (size_t i = a; i < b; i++) {
-        char chunk = iv_bmp[i], j = 0;
+        u8_t chunk = iv_bmp[i], j = 0;
+
         if (chunk == 0xff)
             continue;
+
         while ((chunk & 0x1)) {
             chunk >>= 1;
             j++;
         }
+
         iv_bmp[i] |= 1 << j;
+
         int iv = IV_BASE + i * 8 + j;
         handlers[iv] = handler ? handler : intr_routine_fallback;
+
         return iv;
     }
+
     return 0;
 }
 
@@ -62,9 +69,11 @@ void
 isrm_ivfree(int iv)
 {
     assert(iv < 256);
+
     if (iv >= IV_BASE) {
         iv_bmp[(iv - IV_BASE) / 8] &= ~(1 << ((iv - IV_BASE) % 8));
     }
+
     handlers[iv] = intr_routine_fallback;
 }
 
@@ -80,16 +89,19 @@ isrm_bindirq(int irq, isr_cb irq_handler)
     // PC_AT_IRQ_RTC -> RTC_TIMER_IV, fixed, edge trigged, polarity=high,
     // physical, APIC ID 0
     ioapic_redirect(acpi_gistranslate(irq), iv, 0, IOAPIC_DELMOD_FIXED);
+
     return iv;
 }
 
-int
+void
 isrm_bindiv(int iv, isr_cb handler)
 {
     assert(iv < 256);
+
     if (iv >= IV_BASE) {
         iv_bmp[(iv - IV_BASE) / 8] |= 1 << ((iv - IV_BASE) % 8);
     }
+
     handlers[iv] = handler;
 }
 
@@ -97,5 +109,6 @@ isr_cb
 isrm_get(int iv)
 {
     assert(iv < 256);
+
     return handlers[iv];
 }

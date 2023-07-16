@@ -44,6 +44,8 @@ default_file_readdir(struct v_file* file, struct dir_context* dctx)
         dctx->read_complete_callback(dctx, pos->name.value, pos->name.len, 0);
         break;
     }
+
+    return i;
 }
 
 int

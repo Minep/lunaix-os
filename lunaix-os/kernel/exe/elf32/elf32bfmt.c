@@ -32,7 +32,7 @@ elf32_open(struct elf32* elf, const char* path)
 }
 
 int
-elf32_openat(struct elf32* elf, void* elf_vfile)
+elf32_openat(struct elf32* elf, const void* elf_vfile)
 {
     int status = 0;
     elf->pheaders = NULL;
@@ -166,7 +166,7 @@ elf32_read_phdr(struct elf32* elf)
 int
 elf32_check_exec(const struct elf32* elf)
 {
-    struct elf32_ehdr* ehdr = &elf->eheader;
+    const struct elf32_ehdr* ehdr = &elf->eheader;
 
     return *(u32_t*)(ehdr->e_ident) == ELFMAGIC &&
            ehdr->e_ident[EI_CLASS] == ELFCLASS32 &&

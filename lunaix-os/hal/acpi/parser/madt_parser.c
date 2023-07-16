@@ -7,8 +7,8 @@ madt_parse(acpi_madt_t* madt, acpi_context* toc)
     toc->madt.apic_addr = madt->apic_addr;
 
     // FUTURE: make madt.{apic,ioapic} as array or linked list.
-    uint8_t* ics_start = (uint8_t*)((uintptr_t)madt + sizeof(acpi_madt_t));
-    uintptr_t ics_end = (uintptr_t)madt + madt->header.length;
+    ptr_t ics_start = (ptr_t)madt + sizeof(acpi_madt_t);
+    ptr_t ics_end = (ptr_t)madt + madt->header.length;
 
     // Cosidering only one IOAPIC present (max 24 pins)
     toc->madt.irq_exception =

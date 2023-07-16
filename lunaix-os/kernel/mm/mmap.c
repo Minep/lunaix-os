@@ -58,13 +58,13 @@ mem_adjust_inplace(vm_regions_t* regions,
 int
 mem_map(void** addr_out,
         struct mm_region** created,
-        void* addr,
+        ptr_t addr,
         struct v_file* file,
         struct mmap_param* param)
 {
     assert_msg(addr, "addr can not be NULL");
 
-    ptr_t last_end = USER_START, found_loc = (ptr_t)addr;
+    ptr_t last_end = USER_START, found_loc = addr;
     struct mm_region *pos, *n;
 
     vm_regions_t* vm_regions = &param->pvms->regions;
@@ -131,7 +131,7 @@ found:
     }
 
     if (addr_out) {
-        *addr_out = found_loc;
+        *addr_out = (void*)found_loc;
     }
     if (created) {
         *created = region;
@@ -146,6 +146,9 @@ mem_remap(void** addr_out,
           struct v_file* file,
           struct mmap_param* param)
 {
+    // TODO
+
+    return EINVAL;
 }
 
 void
@@ -168,9 +171,13 @@ mem_sync_pages(ptr_t mnt,
         if (PG_IS_DIRTY(*mapping.pte)) {
             size_t offset = mapping.va - region->start + region->foff;
             struct v_inode* inode = region->mfile->inode;
-            region->mfile->ops->write_page(inode, mapping.va, PG_SIZE, offset);
+
+            region->mfile->ops->write_page(
+              inode, (void*)mapping.va, PG_SIZE, offset);
+
             *mapping.pte &= ~PG_DIRTY;
-            cpu_invplg(mapping.pte);
+
+            cpu_invplg((ptr_t)mapping.pte);
         } else if ((options & MS_INVALIDATE)) {
             goto invalidate;
         }
@@ -184,7 +191,7 @@ mem_sync_pages(ptr_t mnt,
     invalidate:
         *mapping.pte &= ~PG_PRESENT;
         pmm_free_page(KERNEL_PID, mapping.pa);
-        cpu_invplg(mapping.pte);
+        cpu_invplg((ptr_t)mapping.pte);
     }
 }
 
@@ -231,7 +238,7 @@ mem_unmap_region(ptr_t mnt, struct mm_region* region)
 }
 
 int
-mem_unmap(ptr_t mnt, vm_regions_t* regions, void* addr, size_t length)
+mem_unmap(ptr_t mnt, vm_regions_t* regions, ptr_t addr, size_t length)
 {
     length = ROUNDUP(length, PG_SIZE);
     ptr_t cur_addr = PG_ALIGN(addr);
@@ -289,14 +296,16 @@ __DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
     int errno = 0;
     void* result = (void*)-1;
 
-    if (!length || length > BS_SIZE || !PG_ALIGNED(addr)) {
+    ptr_t addr_ptr = (ptr_t)addr;
+
+    if (!length || length > BS_SIZE || !PG_ALIGNED(addr_ptr)) {
         errno = EINVAL;
         goto done;
     }
 
-    if (!addr) {
-        addr = UMMAP_START;
-    } else if (addr < UMMAP_START || addr + length >= UMMAP_END) {
+    if (!addr_ptr) {
+        addr_ptr = UMMAP_START;
+    } else if (addr_ptr < UMMAP_START || addr_ptr + length >= UMMAP_END) {
         if (!(options & (MAP_FIXED | MAP_FIXED_NOREPLACE))) {
             errno = ENOMEM;
             goto done;
@@ -323,19 +332,20 @@ __DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
                                 .offset = offset,
                                 .type = REGION_TYPE_GENERAL,
                                 .proct = proct,
-                                .pvms = &__current->mm,
+                                .pvms = (struct proc_mm*)&__current->mm,
                                 .vms_mnt = VMS_SELF };
 
-    errno = mem_map(&result, NULL, addr, file, &param);
+    errno = mem_map(&result, NULL, addr_ptr, file, &param);
 
 done:
     __current->k_status = errno;
     return result;
 }
 
-__DEFINE_LXSYSCALL2(void, munmap, void*, addr, size_t, length)
+__DEFINE_LXSYSCALL2(int, munmap, void*, addr, size_t, length)
 {
-    return mem_unmap(VMS_SELF, &__current->mm.regions, addr, length);
+    return mem_unmap(
+      VMS_SELF, (vm_regions_t*)&__current->mm.regions, (ptr_t)addr, length);
 }
 
 __DEFINE_LXSYSCALL3(int, msync, void*, addr, size_t, length, int, flags)
@@ -344,8 +354,11 @@ __DEFINE_LXSYSCALL3(int, msync, void*, addr, size_t, length, int, flags)
         return DO_STATUS(EINVAL);
     }
 
-    int status =
-      mem_msync(VMS_SELF, &__current->mm.regions, addr, length, flags);
+    int status = mem_msync(VMS_SELF,
+                           (vm_regions_t*)&__current->mm.regions,
+                           (ptr_t)addr,
+                           length,
+                           flags);
 
     return DO_STATUS(status);
 }

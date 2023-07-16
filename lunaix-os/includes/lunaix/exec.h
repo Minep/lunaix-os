@@ -28,7 +28,7 @@ struct exec_container
     struct load_context exe;
 
     // argv prependums
-    char* argv_pp[2];
+    const char* argv_pp[2];
     const char** argv;
     const char** envp;
 

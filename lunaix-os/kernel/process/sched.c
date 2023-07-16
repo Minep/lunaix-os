@@ -66,7 +66,7 @@ sched_init_dummy()
     *execp = (struct exec_param){
         .cs = KCODE_SEG,
         .eflags = cpu_reflags() | 0x0200,
-        .eip = (void*)my_dummy,
+        .eip = (ptr_t)my_dummy,
         .ss = KDATA_SEG,
     };
 
@@ -224,6 +224,8 @@ __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
 
     block_current();
     schedule();
+
+    return 0;
 }
 
 __DEFINE_LXSYSCALL1(unsigned int, alarm, unsigned int, seconds)
@@ -371,7 +373,7 @@ commit_process(struct proc_info* process)
 
 // from <kernel/process.c>
 extern void
-__del_pagetable(pid_t pid, uintptr_t mount_point);
+__del_pagetable(pid_t pid, ptr_t mount_point);
 
 pid_t
 destroy_process(pid_t pid)
@@ -379,8 +381,9 @@ destroy_process(pid_t pid)
     int index = pid;
     if (index <= 0 || index > sched_ctx.ptable_len) {
         __current->k_status = EINVAL;
-        return;
+        return -1;
     }
+
     struct proc_info* proc = sched_ctx._procs[index];
     sched_ctx._procs[index] = 0;
 

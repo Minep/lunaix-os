@@ -28,7 +28,7 @@ struct llist_header piles = { .next = &piles, .prev = &piles };
 void*
 __alloc_cake(unsigned int cake_pg)
 {
-    uintptr_t pa = pmm_alloc_cpage(KERNEL_PID, cake_pg, 0);
+    ptr_t pa = (ptr_t)pmm_alloc_cpage(KERNEL_PID, cake_pg, 0);
     if (!pa) {
         return NULL;
     }
@@ -44,9 +44,11 @@ __new_cake(struct cake_pile* pile)
         return NULL;
     }
 
-    int max_piece = pile->pieces_per_cake;
+    u32_t max_piece = pile->pieces_per_cake;
 
-    cake->first_piece = (void*)((uintptr_t)cake + pile->offset);
+    assert(max_piece);
+
+    cake->first_piece = (void*)((ptr_t)cake + pile->offset);
     cake->next_free = 0;
     pile->cakes_count++;
 
@@ -154,7 +156,7 @@ cake_grab(struct cake_pile* pile)
     }
 
     void* ptr =
-      (void*)((uintptr_t)pos->first_piece + found_index * pile->piece_size);
+      (void*)((ptr_t)pos->first_piece + found_index * pile->piece_size);
 
     if (pile->ctor) {
         pile->ctor(pile, ptr);
@@ -176,8 +178,7 @@ cake_release(struct cake_pile* pile, void* area)
             if (pos->first_piece > area) {
                 continue;
             }
-            piece_index =
-              (uintptr_t)(area - pos->first_piece) / pile->piece_size;
+            piece_index = (ptr_t)(area - pos->first_piece) / pile->piece_size;
             if (piece_index < pile->pieces_per_cake) {
                 goto found;
             }

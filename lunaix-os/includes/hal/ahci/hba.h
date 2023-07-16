@@ -79,8 +79,8 @@ typedef unsigned int hba_reg_t;
 
 struct hba_cmdh
 {
-    uint16_t options;
-    uint16_t prdt_len;
+    u16_t options;
+    u16_t prdt_len;
     u32_t transferred_size;
     u32_t cmd_table_base;
     u32_t reserved[5];
@@ -97,9 +97,9 @@ struct hba_prdte
 
 struct hba_cmdt
 {
-    uint8_t command_fis[64];
-    uint8_t atapi_cmd[16];
-    uint8_t reserved[0x30];
+    u8_t command_fis[64];
+    u8_t atapi_cmd[16];
+    u8_t reserved[0x30];
     struct hba_prdte entries[HBA_MAX_PRDTE];
 } __HBA_PACKED__;
 
@@ -114,16 +114,16 @@ struct hba_device
     char serial_num[20];
     char model[40];
     u32_t flags;
-    uint64_t max_lba;
+    lba_t max_lba;
     u32_t block_size;
-    uint64_t wwn;
-    uint8_t cbd_size;
+    u64_t wwn;
+    u8_t cbd_size;
     struct
     {
-        uint8_t sense_key;
-        uint8_t error;
-        uint8_t status;
-        uint8_t reserve;
+        u8_t sense_key;
+        u8_t error;
+        u8_t status;
+        u8_t reserve;
     } last_result;
     u32_t alignment_offset;
     u32_t block_per_sec;

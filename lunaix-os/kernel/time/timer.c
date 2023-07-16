@@ -41,7 +41,7 @@ static volatile struct lx_timer_context* timer_ctx = NULL;
 // Don't optimize them! Took me an half hour to figure that out...
 
 static volatile u32_t rtc_counter = 0;
-static volatile uint8_t apic_timer_done = 0;
+static volatile u8_t apic_timer_done = 0;
 
 static volatile u32_t sched_ticks = 0;
 static volatile u32_t sched_ticks_counter = 0;
@@ -157,7 +157,7 @@ struct lx_timer*
 timer_run_second(u32_t second,
                  void (*callback)(void*),
                  void* payload,
-                 uint8_t flags)
+                 u8_t flags)
 {
     return timer_run(
       second * timer_ctx->running_frequency, callback, payload, flags);
@@ -167,7 +167,7 @@ struct lx_timer*
 timer_run_ms(u32_t millisecond,
              void (*callback)(void*),
              void* payload,
-             uint8_t flags)
+             u8_t flags)
 {
     return timer_run(timer_ctx->running_frequency / 1000 * millisecond,
                      callback,
@@ -176,7 +176,7 @@ timer_run_ms(u32_t millisecond,
 }
 
 struct lx_timer*
-timer_run(ticks_t ticks, void (*callback)(void*), void* payload, uint8_t flags)
+timer_run(ticks_t ticks, void (*callback)(void*), void* payload, u8_t flags)
 {
     struct lx_timer* timer = (struct lx_timer*)cake_grab(timer_pile);
 
@@ -247,5 +247,5 @@ temp_intr_routine_apic_timer(const isr_param* param)
 struct lx_timer_context*
 timer_context()
 {
-    return timer_ctx;
+    return (struct lx_timer_context*)timer_ctx;
 }

@@ -86,7 +86,7 @@ typedef struct
     // 物理页地址（如果不存在映射，则为0）
     ptr_t pa;
     // 映射的flags
-    uint16_t flags;
+    u16_t flags;
     // PTE地址
     x86_pte_t* pte;
 } v_mapping;
@@ -94,7 +94,7 @@ typedef struct
 typedef struct
 {
     x86_pte_t entry[PG_MAX_ENTRIES];
-} __attribute__((packed)) x86_page_table;
+} __attribute__((packed, aligned(4))) x86_page_table;
 
 extern void __pg_mount_point;
 

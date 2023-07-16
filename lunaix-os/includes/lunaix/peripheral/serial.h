@@ -26,24 +26,24 @@ void
 serial_init();
 
 char
-serial_rx_byte(uintptr_t port);
+serial_rx_byte(ptr_t port);
 
 void
-serial_rx_buffer(uintptr_t port, char* data, size_t len);
+serial_rx_buffer(ptr_t port, char* data, size_t len);
 
 void
-serial_tx_byte(uintptr_t port, char data);
+serial_tx_byte(ptr_t port, char data);
 
 void
-serial_tx_buffer(uintptr_t port, char* data, size_t len);
+serial_tx_buffer(ptr_t port, char* data, size_t len);
 
 void
-serial_clear_fifo(uintptr_t port);
+serial_clear_fifo(ptr_t port);
 
 void
-serial_disable_irq(uintptr_t port);
+serial_disable_irq(ptr_t port);
 
 void
-serial_enable_irq(uintptr_t port);
+serial_enable_irq(ptr_t port);
 
 #endif /* __LUNAIX_SERIAL_H */

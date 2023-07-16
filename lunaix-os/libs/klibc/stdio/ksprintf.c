@@ -20,7 +20,10 @@ static const char flag_chars[] = "#0- +";
 #define FLAG_CAPS (1 << 9)
 
 size_t
-__ksprintf_internal(char* buffer, char* fmt, size_t max_len, va_list vargs)
+__ksprintf_internal(char* buffer,
+                    const char* fmt,
+                    size_t max_len,
+                    va_list vargs)
 {
     // This sprintf just a random implementation I found it on Internet . lol.
     //      Of course, with some modifications for porting to LunaixOS :)
@@ -113,7 +116,7 @@ __ksprintf_internal(char* buffer, char* fmt, size_t max_len, va_list vargs)
                 base = 16;
                 goto format_unsigned;
             case 'p':
-                num = (uintptr_t)va_arg(vargs, void*);
+                num = (ptr_t)va_arg(vargs, void*);
                 base = 16;
                 flags |= FLAG_ALT | FLAG_ALT2 | FLAG_NUMERIC;
                 break;

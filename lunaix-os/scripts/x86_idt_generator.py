@@ -87,16 +87,16 @@ def export_c(src: Path):
 
 #define IDT_ENTRY 256
 
-uint64_t _idt[IDT_ENTRY];
-uint16_t _idt_limit = sizeof(_idt) - 1;
+u64_t _idt[IDT_ENTRY];
+u16_t _idt_limit = sizeof(_idt) - 1;
 static inline void
 _set_idt_entry(u32_t vector,
-               uint16_t seg_selector,
+               u16_t seg_selector,
                void (*isr)(),
-               uint8_t dpl,
-               uint8_t type)
+               u8_t dpl,
+               u8_t type)
 {{
-    uintptr_t offset = (uintptr_t)isr;
+    ptr_t offset = (ptr_t)isr;
     _idt[vector] = (offset & 0xffff0000) | IDT_ATTR(dpl, type);
     _idt[vector] <<= 32;
     _idt[vector] |= (seg_selector << 16) | (offset & 0x0000ffff);

@@ -2,6 +2,7 @@
 #include <lunaix/load.h>
 #include <lunaix/mm/mmap.h>
 #include <lunaix/mm/page.h>
+#include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 
 int

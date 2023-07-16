@@ -160,7 +160,7 @@ pcache_read(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
         fpos += rd_bytes;
     }
 
-    return errno < 0 ? errno : buf_off;
+    return errno < 0 ? errno : (int)buf_off;
 }
 
 void
@@ -180,7 +180,7 @@ int
 pcache_commit(struct v_inode* inode, struct pcache_pg* page)
 {
     if (!(page->flags & PCACHE_DIRTY)) {
-        return;
+        return 0;
     }
 
     int errno =

@@ -1,7 +1,9 @@
 #ifndef __LUNAIX_SYS_TYPES_H
 #define __LUNAIX_SYS_TYPES_H
 
+#undef NULL
 #define NULL (void*)0
+#define NULLPTR 0
 
 #define PEXITTERM 0x100
 #define PEXITSTOP 0x200

@@ -20,38 +20,38 @@
 
 struct sata_fis_head
 {
-    uint8_t type;
-    uint8_t options;
-    uint8_t status_cmd;
-    uint8_t feat_err;
+    u8_t type;
+    u8_t options;
+    u8_t status_cmd;
+    u8_t feat_err;
 } __HBA_PACKED__;
 
 struct sata_reg_fis
 {
     struct sata_fis_head head;
 
-    uint8_t lba0, lba8, lba16;
-    uint8_t dev;
-    uint8_t lba24, lba32, lba40;
-    uint8_t feature;
+    u8_t lba0, lba8, lba16;
+    u8_t dev;
+    u8_t lba24, lba32, lba40;
+    u8_t feature;
 
-    uint16_t count;
+    u16_t count;
 
-    uint8_t reserved[6];
+    u8_t reserved[6];
 } __HBA_PACKED__;
 
 struct sata_data_fis
 {
     struct sata_fis_head head;
 
-    uint8_t data[0];
+    u8_t data[0];
 } __HBA_PACKED__;
 
 void
 sata_create_fis(struct sata_reg_fis* cmd_fis,
-                uint8_t command,
-                uint64_t lba,
-                uint16_t sector_count);
+                u8_t command,
+                lba_t lba,
+                u16_t sector_count);
 
 void
 sata_submit(struct hba_device* dev, struct blkio_req* io_req);

@@ -28,4 +28,7 @@
 #define _SIG_UNBLOCK SIG_UNBLOCK
 #define _SIG_SETMASK SIG_SETMASK
 
+int
+signal_send(pid_t pid, int signum);
+
 #endif /* __LUNAIX_SIGNAL_H */

@@ -10,7 +10,7 @@ mcfg_parse(acpi_sdthdr_t* mcfg, acpi_context* toc)
     size_t alloc_num = (mcfg->length - sizeof(acpi_sdthdr_t) - 8) /
                        sizeof(struct acpi_mcfg_alloc);
     struct acpi_mcfg_alloc* allocs =
-      (struct acpi_mcfg_alloc*)((uintptr_t)mcfg + (sizeof(acpi_sdthdr_t) + 8));
+      (struct acpi_mcfg_alloc*)((ptr_t)mcfg + (sizeof(acpi_sdthdr_t) + 8));
 
     toc->mcfg.alloc_num = alloc_num;
     toc->mcfg.allocations = valloc(sizeof(struct mcfg_alloc_info) * alloc_num);

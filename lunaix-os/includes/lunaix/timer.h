@@ -37,7 +37,7 @@ struct lx_timer
     ticks_t counter;
     void* payload;
     void (*callback)(void*);
-    uint8_t flags;
+    u8_t flags;
 };
 
 /**
@@ -52,16 +52,16 @@ struct lx_timer*
 timer_run_second(u32_t second,
                  void (*callback)(void*),
                  void* payload,
-                 uint8_t flags);
+                 u8_t flags);
 
 struct lx_timer*
 timer_run_ms(u32_t millisecond,
              void (*callback)(void*),
              void* payload,
-             uint8_t flags);
+             u8_t flags);
 
 struct lx_timer*
-timer_run(ticks_t ticks, void (*callback)(void*), void* payload, uint8_t flags);
+timer_run(ticks_t ticks, void (*callback)(void*), void* payload, u8_t flags);
 
 struct lx_timer_context*
 timer_context();

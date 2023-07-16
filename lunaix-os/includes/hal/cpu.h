@@ -39,7 +39,7 @@ cpu_has_apic();
 static inline reg32
 cpu_rcr0()
 {
-    uintptr_t val;
+    ptr_t val;
     asm volatile("movl %%cr0,%0" : "=r"(val));
     return val;
 }
@@ -47,7 +47,7 @@ cpu_rcr0()
 static inline reg32
 cpu_rcr2()
 {
-    uintptr_t val;
+    ptr_t val;
     asm volatile("movl %%cr2,%0" : "=r"(val));
     return val;
 }
@@ -55,7 +55,7 @@ cpu_rcr2()
 static inline reg32
 cpu_rcr3()
 {
-    uintptr_t val;
+    ptr_t val;
     asm volatile("movl %%cr3,%0" : "=r"(val));
     return val;
 }
@@ -63,7 +63,7 @@ cpu_rcr3()
 static inline reg32
 cpu_reflags()
 {
-    uintptr_t val;
+    ptr_t val;
     asm volatile("pushf\n"
                  "popl %0\n"
                  : "=r"(val)::);
@@ -90,9 +90,9 @@ cpu_lcr3(reg32 v)
 }
 
 static inline void
-cpu_invplg(void* va)
+cpu_invplg(ptr_t va)
 {
-    asm volatile("invlpg (%0)" ::"r"((uintptr_t)va) : "memory");
+    asm volatile("invlpg (%0)" ::"r"(va) : "memory");
 }
 
 static inline void

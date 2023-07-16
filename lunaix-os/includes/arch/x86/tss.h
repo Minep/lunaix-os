@@ -6,8 +6,8 @@ struct x86_tss
 {
     u32_t link;
     u32_t esp0;
-    uint16_t ss0;
-    uint8_t __padding[94];
+    u16_t ss0;
+    u8_t __padding[94];
 } __attribute__((packed));
 
 void

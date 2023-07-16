@@ -52,8 +52,8 @@ struct proc_info
     pid_t pid;                // offset = 0
     struct proc_info* parent; // offset = 4
     isr_param intr_ctx;       // offset = 8
-    uintptr_t ustack_top;     // offset = 84 -> 56 -> 60
-    void* page_table;         // offset = 88 -> 60 -> 64
+    ptr_t ustack_top;         // offset = 84 -> 56 -> 60
+    ptr_t page_table;         // offset = 88 -> 60 -> 64
     void* fxstate;            // offset = 92 -> 64 -> 68
 
     /* ---- critical section end ---- */
@@ -73,7 +73,7 @@ struct proc_info
 
     struct proc_mm mm;
     time_t created;
-    uint8_t state;
+    u8_t state;
     int32_t exit_code;
     int32_t k_status;
     sigset_t sig_pending;
@@ -122,7 +122,7 @@ pid_t
 destroy_process(pid_t pid);
 
 void
-setup_proc_mem(struct proc_info* proc, uintptr_t kstack_from);
+setup_proc_mem(struct proc_info* proc, ptr_t kstack_from);
 
 /**
  * @brief 复制当前进程（LunaixOS的类 fork (unix) 实现）

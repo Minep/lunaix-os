@@ -94,7 +94,7 @@
         pushl 8(%ebp)       /* ecx - #2 arg */
         pushl 4(%ebp)       /* ebx - #1 arg */
         
-        call (%eax)
+        call *(%eax)
 
         movl %eax, (%ebp)    /* save the return value */
 
