@@ -6,8 +6,8 @@ int
 main(int argc, const char* argv[])
 {
     char* path = ".";
-    if (argc > 0) {
-        path = argv[0];
+    if (argc > 1) {
+        path = argv[1];
     }
 
     DIR* dir = opendir(path);

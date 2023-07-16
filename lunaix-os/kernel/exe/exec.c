@@ -1,7 +1,7 @@
 #include <arch/abi.h>
-#include <lunaix/elf.h>
 #include <lunaix/exec.h>
 #include <lunaix/fs.h>
+#include <lunaix/load.h>
 #include <lunaix/mm/mmap.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
@@ -14,11 +14,18 @@
 #include <klibc/string.h>
 
 void
-exec_container(struct exec_container* param, struct proc_info* proc, ptr_t vms)
+exec_container(struct exec_container* param,
+               struct proc_info* proc,
+               ptr_t vms,
+               const char** argv,
+               const char** envp)
 {
     *param = (struct exec_container){ .proc = proc,
                                       .vms_mnt = vms,
-                                      .executable = { .container = param } };
+                                      .exe = { .container = param },
+                                      .argv_pp = { 0, 0 },
+                                      .argv = argv,
+                                      .envp = envp };
 }
 
 size_t
@@ -48,70 +55,26 @@ extern int
 create_heap(struct proc_mm* pvms, ptr_t addr);
 
 int
-exec_load(struct exec_container* container,
-          struct v_file* executable,
-          const char** argv,
-          const char** envp)
+exec_load(struct exec_container* container, struct v_file* executable)
 {
     int errno = 0;
-    char* ldpath = NULL;
 
+    const char **argv = container->argv, **envp = container->envp;
     size_t argv_len, envp_len;
     size_t sz_argv = exec_str_size(argv, &argv_len);
     size_t sz_envp = exec_str_size(envp, &envp_len);
     size_t var_sz = ROUNDUP(sz_envp, PG_SIZE);
+    char** argv_extra = container->argv_pp;
 
-    char* argv_extra[2] = { executable->dnode->name.value, 0 };
+    argv_extra[0] = executable->dnode->name.value;
 
     if (var_sz / PG_SIZE > MAX_VAR_PAGES) {
         errno = E2BIG;
         goto done;
     }
 
-    struct elf32 elf;
-
-    if ((errno = elf32_openat(&elf, executable))) {
+    if ((errno = load_executable(&container->exe, executable))) {
         goto done;
-    }
-
-    if (!elf32_check_exec(&elf)) {
-        errno = ENOEXEC;
-        goto done;
-    }
-
-    ldpath = valloc(512);
-    errno = elf32_find_loader(&elf, ldpath, 512);
-
-    if (errno < 0) {
-        vfree(ldpath);
-        goto done;
-    }
-
-    if (errno != NO_LOADER) {
-        // TODO load loader
-        argv_extra[1] = ldpath;
-
-        // close old elf
-        if ((errno = elf32_close(&elf))) {
-            goto done;
-        }
-
-        // open the loader instead
-        if ((errno = elf32_open(&elf, ldpath))) {
-            goto done;
-        }
-
-        // Is this the valid loader?
-        if (!elf32_static_linked(&elf) || !elf32_check_exec(&elf)) {
-            errno = ELIBBAD;
-            goto done_close_elf32;
-        }
-
-        // TODO: relocate loader
-    }
-
-    if ((errno = elf32_load(&container->executable, &elf))) {
-        goto done_close_elf32;
     }
 
     struct proc_mm* pvms = &container->proc->mm;
@@ -134,11 +97,11 @@ exec_load(struct exec_container* container,
     if (!argv_extra[1]) {
         // If loading a statically linked file, then heap remapping we can do,
         // otherwise delayed.
-        create_heap(container->vms_mnt, PG_ALIGN(container->executable.end));
+        create_heap(&container->proc->mm, PG_ALIGN(container->exe.end));
     }
 
     if ((errno = mem_map(&mapped, NULL, UMMAP_END, NULL, &map_vars))) {
-        goto done_close_elf32;
+        goto done;
     }
 
     if (container->vms_mnt == VMS_SELF) {
@@ -190,18 +153,12 @@ exec_load(struct exec_container* container,
         fail("not implemented");
     }
 
-done_close_elf32:
-    elf32_close(&elf);
 done:
-    vfree_safe(ldpath);
     return errno;
 }
 
 int
-exec_load_byname(struct exec_container* container,
-                 const char* filename,
-                 const char** argv,
-                 const char** envp)
+exec_load_byname(struct exec_container* container, const char* filename)
 {
     int errno = 0;
     struct v_dnode* dnode;
@@ -215,26 +172,33 @@ exec_load_byname(struct exec_container* container,
         goto done;
     }
 
-    errno = exec_load(container, file, argv, envp);
+    errno = exec_load(container, file);
 
 done:
     return errno;
 }
 
 int
-exec_kexecve(const char* filename, const char* argv[], const char* envp)
+exec_kexecve(const char* filename, const char* argv[], const char* envp[])
 {
     int errno = 0;
     struct exec_container container;
-    exec_container(&container, __current, VMS_SELF);
+    exec_container(&container, __current, VMS_SELF, argv, envp);
 
-    errno = exec_load_byname(&container, filename, argv, envp);
+    errno = exec_load_byname(&container, filename);
 
     if (errno) {
         return errno;
     }
 
-    j_usr(container.stack_top, container.entry);
+    ptr_t entry = container.exe.entry;
+
+    assert(entry);
+    j_usr(container.stack_top, entry);
+
+    // should not reach
+
+    return errno;
 }
 
 __DEFINE_LXSYSCALL3(int,
@@ -248,9 +212,9 @@ __DEFINE_LXSYSCALL3(int,
 {
     int errno = 0;
     struct exec_container container;
-    exec_container(&container, __current, VMS_SELF);
+    exec_container(&container, __current, VMS_SELF, argv, envp);
 
-    if (!(errno = exec_load_byname(&container, filename, argv, envp))) {
+    if ((errno = exec_load_byname(&container, filename))) {
         goto done;
     }
 
@@ -258,7 +222,7 @@ __DEFINE_LXSYSCALL3(int,
     // return so execve 'will not return' from the perspective of it's invoker
     volatile struct exec_param* execp = __current->intr_ctx.execp;
     execp->esp = container.stack_top;
-    execp->eip = container.entry;
+    execp->eip = container.exe.entry;
 
 done:
     // set return value

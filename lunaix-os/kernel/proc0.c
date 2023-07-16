@@ -68,7 +68,7 @@ exec_initd()
 {
     int errno = 0;
 
-    if (exec_kexecve("/mnt/lunaix-os/usr/init", NULL, NULL)) {
+    if ((errno = exec_kexecve("/mnt/lunaix-os/usr/init", NULL, NULL))) {
         goto fail;
     }
 

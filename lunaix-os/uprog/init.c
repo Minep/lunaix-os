@@ -28,7 +28,7 @@ main(int argc, const char** argv)
 
     pid_t pid;
     if (!(pid = fork())) {
-        err = execve("/mnt/lunaix-os/usr/sh", NULL, NULL);
+        err = execve("/usr/sh", NULL, NULL);
         printf("fail to execute (%d)\n", errno);
         _exit(err);
     }

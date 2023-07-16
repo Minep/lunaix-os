@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_ELF_H
-#define __LUNAIX_ELF_H
+#ifndef __LUNAIX_ELF32_H
+#define __LUNAIX_ELF32_H
 
 #include <lunaix/types.h>
 
@@ -33,6 +33,9 @@ typedef unsigned int elf32_wrd_t;
 
 #define EI_CLASS 4
 #define EI_DATA 5
+
+#define NO_LOADER 0
+#define DEFAULT_LOADER "usr/ld"
 
 struct elf32_ehdr
 {
@@ -114,10 +117,7 @@ elf32_read_phdr(struct elf32* elf);
 size_t
 elf32_loadable_memsz(const struct elf32* elf);
 
-int
-elf32_load(struct load_context* ldctx, const struct elf32* elf);
-
 #define SIZE_EHDR sizeof(struct elf32_ehdr)
 #define SIZE_PHDR sizeof(struct elf32_phdr)
 
-#endif /* __LUNAIX_ELF_H */
+#endif /* __LUNAIX_ELF32_H */

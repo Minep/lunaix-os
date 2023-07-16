@@ -1,13 +1,9 @@
 #ifndef __LUNAIX_EXEC_H
 #define __LUNAIX_EXEC_H
 
-#include <lunaix/elf.h>
 #include <lunaix/fs.h>
 #include <lunaix/process.h>
 #include <lunaix/types.h>
-
-#define NO_LOADER 0
-#define DEFAULT_LOADER "usr/ld"
 
 #define MAX_VAR_PAGES 8
 #define DEFAULT_HEAP_PAGES 16
@@ -29,10 +25,14 @@ struct exec_container
     struct proc_info* proc;
     ptr_t vms_mnt;
 
-    struct load_context executable;
+    struct load_context exe;
+
+    // argv prependums
+    char* argv_pp[2];
+    const char** argv;
+    const char** envp;
 
     ptr_t stack_top;
-    ptr_t entry; // mapped to one of {executable|loader}.entry
 
     int status;
 };
@@ -48,19 +48,13 @@ struct uexec_param
 #ifndef __USR_WRAPPER__
 
 int
-exec_load_byname(struct exec_container* container,
-                 const char* filename,
-                 const char** argv,
-                 const char** envp);
+exec_load_byname(struct exec_container* container, const char* filename);
 
 int
-exec_load(struct exec_container* container,
-          struct v_file* executable,
-          const char** argv,
-          const char** envp);
+exec_load(struct exec_container* container, struct v_file* executable);
 
 int
-exec_kexecve(const char* filename, const char* argv[], const char* envp);
+exec_kexecve(const char* filename, const char* argv[], const char* envp[]);
 
 #endif
 
