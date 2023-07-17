@@ -4,6 +4,7 @@
             "name": "OS-DEV",
             "includePath": [
                 "${workspaceFolder}/includes",
+                "${workspaceFolder}/includes/usr",
                 "${workspaceFolder}/usr/includes"
             ],
             "compilerArgs": [

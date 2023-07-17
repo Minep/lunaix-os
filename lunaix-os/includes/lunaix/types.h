@@ -3,7 +3,7 @@
 
 #include <stdarg.h>
 #include <stddef.h>
-#include <sys/types.h>
+#include <usr/lunaix/types.h>
 
 #define PACKED __attribute__((packed))
 

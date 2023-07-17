@@ -56,7 +56,7 @@
 
 #include <lunaix/fs/twifs.h>
 
-#include <sys/dirent_defs.h>
+#include <usr/lunaix/dirent_defs.h>
 
 static struct cake_pile* dnode_pile;
 static struct cake_pile* inode_pile;

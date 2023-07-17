@@ -1,8 +1,0 @@
-OS_ARCH := x86
-OS_NAME := lunaix
-OS_ID := LunaixOS
-OS_VER := dev$(shell date +%Y%m%d)
-OS_BIN := $(OS_NAME).bin
-OS_ISO := $(OS_NAME).iso
-
-USR_LIB := liblxusrt.a

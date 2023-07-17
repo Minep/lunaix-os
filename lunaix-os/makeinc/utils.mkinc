@@ -1,0 +1,4 @@
+status = @printf "  %-8s %s\n" $(1) $(2)
+status_ := @printf "  %-8s %s\n" $$(1) $$(2)
+
+export status_

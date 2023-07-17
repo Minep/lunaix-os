@@ -3,7 +3,7 @@
 #include <lunaix/fs/devfs.h>
 #include <lunaix/spike.h>
 
-#include <sys/dirent_defs.h>
+#include <usr/lunaix/dirent_defs.h>
 
 extern struct v_inode_ops devfs_inode_ops;
 extern struct v_file_ops devfs_file_ops;

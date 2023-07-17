@@ -6,7 +6,7 @@
 
 #include <klibc/string.h>
 
-#include <sys/dirent_defs.h>
+#include <usr/lunaix/dirent_defs.h>
 
 extern struct cake_pile* drec_cache_pile;
 

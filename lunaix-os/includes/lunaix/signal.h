@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_SIGNAL_H
 #define __LUNAIX_SIGNAL_H
 
-#include <signal_defs.h>
+#include <usr/lunaix/signal_defs.h>
 
 #define _SIG_NUM 16
 
