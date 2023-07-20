@@ -61,6 +61,14 @@ cpu_rcr3()
 }
 
 static inline reg32
+cpu_rcr4()
+{
+    ptr_t val;
+    asm volatile("movl %%cr4,%0" : "=r"(val));
+    return val;
+}
+
+static inline reg32
 cpu_reflags()
 {
     ptr_t val;

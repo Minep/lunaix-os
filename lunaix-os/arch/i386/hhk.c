@@ -85,6 +85,9 @@ _init_page(ptd_t* ptd)
     for (u32_t i = 0; i < kernel_pg_counts; i++) {
         // FIXME: 只是用作用户模式（R3）测试！
         //        在实际中，内核代码除了极少部分需要暴露给R3（如从信号返回），其余的应为R0。
+
+#warning "fixme: kernel pages should not be user-accessable"
+
         SET_PTE(ptd,
                 PG_TABLE_KERNEL,
                 kernel_pte_index + i,

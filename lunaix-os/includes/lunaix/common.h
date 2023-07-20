@@ -25,6 +25,8 @@
 #define KCODE_SEG 0x08
 #define KDATA_SEG 0x10
 
+#define KSIZE (MEM_4MB * 16)
+
 #define USTACK_SIZE MEM_4MB
 #define USTACK_TOP 0x9ffffff0
 #define USTACK_END (0x9fffffff - USTACK_SIZE + 1)

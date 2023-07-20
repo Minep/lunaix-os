@@ -1,14 +1,16 @@
 #ifndef __LUNAIX_SYS_SIGNAL_DEFS_H
 #define __LUNAIX_SYS_SIGNAL_DEFS_H
 
-#define SIGSEGV 1
-#define SIGALRM 2
-#define SIGCHLD 3
+#define SIGALRM 1
+#define SIGCHLD 2
 #define SIGCLD SIGCHLD
-#define SIGINT 4
-#define SIGKILL 5
-#define SIGSTOP 6
-#define SIGCONT 7
+
+#define SIGSTOP 3
+#define SIGCONT 4
+
+#define SIGINT 5
+#define SIGSEGV 6
+#define SIGKILL 7
 #define SIGTERM 8
 
 #define SIG_BLOCK 1

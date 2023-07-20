@@ -9,22 +9,8 @@
 
 extern struct scheduler sched_ctx; /* kernel/sched.c */
 
-extern void
-_exit(int status);
-
-void __USER__
-default_sighandler_term(int signum)
-{
-    _exit(signum);
-}
-
-void* default_handlers[_SIG_NUM] = {
-    // TODO: 添加默认handler
-    [_SIGINT] = default_sighandler_term,
-    [_SIGTERM] = default_sighandler_term,
-    [_SIGKILL] = default_sighandler_term,
-    [_SIGSEGV] = default_sighandler_term,
-};
+static u32_t term_sigs =
+  (1 << SIGSEGV) | (1 << SIGINT) | (1 << SIGKILL) | (1 << SIGTERM);
 
 // Referenced in kernel/asm/x86/interrupt.S
 void*
@@ -46,13 +32,12 @@ signal_dispatch()
         return 0;
     }
 
-    // TODO: SIG{INT|TERM|KILL|SEGV} should have highest priority.
-    //       Terminate the process right here if any of unmaskable signal is
-    //       set.
-
-    if (!__current->sig_handler[sig_selected] &&
-        !default_handlers[sig_selected]) {
-        // 如果该信号没有handler，则忽略
+    if (!__current->sig_handler[sig_selected]) {
+        if ((term_sigs & (1 << sig_selected))) {
+            terminate_proc(sig_selected);
+            schedule();
+            // never return
+        }
         return 0;
     }
 
@@ -94,11 +79,6 @@ signal_dispatch()
 
     sig_ctx->sig_num = sig_selected;
     sig_ctx->signal_handler = __current->sig_handler[sig_selected];
-
-    if (!sig_ctx->signal_handler) {
-        // 如果没有用户自定义的Handler，则使用系统默认Handler。
-        sig_ctx->signal_handler = default_handlers[sig_selected];
-    }
 
     __SIGSET(__current->sig_inprogress, sig_selected);
 

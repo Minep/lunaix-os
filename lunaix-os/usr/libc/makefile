@@ -32,7 +32,7 @@ $(BUILD_DIR):
 	@$(CC) $(CFLAGS) $(libc_include_opt) $(global_include_opt) -c $< -o $@
 
 %.S.o: %.S
-	@$(call status_,CC,$@)
+	@$(call status_,AS,$@)
 	@$(CC) $(libc_include_opt) $(global_include_opt) -c $< -o $@
 
 $(build_lib)/$(BUILD_NAME): $(obj_files)

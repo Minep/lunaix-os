@@ -2,5 +2,5 @@ default=0
 timeout=0
 
 menuentry "$_OS_NAME" {
-	multiboot /boot/$_OS_NAME.bin
+	multiboot /boot/kernel.bin
 }

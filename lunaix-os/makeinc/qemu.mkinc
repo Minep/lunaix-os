@@ -1,7 +1,7 @@
 QEMU_MON_TERM := gnome-terminal
 QEMU_MON_PORT := 45454
 
-QEMU_OPTIONS := -s -S -m 1G \
+get_qemu_options = -s -S -m 1G \
 				-rtc base=utc \
 				-no-reboot \
 				-machine q35 \
@@ -10,7 +10,7 @@ QEMU_OPTIONS := -s -S -m 1G \
 				-d trace:ide_dma_cb \
 				-serial tcp::12345,server,nowait\
 				-drive id=disk,file="machine/disk0.vdi",if=none \
-				-drive id=cdrom,file="$(BUILD_DIR)/$(OS_ISO)",readonly=on,if=none,format=raw \
+				-drive id=cdrom,file="$(1)",readonly=on,if=none,format=raw \
 				-device ahci,id=ahci \
 				-device ide-hd,drive=disk,bus=ahci.0 \
 				-device ide-cd,drive=cdrom,bus=ahci.1 \

@@ -14,20 +14,20 @@ SECTIONS {
 
     .hhk_init_text BLOCK(4K) : {
         * (.multiboot)
-        build/obj/arch/x86/*.o (.hhk_init)
-        build/obj/arch/x86/*.o (.text)
+        arch/*.o (.hhk_init)
+        arch/*.o (.text)
     }
 
     .hhk_init_bss BLOCK(4K) : {
-        build/obj/arch/x86/*.o (.bss)
+        arch/*.o (.bss)
     }
 
     .hhk_init_data BLOCK(4K) : {
-        build/obj/arch/x86/*.o (.data)
+        arch/*.o (.data)
     }
 
     .hhk_init_rodata BLOCK(4K) : {
-        build/obj/arch/x86/*.o (.rodata)
+        arch/*.o (.rodata)
     }
     __init_hhk_end = ALIGN(4K);
 
@@ -37,33 +37,41 @@ SECTIONS {
     /* 好了，我们的内核…… */
     .text BLOCK(4K) : AT ( ADDR(.text) - 0xC0000000 ) {
         __kernel_start = .;
-        build/obj/kernel/*.o (.text)
-        build/obj/hal/*.o (.text)
+        kernel/*.o (.text)
+        hal/*.o (.text)
+        debug/*.o (.text)
+        libs/*.o (.text)
     }
 
     __usrtext_start = ALIGN(4K);
     .usrtext BLOCK(4K) : AT ( ADDR(.usrtext) - 0xC0000000 ) {
-        build/obj/kernel/*.o (.usrtext)
+        * (.usrtext)
     }
     __usrtext_end = ALIGN(4K);
 
-    .data BLOCK(4k) : AT ( ADDR(.data) - 0xC0000000 ) {
-        build/obj/kernel/*.o (.data)
-        build/obj/hal/*.o (.data)
+    .data BLOCK(4K) : AT ( ADDR(.data) - 0xC0000000 ) {
+        kernel/*.o (.data)
+        hal/*.o (.data)
+        debug/*.o (.data)
+        libs/*.o (.data)
     }
 
     .rodata BLOCK(4K) : AT ( ADDR(.rodata) - 0xC0000000 ) {
-        build/obj/kernel/*.o (.rodata)
-        build/obj/hal/*.o (.rodata)
+        kernel/*.o (.rodata)
+        hal/*.o (.rodata)
+        debug/*.o (.rodata)
+        libs/*.o (.rodata)
     }
 
     .kpg BLOCK(4K) : AT ( ADDR(.kpg) - 0xC0000000 ) {
-        build/obj/arch/x86/*.o (.kpg)
+        arch/*.o (.kpg)
     }
 
     .bss BLOCK(4K) : AT ( ADDR(.bss) - 0xC0000000 ) {
-        build/obj/kernel/*.o (.bss)
-        build/obj/hal/*.o (.bss)
+        kernel/*.o (.bss)
+        hal/*.o (.bss)
+        debug/*.o (.bss)
+        libs/*.o (.bss)
     }
 
     __kernel_end = ALIGN(4K);

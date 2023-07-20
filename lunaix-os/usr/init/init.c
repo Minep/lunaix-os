@@ -28,12 +28,16 @@ main(int argc, const char** argv)
 
     pid_t pid;
     if (!(pid = fork())) {
-        err = execve("/usr/sh", NULL, NULL);
+        err = execve("/usr/bin/signal_demo", NULL, NULL);
         printf("fail to execute (%d)\n", errno);
         _exit(err);
     }
 
-    waitpid(pid, NULL, 0);
+    waitpid(pid, &err, 0);
+
+    if (err) {
+        printf("shell exit abnormally (%d)", err);
+    }
 
     return 0;
 }

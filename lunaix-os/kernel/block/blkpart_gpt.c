@@ -46,7 +46,8 @@ blkpart_parse(struct device* master, struct gpt_header* header)
         }
 
         // Convert UEFI's 512B LB representation into local LBA range.
-        u64_t slba_local = (ent->start_lba * GPT_BLKSIZE) / bdev->blk_size;
+        u64_t slba_local =
+          (ent->start_lba * GPT_BLKSIZE) / (u64_t)bdev->blk_size;
         u64_t elba_local = (ent->end_lba * GPT_BLKSIZE) / (u64_t)bdev->blk_size;
 
         kprintf("%s: guid part#%d: %d..%d\n",

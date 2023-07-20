@@ -28,6 +28,7 @@ __print_panic_msg(const char* msg, const isr_param* param);
 void
 intr_routine_page_fault(const isr_param* param)
 {
+    uint32_t errcode = param->execp->err_code;
     ptr_t ptr = cpu_rcr2();
     if (!ptr) {
         goto segv_term;
@@ -47,6 +48,11 @@ intr_routine_page_fault(const isr_param* param)
 
     if (!hit_region) {
         // 当你凝视深渊时……
+        goto segv_term;
+    }
+
+    if ((errcode & PG_ALLOW_USER)) {
+        // invalid access
         goto segv_term;
     }
 
@@ -78,7 +84,7 @@ intr_routine_page_fault(const isr_param* param)
                 goto oom;
             }
 
-            *pte = *pte | pa | PG_PRESENT;
+            *pte = *pte | pa | PG_PRESENT | PG_ALLOW_USER;
             memset((void*)PG_ALIGN(ptr), 0, PG_SIZE);
             goto resolved;
         }
@@ -101,7 +107,7 @@ intr_routine_page_fault(const isr_param* param)
         }
 
         cpu_invplg((ptr_t)pte);
-        *pte = (*pte & 0xFFF) | pa | PG_PRESENT;
+        *pte = (*pte & 0xFFF) | pa | PG_PRESENT | PG_ALLOW_USER;
 
         memset((void*)ptr, 0, PG_SIZE);
 
@@ -128,13 +134,17 @@ intr_routine_page_fault(const isr_param* param)
 
 oom:
     kprintf(KERROR "out of memory\n");
+
 segv_term:
-    kprintf(KERROR "(pid: %d) Segmentation fault on %p (%p:%p)\n",
+    kprintf(KERROR "(pid: %d) Segmentation fault on %p (%p:%p,e=0x%x)\n",
             __current->pid,
             ptr,
             param->execp->cs,
-            param->execp->eip);
+            param->execp->eip,
+            param->execp->err_code);
+
     __SIGSET(__current->sig_pending, _SIGSEGV);
+
     schedule();
     // should not reach
     while (1)

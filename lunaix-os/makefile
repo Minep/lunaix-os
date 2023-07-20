@@ -1,9 +1,23 @@
-include config/make-locations
-include config/make-os
-include config/make-cc
-include config/make-debug-tool
+mkinc_dir := $(CURDIR)/makeinc
+
+include $(mkinc_dir)/os.mkinc
+include $(mkinc_dir)/toolchain.mkinc
+include $(mkinc_dir)/qemu.mkinc
+include $(mkinc_dir)/utils.mkinc
+
+
+ARCH ?= i386
+export ARCH
 
 DEPS := $(CC) $(LD) $(AR) xorriso grub-mkrescue
+
+kbuild_dir := build
+kbin_dir := $(kbuild_dir)/bin
+os_img_dir := $(kbuild_dir)/img
+
+os_build_tag := $(OS_NAME)_$(ARCH)_$(OS_VER)
+kbin := $(kbin_dir)/kernel.bin
+kimg := $(kbuild_dir)/$(os_build_tag).iso
 
 $(DEPS):
 	@echo -n "checking $@ .... "
@@ -17,50 +31,55 @@ check-cc:
 	@echo -n "checking target i686-elf.... "
 	@test "`i686-elf-gcc -dumpmachine`" = "i686-elf" && echo ok || (echo "failed" && exit 1)
 
-$(OBJECT_DIR):
-	@mkdir -p $(OBJECT_DIR)
+$(kbuild_dir):
+	@mkdir -p $(kbin_dir)
+	@mkdir -p $(os_img_dir)
+	@mkdir -p $(os_img_dir)/boot
+	@mkdir -p $(os_img_dir)/boot/grub
+	@mkdir -p $(os_img_dir)/usr
 
-$(BIN_DIR):
-	@mkdir -p $(BIN_DIR)
+export BUILD_DIR=$(kbuild_dir)
+export BUILD_NAME=$(kbin)
+$(kbin):
+	$(call status,TASK,$(notdir $@))
+	@$(MAKE) $(MKFLAGS) -I $(mkinc_dir) -f kernel.mk all
 
-$(USR_DIR):
-	@mkdir -p $(USR_DIR)
+$(kimg): usr/build $(kbin)
+	$(call status,TASK,$(notdir $@))
+	@./config-grub.sh ${OS_NAME} $(os_img_dir)/boot/grub/grub.cfg
+	@cp -r usr/build/* $(os_img_dir)/usr
+	@cp $(kbin) $(os_img_dir)/boot
+	@grub-mkrescue -o $(kimg) $(os_img_dir) -- -volid "$(OS_ID) $(OS_VER)" -system_id "$(OS_NAME)"
 
-$(ISO_DIR):
-	@mkdir -p $(ISO_DIR)
-	@mkdir -p $(ISO_BOOT_DIR)
-	@mkdir -p $(ISO_GRUB_DIR)
+usr/build: user
 
 check: $(DEPS) check-cc GRUB_TEMPLATE
 
-prepare: check $(OBJECT_DIR) $(BIN_DIR) $(ISO_DIR) $(USR_DIR)
+prepare: check $(os_img_dir)
 
-usrlib: prepare makefile.usr
-	@make -f makefile.usr usr-runtime
+export BUILD_MODE=release
+bootable: $(kbuild_dir) $(kimg)
 
-usrlib-debug: prepare makefile.usr
-	@make -f makefile.usr usr-runtime-debug
+export BUILD_MODE=debug
+bootable-debug: $(kbuild_dir) $(kimg)
 
-usr-prog: prepare usrlib makefile.prog
-	@make -f makefile.prog all
-
-bootable: usr-prog usrlib makefile.ker
-	@make -f makefile.ker all
-
-bootable-debug: usr-prog usrlib-debug makefile.ker
-	@make -f makefile.ker all-debug
+user:
+	$(call status,$@)
+	@$(MAKE) $(MKFLAGS) -C usr all -I $(mkinc_dir)
 
 all: bootable
 
 instable: CFLAGS := -g -std=gnu99 -ffreestanding $(O) $(W) $(ARCH_OPT) -D__LUNAIXOS_DEBUG__
 instable: all
 
-all-debug: clean bootable-debug
-	@echo "Dumping the disassembled kernel code to $(BUILD_DIR)/kdump.txt"
-	@i686-elf-objdump -S $(BIN_DIR)/$(OS_BIN) > $(BUILD_DIR)/kdump.txt
+all-debug: bootable-debug
+	@echo "Dumping the disassembled kernel code to $(kbuild_dir)/kdump.txt"
+	@i686-elf-objdump -S $(kbin) > $(kbuild_dir)/kdump.txt
 
 clean:
-	@rm -rf $(BUILD_DIR) || exit 1
+	@rm -rf $(kbuild_dir) || exit 1
+	@$(MAKE) -C usr clean -I $(mkinc_dir)
+	@$(MAKE) -f kernel.mk clean -I $(mkinc_dir)
 
 run: $(BUILD_DIR)/$(OS_ISO)
 	@qemu-system-i386 $(QEMU_OPTIONS)
@@ -68,14 +87,14 @@ run: $(BUILD_DIR)/$(OS_ISO)
 	@telnet 127.0.0.1 $(QEMU_MON_PORT)
 
 debug-qemu: all-debug
-	@i686-elf-objcopy --only-keep-debug $(BIN_DIR)/$(OS_BIN) $(BUILD_DIR)/kernel.dbg
-	@qemu-system-i386 $(QEMU_OPTIONS)
+	@i686-elf-objcopy --only-keep-debug $(kbin) $(kbuild_dir)/kernel.dbg
+	@qemu-system-i386 $(call get_qemu_options,$(kimg))
 	@sleep 1
 	@$(QEMU_MON_TERM) -- telnet 127.0.0.1 $(QEMU_MON_PORT)
 	@gdb -s $(BUILD_DIR)/kernel.dbg -ex "target remote localhost:1234"
 
 debug-qemu-vscode: all-debug
-	@i686-elf-objcopy --only-keep-debug $(BIN_DIR)/$(OS_BIN) $(BUILD_DIR)/kernel.dbg
+	@i686-elf-objcopy --only-keep-debug $(kbin) $(kbuild_dir)/kernel.dbg
 	@qemu-system-i386 $(QEMU_OPTIONS)
 	@sleep 0.5
 	@telnet 127.0.0.1 $(QEMU_MON_PORT)
@@ -85,4 +104,4 @@ debug-bochs: all-debug
 
 debug-metal: 
 	@printf "@cmc" > $(PORT)
-	@gdb -s $(BUILD_DIR)/kernel.dbg -ex "target remote $(PORT)"
+	@gdb -s $(kbuild_dir)/kernel.dbg -ex "target remote $(PORT)"
