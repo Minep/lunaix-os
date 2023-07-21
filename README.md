@@ -195,7 +195,7 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 1. `_exit(2)`
 1. `sigreturn(2)`
 1. `sigprocmask(2)`
-1. `signal(2)`
+1. `sigaction(2)`
 1. `kill(2)`
 1. `sigpending(2)`
 1. `sigsuspend(2)`
@@ -206,8 +206,8 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 2. `mkdir(2)`
 2. `lseek(2)`
 2. `readdir(2)`
-2. `readlink(2)`※
-2. `readlinkat(2)`※
+2. `readlink(2)`
+2. `readlinkat(2)`
 2. `rmdir(2)`※
 2. `unlink(2)`※
 2. `unlinkat(2)`※
@@ -215,7 +215,7 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 2. `fsync(2)`※
 2. `dup(2)`
 2. `dup2(2)`
-2. `symlink(2)`※
+2. `symlink(2)`
 2. `chdir(2)`
 2. `fchdir(2)`
 2. `getcwd(2)`
