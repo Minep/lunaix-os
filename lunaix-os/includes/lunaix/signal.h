@@ -16,17 +16,16 @@
 #define _SIGSTOP SIGSTOP
 #define _SIGCONT SIGCONT
 #define _SIGTERM SIGTERM
-
-#define __SIGNAL(num) (1 << (num))
-#define __SIGSET(bitmap, num) (bitmap = bitmap | __SIGNAL(num))
-#define __SIGTEST(bitmap, num) (bitmap & __SIGNAL(num))
-#define __SIGCLEAR(bitmap, num) ((bitmap) = (bitmap) & ~__SIGNAL(num))
-
-#define _SIGNAL_UNMASKABLE (__SIGNAL(_SIGKILL) | __SIGNAL(_SIGSTOP))
-
 #define _SIG_BLOCK SIG_BLOCK
 #define _SIG_UNBLOCK SIG_UNBLOCK
 #define _SIG_SETMASK SIG_SETMASK
+
+#define sigset(num) (1 << (num))
+#define sigset_add(set, num) (set = set | sigset(num))
+#define sigset_test(set, num) (set & sigset(num))
+#define sigset_clear(set, num) ((set) = (set) & ~sigset(num))
+#define sigset_union(set, set2) ((set) = (set) | (set2))
+#define sigset_intersect(set, set2) ((set) = (set) & (set2))
 
 int
 signal_send(pid_t pid, int signum);

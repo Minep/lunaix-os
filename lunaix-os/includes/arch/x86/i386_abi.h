@@ -21,4 +21,24 @@
                  "r"(pc)                                                       \
                  : "eax", "memory");
 
+#define push_arg1(stack_ptr, arg) *((typeof((arg))*)(stack_ptr)--) = arg
+#define push_arg2(stack_ptr, arg1, arg2)                                       \
+    {                                                                          \
+        *((typeof((arg1))*)(stack_ptr)--) = arg1;                              \
+        *((typeof((arg2))*)(stack_ptr)--) = arg2;                              \
+    }
+#define push_arg3(stack_ptr, arg1, arg2, arg3)                                 \
+    {                                                                          \
+        *((typeof((arg1))*)(stack_ptr)--) = arg1;                              \
+        *((typeof((arg2))*)(stack_ptr)--) = arg2;                              \
+        *((typeof((arg3))*)(stack_ptr)--) = arg3;                              \
+    }
+#define push_arg4(stack_ptr, arg1, arg2, arg3, arg4)                           \
+    {                                                                          \
+        *((typeof((arg1))*)(stack_ptr)--) = arg1;                              \
+        *((typeof((arg2))*)(stack_ptr)--) = arg2;                              \
+        *((typeof((arg3))*)(stack_ptr)--) = arg3;                              \
+        *((typeof((arg4))*)(stack_ptr)--) = arg4;                              \
+    }
+
 #endif /* __LUNAIX_ABI_H */

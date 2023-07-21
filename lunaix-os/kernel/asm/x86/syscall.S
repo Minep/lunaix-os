@@ -20,7 +20,7 @@
         .long __lxsys_waitpid       /* 10 */
         .long __lxsys_sigreturn
         .long __lxsys_sigprocmask
-        .long __lxsys_signal
+        .long __lxsys_sys_sigaction
         .long __lxsys_pause
         .long __lxsys_kill          /* 15 */
         .long __lxsys_alarm

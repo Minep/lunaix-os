@@ -111,14 +111,24 @@ run(struct proc_info* proc)
 int
 can_schedule(struct proc_info* proc)
 {
-    if (__SIGTEST(proc->sig_pending, _SIGCONT)) {
-        __SIGCLEAR(proc->sig_pending, _SIGSTOP);
-    } else if (__SIGTEST(proc->sig_pending, _SIGSTOP)) {
+    if (!proc) {
+        return 0;
+    }
+
+    struct sighail* sh = &proc->sigctx;
+
+    if ((proc->state & PS_PAUSED)) {
+        return !!(sh->sig_pending & ~1);
+    }
+
+    if (sigset_test(sh->sig_pending, _SIGCONT)) {
+        sigset_clear(sh->sig_pending, _SIGSTOP);
+    } else if (sigset_test(sh->sig_pending, _SIGSTOP)) {
         // 如果进程受到SIGSTOP，则该进程不给予调度。
         return 0;
     }
 
-    return 1;
+    return (proc->state == PS_READY);
 }
 
 void
@@ -143,7 +153,7 @@ check_sleepers()
 
         if (atime && now >= atime) {
             pos->sleep.alarm_time = 0;
-            __SIGSET(pos->sig_pending, _SIGALRM);
+            proc_setsignal(pos, _SIGALRM);
         }
 
         if (!wtime && !atime) {
@@ -165,6 +175,7 @@ schedule()
     struct proc_info* next;
     int prev_ptr = sched_ctx.procs_index;
     int ptr = prev_ptr;
+    int found = 0;
 
     if (!(__current->state & ~PS_RUNNING)) {
         __current->state = PS_READY;
@@ -174,23 +185,20 @@ schedule()
 
     // round-robin scheduler
 redo:
+
     do {
         ptr = (ptr + 1) % sched_ctx.ptable_len;
         next = sched_ctx._procs[ptr];
-    } while (!next || (next->state != PS_READY && ptr != prev_ptr));
+
+        if (!(found = can_schedule(next))) {
+            if (ptr == prev_ptr) {
+                next = &dummy_proc;
+                goto done;
+            }
+        }
+    } while (!found);
 
     sched_ctx.procs_index = ptr;
-
-    if (next->state != PS_READY) {
-        // schedule the dummy process if we're out of choice
-        next = &dummy_proc;
-        goto done;
-    }
-
-    if (!can_schedule(next)) {
-        // 如果该进程不给予调度，则尝试重新选择
-        goto redo;
-    }
 
 done:
     run(next);
@@ -305,7 +313,6 @@ repeat:
     goto repeat;
 
 done:
-    status_flags |= PEXITSIG * (proc->sig_inprogress != 0);
     if (status) {
         *status = proc->exit_code | status_flags;
     }
@@ -433,7 +440,7 @@ terminate_proc(int exit_code)
     __current->state = PS_TERMNAT;
     __current->exit_code = exit_code;
 
-    __SIGSET(__current->parent->sig_pending, _SIGCHLD);
+    proc_setsignal(__current->parent, _SIGCHLD);
 }
 
 struct proc_info*

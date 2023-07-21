@@ -35,9 +35,6 @@ sleep(unsigned int);
 extern int
 pause();
 
-extern int
-kill(pid_t pid, int signum);
-
 extern unsigned int
 alarm(unsigned int seconds);
 

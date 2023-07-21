@@ -20,4 +20,16 @@
 typedef unsigned int sigset_t;
 typedef void (*sighandler_t)(int);
 
+struct sigaction
+{
+    sigset_t sa_mask;
+    void (*sa_handler)(int);
+    void (*sa_sigaction)(int, void*, void*);
+};
+
+struct siginfo
+{
+    // TODO
+};
+
 #endif /* __LUNAIX_SIGNAL_DEFS_H */

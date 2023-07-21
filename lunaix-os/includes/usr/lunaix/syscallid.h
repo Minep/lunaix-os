@@ -14,7 +14,7 @@
 
 #define __SYSCALL_sigreturn 11
 #define __SYSCALL_sigprocmask 12
-#define __SYSCALL_signal 13
+#define __SYSCALL_sys_sigaction 13
 #define __SYSCALL_pause 14
 #define __SYSCALL_kill 15
 #define __SYSCALL_alarm 16

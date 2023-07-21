@@ -21,8 +21,6 @@ __LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
 
 __LXSYSCALL(int, pause)
 
-__LXSYSCALL2(int, kill, pid_t, pid, int, signum)
-
 __LXSYSCALL1(unsigned int, alarm, unsigned int, seconds)
 
 __LXSYSCALL2(int, link, const char*, oldpath, const char*, newpath)

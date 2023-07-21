@@ -31,10 +31,10 @@ main()
     signal(SIGSEGV, sigsegv_handler);
     signal(SIGALRM, sigalrm_handler);
 
-    alarm(5);
-
     int status;
     pid_t p = 0;
+
+    alarm(5);
 
     printf("Child sleep 3s, parent pause.\n");
     if (!fork()) {

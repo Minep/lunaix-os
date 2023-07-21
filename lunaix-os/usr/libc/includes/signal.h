@@ -4,8 +4,17 @@
 #include <lunaix/signal_defs.h>
 #include <lunaix/types.h>
 
-extern int
+extern sighandler_t
 signal(int signum, sighandler_t handler);
+
+extern int
+kill(pid_t pid, int signum);
+
+extern int
+raise(int signum);
+
+extern int
+sigaction(int signum, struct sigaction* action);
 
 extern int
 sigpending(sigset_t* set);

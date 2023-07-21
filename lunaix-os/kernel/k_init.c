@@ -179,9 +179,6 @@ spawn_proc0()
     assert_msg(0, "Unexpected Return");
 }
 
-extern u8_t __usrtext_start;
-extern u8_t __usrtext_end;
-
 // 按照 Memory map 标识可用的物理页
 void
 setup_memory(multiboot_memory_map_t* map, size_t map_size)
@@ -201,11 +198,6 @@ setup_memory(multiboot_memory_map_t* map, size_t map_size)
     // 将内核占据的页，包括前1MB，hhk_init 设为已占用
     size_t pg_count = V2P(&__kernel_end) >> PG_SIZE_BITS;
     pmm_mark_chunk_occupied(KERNEL_PID, 0, pg_count, PP_FGLOCKED);
-
-    for (ptr_t i = (ptr_t)&__usrtext_start; i < (ptr_t)&__usrtext_end;
-         i += PG_SIZE) {
-        vmm_set_mapping(VMS_SELF, i, V2P(i), PG_PREM_UR, VMAP_NULL);
-    }
 
     // reserve higher half
     for (size_t i = L1_INDEX(KERNEL_MM_BASE); i < 1023; i++) {

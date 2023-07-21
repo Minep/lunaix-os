@@ -26,31 +26,32 @@
 // Provided by linker (see linker.ld)
 extern u8_t __kernel_start;
 extern u8_t __kernel_end;
+extern u8_t __ktext_start;
+extern u8_t __ktext_end;
+
 extern u8_t __init_hhk_end;
 extern u8_t _k_stack;
 
 void
-_init_page(ptd_t* ptd)
+_init_page(x86_page_table* ptd)
 {
-    SET_PDE(ptd, 0, NEW_L1_ENTRY(PG_PREM_RW, ptd + PG_MAX_ENTRIES))
+    ptd->entry[0] = NEW_L1_ENTRY(PG_PREM_RW, (ptd_t*)ptd + PG_MAX_ENTRIES);
 
     // 对低1MiB空间进行对等映射（Identity
     // mapping），也包括了我们的VGA，方便内核操作。
+    x86_page_table* id_pt =
+      (x86_page_table*)GET_PG_ADDR(ptd->entry[PG_TABLE_IDENTITY]);
+
     for (u32_t i = 0; i < 256; i++) {
-        SET_PTE(ptd,
-                PG_TABLE_IDENTITY,
-                i,
-                NEW_L2_ENTRY(PG_PREM_RW, (i << PG_SIZE_BITS)))
+        id_pt->entry[i] = NEW_L2_ENTRY(PG_PREM_RW, (i << PG_SIZE_BITS));
     }
 
     // 对等映射我们的hhk_init，这样一来，当分页与地址转换开启后，我们依然能够照常执行最终的
     // jmp 指令来跳转至
     //  内核的入口点
     for (u32_t i = 0; i < HHK_PAGE_COUNT; i++) {
-        SET_PTE(ptd,
-                PG_TABLE_IDENTITY,
-                256 + i,
-                NEW_L2_ENTRY(PG_PREM_RW, 0x100000 + (i << PG_SIZE_BITS)))
+        id_pt->entry[256 + i] =
+          NEW_L2_ENTRY(PG_PREM_RW, 0x100000 + (i << PG_SIZE_BITS));
     }
 
     // --- 将内核重映射至高半区 ---
@@ -65,9 +66,8 @@ _init_page(ptd_t* ptd)
     //  当然，就现在而言，我们的内核只占用不到50个页（每个页表包含1024个页）
     //  这里分配了3个页表（12MiB），未雨绸缪。
     for (u32_t i = 0; i < PG_TABLE_STACK - PG_TABLE_KERNEL; i++) {
-        SET_PDE(ptd,
-                kernel_pde_index + i,
-                NEW_L1_ENTRY(PG_PREM_URW, PT_ADDR(ptd, PG_TABLE_KERNEL + i)))
+        ptd->entry[kernel_pde_index + i] =
+          NEW_L1_ENTRY(PG_PREM_RW, PT_ADDR(ptd, PG_TABLE_KERNEL + i));
     }
 
     // 首先，检查内核的大小是否可以fit进我们这几个表（12MiB）
@@ -80,22 +80,26 @@ _init_page(ptd_t* ptd)
 
     // 计算内核.text段的物理地址
     ptr_t kernel_pm = V2P(&__kernel_start);
+    ptr_t ktext_start = V2P(&__ktext_start);
+    ptr_t ktext_end = V2P(&ktext_end);
 
     // 重映射内核至高半区地址（>=0xC0000000）
     for (u32_t i = 0; i < kernel_pg_counts; i++) {
-        // FIXME: 只是用作用户模式（R3）测试！
-        //        在实际中，内核代码除了极少部分需要暴露给R3（如从信号返回），其余的应为R0。
+        ptr_t paddr = kernel_pm + (i << PG_SIZE_BITS);
+        u32_t flags = PG_PREM_RW;
 
-#warning "fixme: kernel pages should not be user-accessable"
+        if (paddr >= ktext_start && paddr <= ktext_end) {
+            flags = PG_PREM_R;
+        }
 
         SET_PTE(ptd,
                 PG_TABLE_KERNEL,
                 kernel_pte_index + i,
-                NEW_L2_ENTRY(PG_PREM_URW, kernel_pm + (i << PG_SIZE_BITS)))
+                NEW_L2_ENTRY(flags, paddr))
     }
 
     // 最后一个entry用于循环映射
-    SET_PDE(ptd, PG_MAX_ENTRIES - 1, NEW_L1_ENTRY(T_SELF_REF_PERM, ptd));
+    ptd->entry[PG_MAX_ENTRIES - 1] = NEW_L1_ENTRY(T_SELF_REF_PERM, ptd);
 }
 
 u32_t
@@ -130,7 +134,7 @@ _save_multiboot_info(multiboot_info_t* info, u8_t* destination)
 }
 
 void
-_hhk_init(ptd_t* ptd, u32_t kpg_size)
+_hhk_init(x86_page_table* ptd, u32_t kpg_size)
 {
 
     // 初始化 kpg 全为0

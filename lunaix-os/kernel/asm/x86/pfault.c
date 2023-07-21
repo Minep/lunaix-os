@@ -11,6 +11,19 @@
 
 #include <klibc/string.h>
 
+static u32_t
+get_ptattr(struct mm_region* vmr)
+{
+    u32_t vmr_attr = vmr->attr;
+    u32_t ptattr = PG_PRESENT | PG_ALLOW_USER;
+
+    if ((vmr_attr & PROT_WRITE)) {
+        ptattr |= PG_WRITE;
+    }
+
+    return ptattr & 0xfff;
+}
+
 static void
 kprintf(const char* fmt, ...)
 {
@@ -51,13 +64,16 @@ intr_routine_page_fault(const isr_param* param)
         goto segv_term;
     }
 
-    if ((errcode & PG_ALLOW_USER)) {
-        // invalid access
-        goto segv_term;
-    }
-
     volatile x86_pte_t* pte = &PTE_MOUNTED(VMS_SELF, ptr >> 12);
     if (PG_IS_PRESENT(*pte)) {
+        if (((errcode ^ mapping.flags) & PG_ALLOW_USER)) {
+            // invalid access
+            kprintf(KDEBUG "invalid user access. (%p->%p, attr:0x%x)\n",
+                    mapping.va,
+                    mapping.pa,
+                    mapping.flags);
+            goto segv_term;
+        }
         if ((hit_region->attr & COW_MASK) == COW_MASK) {
             // normal page fault, do COW
             cpu_invplg((ptr_t)pte);
@@ -84,7 +100,7 @@ intr_routine_page_fault(const isr_param* param)
                 goto oom;
             }
 
-            *pte = *pte | pa | PG_PRESENT | PG_ALLOW_USER;
+            *pte = *pte | pa | get_ptattr(hit_region);
             memset((void*)PG_ALIGN(ptr), 0, PG_SIZE);
             goto resolved;
         }
@@ -107,7 +123,7 @@ intr_routine_page_fault(const isr_param* param)
         }
 
         cpu_invplg((ptr_t)pte);
-        *pte = (*pte & 0xFFF) | pa | PG_PRESENT | PG_ALLOW_USER;
+        *pte = (*pte & 0xFFF) | pa | get_ptattr(hit_region);
 
         memset((void*)ptr, 0, PG_SIZE);
 
@@ -143,7 +159,7 @@ segv_term:
             param->execp->eip,
             param->execp->err_code);
 
-    __SIGSET(__current->sig_pending, _SIGSEGV);
+    sigset_add(__current->sigctx.sig_pending, _SIGSEGV);
 
     schedule();
     // should not reach

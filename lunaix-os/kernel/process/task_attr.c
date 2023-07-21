@@ -5,14 +5,14 @@ void
 __read_pending_sig(struct twimap* map)
 {
     struct proc_info* proc = twimap_data(map, struct proc_info*);
-    twimap_printf(map, "%bb", proc->sig_pending);
+    twimap_printf(map, "%bb", proc->sigctx.sig_pending);
 }
 
 void
 __read_masked_sig(struct twimap* map)
 {
     struct proc_info* proc = twimap_data(map, struct proc_info*);
-    twimap_printf(map, "%bb", proc->sig_mask);
+    twimap_printf(map, "%bb", proc->sigctx.sig_mask);
 }
 
 void

@@ -15,14 +15,35 @@
 // 虽然内核不是进程，但为了区分，这里使用Pid=-1来指代内核。这主要是方便物理页所有权检查。
 #define KERNEL_PID -1
 
+/*
+    |C|Bk|De|Tn|Pu|Rn|
+         \----/
+            Dt
+
+    Group Dt: whether this process is terminated.
+
+    Rn: Running
+    Tn: Terminated
+    De: Destoryed
+    Pu: Paused
+    Bk: Blocked
+    C : Created
+*/
+
 #define PS_READY 0
 #define PS_RUNNING 1
 #define PS_TERMNAT 2
 #define PS_DESTROY 4
-#define PS_BLOCKED 8
-#define PS_CREATED 16
+#define PS_PAUSED 8
+#define PS_BLOCKED 16
+#define PS_CREATED 32
 
-#define PROC_TERMINATED(state) (state & 0x6)
+#define PS_GrBP (PS_PAUSED | PS_BLOCKED)
+#define PS_GrDT (PS_TERMNAT | PS_DESTROY)
+
+#define PROC_TERMINATED(state) ((state)&PS_GrDT)
+#define PROC_HANGED(state) ((state)&PS_BLOCKED)
+#define PROC_RUNNABLE(state) ((state)&PS_PAUSED)
 
 #define PROC_FINPAUSE 1
 
@@ -32,10 +53,28 @@ struct proc_sigstate
     char fxstate[512] __attribute__((aligned(16)));
 };
 
+struct sigact
+{
+    struct sigact* prev;
+    sigset_t sa_mask;
+    void* sa_actor;
+    void* sa_handler;
+    pid_t sender;
+};
+
+struct sighail
+{
+    sigset_t sig_pending;
+    sigset_t sig_mask;
+    struct sigact* inprogress;
+    struct sigact signals[_SIG_NUM];
+};
+
 struct proc_sig
 {
-    void* signal_handler;
     int sig_num;
+    void* sigact;
+    void* sighand;
     struct proc_sigstate prev_context;
 } __attribute__((packed));
 
@@ -76,11 +115,8 @@ struct proc_info
     u8_t state;
     int32_t exit_code;
     int32_t k_status;
-    sigset_t sig_pending;
-    sigset_t sig_mask;
-    sigset_t sig_inprogress;
     int flags;
-    void* sig_handler[_SIG_NUM];
+    struct sighail sigctx;
     struct v_fdtable* fdtable;
     struct v_dnode* cwd;
     pid_t pgid;
@@ -92,6 +128,18 @@ static inline void
 block_current()
 {
     __current->state = PS_BLOCKED;
+}
+
+static inline void
+pause_current()
+{
+    __current->state = PS_PAUSED;
+}
+
+static inline void
+resume_current()
+{
+    __current->state = PS_RUNNING;
 }
 
 /**
@@ -150,5 +198,8 @@ orphaned_proc(pid_t pid);
 
 struct proc_info*
 get_process(pid_t pid);
+
+void
+proc_setsignal(struct proc_info* proc, int signum);
 
 #endif /* __LUNAIX_PROCESS_H */

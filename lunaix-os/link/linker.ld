@@ -37,17 +37,15 @@ SECTIONS {
     /* 好了，我们的内核…… */
     .text BLOCK(4K) : AT ( ADDR(.text) - 0xC0000000 ) {
         __kernel_start = .;
+        PROVIDE(__ktext_start = .);
+        
         kernel/*.o (.text)
         hal/*.o (.text)
         debug/*.o (.text)
         libs/*.o (.text)
-    }
 
-    __usrtext_start = ALIGN(4K);
-    .usrtext BLOCK(4K) : AT ( ADDR(.usrtext) - 0xC0000000 ) {
-        * (.usrtext)
+        PROVIDE(__ktext_end = .);
     }
-    __usrtext_end = ALIGN(4K);
 
     .data BLOCK(4K) : AT ( ADDR(.data) - 0xC0000000 ) {
         kernel/*.o (.data)

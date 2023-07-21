@@ -16,7 +16,7 @@
 .section .bss
     .align 16
     lo_tmp_stack:
-        .skip 128
+        .skip 256
     tmp_stack:
 
 /*
@@ -94,14 +94,14 @@
         movw %ax, %ds
         movw %ax, %es
 
-        # 保存用户栈顶指针。这是因为我们允许系统调用内进行上下文切换，而这样一来，我们就失去了用户栈的信息，
-        # 这样一来，就无法设置信号上下文。这主要是为了实现了pause()而做的准备
         movl __current, %eax
 
+        # FIXME: Save x87 context to user stack, rather than kernel's memory.
         # 保存x87FPU的状态
         movl 68(%eax), %ebx
         fxsave (%ebx)
 
+        # 保存用户栈顶指针。因为我们允许同级中断的产生，所以需要该手段跟踪用户栈的地址。
         movl 124(%esp), %ebx     # 取出esp
         movl %ebx, 60(%eax)     # 存入__current->ustack_top
 
@@ -217,14 +217,17 @@
     handle_signal:
         # 注意1：任何对proc_sig的布局改动，都须及时的保证这里的一致性！
         # 注意2：handle_signal在调用之前，须确保proc_sig已经写入用户栈！
-        leal 8(%eax), %ebx      # arg1 in %eax: addr of proc_sig structure in user stack
+        # arg1 in %eax: addr of proc_sig structure in user stack
+        leal 12(%eax), %ebx      # %ebx = &proc_sig->prev_context
 
         pushl $UDATA_SEG        # proc_sig->prev_context.proc_regs.ss
         pushl %eax              # esp
+
         movl 48(%ebx), %ebx
         pushl 68(%ebx)          # proc_sig->prev_context.proc_regs.execp->eflags
+        
         pushl $UCODE_SEG        # cs
-        pushl $sig_wrapper      # eip for sig wrapper
+        pushl 4(%eax)           # %eip = proc_sig->sigact
 
         movw $UDATA_SEG, %cx    # switch data seg to user mode
         movw %cx, %es
@@ -232,21 +235,4 @@
         movw %cx, %fs
         movw %cx, %gs
 
-        iret  
-
-.section .usrtext
-    sig_wrapper:                # in user mode
-        movl %esp, %eax
-        and $0xfffffff0, %esp
-        subl $8, %esp
-        pushl %eax              # Addr to proc_sig structure 
-        pushl 4(%eax)           # proc_sig->sig_num     ---- 16 bytes aligned
-
-        call *(%eax)             # invoke signal handler
-
-        # invoke the sigreturn syscall to exit the signal wrapper
-        movl $__SYSCALL_sigreturn, %eax
-        movl 4(%esp), %ebx
-        int $LUNAIX_SYS_CALL    
-
-        ud2                     # never reach!
+        iret

@@ -9,51 +9,55 @@
 
 extern struct scheduler sched_ctx; /* kernel/sched.c */
 
-static u32_t term_sigs =
-  (1 << SIGSEGV) | (1 << SIGINT) | (1 << SIGKILL) | (1 << SIGTERM);
+#define UNMASKABLE (sigset(SIGKILL) | sigset(SIGTERM))
+#define TERMSIG (sigset(SIGSEGV) | sigset(SIGINT) | UNMASKABLE)
 
 // Referenced in kernel/asm/x86/interrupt.S
 void*
 signal_dispatch()
 {
-    if (!__current->sig_pending) {
+    if (!__current->sigctx.sig_pending) {
         // 没有待处理信号
         return 0;
     }
 
-    int sig_selected =
-      31 - __builtin_clz(__current->sig_pending &
-                         ~(__current->sig_mask | __current->sig_inprogress));
+    struct sighail* psig = &__current->sigctx;
+    struct sigact* prev_working = psig->inprogress;
+    sigset_t mask = psig->sig_mask | (prev_working ? prev_working->sa_mask : 0);
 
-    __SIGCLEAR(__current->sig_pending, sig_selected);
+    int sig_selected = 31 - __builtin_clz(psig->sig_pending & ~mask);
+
+    sigset_clear(psig->sig_pending, sig_selected);
+
+    struct sigact* action = &psig->signals[sig_selected];
 
     if (sig_selected == 0) {
         // SIG0 is reserved
         return 0;
     }
 
-    if (!__current->sig_handler[sig_selected]) {
-        if ((term_sigs & (1 << sig_selected))) {
-            terminate_proc(sig_selected);
+    if (!action->sa_actor) {
+        if (sigset_test(TERMSIG, sig_selected)) {
+            terminate_proc(sig_selected | PEXITSIG);
             schedule();
             // never return
         }
         return 0;
     }
 
-    ptr_t ustack = __current->ustack_top & ~0xf;
+    ptr_t ustack = __current->ustack_top;
 
     if ((int)(ustack - USTACK_END) < (int)sizeof(struct proc_sig)) {
         // 用户栈没有空间存放信号上下文
         return 0;
     }
 
-    struct proc_sig* sig_ctx =
-      (struct proc_sig*)(ustack - sizeof(struct proc_sig));
+    struct proc_sig* sigframe =
+      (struct proc_sig*)((ustack - sizeof(struct proc_sig)) & ~0xf);
 
     /*
         这是一个相当恶心的坑。
-        问题是出在原本的sig_ctx->prev_context = __current->intr_ctx的上面
+        问题是出在原本的sigframe->prev_context = __current->intr_ctx的上面
         这个语句会被gcc在编译时，用更加高效的 rep movsl 来代替。
 
         由于我们采用按需分页，所以在很多情况下，用户栈实际被分配的空间不允许我们进行完整的
@@ -75,14 +79,23 @@ signal_dispatch()
     __temp_save.proc_regs = __current->intr_ctx;
     memcpy(__temp_save.fxstate, __current->fxstate, 512);
 
-    sig_ctx->prev_context = __temp_save;
+    sigframe->sig_num = sig_selected;
 
-    sig_ctx->sig_num = sig_selected;
-    sig_ctx->signal_handler = __current->sig_handler[sig_selected];
+    sigframe->sigact = action->sa_actor;
+    sigframe->sighand = action->sa_handler;
+    sigframe->prev_context = __temp_save;
 
-    __SIGSET(__current->sig_inprogress, sig_selected);
+    action->prev = prev_working;
+    psig->inprogress = action;
 
-    return sig_ctx;
+    return sigframe;
+}
+
+void
+proc_setsignal(struct proc_info* proc, int signum)
+{
+    sigset_add(proc->sigctx.sig_pending, signum);
+    proc->sigctx.signals[signum].sender = __current->pid;
 }
 
 int
@@ -93,7 +106,9 @@ signal_send(pid_t pid, int signum)
         return -1;
     }
 
+    pid_t sender_pid = __current->pid;
     struct proc_info* proc;
+
     if (pid > 0) {
         proc = get_process(pid);
         goto send_single;
@@ -114,7 +129,9 @@ send_grp:
     struct proc_info *pos, *n;
     llist_for_each(pos, n, &proc->grp_member, grp_member)
     {
-        __SIGSET(pos->sig_pending, signum);
+        struct sighail* sh = &pos->sigctx;
+        sigset_add(sh->sig_pending, signum);
+        sh->signals[signum].sender = sender_pid;
     }
 
 send_single:
@@ -122,7 +139,10 @@ send_single:
         __current->k_status = EINVAL;
         return -1;
     }
-    __SIGSET(proc->sig_pending, signum);
+
+    sigset_add(proc->sigctx.sig_pending, signum);
+    proc->sigctx.signals[signum].sender = sender_pid;
+
     return 0;
 }
 
@@ -130,8 +150,15 @@ __DEFINE_LXSYSCALL1(int, sigreturn, struct proc_sig, *sig_ctx)
 {
     memcpy(__current->fxstate, sig_ctx->prev_context.fxstate, 512);
     __current->intr_ctx = sig_ctx->prev_context.proc_regs;
-    __current->flags &= ~PROC_FINPAUSE;
-    __SIGCLEAR(__current->sig_inprogress, sig_ctx->sig_num);
+
+    struct sigact* current = __current->sigctx.inprogress;
+    if (current) {
+        __current->sigctx.inprogress = current->prev;
+        current->prev = NULL;
+    } else {
+        __current->sigctx.inprogress = NULL;
+    }
+
     schedule();
 
     // never reach!
@@ -147,50 +174,48 @@ __DEFINE_LXSYSCALL3(int,
                     sigset_t,
                     *oldset)
 {
-    *oldset = __current->sig_mask;
+    struct sighail* sh = &__current->sigctx;
+    *oldset = sh->sig_mask;
+
     if (how == _SIG_BLOCK) {
-        __current->sig_mask |= *set;
+        sigset_union(sh->sig_mask, *set);
     } else if (how == _SIG_UNBLOCK) {
-        __current->sig_mask &= ~(*set);
+        sigset_intersect(sh->sig_mask, ~(*set));
     } else if (how == _SIG_SETMASK) {
-        __current->sig_mask = *set;
+        sh->sig_mask = *set;
     } else {
         return 0;
     }
-    __current->sig_mask &= ~_SIGNAL_UNMASKABLE;
+
+    sigset_intersect(sh->sig_mask, ~UNMASKABLE);
     return 1;
 }
 
-__DEFINE_LXSYSCALL2(int, signal, int, signum, sighandler_t, handler)
+__DEFINE_LXSYSCALL2(int, sys_sigaction, int, signum, struct sigaction*, action)
 {
     if (signum <= 0 || signum >= _SIG_NUM) {
         return -1;
     }
 
-    if ((__SIGNAL(signum) & _SIGNAL_UNMASKABLE)) {
+    if (sigset_test(UNMASKABLE, signum)) {
         return -1;
     }
 
-    __current->sig_handler[signum] = (void*)handler;
+    struct sigact* sa = &__current->sigctx.signals[signum];
+
+    sa->sa_actor = (void*)action->sa_sigaction;
+    sa->sa_handler = (void*)action->sa_handler;
+    sigset_union(sa->sa_mask, sigset(signum));
 
     return 0;
 }
 
-void
-__do_pause()
-{
-    __current->flags |= PROC_FINPAUSE;
-
-    while ((__current->flags & PROC_FINPAUSE)) {
-        sched_yieldk();
-    }
-
-    __current->k_status = EINTR;
-}
-
 __DEFINE_LXSYSCALL(int, pause)
 {
-    __do_pause();
+    pause_current();
+    sched_yieldk();
+
+    __current->k_status = EINTR;
     return -1;
 }
 
@@ -201,15 +226,18 @@ __DEFINE_LXSYSCALL2(int, kill, pid_t, pid, int, signum)
 
 __DEFINE_LXSYSCALL1(int, sigpending, sigset_t, *sigset)
 {
-    *sigset = __current->sig_pending;
+    *sigset = __current->sigctx.sig_pending;
     return 0;
 }
 
 __DEFINE_LXSYSCALL1(int, sigsuspend, sigset_t, *mask)
 {
-    sigset_t tmp = __current->sig_mask;
-    __current->sig_mask = (*mask) & ~_SIGNAL_UNMASKABLE;
-    __do_pause();
-    __current->sig_mask = tmp;
+    sigset_t tmp = __current->sigctx.sig_mask;
+    __current->sigctx.sig_mask = (*mask) & ~UNMASKABLE;
+
+    pause_current();
+    sched_yieldk();
+
+    __current->sigctx.sig_mask = tmp;
     return -1;
 }
