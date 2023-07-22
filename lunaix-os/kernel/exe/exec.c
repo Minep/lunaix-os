@@ -29,25 +29,34 @@ exec_container(struct exec_container* param,
 }
 
 size_t
-exec_str_size(const char** str_arr, size_t* length)
+args_ptr_size(const char** paramv)
 {
-    if (!str_arr) {
-        *length = 0;
-        return 0;
+    size_t sz = 0;
+    while (*paramv) {
+        sz++;
+        paramv++;
     }
 
-    const char* chr = *str_arr;
-    size_t sz = 0, len = 0;
+    return (sz + 1) * sizeof(ptr_t);
+}
 
-    while (chr) {
-        sz += strlen(chr);
-        len++;
+ptr_t
+copy_to_ustack(ptr_t stack_top, ptr_t* paramv)
+{
+    ptr_t ptr;
+    size_t sz = 0;
 
-        chr = *(str_arr++);
+    while ((ptr = *paramv)) {
+        sz = strlen((const char*)ptr) + 1;
+
+        stack_top -= sz;
+        memcpy((void*)stack_top, (const void*)ptr, sz);
+        *paramv = stack_top;
+
+        paramv++;
     }
 
-    *length = len;
-    return sz + sizeof(char*);
+    return stack_top;
 }
 
 // externed from mm/dmm.c
@@ -60,34 +69,15 @@ exec_load(struct exec_container* container, struct v_file* executable)
     int errno = 0;
 
     const char **argv = container->argv, **envp = container->envp;
-    size_t argv_len, envp_len;
-    size_t sz_argv = exec_str_size(argv, &argv_len);
-    size_t sz_envp = exec_str_size(envp, &envp_len);
-    size_t var_sz = ROUNDUP(sz_envp, PG_SIZE);
     const char** argv_extra = container->argv_pp;
 
     argv_extra[0] = executable->dnode->name.value;
-
-    if (var_sz / PG_SIZE > MAX_VAR_PAGES) {
-        errno = E2BIG;
-        goto done;
-    }
 
     if ((errno = load_executable(&container->exe, executable))) {
         goto done;
     }
 
     struct proc_mm* pvms = &container->proc->mm;
-
-    // A dedicated place for process variables (e.g. envp)
-    struct mmap_param map_vars = { .pvms = pvms,
-                                   .vms_mnt = container->vms_mnt,
-                                   .flags = MAP_ANON | MAP_PRIVATE | MAP_FIXED,
-                                   .type = REGION_TYPE_VARS,
-                                   .proct = PROT_READ,
-                                   .mlen = MAX_VAR_PAGES * PG_SIZE };
-
-    void* mapped;
 
     if (pvms->heap) {
         mem_unmap_region(container->vms_mnt, pvms->heap);
@@ -100,30 +90,35 @@ exec_load(struct exec_container* container, struct v_file* executable)
         create_heap(&container->proc->mm, PG_ALIGN(container->exe.end));
     }
 
-    if ((errno = mem_map(&mapped, NULL, UMMAP_END, NULL, &map_vars))) {
-        goto done;
-    }
-
     if (container->vms_mnt == VMS_SELF) {
         // we are loading executable into current addr space
 
-        // make some handy infos available to user space
-        if (envp)
-            memcpy(mapped, (void*)envp, sz_envp);
+        ptr_t ustack = USTACK_TOP;
+        size_t argv_len = 0, envp_len = 0;
+        ptr_t argv_ptr = 0, envp_ptr = 0;
 
-        void* ustack = (void*)USTACK_TOP;
+        if (envp) {
+            argv_len = args_ptr_size(envp);
+            ustack -= envp_len;
+            envp_ptr = ustack;
 
-        if (argv) {
-            ustack = (void*)((ptr_t)ustack - sz_argv);
-            memcpy(ustack, (void*)argv, sz_argv);
+            memcpy((void*)ustack, (const void*)envp, envp_len);
+            ustack = copy_to_ustack(ustack, (ptr_t*)ustack);
         }
 
-        for (size_t i = 0; i < 2 && argv_extra[i]; i++, argv_len++) {
-            const char* extra_arg = argv_extra[i];
-            size_t str_len = strlen(extra_arg);
+        if (argv) {
+            argv_len = args_ptr_size(argv);
+            ustack -= argv_len;
 
-            ustack = (void*)((ptr_t)ustack - str_len);
-            memcpy(ustack, (const void*)extra_arg, str_len);
+            memcpy((void*)ustack, (const void**)argv, argv_len);
+            for (size_t i = 0; i < 2 && argv_extra[i]; i++) {
+                ustack -= sizeof(ptr_t);
+                *((ptr_t*)ustack) = (ptr_t)argv_extra[i];
+                argv_len += sizeof(ptr_t);
+            }
+
+            argv_ptr = ustack;
+            ustack = copy_to_ustack(ustack, (ptr_t*)ustack);
         }
 
         // four args (arg{c|v}, env{c|p}) for main
@@ -131,10 +126,11 @@ exec_load(struct exec_container* container, struct v_file* executable)
 
         container->stack_top = (ptr_t)exec_param;
 
-        *exec_param = (struct uexec_param){
-            .argc = argv_len, .argv = ustack, .envc = envp_len, .envp = mapped
-        };
-
+        *exec_param =
+          (struct uexec_param){ .argc = (argv_len - 1) / sizeof(ptr_t),
+                                .argv = (char**)argv_ptr,
+                                .envc = (envp_len - 1) / sizeof(ptr_t),
+                                .envp = (char**)envp_ptr };
     } else {
         /*
             TODO need to find a way to inject argv and envp remotely

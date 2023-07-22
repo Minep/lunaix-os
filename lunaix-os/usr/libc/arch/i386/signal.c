@@ -33,10 +33,13 @@ signal(int signum, sighandler_t handler)
     return handler;
 }
 
+extern pid_t
+getpid();
+
 int
 raise(int signum)
 {
-    return kill(0, signum);
+    return kill(getpid(), signum);
 }
 
 int

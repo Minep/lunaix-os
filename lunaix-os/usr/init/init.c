@@ -28,7 +28,7 @@ main(int argc, const char** argv)
 
     pid_t pid;
     if (!(pid = fork())) {
-        err = execve("/usr/bin/signal_demo", NULL, NULL);
+        err = execve("/usr/bin/sh", NULL, NULL);
         printf("fail to execute (%d)\n", errno);
         _exit(err);
     }

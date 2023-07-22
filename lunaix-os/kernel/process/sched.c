@@ -184,8 +184,6 @@ schedule()
     check_sleepers();
 
     // round-robin scheduler
-redo:
-
     do {
         ptr = (ptr + 1) % sched_ctx.ptable_len;
         next = sched_ctx._procs[ptr];
