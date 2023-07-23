@@ -1,9 +1,9 @@
 #ifndef __LUNAIX_I386ABI_H
 #define __LUNAIX_I386ABI_H
 
-#define store_retval(retval) __current->intr_ctx.registers.eax = (retval)
+#define store_retval(retval) __current->intr_ctx->registers.eax = (retval)
 
-#define store_retval_to(proc, retval) (proc)->intr_ctx.registers.eax = (retval)
+#define store_retval_to(proc, retval) (proc)->intr_ctx->registers.eax = (retval)
 
 #define j_usr(sp, pc)                                                          \
     asm volatile("movw %0, %%ax\n"                                             \

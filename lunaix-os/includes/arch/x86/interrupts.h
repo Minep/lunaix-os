@@ -8,24 +8,25 @@
 
 struct exec_param;
 
+struct regcontext
+{
+    reg32 eax;
+    reg32 ebx;
+    reg32 ecx;
+    reg32 edx;
+    reg32 edi;
+    reg32 ebp;
+    reg32 esi;
+    reg32 ds;
+    reg32 es;
+    reg32 fs;
+    reg32 gs;
+} __attribute__((packed));
+
 typedef struct
 {
     unsigned int depth;
-    struct
-    {
-        reg32 eax;
-        reg32 ebx;
-        reg32 ecx;
-        reg32 edx;
-        reg32 edi;
-        reg32 ebp;
-        reg32 esi;
-        reg32 ds;
-        reg32 es;
-        reg32 fs;
-        reg32 gs;
-    } __attribute__((packed)) registers;
-
+    struct regcontext registers;
     union
     {
         reg32 esp;
@@ -35,7 +36,7 @@ typedef struct
 
 struct exec_param
 {
-    isr_param saved_prev_ctx;
+    isr_param* saved_prev_ctx;
     u32_t vector;
     u32_t err_code;
     u32_t eip;

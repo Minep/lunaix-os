@@ -1,5 +1,5 @@
+#include <arch/abi.h>
 #include <arch/x86/interrupts.h>
-#include <arch/x86/tss.h>
 
 #include <hal/apic.h>
 #include <hal/cpu.h>
@@ -63,6 +63,8 @@ sched_init_dummy()
     struct exec_param* execp =
       (void*)dummy_stack + DUMMY_STACK_SIZE - sizeof(struct exec_param);
 
+    isr_param* isrp = (void*)execp - sizeof(isr_param);
+
     *execp = (struct exec_param){
         .cs = KCODE_SEG,
         .eflags = cpu_reflags() | 0x0200,
@@ -70,13 +72,15 @@ sched_init_dummy()
         .ss = KDATA_SEG,
     };
 
+    *isrp = (isr_param){ .registers = { .ds = KDATA_SEG,
+                                        .es = KDATA_SEG,
+                                        .fs = KDATA_SEG,
+                                        .gs = KDATA_SEG },
+                         .execp = execp };
+
     // memset to 0
     dummy_proc = (struct proc_info){};
-    dummy_proc.intr_ctx = (isr_param){ .registers = { .ds = KDATA_SEG,
-                                                      .es = KDATA_SEG,
-                                                      .fs = KDATA_SEG,
-                                                      .gs = KDATA_SEG },
-                                       .execp = execp };
+    dummy_proc.intr_ctx = isrp;
 
     dummy_proc.page_table = cpu_rcr3();
     dummy_proc.state = PS_READY;
@@ -99,7 +103,6 @@ run(struct proc_info* proc)
         由于这中间没有进行地址空间的交换，所以第二次跳转使用的是同一个内核栈，而之前默认tss.esp0的值是永远指向最顶部
         这样一来就有可能会覆盖更早的上下文信息（比如嵌套的信号捕获函数）
     */
-    tss_update_esp(proc->intr_ctx.esp);
 
     apic_done_servicing();
 
@@ -226,7 +229,7 @@ __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
         llist_append(&root_proc->sleep.sleepers, &__current->sleep.sleepers);
     }
 
-    __current->intr_ctx.registers.eax = seconds;
+    store_retval(seconds);
 
     block_current();
     schedule();

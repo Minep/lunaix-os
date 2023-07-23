@@ -76,7 +76,7 @@ signal_dispatch()
         解决办法就是先吧intr_ctx拷贝到一个静态分配的区域里，然后再注入到用户栈。
     */
     static volatile struct proc_sigstate __temp_save;
-    __temp_save.proc_regs = __current->intr_ctx;
+    __temp_save.proc_regs = *__current->intr_ctx;
     memcpy(__temp_save.fxstate, __current->fxstate, 512);
 
     sigframe->sig_num = sig_selected;
@@ -149,7 +149,8 @@ send_single:
 __DEFINE_LXSYSCALL1(int, sigreturn, struct proc_sig, *sig_ctx)
 {
     memcpy(__current->fxstate, sig_ctx->prev_context.fxstate, 512);
-    __current->intr_ctx = sig_ctx->prev_context.proc_regs;
+    // FIXME: Interrupt context is exposed to user space!
+    *__current->intr_ctx = sig_ctx->prev_context.proc_regs;
 
     struct sigact* current = __current->sigctx.inprogress;
     if (current) {

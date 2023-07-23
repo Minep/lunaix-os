@@ -1,7 +1,10 @@
 #ifndef __LUNAIX_TSS_H
 #define __LUNAIX_TSS_H
-#include <lunaix/types.h>
 
+#define tss_esp0_off 4
+
+#ifndef __ASM__
+#include <lunaix/types.h>
 struct x86_tss
 {
     u32_t link;
@@ -12,5 +15,6 @@ struct x86_tss
 
 void
 tss_update_esp(u32_t esp0);
+#endif
 
 #endif /* __LUNAIX_TSS_H */

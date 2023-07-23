@@ -137,4 +137,10 @@ cpu_rdmsr(u32_t msr_idx, u32_t* reg_high, u32_t* reg_low);
 void
 cpu_wrmsr(u32_t msr_idx, u32_t reg_high, u32_t reg_low);
 
+static inline void
+cpu_ldvmspace(ptr_t vms)
+{
+    cpu_lcr3(vms);
+}
+
 #endif

@@ -221,7 +221,13 @@ dup_proc()
     __copy_fdtable(pcb);
     region_copy(&__current->mm, &pcb->mm);
 
-    setup_proc_mem(pcb, VMS_SELF);
+    /*
+     *  store the return value for forked process.
+     *  this will be implicit carried over after kernel stack is copied.
+     */
+    store_retval(0);
+
+    copy_kernel_stack(pcb, VMS_SELF);
 
     // 根据 mm_region 进一步配置页表
 
@@ -240,9 +246,6 @@ dup_proc()
 
     vmm_unmount_pd(VMS_MOUNT_1);
 
-    // 正如同fork，返回两次。
-    store_retval_to(pcb, 0);
-
     commit_process(pcb);
 
     return pcb->pid;
@@ -251,7 +254,7 @@ dup_proc()
 extern void __kernel_end;
 
 void
-setup_proc_mem(struct proc_info* proc, ptr_t usedMnt)
+copy_kernel_stack(struct proc_info* proc, ptr_t usedMnt)
 {
     // copy the entire kernel page table
     pid_t pid = proc->pid;
@@ -279,9 +282,5 @@ setup_proc_mem(struct proc_info* proc, ptr_t usedMnt)
         *ppte = (p & 0xfff) | ppa;
     }
 
-    // 我们不需要分配内核的区域，因为所有的内核代码和数据段只能通过系统调用来访问，任何非法的访问
-    // 都会导致eip落在区域外面，从而segmentation fault.
-
-    // 至于其他的区域我们暂时没有办法知道，因为那需要知道用户程序的信息。我们留到之后在处理。
     proc->page_table = pt_copy;
 }

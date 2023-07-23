@@ -126,10 +126,6 @@ spawn_proc0()
      * 目前的解决方案是2
      */
 
-    proc0->intr_ctx = (isr_param){ .registers = { .ds = KDATA_SEG,
-                                                  .es = KDATA_SEG,
-                                                  .fs = KDATA_SEG,
-                                                  .gs = KDATA_SEG } };
     proc0->parent = proc0;
 
     // 方案1：必须在读取eflags之后禁用。否则当进程被调度时，中断依然是关闭的！
@@ -141,7 +137,7 @@ spawn_proc0()
     proc0->page_table = vmm_dup_vmspace(proc0->pid);
 
     // 直接切换到新的拷贝，进行配置。
-    cpu_lcr3(proc0->page_table);
+    cpu_ldvmspace(proc0->page_table);
 
     // 为内核创建一个专属栈空间。
     for (size_t i = 0; i < (KSTACK_SIZE >> PG_SIZE_BITS); i++) {
@@ -155,12 +151,19 @@ spawn_proc0()
 
     struct exec_param* execp =
       (struct exec_param*)(KSTACK_TOP - sizeof(struct exec_param));
+    isr_param* isrp = (isr_param*)((ptr_t)execp - sizeof(isr_param));
 
     *execp = (struct exec_param){ .cs = KCODE_SEG,
                                   .eip = (ptr_t)__proc0,
                                   .ss = KDATA_SEG,
                                   .eflags = cpu_reflags() };
-    proc0->intr_ctx.execp = execp;
+    *isrp = (isr_param){ .registers = { .ds = KDATA_SEG,
+                                        .es = KDATA_SEG,
+                                        .fs = KDATA_SEG,
+                                        .gs = KDATA_SEG },
+                         .execp = execp };
+
+    proc0->intr_ctx = isrp;
 
     // 加载x87默认配置
     asm volatile("fninit\n"

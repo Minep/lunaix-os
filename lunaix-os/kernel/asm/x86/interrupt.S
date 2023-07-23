@@ -1,6 +1,7 @@
 #define __ASM__
 #include <arch/x86/interrupts.h>
 #include <arch/x86/i386_asm.h>
+#include <arch/x86/tss.h>
 #include <lunaix/syscall.h>
 #define __ASM_INTR_DIAGNOSIS
 
@@ -29,25 +30,104 @@
 
 */
 
+#define regsize 4
+
+/* stack layout: saved interrupt context */
+    .struct 0
+idepth:
+    .struct idepth + regsize
+ieax:
+    .struct ieax + regsize
+iebx:
+    .struct iebx + regsize
+iecx:
+    .struct iecx + regsize
+iedx:
+    .struct iedx + regsize
+iedi:
+    .struct iedi + regsize
+iebp:
+    .struct iebp + regsize
+iesi:
+    .struct iesi + regsize
+ids:
+    .struct ids + regsize
+ies:
+    .struct ies + regsize
+ifs:
+    .struct ifs + regsize
+igs:
+    .struct igs + regsize
+iesp:
+    .struct iesp + regsize
+isave_prev:
+    .struct isave_prev + regsize
+ivec:
+    .struct ivec + regsize
+iecode:
+    .struct iecode + regsize
+ieip:
+    .struct ieip + regsize
+ics:
+    .struct ics + regsize
+ieflags:
+    .struct ieflags + regsize
+iuesp:
+    .struct iuesp + regsize
+iuss:
+
+
+/* stack layout: execution (flow-control) state context */
+    .struct 0
+exsave_prev:
+    .struct exsave_prev + regsize
+exvec:
+    .struct exvec + regsize
+execode:
+    .struct execode + regsize
+exeip:
+    .struct exeip + regsize
+excs:
+    .struct excs + regsize
+exeflags:
+    .struct exeflags + regsize
+exuesp:
+    .struct exuesp + regsize
+exuss:
+
+/* struct layout: critical section of struct proc_info */
+    .struct 0
+proc_pid:
+    .struct proc_pid + regsize
+proc_parent:
+    .struct proc_parent + regsize
+proc_intr_ctx:
+    .struct proc_intr_ctx + regsize
+proc_ustack_top:
+    .struct proc_ustack_top + regsize
+proc_page_table:
+    .struct proc_page_table + regsize
+proc_fxstate:
+
 .section .text
     .global interrupt_wrapper
     interrupt_wrapper:
         /*
          Stack layout (layout of struct isr_param)
-    msa:   [ss]             > 76
-           [esp]            > 72
-           eflags           > 68
-           cs               > 64
-           eip              > 60
-           err_code         > 56
-           vector           > offset = 52
+    msa:   [ss]             > 76 -> 28
+           [esp]            > 72 -> 24
+           eflags           > 68 -> 20
+           cs               > 64 -> 16
+           eip              > 60 -> 12
+           err_code         > 56 -> 8
+           vector           > offset = 52 -> 4
            [saved_prev_ctx] > offset = 0
            ---
-           esp
+           esp       > 12 * 4 = 48
            gs
            fs
            es
-           ds         > offset = 7 * 4 = 28 + 4
+           ds         > offset = 8 * 4 = 32
            esi
            ebp
            edi
@@ -62,7 +142,7 @@
         */
         cld
 
-        subl $52, %esp
+        subl $4, %esp
         pushl %esp
 
         subl $16, %esp
@@ -80,11 +160,11 @@
         pushl %eax
 
         movl __current, %eax
-        movl 8(%eax), %eax
+        movl proc_intr_ctx(%eax), %eax
         incl %eax
         pushl %eax          # nested intr: current depth
 
-        movl 116(%esp), %eax   /* 取出 %cs */
+        movl ics(%esp), %eax   /* 取出 %cs */
         andl $0x3, %eax          /* 判断 RPL */
         jz 1f
 
@@ -98,12 +178,12 @@
 
         # FIXME: Save x87 context to user stack, rather than kernel's memory.
         # 保存x87FPU的状态
-        movl 68(%eax), %ebx
+        movl proc_fxstate(%eax), %ebx
         fxsave (%ebx)
 
         # 保存用户栈顶指针。因为我们允许同级中断的产生，所以需要该手段跟踪用户栈的地址。
-        movl 124(%esp), %ebx     # 取出esp
-        movl %ebx, 60(%eax)     # 存入__current->ustack_top
+        movl iuesp(%esp), %ebx     # 取出esp
+        movl %ebx, proc_ustack_top(%eax)     # 存入__current->ustack_top
 
     1:
         movl %esp, %eax
@@ -121,16 +201,17 @@
 
 #ifdef __ASM_INTR_DIAGNOSIS
         movl %eax, (debug_resv + 8)
-        movl 48(%esp), %eax
-        movl 60(%eax), %eax
+        movl iesp(%esp), %eax
+        movl exeip(%eax), %eax
         movl %eax, (debug_resv + 4) # eip
 #endif
         movl __current, %eax
-        movl 68(%eax), %eax
+        movl proc_fxstate(%eax), %eax
         
         test %eax, %eax     # do we have stored x87 context?
         jz 1f 
-        fxrstor (%eax)      
+        fxrstor (%eax) 
+
 1:
         popl %eax   # discard isr_param::depth
         popl %eax
@@ -150,20 +231,10 @@
 
         movl %eax, tmp_store
         movl __current, %eax
+        
+
         # nested intr: restore saved context
-        popl 8(%eax)       # depth
-        popl 12(%eax)      # eax
-        popl 16(%eax)      # ebx
-        popl 20(%eax)      # ecx
-        popl 24(%eax)      # edx
-        popl 28(%eax)      # edi
-        popl 32(%eax)      # ebp
-        popl 36(%eax)      # esi
-        popl 40(%eax)      # ds
-        popl 44(%eax)      # es
-        popl 48(%eax)      # fs
-        popl 52(%eax)      # gs
-        popl 56(%eax)      # esp
+        popl proc_intr_ctx(%eax)
 
         addl $8, %esp
 
@@ -180,8 +251,9 @@
         shll $3, %eax
         addl $12, %eax
         addl %esp, %eax
-        movl %eax, (_tss + 4)
+        movl %eax, (_tss + tss_esp0_off)
         movl tmp_store, %eax
+
         iret
 
     .global switch_to
@@ -191,8 +263,8 @@
 
         popl %ebx               # next
         movl __current, %eax    
-        movl 64(%eax), %ecx     # __current->pagetable
-        movl 64(%ebx), %eax     # next->pagetable
+        movl proc_page_table(%eax), %ecx     # __current->pagetable
+        movl proc_page_table(%ebx), %eax     # next->pagetable
         
         cmpl %ecx, %eax         # if(next->pagtable != __current->pagetable) {
         jz 1f
@@ -204,13 +276,19 @@
         # 我们已经处在了新的地址空间，为了避免影响其先前的栈布局
         # 需要使用一个临时的栈空间
         movl $tmp_stack, %esp
+        
+        # 更新 tss
+        movl proc_intr_ctx(%ebx), %eax      # proc->intr_ctx
+        movl iesp(%eax), %eax      # intr_ctx->esp
+        movl %eax, (tss_esp0_off + _tss)
+
         call signal_dispatch    # kernel/signal.c
 
         test %eax, %eax         # do we have signal to handle?
         jz 1f
         jmp handle_signal
     1:
-        leal 8(%ebx), %eax
+        movl proc_intr_ctx(%ebx), %eax
         jmp soft_iret
 
     .global handle_signal
