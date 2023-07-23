@@ -4,6 +4,9 @@
 #include <lunaix/spike.h>
 #include <lunaix/status.h>
 #include <lunaix/syscall.h>
+#include <lunaix/syslog.h>
+
+LOG_MODULE("SIG")
 
 #include <klibc/string.h>
 
@@ -11,6 +14,13 @@ extern struct scheduler sched_ctx; /* kernel/sched.c */
 
 #define UNMASKABLE (sigset(SIGKILL) | sigset(SIGTERM))
 #define TERMSIG (sigset(SIGSEGV) | sigset(SIGINT) | UNMASKABLE)
+#define CORE (sigset(SIGSEGV))
+
+static inline void
+signal_terminate(int errcode)
+{
+    terminate_proc(errcode | PEXITSIG);
+}
 
 // Referenced in kernel/asm/x86/interrupt.S
 void*
@@ -38,7 +48,7 @@ signal_dispatch()
 
     if (!action->sa_actor) {
         if (sigset_test(TERMSIG, sig_selected)) {
-            terminate_proc(sig_selected | PEXITSIG);
+            signal_terminate(sig_selected);
             schedule();
             // never return
         }
@@ -55,35 +65,11 @@ signal_dispatch()
     struct proc_sig* sigframe =
       (struct proc_sig*)((ustack - sizeof(struct proc_sig)) & ~0xf);
 
-    /*
-        这是一个相当恶心的坑。
-        问题是出在原本的sigframe->prev_context = __current->intr_ctx的上面
-        这个语句会被gcc在编译时，用更加高效的 rep movsl 来代替。
-
-        由于我们采用按需分页，所以在很多情况下，用户栈实际被分配的空间不允许我们进行完整的
-        注入，而需要走page fault handler进行动态分页。
-
-        竞态条件就出现在这里！
-
-        假若我们的__current->intr_ctx注入了一半，然后产生page-fault中断，
-        那么这就会导致我们的__current->intr_ctx被这个page-fault中断导致的
-        上下文信息覆盖。那么当page-fault handler成功分配了一个页，返回，
-        拷贝也就得以进行。遗憾的是，只不过这次拷贝的内容和前面的拷贝是没有任何的关系
-        （因为此时的intr_ctx已经不是之前的intr_ctx了！）
-        而这就会导致我们保存在信号上下文中的进程上下文信息不完整，从而在soft_iret时
-        触发#GP。
-
-        解决办法就是先吧intr_ctx拷贝到一个静态分配的区域里，然后再注入到用户栈。
-    */
-    static volatile struct proc_sigstate __temp_save;
-    __temp_save.proc_regs = *__current->intr_ctx;
-    memcpy(__temp_save.fxstate, __current->fxstate, 512);
-
     sigframe->sig_num = sig_selected;
-
     sigframe->sigact = action->sa_actor;
     sigframe->sighand = action->sa_handler;
-    sigframe->prev_context = __temp_save;
+
+    sigframe->saved_ictx = __current->intr_ctx;
 
     action->prev = prev_working;
     psig->inprogress = action;
@@ -135,7 +121,7 @@ send_grp:
     }
 
 send_single:
-    if (PROC_TERMINATED(proc->state)) {
+    if (proc_terminated(proc)) {
         __current->k_status = EINVAL;
         return -1;
     }
@@ -148,9 +134,7 @@ send_single:
 
 __DEFINE_LXSYSCALL1(int, sigreturn, struct proc_sig, *sig_ctx)
 {
-    memcpy(__current->fxstate, sig_ctx->prev_context.fxstate, 512);
-    // FIXME: Interrupt context is exposed to user space!
-    *__current->intr_ctx = sig_ctx->prev_context.proc_regs;
+    __current->intr_ctx = sig_ctx->saved_ictx;
 
     struct sigact* current = __current->sigctx.inprogress;
     if (current) {
@@ -158,6 +142,24 @@ __DEFINE_LXSYSCALL1(int, sigreturn, struct proc_sig, *sig_ctx)
         current->prev = NULL;
     } else {
         __current->sigctx.inprogress = NULL;
+    }
+
+    if (proc_terminated(__current)) {
+        __current->exit_code |= PEXITSIG;
+    } else if (sigset_test(CORE, sig_ctx->sig_num)) {
+        signal_terminate(sig_ctx->sig_num);
+    }
+
+    ptr_t ictx = (ptr_t)__current->intr_ctx;
+
+    /*
+        Ensure our restored context is within kernel stack
+
+        This prevent user to forge their own context such that arbitrary code
+       can be executed as supervisor level
+    */
+    if (!within_kstack(ictx)) {
+        signal_terminate(SIGSEGV);
     }
 
     schedule();

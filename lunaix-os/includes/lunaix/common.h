@@ -13,6 +13,7 @@
 #define KSTACK_SIZE MEM_1MB
 #define KSTACK_START (USER_START - KSTACK_SIZE)
 #define KSTACK_TOP ((USER_START - 1) & ~0xf)
+#define within_kstack(addr) (KSTACK_START <= (addr) && (addr) <= KSTACK_TOP)
 
 #define KERNEL_MM_BASE 0xC0000000
 

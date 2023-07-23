@@ -211,8 +211,6 @@ dup_proc()
     pcb->intr_ctx = __current->intr_ctx;
     pcb->parent = __current;
 
-    memcpy(pcb->fxstate, __current->fxstate, 512);
-
     if (__current->cwd) {
         pcb->cwd = __current->cwd;
         vfs_ref_dnode(pcb->cwd);

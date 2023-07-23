@@ -7,4 +7,6 @@
 #define UDATA_SEG 0x23
 #define TSS_SEG 0x28
 
+#define stack_alignment 0xfffffff0
+
 #endif /* __LUNAIX_I386_ASM_H */

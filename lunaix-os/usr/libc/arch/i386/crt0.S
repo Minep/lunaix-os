@@ -10,6 +10,7 @@
     .global _start
     _start:        
         xorl %eax, %eax
+        fninit
         call main
         
     1:

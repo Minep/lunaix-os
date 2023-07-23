@@ -3,6 +3,8 @@
 #include <arch/x86/i386_asm.h>
 #include <arch/x86/tss.h>
 #include <lunaix/syscall.h>
+#include <arch/x86/interrupt.S.inc>
+
 #define __ASM_INTR_DIAGNOSIS
 
 #ifdef __ASM_INTR_DIAGNOSIS
@@ -29,85 +31,6 @@
     Be aware the twists, offsets and hidden dependencies!
 
 */
-
-#define regsize 4
-
-/* stack layout: saved interrupt context */
-    .struct 0
-idepth:
-    .struct idepth + regsize
-ieax:
-    .struct ieax + regsize
-iebx:
-    .struct iebx + regsize
-iecx:
-    .struct iecx + regsize
-iedx:
-    .struct iedx + regsize
-iedi:
-    .struct iedi + regsize
-iebp:
-    .struct iebp + regsize
-iesi:
-    .struct iesi + regsize
-ids:
-    .struct ids + regsize
-ies:
-    .struct ies + regsize
-ifs:
-    .struct ifs + regsize
-igs:
-    .struct igs + regsize
-iesp:
-    .struct iesp + regsize
-isave_prev:
-    .struct isave_prev + regsize
-ivec:
-    .struct ivec + regsize
-iecode:
-    .struct iecode + regsize
-ieip:
-    .struct ieip + regsize
-ics:
-    .struct ics + regsize
-ieflags:
-    .struct ieflags + regsize
-iuesp:
-    .struct iuesp + regsize
-iuss:
-
-
-/* stack layout: execution (flow-control) state context */
-    .struct 0
-exsave_prev:
-    .struct exsave_prev + regsize
-exvec:
-    .struct exvec + regsize
-execode:
-    .struct execode + regsize
-exeip:
-    .struct exeip + regsize
-excs:
-    .struct excs + regsize
-exeflags:
-    .struct exeflags + regsize
-exuesp:
-    .struct exuesp + regsize
-exuss:
-
-/* struct layout: critical section of struct proc_info */
-    .struct 0
-proc_pid:
-    .struct proc_pid + regsize
-proc_parent:
-    .struct proc_parent + regsize
-proc_intr_ctx:
-    .struct proc_intr_ctx + regsize
-proc_ustack_top:
-    .struct proc_ustack_top + regsize
-proc_page_table:
-    .struct proc_page_table + regsize
-proc_fxstate:
 
 .section .text
     .global interrupt_wrapper
@@ -168,7 +91,8 @@ proc_fxstate:
         andl $0x3, %eax          /* 判断 RPL */
         jz 1f
 
-        movw $KDATA_SEG, %ax    /* 如果从用户模式转来，则切换至内核数据段 */
+    /* crossing the user/kernel boundary */
+        movw $KDATA_SEG, %ax
         movw %ax, %gs
         movw %ax, %fs
         movw %ax, %ds
@@ -176,18 +100,21 @@ proc_fxstate:
 
         movl __current, %eax
 
-        # FIXME: Save x87 context to user stack, rather than kernel's memory.
-        # 保存x87FPU的状态
-        movl proc_fxstate(%eax), %ebx
-        fxsave (%ebx)
-
         # 保存用户栈顶指针。因为我们允许同级中断的产生，所以需要该手段跟踪用户栈的地址。
         movl iuesp(%esp), %ebx     # 取出esp
         movl %ebx, proc_ustack_top(%eax)     # 存入__current->ustack_top
 
+        # Save x87 context to user stack, rather than kernel's memory.
+        # XXX: what will happen if we triggered a page fault during fxsave?
+        movl iuesp(%esp), %eax
+        andl $stack_alignment, %eax 
+        subl $512, %eax
+        fxsave (%eax)
+
+    /* kernel space same-level switch */
     1:
         movl %esp, %eax
-        andl $0xfffffff0, %esp
+        andl $stack_alignment, %esp
         subl $16, %esp
         movl %eax, (%esp)
 
@@ -205,12 +132,19 @@ proc_fxstate:
         movl exeip(%eax), %eax
         movl %eax, (debug_resv + 4) # eip
 #endif
-        movl __current, %eax
-        movl proc_fxstate(%eax), %eax
+        // movl __current, %eax
+        // movl proc_fxstate(%eax), %eax
         
-        test %eax, %eax     # do we have stored x87 context?
+        // test %eax, %eax     # do we have stored x87 context?
+
+        movl ics(%esp), %eax
+        andl $3, %eax
         jz 1f 
-        fxrstor (%eax) 
+
+        movl iuesp(%esp), %eax
+        andl $stack_alignment, %eax 
+        subl $512, %eax
+        fxrstor (%eax)
 
 1:
         popl %eax   # discard isr_param::depth
@@ -276,16 +210,16 @@ proc_fxstate:
         # 我们已经处在了新的地址空间，为了避免影响其先前的栈布局
         # 需要使用一个临时的栈空间
         movl $tmp_stack, %esp
-        
-        # 更新 tss
-        movl proc_intr_ctx(%ebx), %eax      # proc->intr_ctx
-        movl iesp(%eax), %eax      # intr_ctx->esp
-        movl %eax, (tss_esp0_off + _tss)
 
         call signal_dispatch    # kernel/signal.c
 
         test %eax, %eax         # do we have signal to handle?
         jz 1f
+
+        # 更新 tss
+        movl proc_intr_ctx(%ebx), %ecx      # __current->intr_ctx
+        movl %ecx, (tss_esp0_off + _tss)
+
         jmp handle_signal
     1:
         movl proc_intr_ctx(%ebx), %eax
@@ -296,16 +230,16 @@ proc_fxstate:
         # 注意1：任何对proc_sig的布局改动，都须及时的保证这里的一致性！
         # 注意2：handle_signal在调用之前，须确保proc_sig已经写入用户栈！
         # arg1 in %eax: addr of proc_sig structure in user stack
-        leal 12(%eax), %ebx      # %ebx = &proc_sig->prev_context
+        movl psig_saved_ictx(%eax), %ebx      # %ebx = &proc_sig->saved_ictx
 
-        pushl $UDATA_SEG        # proc_sig->prev_context.proc_regs.ss
+        pushl $UDATA_SEG
         pushl %eax              # esp
 
-        movl 48(%ebx), %ebx
-        pushl 68(%ebx)          # proc_sig->prev_context.proc_regs.execp->eflags
+        movl iexecp(%ebx), %ebx
+        pushl exeflags(%ebx)          # proc_sig->saved_ictx->execp->eflags
         
         pushl $UCODE_SEG        # cs
-        pushl 4(%eax)           # %eip = proc_sig->sigact
+        pushl psig_sigact(%eax)           # %eip = proc_sig->sigact
 
         movw $UDATA_SEG, %cx    # switch data seg to user mode
         movw %cx, %es

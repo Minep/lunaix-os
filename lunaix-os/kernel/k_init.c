@@ -165,11 +165,6 @@ spawn_proc0()
 
     proc0->intr_ctx = isrp;
 
-    // 加载x87默认配置
-    asm volatile("fninit\n"
-                 "fxsave (%%eax)" ::"a"(proc0->fxstate)
-                 : "memory");
-
     // 向调度器注册进程。
     commit_process(proc0);
 

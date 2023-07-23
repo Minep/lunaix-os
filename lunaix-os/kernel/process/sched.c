@@ -142,7 +142,7 @@ check_sleepers()
     time_t now = clock_systime();
     llist_for_each(pos, n, &leader->sleep.sleepers, sleep.sleepers)
     {
-        if (PROC_TERMINATED(pos->state)) {
+        if (proc_terminated(pos)) {
             goto del;
         }
 
@@ -343,8 +343,6 @@ alloc_process()
     proc->created = clock_systime();
     proc->pgid = proc->pid;
     proc->fdtable = vzalloc(sizeof(struct v_fdtable));
-    proc->fxstate =
-      vzalloc_dma(512); // FXSAVE需要十六位对齐地址，使用DMA块（128位对齐）
 
     llist_init_head(&proc->mm.regions);
     llist_init_head(&proc->tasks);
@@ -415,7 +413,6 @@ destroy_process(pid_t pid)
     }
 
     vfree(proc->fdtable);
-    vfree_dma(proc->fxstate);
 
     vmm_mount_pd(VMS_MOUNT_1, proc->page_table);
 
@@ -466,5 +463,5 @@ orphaned_proc(pid_t pid)
 
     // 如果其父进程的状态是terminated 或 destroy中的一种
     // 或者其父进程是在该进程之后创建的，那么该进程为孤儿进程
-    return PROC_TERMINATED(parent->state) || parent->created > proc->created;
+    return proc_terminated(parent) || parent->created > proc->created;
 }

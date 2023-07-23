@@ -24,7 +24,7 @@ sigalrm_handler(int signum)
     printf("I, pid %d, have received an alarm!\n", pid);
 }
 
-void
+int
 main()
 {
     signal(SIGCHLD, sigchild_handler);
@@ -72,4 +72,6 @@ main()
     }
 
     printf("done\n");
+
+    return 0;
 }

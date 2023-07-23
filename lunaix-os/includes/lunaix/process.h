@@ -41,17 +41,11 @@
 #define PS_GrBP (PS_PAUSED | PS_BLOCKED)
 #define PS_GrDT (PS_TERMNAT | PS_DESTROY)
 
-#define PROC_TERMINATED(state) ((state)&PS_GrDT)
-#define PROC_HANGED(state) ((state)&PS_BLOCKED)
-#define PROC_RUNNABLE(state) ((state)&PS_PAUSED)
+#define proc_terminated(proc) (((proc)->state) & PS_GrDT)
+#define proc_hanged(proc) (((proc)->state) & PS_BLOCKED)
+#define proc_runnable(proc) (((proc)->state) & PS_PAUSED)
 
 #define PROC_FINPAUSE 1
-
-struct proc_sigstate
-{
-    isr_param proc_regs;
-    char fxstate[512] __attribute__((aligned(16)));
-};
 
 struct sigact
 {
@@ -75,7 +69,7 @@ struct proc_sig
     int sig_num;
     void* sigact;
     void* sighand;
-    struct proc_sigstate prev_context;
+    isr_param* saved_ictx;
 } __attribute__((packed));
 
 struct proc_info
@@ -93,7 +87,6 @@ struct proc_info
     isr_param* intr_ctx;      // offset = 8
     ptr_t ustack_top;         // offset = 84 -> 56 -> 60 -> 12
     ptr_t page_table;         // offset = 88 -> 60 -> 64 -> 16
-    void* fxstate;            // offset = 92 -> 64 -> 68 -> 20
 
     /* ---- critical section end ---- */
 

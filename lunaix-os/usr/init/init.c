@@ -35,7 +35,7 @@ main(int argc, const char** argv)
 
     waitpid(pid, &err, 0);
 
-    if (err) {
+    if (WEXITSTATUS(err)) {
         printf("shell exit abnormally (%d)", err);
     }
 
