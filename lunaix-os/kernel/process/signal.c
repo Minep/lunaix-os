@@ -78,6 +78,12 @@ signal_dispatch()
 }
 
 void
+proc_clear_signal(struct proc_info* proc)
+{
+    memset(&proc->sigctx, 0, sizeof(proc->sigctx));
+}
+
+void
 proc_setsignal(struct proc_info* proc, int signum)
 {
     sigset_add(proc->sigctx.sig_pending, signum);

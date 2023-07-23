@@ -45,8 +45,6 @@
 #define proc_hanged(proc) (((proc)->state) & PS_BLOCKED)
 #define proc_runnable(proc) (((proc)->state) & PS_PAUSED)
 
-#define PROC_FINPAUSE 1
-
 struct sigact
 {
     struct sigact* prev;
@@ -76,17 +74,17 @@ struct proc_info
 {
     /*
         Any change to *critical section*, including layout, size
-        must be reflected in kernel/asm/x86/interrupt.S to avoid
+        must be reflected in arch/x86/interrupt.S.inc to avoid
         disaster!
      */
 
     /* ---- critical section start ---- */
 
-    pid_t pid;                // offset = 0
-    struct proc_info* parent; // offset = 4
-    isr_param* intr_ctx;      // offset = 8
-    ptr_t ustack_top;         // offset = 84 -> 56 -> 60 -> 12
-    ptr_t page_table;         // offset = 88 -> 60 -> 64 -> 16
+    pid_t pid;
+    struct proc_info* parent;
+    isr_param* intr_ctx;
+    ptr_t ustack_top;
+    ptr_t page_table;
 
     /* ---- critical section end ---- */
 
@@ -108,7 +106,6 @@ struct proc_info
     u8_t state;
     int32_t exit_code;
     int32_t k_status;
-    int flags;
     struct sighail sigctx;
     struct v_fdtable* fdtable;
     struct v_dnode* cwd;
@@ -194,5 +191,8 @@ get_process(pid_t pid);
 
 void
 proc_setsignal(struct proc_info* proc, int signum);
+
+void
+proc_clear_signal(struct proc_info* proc);
 
 #endif /* __LUNAIX_PROCESS_H */

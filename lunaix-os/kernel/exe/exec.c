@@ -224,6 +224,10 @@ __DEFINE_LXSYSCALL3(int,
     execp->esp = container.stack_top;
     execp->eip = container.exe.entry;
 
+    // these become meaningless once execved!
+    __current->ustack_top = 0;
+    proc_clear_signal(__current);
+
 done:
     // set return value
     store_retval(DO_STATUS(errno));

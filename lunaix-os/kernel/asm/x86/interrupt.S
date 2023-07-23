@@ -35,34 +35,6 @@
 .section .text
     .global interrupt_wrapper
     interrupt_wrapper:
-        /*
-         Stack layout (layout of struct isr_param)
-    msa:   [ss]             > 76 -> 28
-           [esp]            > 72 -> 24
-           eflags           > 68 -> 20
-           cs               > 64 -> 16
-           eip              > 60 -> 12
-           err_code         > 56 -> 8
-           vector           > offset = 52 -> 4
-           [saved_prev_ctx] > offset = 0
-           ---
-           esp       > 12 * 4 = 48
-           gs
-           fs
-           es
-           ds         > offset = 8 * 4 = 32
-           esi
-           ebp
-           edi
-           edx
-           ecx
-           ebx
-           eax
-    lsa:   depth       > offset = 0
-
-            las: Least Significant Address
-            msa: Most Significant Address
-        */
         cld
 
         subl $4, %esp
@@ -98,18 +70,18 @@
         movw %ax, %ds
         movw %ax, %es
 
-        movl __current, %eax
-
-        # 保存用户栈顶指针。因为我们允许同级中断的产生，所以需要该手段跟踪用户栈的地址。
-        movl iuesp(%esp), %ebx     # 取出esp
-        movl %ebx, proc_ustack_top(%eax)     # 存入__current->ustack_top
+        movl __current, %ebx
 
         # Save x87 context to user stack, rather than kernel's memory.
-        # XXX: what will happen if we triggered a page fault during fxsave?
+        # XXX what will happen if we triggered a page fault during fxsave?
+        # FIXME can we remove this overhead?
         movl iuesp(%esp), %eax
         andl $stack_alignment, %eax 
         subl $512, %eax
         fxsave (%eax)
+
+        # 保存用户栈顶指针。因为我们允许同级中断的产生，所以需要该手段跟踪用户栈的地址。
+        movl %eax, proc_ustack_top(%ebx)     # 存入__current->ustack_top
 
     /* kernel space same-level switch */
     1:
@@ -132,18 +104,15 @@
         movl exeip(%eax), %eax
         movl %eax, (debug_resv + 4) # eip
 #endif
-        // movl __current, %eax
-        // movl proc_fxstate(%eax), %eax
-        
-        // test %eax, %eax     # do we have stored x87 context?
 
         movl ics(%esp), %eax
         andl $3, %eax
         jz 1f 
 
-        movl iuesp(%esp), %eax
-        andl $stack_alignment, %eax 
-        subl $512, %eax
+        movl __current, %eax
+        movl proc_ustack_top(%eax), %eax
+        test %eax, %eax
+        jz 1f
         fxrstor (%eax)
 
 1:
@@ -165,7 +134,6 @@
 
         movl %eax, tmp_store
         movl __current, %eax
-        
 
         # nested intr: restore saved context
         popl proc_intr_ctx(%eax)
@@ -221,6 +189,7 @@
         movl %ecx, (tss_esp0_off + _tss)
 
         jmp handle_signal
+
     1:
         movl proc_intr_ctx(%ebx), %eax
         jmp soft_iret
