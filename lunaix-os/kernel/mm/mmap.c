@@ -177,7 +177,7 @@ mem_sync_pages(ptr_t mnt,
 
             *mapping.pte &= ~PG_DIRTY;
 
-            cpu_invplg((ptr_t)mapping.pte);
+            cpu_flush_page((ptr_t)mapping.pte);
         } else if ((options & MS_INVALIDATE)) {
             goto invalidate;
         }
@@ -191,7 +191,7 @@ mem_sync_pages(ptr_t mnt,
     invalidate:
         *mapping.pte &= ~PG_PRESENT;
         pmm_free_page(KERNEL_PID, mapping.pa);
-        cpu_invplg((ptr_t)mapping.pte);
+        cpu_flush_page((ptr_t)mapping.pte);
     }
 }
 

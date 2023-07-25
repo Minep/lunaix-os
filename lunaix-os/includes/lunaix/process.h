@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_PROCESS_H
 #define __LUNAIX_PROCESS_H
 
-#include <arch/x86/interrupts.h>
+#include <arch/i386/interrupts.h>
 #include <lunaix/clock.h>
 #include <lunaix/ds/waitq.h>
 #include <lunaix/fs.h>
@@ -74,7 +74,7 @@ struct proc_info
 {
     /*
         Any change to *critical section*, including layout, size
-        must be reflected in arch/x86/interrupt.S.inc to avoid
+        must be reflected in arch/i386/interrupt.S.inc to avoid
         disaster!
      */
 
@@ -194,5 +194,11 @@ proc_setsignal(struct proc_info* proc, int signum);
 
 void
 proc_clear_signal(struct proc_info* proc);
+
+// enable interrupt upon transfer
+#define TRANSFER_IE 1
+
+void
+proc_init_transfer(struct proc_info* proc, ptr_t stop, ptr_t target, int flags);
 
 #endif /* __LUNAIX_PROCESS_H */

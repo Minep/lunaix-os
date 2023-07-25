@@ -1,5 +1,5 @@
-#include <arch/x86/gdt.h>
-#include <arch/x86/tss.h>
+#include <arch/i386/gdt.h>
+#include <arch/i386/tss.h>
 #include <lunaix/types.h>
 
 #define GDT_ENTRY 6

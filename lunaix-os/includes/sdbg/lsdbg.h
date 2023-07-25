@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_LSDBG_H
 #define __LUNAIX_LSDBG_H
 
-#include <arch/x86/interrupts.h>
+#include <arch/i386/interrupts.h>
 
 #define SDBG_CLNT_HI 0x10
 #define SDBG_CLNT_QUIT 0xff

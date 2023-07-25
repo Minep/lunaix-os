@@ -1,4 +1,4 @@
-#include <arch/x86/tss.h>
+#include <arch/i386/tss.h>
 #include <lunaix/common.h>
 #include <lunaix/process.h>
 

@@ -7,21 +7,22 @@ LOG_MODULE("rand")
 int
 __rand_rd_pg(struct device* dev, void* buf, size_t offset)
 {
-    rnd_fill(buf, PG_SIZE);
+    // rnd_fill(buf, PG_SIZE);
     return PG_SIZE;
 }
 
 int
 __rand_rd(struct device* dev, void* buf, size_t offset, size_t len)
 {
-    rnd_fill(buf, len);
+    // rnd_fill(buf, len);
     return len;
 }
 
 void
 devbuiltin_init_rand()
 {
-    if (!rnd_is_supported()) {
+    // TODO rnd device need better abstraction
+    if (1) {
         kprintf(KWARN "not supported.\n");
         return;
     }

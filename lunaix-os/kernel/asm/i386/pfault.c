@@ -1,4 +1,4 @@
-#include <arch/x86/interrupts.h>
+#include <arch/i386/interrupts.h>
 #include <lunaix/common.h>
 #include <lunaix/mm/mm.h>
 #include <lunaix/mm/pmm.h>
@@ -42,7 +42,7 @@ void
 intr_routine_page_fault(const isr_param* param)
 {
     uint32_t errcode = param->execp->err_code;
-    ptr_t ptr = cpu_rcr2();
+    ptr_t ptr = cpu_ldeaddr();
     if (!ptr) {
         goto segv_term;
     }
@@ -52,9 +52,7 @@ intr_routine_page_fault(const isr_param* param)
         goto segv_term;
     }
 
-    if (!SEL_RPL(param->execp->cs)) {
-        // TODO if kernel pfault
-    }
+    // XXX do kernel trigger pfault?
 
     vm_regions_t* vmr = (vm_regions_t*)&__current->mm.regions;
     struct mm_region* hit_region = region_get(vmr, ptr);
@@ -76,7 +74,7 @@ intr_routine_page_fault(const isr_param* param)
         }
         if ((hit_region->attr & COW_MASK) == COW_MASK) {
             // normal page fault, do COW
-            cpu_invplg((ptr_t)pte);
+            cpu_flush_page((ptr_t)pte);
 
             ptr_t pa = (ptr_t)vmm_dup_page(__current->pid, PG_ENTRY_ADDR(*pte));
 
@@ -93,7 +91,7 @@ intr_routine_page_fault(const isr_param* param)
     //   -> a new page need to be alloc
     if ((hit_region->attr & REGION_ANON)) {
         if (!PG_IS_PRESENT(*pte)) {
-            cpu_invplg((ptr_t)pte);
+            cpu_flush_page((ptr_t)pte);
 
             ptr_t pa = pmm_alloc_page(__current->pid, 0);
             if (!pa) {
@@ -122,7 +120,7 @@ intr_routine_page_fault(const isr_param* param)
             goto oom;
         }
 
-        cpu_invplg((ptr_t)pte);
+        cpu_flush_page((ptr_t)pte);
         *pte = (*pte & 0xFFF) | pa | get_ptattr(hit_region);
 
         memset((void*)ptr, 0, PG_SIZE);
@@ -167,6 +165,6 @@ segv_term:
         ;
 
 resolved:
-    cpu_invplg(ptr);
+    cpu_flush_page(ptr);
     return;
 }

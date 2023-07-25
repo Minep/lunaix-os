@@ -1,4 +1,4 @@
-#include <arch/x86/interrupts.h>
+#include <arch/i386/interrupts.h>
 #include <klibc/stdio.h>
 #include <lunaix/spike.h>
 
@@ -13,7 +13,7 @@ __assert_fail(const char* expr, const char* file, unsigned int line)
     //  This is a convention we made that the LUNAIX_SYS_PANIC syscall will
     //  print the panic message passed via %edi. (see
     //  kernel/asm/x86/interrupts.c)
-    asm("int %0" ::"i"(LUNAIX_SYS_PANIC), "D"(buffer));
+    cpu_trap_panic(buffer);
 
     DO_SPIN // never reach
 }
@@ -21,7 +21,7 @@ __assert_fail(const char* expr, const char* file, unsigned int line)
 void
 panick(const char* msg)
 {
-    asm("int %0" ::"i"(LUNAIX_SYS_PANIC), "D"(msg));
+    cpu_trap_panic(msg);
     DO_SPIN
 }
 

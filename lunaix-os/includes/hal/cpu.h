@@ -3,144 +3,81 @@
 
 #include <lunaix/types.h>
 
-#define SEL_RPL(selector) ((selector)&0x3)
+/**
+ * @brief Get processor ID string
+ *
+ * @param id_out
+ */
+void
+cpu_get_id(char* id_out);
 
-typedef unsigned int reg32;
-typedef unsigned short reg16;
+/**
+ * @brief Load current processor state
+ *
+ * @return u32_t
+ */
+u32_t
+cpu_ldstate();
 
-typedef struct
-{
-    reg32 eax;
-    reg32 ebx;
-    reg32 ecx;
-    reg32 edx;
-    reg32 edi;
-    reg32 ebp;
-    reg32 esi;
-    reg32 esp;
-} __attribute__((packed)) gp_regs;
+/**
+ * @brief Load current processor config
+ *
+ * @return u32_t
+ */
+u32_t
+cpu_ldconfig();
 
-typedef struct
-{
-    reg16 ds;
-    reg16 es;
-    reg16 fs;
-    reg16 gs;
-} __attribute__((packed)) sg_reg;
+/**
+ * @brief Change current processor state
+ *
+ * @return u32_t
+ */
+void
+cpu_chconfig(u32_t val);
+
+/**
+ * @brief Load current virtual memory space
+ *
+ * @return u32_t
+ */
+u32_t
+cpu_ldvmspace();
+
+/**
+ * @brief Change current virtual memory space
+ *
+ * @return u32_t
+ */
+void
+cpu_chvmspace(u32_t val);
+
+/**
+ * @brief Flush TLB
+ *
+ * @return u32_t
+ */
+void
+cpu_flush_page(ptr_t va);
 
 void
-cpu_get_brand(char* brand_out);
-
-int
-cpu_has_apic();
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wreturn-type"
-static inline reg32
-cpu_rcr0()
-{
-    ptr_t val;
-    asm volatile("movl %%cr0,%0" : "=r"(val));
-    return val;
-}
-
-static inline reg32
-cpu_rcr2()
-{
-    ptr_t val;
-    asm volatile("movl %%cr2,%0" : "=r"(val));
-    return val;
-}
-
-static inline reg32
-cpu_rcr3()
-{
-    ptr_t val;
-    asm volatile("movl %%cr3,%0" : "=r"(val));
-    return val;
-}
-
-static inline reg32
-cpu_rcr4()
-{
-    ptr_t val;
-    asm volatile("movl %%cr4,%0" : "=r"(val));
-    return val;
-}
-
-static inline reg32
-cpu_reflags()
-{
-    ptr_t val;
-    asm volatile("pushf\n"
-                 "popl %0\n"
-                 : "=r"(val)::);
-    return val;
-}
-#pragma GCC diagnostic pop
-
-static inline void
-cpu_lcr0(reg32 v)
-{
-    asm("mov %0, %%cr0" ::"r"(v));
-}
-
-static inline void
-cpu_lcr2(reg32 v)
-{
-    asm("mov %0, %%cr2" ::"r"(v));
-}
-
-static inline void
-cpu_lcr3(reg32 v)
-{
-    asm("mov %0, %%cr3" ::"r"(v));
-}
-
-static inline void
-cpu_invplg(ptr_t va)
-{
-    asm volatile("invlpg (%0)" ::"r"(va) : "memory");
-}
-
-static inline void
-cpu_enable_interrupt()
-{
-    asm volatile("sti");
-}
-
-static inline void
-cpu_disable_interrupt()
-{
-    asm volatile("cli");
-}
-
-static inline void
-cpu_invtlb()
-{
-    reg32 interm;
-    asm("movl %%cr3, %0\n"
-        "movl %0, %%cr3"
-        : "=r"(interm)
-        : "r"(interm));
-}
-
-static inline void
-cpu_int(int vect)
-{
-    asm("int %0" ::"i"(vect));
-}
+cpu_flush_vmspace();
 
 void
-cpu_rdmsr(u32_t msr_idx, u32_t* reg_high, u32_t* reg_low);
+cpu_enable_interrupt();
 
 void
-cpu_wrmsr(u32_t msr_idx, u32_t reg_high, u32_t reg_low);
+cpu_disable_interrupt();
 
-static inline void
-cpu_ldvmspace(ptr_t vms)
-{
-    cpu_lcr3(vms);
-}
+void
+cpu_trap_sched();
 
-#endif
+void
+cpu_trap_panic(char* message);
+
+void
+cpu_wait();
+
+ptr_t
+cpu_ldeaddr();
+
+#endif /* __LUNAIX_CPU_H */

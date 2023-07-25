@@ -19,7 +19,6 @@ OFLAGS := -fno-gcse\
 		  -fno-cse-skip-blocks\
 		  -fno-optimize-strlen\
 		  -fno-inline-functions-called-once \
-		  -fno-inline-functions \
 		  -fno-inline-small-functions \
 		  -fno-indirect-inlining
 

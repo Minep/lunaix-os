@@ -1,4 +1,4 @@
-#include <arch/x86/interrupts.h>
+#include <arch/i386/interrupts.h>
 #include <hal/acpi/acpi.h>
 #include <hal/ioapic.h>
 #include <lunaix/common.h>

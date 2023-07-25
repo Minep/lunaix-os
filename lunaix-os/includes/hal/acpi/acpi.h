@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_ACPI_ACPI_H
 #define __LUNAIX_ACPI_ACPI_H
 
-#include <arch/x86/boot/multiboot.h>
+#include <arch/i386/boot/multiboot.h>
 #include <stddef.h>
 #include <stdint.h>
 

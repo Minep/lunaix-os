@@ -9,9 +9,9 @@
 #endif
 
 #ifdef __ARCH_IA32
-    #include "x86/i386_asm.h"
+    #include "i386/i386_asm.h"
     #ifndef __ASM__
-        #include "x86/i386_abi.h"
+        #include "i386/i386_abi.h"
     #endif
 #endif
 

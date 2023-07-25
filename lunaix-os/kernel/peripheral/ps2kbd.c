@@ -8,7 +8,7 @@
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
 
-#include <arch/x86/interrupts.h>
+#include <arch/i386/interrupts.h>
 #include <hal/cpu.h>
 #include <klibc/string.h>
 

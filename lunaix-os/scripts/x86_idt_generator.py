@@ -1,6 +1,6 @@
 from pathlib import Path
 
-intr_handler_h = "arch/x86/intrhnds.h"
+intr_handler_h = "arch/i386/intrhnds.h"
 intr_handler_c = "kernel/asm/x86/intrhnds.c"
 intr_handler_s = "kernel/asm/x86/intrhnds.S"
 
@@ -81,7 +81,7 @@ def export_c(src: Path):
     code = '\n'.join(expr_list)
     with cfile.open(mode='w+') as f:
         f.write(f'''
-#include <arch/x86/idt.h>
+#include <arch/i386/idt.h>
 #include <stdint.h>
 #include <{intr_handler_h}>
 

@@ -1,4 +1,4 @@
-#include <arch/x86/interrupts.h>
+#include <arch/i386/interrupts.h>
 #include <lunaix/isrm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>

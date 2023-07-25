@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_GDBSTUB_H
 #define __LUNAIX_GDBSTUB_H
 
-#include <arch/x86/interrupts.h>
+#include <arch/i386/interrupts.h>
 
 void
 gdbstub_loop(isr_param* param);

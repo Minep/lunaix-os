@@ -55,7 +55,7 @@ vmm_set_mapping(ptr_t mnt, ptr_t va, ptr_t pa, pt_attr attr, int options)
           NEW_L1_ENTRY(attr | PG_WRITE | PG_PRESENT, new_l1pt_pa);
 
         // make sure our new l2 table is visible to CPU
-        cpu_invplg((ptr_t)l2pt);
+        cpu_flush_page((ptr_t)l2pt);
 
         memset((void*)l2pt, 0, PG_SIZE);
     } else {
@@ -66,7 +66,7 @@ vmm_set_mapping(ptr_t mnt, ptr_t va, ptr_t pa, pt_attr attr, int options)
     }
 
     if (mnt == VMS_SELF) {
-        cpu_invplg(va);
+        cpu_flush_page(va);
     }
 
     if ((options & VMAP_NOMAP)) {
@@ -98,7 +98,7 @@ vmm_del_mapping(ptr_t mnt, ptr_t va)
         x86_page_table* l2pt = (x86_page_table*)(mnt | (l1_index << 12));
         x86_pte_t l2pte = l2pt->entry[l2_index];
 
-        cpu_invplg(va);
+        cpu_flush_page(va);
         l2pt->entry[l2_index] = PTE_NULL;
 
         return PG_ENTRY_ADDR(l2pte);
@@ -184,7 +184,7 @@ vmm_mount_pd(ptr_t mnt, ptr_t pde)
 {
     x86_page_table* l1pt = (x86_page_table*)L1_BASE_VADDR;
     l1pt->entry[(mnt >> 22)] = NEW_L1_ENTRY(T_SELF_REF_PERM, pde);
-    cpu_invplg(mnt);
+    cpu_flush_page(mnt);
     return mnt;
 }
 
@@ -193,6 +193,6 @@ vmm_unmount_pd(ptr_t mnt)
 {
     x86_page_table* l1pt = (x86_page_table*)L1_BASE_VADDR;
     l1pt->entry[(mnt >> 22)] = 0;
-    cpu_invplg(mnt);
+    cpu_flush_page(mnt);
     return mnt;
 }

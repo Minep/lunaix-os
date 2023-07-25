@@ -1,5 +1,5 @@
 #define __ASM__ 1
-#include <arch/x86/boot/multiboot.h>
+#include <arch/i386/boot/multiboot.h>
 
 #define MB_FLAGS    (MULTIBOOT_MEMORY_INFO | MULTIBOOT_PAGE_ALIGN)
 #define KPG_SIZE    10*4096
@@ -9,7 +9,7 @@
     .long MB_FLAGS
     .long CHECKSUM(MB_FLAGS)
 
-.section .bss
+.section .hhk_init_bss
     .global mb_info
     .align 16
     /* 为Multiboot info struct 预留空间 */
@@ -35,7 +35,7 @@
         .skip KPG_SIZE, 0
 
 
-.section .hhk_init
+.section .hhk_init_text
     .global start_
     .type start_, @function     /* Optional, this just give the 
                                  * linker more knowledge about the label 
@@ -50,7 +50,7 @@
 
         /* 
             将咱们的 multiboot_info 挪个地儿，就是上述预留的空间里
-            而后在_hhk_init里，我们会对所有的高半核初始化代码（arch/x86下的所有）进行Identity map
+            而后在_hhk_init里，我们会对所有的高半核初始化代码（arch/i386下的所有）进行Identity map
             这样，我们能够保证当分页与虚拟地址开启后，我们的内核能够访问到multiboot info table
          */
 

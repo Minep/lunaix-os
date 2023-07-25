@@ -13,7 +13,7 @@
 #include <hal/pic.h>
 #include <hal/rtc.h>
 
-#include <arch/x86/interrupts.h>
+#include <arch/i386/interrupts.h>
 
 #include <lunaix/mm/mmio.h>
 #include <lunaix/spike.h>
@@ -34,7 +34,9 @@ apic_init()
 
     // Make sure the APIC is there
     //  FUTURE: Use 8259 as fallback
-    assert_msg(cpu_has_apic(), "No APIC detected!");
+
+    // FIXME apic abstraction as local interrupt controller
+    // assert_msg(cpu_has_apic(), "No APIC detected!");
 
     // As we are going to use APIC, disable the old 8259 PIC
     pic_disable();

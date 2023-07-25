@@ -11,23 +11,21 @@ SECTIONS {
     . = 0x100000;
 
     /* 这里是我们的高半核初始化代码段和数据段 */
-
     .hhk_init_text BLOCK(4K) : {
-        * (.multiboot)
-        arch/*.o (.hhk_init)
-        arch/*.o (.text)
+        *(.multiboot)
+        *(.hhk_init_text)
     }
 
     .hhk_init_bss BLOCK(4K) : {
-        arch/*.o (.bss)
+        *(.hhk_init_bss)
     }
 
     .hhk_init_data BLOCK(4K) : {
-        arch/*.o (.data)
+        *(.hhk_init_data)
     }
 
     .hhk_init_rodata BLOCK(4K) : {
-        arch/*.o (.rodata)
+        *(.hhk_init_rodata)
     }
     __init_hhk_end = ALIGN(4K);
 
@@ -39,37 +37,25 @@ SECTIONS {
         __kernel_start = .;
         PROVIDE(__ktext_start = .);
         
-        kernel/*.o (.text)
-        hal/*.o (.text)
-        debug/*.o (.text)
-        libs/*.o (.text)
+        *(.text)
 
         PROVIDE(__ktext_end = .);
     }
 
     .data BLOCK(4K) : AT ( ADDR(.data) - 0xC0000000 ) {
-        kernel/*.o (.data)
-        hal/*.o (.data)
-        debug/*.o (.data)
-        libs/*.o (.data)
+        *(.data)
     }
 
     .rodata BLOCK(4K) : AT ( ADDR(.rodata) - 0xC0000000 ) {
-        kernel/*.o (.rodata)
-        hal/*.o (.rodata)
-        debug/*.o (.rodata)
-        libs/*.o (.rodata)
+        *(.rodata)
     }
 
     .kpg BLOCK(4K) : AT ( ADDR(.kpg) - 0xC0000000 ) {
-        arch/*.o (.kpg)
+        *(.kpg)
     }
 
     .bss BLOCK(4K) : AT ( ADDR(.bss) - 0xC0000000 ) {
-        kernel/*.o (.bss)
-        hal/*.o (.bss)
-        debug/*.o (.bss)
-        libs/*.o (.bss)
+        *(.bss)
     }
 
     __kernel_end = ALIGN(4K);

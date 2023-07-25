@@ -1,6 +1,6 @@
 
-#include <arch/x86/idt.h>
-#include <arch/x86/intrhnds.h>
+#include <arch/i386/idt.h>
+#include <arch/i386/intrhnds.h>
 #include <lunaix/types.h>
 
 #define IDT_ENTRY 256

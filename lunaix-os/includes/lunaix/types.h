@@ -1,6 +1,7 @@
 #ifndef __LUNAIX_TYPES_H
 #define __LUNAIX_TYPES_H
 
+#include <lunaix/compiler.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <usr/lunaix/types.h>

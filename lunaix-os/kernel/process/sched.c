@@ -1,5 +1,5 @@
 #include <arch/abi.h>
-#include <arch/x86/interrupts.h>
+#include <arch/i386/interrupts.h>
 
 #include <hal/apic.h>
 #include <hal/cpu.h>
@@ -60,29 +60,13 @@ sched_init_dummy()
     extern void my_dummy();
     static char dummy_stack[DUMMY_STACK_SIZE] __attribute__((aligned(16)));
 
-    struct exec_param* execp =
-      (void*)dummy_stack + DUMMY_STACK_SIZE - sizeof(struct exec_param);
+    ptr_t stktop = (ptr_t)dummy_stack + DUMMY_STACK_SIZE;
 
-    isr_param* isrp = (void*)execp - sizeof(isr_param);
-
-    *execp = (struct exec_param){
-        .cs = KCODE_SEG,
-        .eflags = cpu_reflags() | 0x0200,
-        .eip = (ptr_t)my_dummy,
-        .ss = KDATA_SEG,
-    };
-
-    *isrp = (isr_param){ .registers = { .ds = KDATA_SEG,
-                                        .es = KDATA_SEG,
-                                        .fs = KDATA_SEG,
-                                        .gs = KDATA_SEG },
-                         .execp = execp };
-
-    // memset to 0
     dummy_proc = (struct proc_info){};
-    dummy_proc.intr_ctx = isrp;
 
-    dummy_proc.page_table = cpu_rcr3();
+    proc_init_transfer(&dummy_proc, stktop, (ptr_t)my_dummy, TRANSFER_IE);
+
+    dummy_proc.page_table = cpu_ldvmspace();
     dummy_proc.state = PS_READY;
     dummy_proc.parent = &dummy_proc;
     dummy_proc.pid = KERNEL_PID;
@@ -209,7 +193,7 @@ void
 sched_yieldk()
 {
     cpu_enable_interrupt();
-    cpu_int(LUNAIX_SCHED);
+    cpu_trap_sched();
 }
 
 __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)

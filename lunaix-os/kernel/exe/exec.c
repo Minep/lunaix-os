@@ -220,9 +220,8 @@ __DEFINE_LXSYSCALL3(int,
 
     // we will jump to new entry point (_u_start) upon syscall's
     // return so execve 'will not return' from the perspective of it's invoker
-    volatile struct exec_param* execp = __current->intr_ctx->execp;
-    execp->esp = container.stack_top;
-    execp->eip = container.exe.entry;
+    eret_target(__current) = container.exe.entry;
+    eret_stack(__current) = container.stack_top;
 
     // these become meaningless once execved!
     __current->ustack_top = 0;

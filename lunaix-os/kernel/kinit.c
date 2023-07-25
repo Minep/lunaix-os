@@ -17,9 +17,9 @@
 #include <lunaix/tty/tty.h>
 #include <lunaix/types.h>
 
-#include <arch/x86/boot/multiboot.h>
-#include <arch/x86/idt.h>
-#include <arch/x86/interrupts.h>
+#include <arch/abi.h>
+#include <arch/i386/boot/multiboot.h>
+#include <arch/i386/interrupts.h>
 
 #include <klibc/stdio.h>
 #include <klibc/string.h>
@@ -137,7 +137,7 @@ spawn_proc0()
     proc0->page_table = vmm_dup_vmspace(proc0->pid);
 
     // 直接切换到新的拷贝，进行配置。
-    cpu_ldvmspace(proc0->page_table);
+    cpu_chvmspace(proc0->page_table);
 
     // 为内核创建一个专属栈空间。
     for (size_t i = 0; i < (KSTACK_SIZE >> PG_SIZE_BITS); i++) {
@@ -149,21 +149,7 @@ spawn_proc0()
                         VMAP_NULL);
     }
 
-    struct exec_param* execp =
-      (struct exec_param*)(KSTACK_TOP - sizeof(struct exec_param));
-    isr_param* isrp = (isr_param*)((ptr_t)execp - sizeof(isr_param));
-
-    *execp = (struct exec_param){ .cs = KCODE_SEG,
-                                  .eip = (ptr_t)__proc0,
-                                  .ss = KDATA_SEG,
-                                  .eflags = cpu_reflags() };
-    *isrp = (isr_param){ .registers = { .ds = KDATA_SEG,
-                                        .es = KDATA_SEG,
-                                        .fs = KDATA_SEG,
-                                        .gs = KDATA_SEG },
-                         .execp = execp };
-
-    proc0->intr_ctx = isrp;
+    proc_init_transfer(proc0, KSTACK_TOP, (ptr_t)__proc0, 0);
 
     // 向调度器注册进程。
     commit_process(proc0);

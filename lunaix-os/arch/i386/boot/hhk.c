@@ -1,5 +1,5 @@
-#include <arch/x86/boot/multiboot.h>
-#include <arch/x86/idt.h>
+#include <arch/i386/boot/multiboot.h>
+#include <arch/i386/idt.h>
 #include <lunaix/common.h>
 #include <lunaix/mm/page.h>
 
@@ -32,7 +32,10 @@ extern u8_t __ktext_end;
 extern u8_t __init_hhk_end;
 extern u8_t _k_stack;
 
-void
+#define boot_text __attribute__((section(".hhk_init_text")))
+#define boot_data __attribute__((section(".hhk_init_data")))
+
+void boot_text
 _init_page(x86_page_table* ptd)
 {
     ptd->entry[0] = NEW_L1_ENTRY(PG_PREM_RW, (ptd_t*)ptd + PG_MAX_ENTRIES);
@@ -102,7 +105,7 @@ _init_page(x86_page_table* ptd)
     ptd->entry[PG_MAX_ENTRIES - 1] = NEW_L1_ENTRY(T_SELF_REF_PERM, ptd);
 }
 
-u32_t
+u32_t boot_text
 __save_subset(u8_t* destination, u8_t* base, unsigned int size)
 {
     unsigned int i = 0;
@@ -112,7 +115,7 @@ __save_subset(u8_t* destination, u8_t* base, unsigned int size)
     return i;
 }
 
-void
+void boot_text
 _save_multiboot_info(multiboot_info_t* info, u8_t* destination)
 {
     u32_t current = 0;
@@ -133,7 +136,7 @@ _save_multiboot_info(multiboot_info_t* info, u8_t* destination)
     }
 }
 
-void
+void boot_text
 _hhk_init(x86_page_table* ptd, u32_t kpg_size)
 {
 

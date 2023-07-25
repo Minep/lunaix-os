@@ -177,12 +177,12 @@ __mark_region(ptr_t start_vpn, ptr_t end_vpn, int attr)
         x86_pte_t* curproc = &PTE_MOUNTED(VMS_SELF, i);
         x86_pte_t* newproc = &PTE_MOUNTED(VMS_MOUNT_1, i);
 
-        cpu_invplg((ptr_t)newproc);
+        cpu_flush_page((ptr_t)newproc);
 
         if ((attr & REGION_MODE_MASK) == REGION_RSHARED) {
             // 如果读共享，则将两者的都标注为只读，那么任何写入都将会应用COW策略。
-            cpu_invplg((ptr_t)curproc);
-            cpu_invplg((ptr_t)(i << 12));
+            cpu_flush_page((ptr_t)curproc);
+            cpu_flush_page((ptr_t)(i << 12));
 
             *curproc = *curproc & ~PG_WRITE;
             *newproc = *newproc & ~PG_WRITE;
@@ -272,7 +272,7 @@ copy_kernel_stack(struct proc_info* proc, ptr_t usedMnt)
             In the name of Celestia our glorious goddess, I will fucking HATE
            the TLB for the rest of my LIFE!
         */
-        cpu_invplg((ptr_t)ppte);
+        cpu_flush_page((ptr_t)ppte);
 
         x86_pte_t p = *ppte;
         ptr_t ppa = vmm_dup_page(pid, PG_ENTRY_ADDR(p));

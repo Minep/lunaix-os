@@ -10,17 +10,17 @@ struct exec_param;
 
 struct regcontext
 {
-    reg32 eax;
-    reg32 ebx;
-    reg32 ecx;
-    reg32 edx;
-    reg32 edi;
-    reg32 ebp;
-    reg32 esi;
-    reg32 ds;
-    reg32 es;
-    reg32 fs;
-    reg32 gs;
+    u32_t eax;
+    u32_t ebx;
+    u32_t ecx;
+    u32_t edx;
+    u32_t edi;
+    u32_t ebp;
+    u32_t esi;
+    u32_t ds;
+    u32_t es;
+    u32_t fs;
+    u32_t gs;
 } __attribute__((packed));
 
 typedef struct
@@ -29,7 +29,7 @@ typedef struct
     struct regcontext registers;
     union
     {
-        reg32 esp;
+        u32_t esp;
         volatile struct exec_param* execp;
     };
 } __attribute__((packed)) isr_param;

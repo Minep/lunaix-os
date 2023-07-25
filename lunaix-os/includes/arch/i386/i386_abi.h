@@ -5,6 +5,11 @@
 
 #define store_retval_to(proc, retval) (proc)->intr_ctx->registers.eax = (retval)
 
+#define eret_target(proc) (proc)->intr_ctx->execp->eip
+#define eret_stack(proc) (proc)->intr_ctx->execp->esp
+#define intr_ivec(proc) (proc)->intr_ctx->execp->vector
+#define intr_ierr(proc) (proc)->intr_ctx->execp->err_code
+
 #define j_usr(sp, pc)                                                          \
     asm volatile("movw %0, %%ax\n"                                             \
                  "movw %%ax, %%es\n"                                           \

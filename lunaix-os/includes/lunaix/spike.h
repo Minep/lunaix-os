@@ -20,8 +20,6 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define likely(x) __builtin_expect((x), 1)
-
 /**
  * @brief Fast log base 2 for integer, utilizing constant unfolding.
  * Adopted from

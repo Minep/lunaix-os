@@ -1,9 +1,9 @@
 #define __ASM__
-#include <arch/x86/interrupts.h>
-#include <arch/x86/i386_asm.h>
-#include <arch/x86/tss.h>
+#include <arch/i386/interrupts.h>
+#include <arch/i386/i386_asm.h>
+#include <arch/i386/tss.h>
 #include <lunaix/syscall.h>
-#include <arch/x86/interrupt.S.inc>
+#include <arch/i386/interrupt.S.inc>
 
 #define __ASM_INTR_DIAGNOSIS
 
