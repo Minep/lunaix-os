@@ -1,0 +1,2 @@
+i386_isrdef.c.j2 -> arch/i386/exceptions/i386_isrdef.c
+i386_intrhnds.S.j2 -> arch/i386/exceptions/intrhnds.S

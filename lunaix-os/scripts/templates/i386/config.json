@@ -1,0 +1,19 @@
+{
+    "exception": {
+        "$type": "list",
+        "$range": "[0..255]",
+
+        "@foreach": {
+            "@case_range_index": {
+                "$range": "[8,10..14,17]",
+
+                "@true": {
+                    "has_errcode": true
+                },
+                "@else": {
+                    "has_errcode": false
+                }
+            }
+        }
+    }
+}

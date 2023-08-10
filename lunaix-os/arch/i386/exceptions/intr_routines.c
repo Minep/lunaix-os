@@ -12,6 +12,8 @@
 
 #include <hal/apic.h>
 
+#include "i386_intr.h"
+
 LOG_MODULE("INTR")
 
 extern void

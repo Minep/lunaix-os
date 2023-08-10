@@ -51,9 +51,6 @@ struct exec_param
 void
 intr_handler(isr_param* param);
 
-void
-intr_routine_init();
-
 #endif
 
 #endif /* __LUNAIX_INTERRUPTS_H */

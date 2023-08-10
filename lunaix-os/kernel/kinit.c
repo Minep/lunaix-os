@@ -18,6 +18,7 @@
 #include <lunaix/types.h>
 
 #include <arch/abi.h>
+#include <arch/exception.h>
 #include <arch/i386/boot/multiboot.h>
 #include <arch/i386/interrupts.h>
 
@@ -48,9 +49,7 @@ void
 _kernel_pre_init()
 {
     // interrupts
-    _init_idt();
-    isrm_init();
-    intr_routine_init();
+    exception_init();
 
     // memory
     pmm_init(MEM_1MB + (_k_init_mb_info->mem_upper << 10));

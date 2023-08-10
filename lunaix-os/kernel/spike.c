@@ -20,7 +20,7 @@ __assert_fail(const char* expr, const char* file, unsigned int line)
 
 void
 panick(const char* msg)
-{
+{       
     cpu_trap_panic(msg);
     DO_SPIN
 }
