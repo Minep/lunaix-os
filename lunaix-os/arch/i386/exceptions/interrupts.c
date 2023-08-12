@@ -1,10 +1,8 @@
-#include <arch/i386/interrupts.h>
-#include <arch/i386/tss.h>
+#include <sys/interrupts.h>
+#include <sys/x86_isa.h>
 
 #include <hal/apic.h>
 #include <hal/cpu.h>
-
-#include <arch/exception.h>
 
 #include <lunaix/isrm.h>
 #include <lunaix/mm/page.h>

@@ -26,7 +26,7 @@
 #include <hal/pci.h>
 #include <hal/rtc.h>
 
-#include <arch/i386/boot/multiboot.h>
+#include <sys/boot/multiboot.h>
 
 #include <klibc/string.h>
 

@@ -49,7 +49,7 @@ struct exec_param
 #define ISR_PARAM_SIZE sizeof(isr_param)
 
 void
-intr_handler(isr_param* param);
+exception_init();
 
 #endif
 

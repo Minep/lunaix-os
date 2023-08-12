@@ -1,5 +1,4 @@
-#include <arch/i386/boot/multiboot.h>
-#include <arch/i386/idt.h>
+#include <sys/boot/multiboot.h>
 #include <lunaix/common.h>
 #include <lunaix/mm/page.h>
 

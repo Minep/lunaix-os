@@ -1,5 +1,5 @@
 #define __ASM__ 1
-#include <arch/i386/boot/multiboot.h>
+#include <sys/boot/multiboot.h>
 
 #define MB_FLAGS    (MULTIBOOT_MEMORY_INFO | MULTIBOOT_PAGE_ALIGN)
 #define KPG_SIZE    10*4096

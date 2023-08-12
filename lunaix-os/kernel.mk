@@ -12,6 +12,7 @@ endef
 define kinc_dirs
 	includes
 	includes/usr
+	arch/$(ARCH)/includes
 endef
 
 

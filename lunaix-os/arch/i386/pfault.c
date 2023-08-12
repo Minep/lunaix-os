@@ -1,4 +1,4 @@
-#include <arch/i386/interrupts.h>
+#include <sys/interrupts.h>
 #include <lunaix/common.h>
 #include <lunaix/mm/mm.h>
 #include <lunaix/mm/pmm.h>

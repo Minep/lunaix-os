@@ -1,19 +1,82 @@
 {
     "exception": {
-        "$type": "list",
-        "$range": "[0..255]",
+        "@define": {
+            "syscall_iv": 33,
+            "iv_counts": 255
+        },
+        "ivdefs": {
+            "$type": "list",
+            "$range": "[0..*iv_counts]",
 
-        "@foreach": {
-            "@case_range_index": {
-                "$range": "[8,10..14,17]",
-
-                "@true": {
-                    "has_errcode": true
+            "iv": "{index}",
+    
+            "@foreach": {
+                "errcode": {
+                    "$type": "case_range_index",
+                    "$range": "[8,10..14,17]",
+    
+                    "@true": {
+                        "has_errcode": true
+                    },
+                    "@else": {
+                        "has_errcode": false
+                    }
                 },
-                "@else": {
-                    "has_errcode": false
+                "dpl": {
+                    "$type": "case_range_index",
+                    "$range": "[*syscall_iv]",
+    
+                    "@true": {
+                        "dpl": 3
+                    },
+                    "@else": {
+                        "dpl": 0
+                    }
                 }
             }
         }
+    },
+    "sys_mmap": {
+        "$type": "memory_map",
+        "width": 32,
+        "granule": {
+            "page": "0x1000",
+            "1M": "0x100000",
+            "4M": "0x400000",
+            "huge": "0x400000",
+            "1G": "0x40000000"
+        },
+        "regions": [
+            {
+                "name": "kernel_stack",
+                "start": "3@1M",
+                "size": "1@1M",
+                "stk_align": 16
+            },
+            {
+                "name": "kernel_exec",
+                "start": "3@1G",
+                "size": "16@4M"
+            },
+            {
+                "name": "pd_mount",
+                "size": "1@4M"
+            },
+            {
+                "$type": "list",
+                "$range": "[1..4]",
+                "size": "1@page",
+                "name": "pg_mount_{index}"
+            },
+            {
+                "name": "vmap",
+                "block": "1@huge"
+            },
+            {
+                "name": "pd_ref",
+                "start": "1023@4M",
+                "size": "1@4M"
+            }
+        ]
     }
 }

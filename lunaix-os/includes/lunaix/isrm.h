@@ -11,7 +11,7 @@
 #ifndef __LUNAIX_ISRM_H
 #define __LUNAIX_ISRM_H
 
-#include <arch/i386/interrupts.h>
+#include <sys/interrupts.h>
 #include <lunaix/types.h>
 
 #define IV_BASE 32

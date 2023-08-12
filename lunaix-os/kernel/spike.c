@@ -1,4 +1,4 @@
-#include <arch/i386/interrupts.h>
+#include <sys/interrupts.h>
 #include <klibc/stdio.h>
 #include <lunaix/spike.h>
 

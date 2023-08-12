@@ -13,7 +13,7 @@
 #include <hal/pic.h>
 #include <hal/rtc.h>
 
-#include <arch/i386/interrupts.h>
+#include <sys/interrupts.h>
 
 #include <lunaix/mm/mmio.h>
 #include <lunaix/spike.h>

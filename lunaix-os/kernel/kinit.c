@@ -17,10 +17,9 @@
 #include <lunaix/tty/tty.h>
 #include <lunaix/types.h>
 
-#include <arch/abi.h>
-#include <arch/exception.h>
-#include <arch/i386/boot/multiboot.h>
-#include <arch/i386/interrupts.h>
+#include <sys/abi.h>
+#include <sys/boot/multiboot.h>
+#include <sys/interrupts.h>
 
 #include <klibc/stdio.h>
 #include <klibc/string.h>

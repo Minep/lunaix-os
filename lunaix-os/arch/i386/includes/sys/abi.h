@@ -1,6 +1,11 @@
 #ifndef __LUNAIX_I386ABI_H
 #define __LUNAIX_I386ABI_H
 
+#include <sys/x86_isa.h>
+
+#define stack_alignment 0xfffffff0
+
+#ifndef __ASM__
 #define store_retval(retval) __current->intr_ctx->registers.eax = (retval)
 
 #define store_retval_to(proc, retval) (proc)->intr_ctx->registers.eax = (retval)
@@ -45,5 +50,5 @@
         *((typeof((arg3))*)(stack_ptr)--) = arg3;                              \
         *((typeof((arg4))*)(stack_ptr)--) = arg4;                              \
     }
-
+#endif
 #endif /* __LUNAIX_ABI_H */

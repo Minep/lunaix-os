@@ -1,4 +1,3 @@
-#include <arch/abi.h>
 #include <klibc/string.h>
 #include <lunaix/clock.h>
 #include <lunaix/common.h>
@@ -12,6 +11,7 @@
 #include <lunaix/status.h>
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
+#include <sys/abi.h>
 
 LOG_MODULE("PROC")
 

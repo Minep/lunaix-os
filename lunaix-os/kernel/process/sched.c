@@ -1,5 +1,5 @@
-#include <arch/abi.h>
-#include <arch/i386/interrupts.h>
+#include <sys/abi.h>
+#include <sys/interrupts.h>
 
 #include <hal/apic.h>
 #include <hal/cpu.h>

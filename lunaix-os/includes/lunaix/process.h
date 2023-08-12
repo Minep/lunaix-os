@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_PROCESS_H
 #define __LUNAIX_PROCESS_H
 
-#include <arch/i386/interrupts.h>
+#include <sys/interrupts.h>
 #include <lunaix/clock.h>
 #include <lunaix/ds/waitq.h>
 #include <lunaix/fs.h>

@@ -1,3 +1,5 @@
+/* Generated from i386_intrhnds.S.j2. Do NOT modify */
+
 #define __ASM__
 .macro isr_template vector, no_error_code=1
     .global _asm_isr\vector

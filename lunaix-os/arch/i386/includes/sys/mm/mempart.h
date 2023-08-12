@@ -1,0 +1,45 @@
+/* Physical Adress Space Partition */
+/* Generated from mempart.h.j2. Do NOT modify */
+
+#define MEM_PAGE 0x1000UL
+#define MEM_1M 0x100000UL
+#define MEM_4M 0x400000UL
+#define MEM_HUGE 0x400000UL
+#define MEM_1G 0x40000000UL
+
+#define KERNEL_STACK 0x300000UL
+#define KERNEL_STACK_SIZE 0x100000UL
+#define KERNEL_STACK_END 0x3ffff0UL
+
+#define KERNEL_EXEC 0xc0000000UL
+#define KERNEL_EXEC_SIZE 0x4000000UL
+#define KERNEL_EXEC_END 0xc3ffffffUL
+
+#define PD_MOUNT 0xc4000000UL
+#define PD_MOUNT_SIZE 0x400000UL
+#define PD_MOUNT_END 0xc43fffffUL
+
+#define PG_MOUNT_1 0xc4400000UL
+#define PG_MOUNT_1_SIZE 0x1000UL
+#define PG_MOUNT_1_END 0xc4400fffUL
+
+#define PG_MOUNT_2 0xc4401000UL
+#define PG_MOUNT_2_SIZE 0x1000UL
+#define PG_MOUNT_2_END 0xc4401fffUL
+
+#define PG_MOUNT_3 0xc4402000UL
+#define PG_MOUNT_3_SIZE 0x1000UL
+#define PG_MOUNT_3_END 0xc4402fffUL
+
+#define PG_MOUNT_4 0xc4403000UL
+#define PG_MOUNT_4_SIZE 0x1000UL
+#define PG_MOUNT_4_END 0xc4403fffUL
+
+#define VMAP 0xc4404000UL
+#define VMAP_SIZE 0x3b7fc000UL
+#define VMAP_END 0xffbfffffUL
+
+#define PD_REF 0xffc00000UL
+#define PD_REF_SIZE 0x400000UL
+#define PD_REF_END 0xffffffffUL
+

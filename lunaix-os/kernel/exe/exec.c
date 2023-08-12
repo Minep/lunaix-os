@@ -1,4 +1,3 @@
-#include <arch/abi.h>
 #include <lunaix/exec.h>
 #include <lunaix/fs.h>
 #include <lunaix/load.h>
@@ -10,6 +9,8 @@
 #include <lunaix/status.h>
 #include <lunaix/syscall.h>
 #include <lunaix/syscall_utils.h>
+
+#include <sys/abi.h>
 
 #include <klibc/string.h>
 

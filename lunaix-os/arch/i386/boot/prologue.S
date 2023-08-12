@@ -1,7 +1,7 @@
 /* 高半核入口点 - 0xC0000000 */
 
 #define __ASM__
-#include <arch/i386/i386_asm.h>
+#include <sys/x86_isa.h>
 
 .section .text
     .global hhk_entry_

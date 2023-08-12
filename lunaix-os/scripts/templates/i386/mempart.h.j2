@@ -1,0 +1,17 @@
+/* Physical Adress Space Partition */
+/* Generated from {{ data["template"] }}. Do NOT modify */
+
+{% for k, v in data["sys_mmap"]["granule"].items() %}
+#define MEM_{{ k.upper() }} {{ hex(v) }}UL
+{% endfor %}
+
+{% for region in data["sys_mmap"]["regions"] %}
+#define {{ region["name"].upper() }} {{ hex(region["start"]) }}UL
+#define {{ region["name"].upper() }}_SIZE {{ hex(region["size"]) }}UL
+{% if "stk_align" in region %}
+#define {{ region["name"].upper() }}_END {{ hex(align(region["start"] + region["size"] - 1, region["stk_align"])) }}UL
+{% else %}
+#define {{ region["name"].upper() }}_END {{ hex((region["start"] + region["size"] - 1)) }}UL
+{% endif %}
+
+{% endfor %}

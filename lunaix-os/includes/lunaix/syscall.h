@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_SYSCALL_H
 #define __LUNAIX_SYSCALL_H
 
-#include <arch/i386/vectors.h>
+#include <sys/vectors.h>
 #include <usr/lunaix/syscallid.h>
 
 #ifndef __ASM__

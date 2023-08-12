@@ -1,4 +1,4 @@
-#include <arch/i386/vectors.h>
+#include <sys/vectors.h>
 #include <cpuid.h>
 #include <hal/cpu.h>
 #include <lunaix/types.h>

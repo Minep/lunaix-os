@@ -9,7 +9,7 @@
  * @copyright Copyright (c) 2022
  *
  */
-#include <arch/i386/interrupts.h>
+#include <sys/interrupts.h>
 #include <hal/apic.h>
 #include <hal/rtc.h>
 

@@ -1,3 +1,5 @@
+/* Generated from {{ data["template"] }}. Do NOT modify */
+
 #define __ASM__
 .macro isr_template vector, no_error_code=1
     .global _asm_isr\vector
@@ -10,10 +12,10 @@
         jmp interrupt_wrapper
 .endm
 .section .text
-{% for isrdef in data["exception"] %}
+{% for isrdef in data["exception"]["ivdefs"] %}
 {% if isrdef["has_errcode"] %}
-    isr_template {{ isrdef["index"] }}, no_error_code=0
+    isr_template {{ isrdef["iv"] }}, no_error_code=0
 {% else %}
-    isr_template {{ isrdef["index"] }}, no_error_code=1
+    isr_template {{ isrdef["iv"] }}, no_error_code=1
 {% endif %}
 {% endfor %}

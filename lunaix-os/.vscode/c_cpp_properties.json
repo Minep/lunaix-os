@@ -5,7 +5,8 @@
             "includePath": [
                 "${workspaceFolder}/includes",
                 "${workspaceFolder}/includes/usr",
-                "${workspaceFolder}/usr/includes"
+                "${workspaceFolder}/usr/includes",
+                "${workspaceFolder}/arch/i386/includes",
             ],
             "compilerArgs": [
                 "-ffreestanding",
