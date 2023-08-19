@@ -1,6 +1,8 @@
 #ifndef __LUNAIX_SPIKE_H
 #define __LUNAIX_SPIKE_H
 
+#include <lunaix/compiler.h>
+
 /** Some helper functions. As helpful as Spike the Dragon! :) **/
 
 // 除法 v/(2^k) 向上取整
@@ -62,8 +64,6 @@
                                                       : 0)                      \
                              : (31 - __builtin_clz(x)))
 
-#define __USER__ __attribute__((section(".usrtext")))
-
 #define DO_SPIN                                                                \
     while (1)                                                                  \
         ;
@@ -96,10 +96,10 @@ __assert_fail(const char* expr, const char* file, unsigned int line)
 
 #endif                                      // __LUNAIXOS_NASSERT__
 
-void
+void noret
 panick(const char* msg);
 
-void
+void noret
 panickf(const char* fmt, ...);
 
 #define wait_until(cond)                                                       \

@@ -23,6 +23,8 @@ typedef int pid_t;
 typedef unsigned long size_t;
 typedef unsigned long off_t;
 
+typedef unsigned int cpu_t;
+
 typedef u64_t lba_t;
 
 #endif /* __LUNAIX_TYPES_H */

@@ -106,3 +106,4 @@ cake_export()
         cake_export_pile(cake_root, pos);
     }
 }
+EXPORT_TWIFS_PLUGIN(cake_alloc, cake_export);

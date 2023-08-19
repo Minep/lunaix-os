@@ -1,5 +1,3 @@
-#include <hal/acpi/acpi.h>
-#include <hal/ioapic.h>
 #include <lunaix/clock.h>
 #include <lunaix/common.h>
 #include <lunaix/input.h>
@@ -8,11 +6,13 @@
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
 
-#include <sys/interrupts.h>
 #include <hal/cpu.h>
+#include <hal/intc.h>
+
 #include <klibc/string.h>
 
-#include <stdint.h>
+#include <sys/interrupts.h>
+#include <sys/port_io.h>
 
 #define PS2_DEV_CMD_MAX_ATTEMPTS 5
 
@@ -123,30 +123,37 @@ ps2_kbd_init()
 
     kbd_idev = input_add_device("i8042-kbd");
 
-    acpi_context* acpi_ctx = acpi_get_context();
-    if (acpi_ctx->fadt.header.rev > 1) {
-        /*
-         *  只有当前ACPI版本大于1时，我们才使用FADT的IAPC_BOOT_ARCH去判断8042是否存在。
-         *  这是一个坑，在ACPI v1中，这个字段是reserved！而这及至ACPI v2才出现。
-         *  需要注意：Bochs 和 QEMU 使用的是ACPI v1，而非 v2
-         * （virtualbox好像是v4）
-         *
-         *  (2022/6/29)
-         *  QEMU在7.0.0版本中，修复了FADT::IAPC_BOOT无法正确提供关于i8042的信息的bug
-         *      https://wiki.qemu.org/ChangeLog/7.0#ACPI_.2F_SMBIOS
-         *
-         *  请看Bochs的bios源码（QEMU的BIOS其实是照抄bochs的，所以也是一个德行。。）：
-         *      https://bochs.sourceforge.io/cgi-bin/lxr/source/bios/rombios32.c#L1314
-         */
-        if (!(acpi_ctx->fadt.boot_arch & IAPC_ARCH_8042)) {
-            kprintf(KERROR "not found\n");
-            // FUTURE: Some alternative fallback on this? Check PCI bus for USB
-            // controller instead?
-            return;
-        }
-    } else {
-        kprintf(KWARN "outdated FADT used, assuming exists.\n");
-    }
+    /* FIXME This require systematical rework! */
+    // acpi_context* acpi_ctx = acpi_get_context();
+    // if (acpi_ctx->fadt.header.rev > 1) {
+    //     /*
+    //      *
+    //      只有当前ACPI版本大于1时，我们才使用FADT的IAPC_BOOT_ARCH去判断8042是否存在。
+    //      *  这是一个坑，在ACPI v1中，这个字段是reserved！而这及至ACPI
+    //      v2才出现。
+    //      *  需要注意：Bochs 和 QEMU 使用的是ACPI v1，而非 v2
+    //      * （virtualbox好像是v4）
+    //      *
+    //      *  (2022/6/29)
+    //      *
+    //      QEMU在7.0.0版本中，修复了FADT::IAPC_BOOT无法正确提供关于i8042的信息的bug
+    //      *      https://wiki.qemu.org/ChangeLog/7.0#ACPI_.2F_SMBIOS
+    //      *
+    //      *
+    //      请看Bochs的bios源码（QEMU的BIOS其实是照抄bochs的，所以也是一个德行。。）：
+    //      *
+    //      https://bochs.sourceforge.io/cgi-bin/lxr/source/bios/rombios32.c#L1314
+    //      */
+    //     if (!(acpi_ctx->fadt.boot_arch & IAPC_ARCH_8042)) {
+    //         kprintf(KERROR "not found\n");
+    //         // FUTURE: Some alternative fallback on this? Check PCI bus for
+    //         USB
+    //         // controller instead?
+    //         return;
+    //     }
+    // } else {
+    //     kprintf(KWARN "outdated FADT used, assuming exists.\n");
+    // }
 
     char result;
 
@@ -157,7 +164,7 @@ ps2_kbd_init()
     ps2_post_cmd(PS2_PORT_CTRL_CMDREG, PS2_CMD_PORT2_DISABLE, PS2_NO_ARG);
 
     // 2、清空控制器缓冲区
-    io_inb(PS2_PORT_ENC_DATA);
+    port_rdbyte(PS2_PORT_ENC_DATA);
 
     // 3、屏蔽所有PS/2设备（端口1&2）IRQ，并且禁用键盘键码转换功能
     result = ps2_issue_cmd(PS2_CMD_READ_CFG, PS2_NO_ARG);
@@ -298,14 +305,14 @@ intr_ps2_kbd_handler(const isr_param* param)
 {
 
     // This is important! Don't believe me? try comment it out and run on Bochs!
-    // while (!(io_inb(PS2_PORT_CTRL_STATUS) & PS2_STATUS_OFULL))
+    // while (!(port_rdbyte(PS2_PORT_CTRL_STATUS) & PS2_STATUS_OFULL))
     //    ;
 
     // I know you are tempting to move this chunk after the keyboard state
     // check. But DO NOT. This chunk is in right place and right order. Moving
     // it at your own risk This is to ensure we've cleared the output buffer
     // everytime, so it won't pile up across irqs.
-    u8_t scancode = io_inb(PS2_PORT_ENC_DATA);
+    u8_t scancode = port_rdbyte(PS2_PORT_ENC_DATA);
     kbd_keycode_t key;
 
     /*
@@ -409,10 +416,10 @@ ps2_issue_cmd(char cmd, u16_t arg)
 
     // 等待PS/2控制器返回。通过轮询（polling）状态寄存器的 bit 0
     // 如置位，则表明返回代码此时就在 0x60 IO口上等待读取。
-    while (!(io_inb(PS2_PORT_CTRL_STATUS) & PS2_STATUS_OFULL))
+    while (!(port_rdbyte(PS2_PORT_CTRL_STATUS) & PS2_STATUS_OFULL))
         ;
 
-    return io_inb(PS2_PORT_ENC_CMDREG);
+    return port_rdbyte(PS2_PORT_ENC_CMDREG);
 }
 
 static u8_t
@@ -432,18 +439,18 @@ static void
 ps2_post_cmd(u8_t port, char cmd, u16_t arg)
 {
     // 等待PS/2输入缓冲区清空，这样我们才可以写入命令
-    while (io_inb(PS2_PORT_CTRL_STATUS) & PS2_STATUS_IFULL)
+    while (port_rdbyte(PS2_PORT_CTRL_STATUS) & PS2_STATUS_IFULL)
         ;
 
-    io_outb(port, cmd);
-    io_delay(PS2_DELAY);
+    port_wrbyte(port, cmd);
+    port_delay(PS2_DELAY);
 
     if (!(arg & PS2_NO_ARG)) {
         // 所有参数一律通过0x60传入。
-        while (io_inb(PS2_PORT_CTRL_STATUS) & PS2_STATUS_IFULL)
+        while (port_rdbyte(PS2_PORT_CTRL_STATUS) & PS2_STATUS_IFULL)
             ;
-        io_outb(PS2_PORT_ENC_CMDREG, (u8_t)(arg & 0x00ff));
-        io_delay(PS2_DELAY);
+        port_wrbyte(PS2_PORT_ENC_CMDREG, (u8_t)(arg & 0x00ff));
+        port_delay(PS2_DELAY);
     }
 }
 
@@ -454,8 +461,8 @@ ps2_issue_dev_cmd(char cmd, u16_t arg)
 
     // 等待PS/2控制器返回。通过轮询（polling）状态寄存器的 bit 0
     // 如置位，则表明返回代码此时就在 0x60 IO口上等待读取。
-    while (!(io_inb(PS2_PORT_CTRL_STATUS) & PS2_STATUS_OFULL))
+    while (!(port_rdbyte(PS2_PORT_CTRL_STATUS) & PS2_STATUS_OFULL))
         ;
 
-    return io_inb(PS2_PORT_ENC_CMDREG);
+    return port_rdbyte(PS2_PORT_ENC_CMDREG);
 }

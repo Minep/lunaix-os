@@ -108,9 +108,6 @@ pmm_alloc_page(pid_t owner, pp_attr_t attr)
             }
         }
     }
-    if (!good_page_found) {
-        __current->k_status = LXOUTOFMEM;
-    }
     return good_page_found;
 }
 

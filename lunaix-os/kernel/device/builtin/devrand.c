@@ -1,5 +1,6 @@
 #include <hal/rnd.h>
 #include <lunaix/device.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/syslog.h>
 
 LOG_MODULE("rand")

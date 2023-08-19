@@ -2,10 +2,9 @@
 #include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
 
-#define VMAP_START PG_MOUNT_BASE + MEM_4MB
-#define VMAP_END VMS_SELF
+#include <sys/mm/mempart.h>
 
-static ptr_t start = VMAP_START;
+static ptr_t start = VMAP;
 
 void*
 vmm_vmap(ptr_t paddr, size_t size, pt_attr attr)
@@ -47,7 +46,7 @@ vmm_vmap(ptr_t paddr, size_t size, pt_attr attr)
         if (current_addr >= VMAP_END) {
             wrapped = 1;
             examed_size = 0;
-            current_addr = VMAP_START;
+            current_addr = VMAP;
         }
     }
 

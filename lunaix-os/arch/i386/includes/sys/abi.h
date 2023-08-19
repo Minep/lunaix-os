@@ -31,6 +31,8 @@
                  "r"(pc)                                                       \
                  : "eax", "memory");
 
+#define switch_context(process) asm volatile("jmp switch_to\n" ::"a"(process));
+
 #define push_arg1(stack_ptr, arg) *((typeof((arg))*)(stack_ptr)--) = arg
 #define push_arg2(stack_ptr, arg1, arg2)                                       \
     {                                                                          \

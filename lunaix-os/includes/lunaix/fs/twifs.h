@@ -1,6 +1,7 @@
 #ifndef __LUNAIX_TWIFS_H
 #define __LUNAIX_TWIFS_H
 
+#include <lunaix/ds/ldga.h>
 #include <lunaix/fs.h>
 #include <lunaix/fs/twimap.h>
 #include <lunaix/spike.h>
@@ -33,6 +34,12 @@ struct twifs_node
         assert(twinode);                                                       \
         (type) twinode->data;                                                  \
     })
+
+#define EXPORT_TWIFS_PLUGIN(label, plg_init)                                   \
+    export_ldga_el(twiplugin_inits, label, ptr_t, plg_init)
+
+void
+twifs_register_plugins();
 
 void
 twifs_init();

@@ -242,6 +242,17 @@ twifs_init()
     fs_root = twifs_dir_node(NULL, NULL, 0, 0);
 }
 
+void
+twifs_register_plugins()
+{
+    int i = 0;
+    ptr_t init_twifs_plugin_fn;
+    ldga_foreach(twiplugin_inits, ptr_t, i, init_twifs_plugin_fn)
+    {
+        ((void (*)())init_twifs_plugin_fn)();
+    }
+}
+
 int
 __twifs_twimap_file_read(struct v_inode* inode,
                          void* buf,

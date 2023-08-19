@@ -2,19 +2,18 @@
 #define __LUNAIX_TIMER_H
 
 #include <lunaix/ds/llist.h>
-#include <stdint.h>
+#include <lunaix/time.h>
+#include <sys/interrupts.h>
 
 #define SYS_TIMER_FREQUENCY_HZ 1024
 
 #define TIMER_MODE_PERIODIC 0x1
 
-typedef u32_t ticks_t;
-
 struct lx_timer_context
 {
     struct lx_timer* active_timers;
     /**
-     * @brief APIC timer base frequency (ticks per seconds)
+     * @brief timer hardware base frequency (ticks per seconds)
      *
      */
     ticks_t base_frequency;
@@ -22,12 +21,18 @@ struct lx_timer_context
      * @brief Desired system running frequency
      *
      */
-    u32_t running_frequency;
+    ticks_t running_frequency;
     /**
      * @brief Ticks per hertz
      *
      */
     ticks_t tphz;
+};
+
+struct timer_init_param
+{
+    struct lx_timer_context* context;
+    void* timer_update_isr;
 };
 
 struct lx_timer
@@ -46,7 +51,7 @@ struct lx_timer
  * @param frequency The frequency that timer should run in Hz.
  */
 void
-timer_init(u32_t frequency);
+timer_init();
 
 struct lx_timer*
 timer_run_second(u32_t second,

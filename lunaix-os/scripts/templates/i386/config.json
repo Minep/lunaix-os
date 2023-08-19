@@ -38,6 +38,11 @@
     },
     "sys_mmap": {
         "$type": "memory_map",
+        "@define": {
+            "page_mnts": 4,
+            "vms_mnts": 1
+        },
+
         "width": 32,
         "granule": {
             "page": "0x1000",
@@ -56,15 +61,19 @@
             {
                 "name": "kernel_exec",
                 "start": "3@1G",
-                "size": "16@4M"
-            },
-            {
-                "name": "pd_mount",
-                "size": "1@4M"
+                "size": "16@4M",
+                "block": "1@page"
             },
             {
                 "$type": "list",
-                "$range": "[1..4]",
+                "$range": "[1..*vms_mnts]",
+                "name": "vms_mount_{index}",
+                "size": "1@4M",
+                "block": "1@huge"
+            },
+            {
+                "$type": "list",
+                "$range": "[1..*page_mnts]",
                 "size": "1@page",
                 "name": "pg_mount_{index}"
             },
@@ -75,7 +84,8 @@
             {
                 "name": "pd_ref",
                 "start": "1023@4M",
-                "size": "1@4M"
+                "size": "1@4M",
+                "block": "1@huge"
             }
         ]
     }

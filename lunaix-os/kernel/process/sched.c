@@ -1,8 +1,9 @@
 #include <sys/abi.h>
 #include <sys/interrupts.h>
+#include <sys/mm/mempart.h>
 
-#include <hal/apic.h>
 #include <hal/cpu.h>
+#include <hal/intc.h>
 
 #include <lunaix/fs/taskfs.h>
 #include <lunaix/mm/cake.h>
@@ -79,20 +80,8 @@ run(struct proc_info* proc)
 {
     proc->state = PS_RUNNING;
 
-    /*
-        将tss.esp0设置为上次调度前的esp值。
-        当处理信号时，上下文信息是不会恢复的，而是保存在用户栈中，然后直接跳转进位于用户空间的sig_wrapper进行
-          信号的处理。当用户自定义的信号处理函数返回时，sigreturn的系统调用才开始进行上下文的恢复（或者说是进行
-          另一次调度。
-        由于这中间没有进行地址空间的交换，所以第二次跳转使用的是同一个内核栈，而之前默认tss.esp0的值是永远指向最顶部
-        这样一来就有可能会覆盖更早的上下文信息（比如嵌套的信号捕获函数）
-    */
-
-    apic_done_servicing();
-
-    asm volatile("pushl %0\n"
-                 "jmp switch_to\n" ::"r"(proc)
-                 : "memory"); // kernel/asm/x86/interrupt.S
+    intc_notify_eos(0);
+    switch_context(proc);
 }
 
 int
@@ -220,6 +209,9 @@ __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
 
     return 0;
 }
+
+// FIXME issue with alarm, paused parent process never got wake up, check what
+// has been fucked up by refactoring.
 
 __DEFINE_LXSYSCALL1(unsigned int, alarm, unsigned int, seconds)
 {

@@ -1,7 +1,7 @@
 /* 高半核入口点 - 0xC0000000 */
 
 #define __ASM__
-#include <sys/x86_isa.h>
+#include <sys/abi.h>
 
 .section .text
     .global hhk_entry_
@@ -9,7 +9,7 @@
         /*
             欢迎来到虚拟内存的世界！ :D
          */
-
+        andl $stack_alignment, %esp
         subl $16, %esp
         /* 
             最终还是决定将IDT&GDT的初始化和安装放在这里
@@ -21,6 +21,7 @@
                     这主要是为了保险起见，让GDTR有一个合法的值，否则多咱的粗心大意，容易出#GP
         */
         call _init_gdt
+
         movl $_gdt, 2(%esp)
         movw _gdt_limit, %ax
         movw %ax, (%esp)
@@ -33,19 +34,14 @@
         movw %cx, %fs
         movw %cx, %gs
         movw %cx, %ss
-
+        
         /* 更新 CS:EIP */
         pushw $KCODE_SEG
         pushl $_after_gdt
         retf
 
     _after_gdt:
-
-        movl $mb_info, _k_init_mb_info
-
-        call _kernel_pre_init
-
-        subl $6, %esp
+        subl $16, %esp
 
         # 加载 IDT
         movl $_idt, 2(%esp)
@@ -53,13 +49,15 @@
         movw %ax, (%esp)
         lidt (%esp)
 
+        # perform arch-specific initialization before diving into kernel
+        call arch_preinit
+
         /* 加载TSS段选择器 */
         movw $TSS_SEG, %ax
         ltr %ax
 
-        addl $6, %esp
-
-        call _kernel_init
+        movl $bhctx_buffer, (%esp)       # mb_parser.c
+        call kernel_bootstrap
 
     1:
         hlt

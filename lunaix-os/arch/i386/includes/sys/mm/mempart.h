@@ -1,3 +1,5 @@
+#ifndef __LUNAIX_MEMPART_H
+#define __LUNAIX_MEMPART_H
 /* Physical Adress Space Partition */
 /* Generated from mempart.h.j2. Do NOT modify */
 
@@ -15,9 +17,9 @@
 #define KERNEL_EXEC_SIZE 0x4000000UL
 #define KERNEL_EXEC_END 0xc3ffffffUL
 
-#define PD_MOUNT 0xc4000000UL
-#define PD_MOUNT_SIZE 0x400000UL
-#define PD_MOUNT_END 0xc43fffffUL
+#define VMS_MOUNT_1 0xc4000000UL
+#define VMS_MOUNT_1_SIZE 0x400000UL
+#define VMS_MOUNT_1_END 0xc43fffffUL
 
 #define PG_MOUNT_1 0xc4400000UL
 #define PG_MOUNT_1_SIZE 0x1000UL
@@ -35,11 +37,12 @@
 #define PG_MOUNT_4_SIZE 0x1000UL
 #define PG_MOUNT_4_END 0xc4403fffUL
 
-#define VMAP 0xc4404000UL
-#define VMAP_SIZE 0x3b7fc000UL
+#define VMAP 0xc4800000UL
+#define VMAP_SIZE 0x3b400000UL
 #define VMAP_END 0xffbfffffUL
 
 #define PD_REF 0xffc00000UL
 #define PD_REF_SIZE 0x400000UL
 #define PD_REF_END 0xffffffffUL
 
+#endif

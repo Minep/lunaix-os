@@ -11,35 +11,39 @@ SECTIONS {
     . = 0x100000;
 
     /* 这里是我们的高半核初始化代码段和数据段 */
-    .hhk_init_text BLOCK(4K) : {
+    .boot.text BLOCK(4K) : {
         *(.multiboot)
-        *(.hhk_init_text)
+        *(.boot.text)
     }
 
-    .hhk_init_bss BLOCK(4K) : {
-        *(.hhk_init_bss)
+    .boot.bss BLOCK(4K) : {
+        *(.boot.bss)
     }
 
-    .hhk_init_data BLOCK(4K) : {
-        *(.hhk_init_data)
+    .boot.data BLOCK(4K) : {
+        *(.boot.data)
     }
 
-    .hhk_init_rodata BLOCK(4K) : {
-        *(.hhk_init_rodata)
+    .boot.rodata BLOCK(4K) : {
+        *(.boot.rodata)
     }
-    __init_hhk_end = ALIGN(4K);
+
+    .boot.bss BLOCK(4K) : {
+        *(.boot.rodata)
+    }
+    __kexec_boot_end = ALIGN(4K);
 
     /* Relocation of our higher half kernel */
     . += 0xC0000000;
 
     /* 好了，我们的内核…… */
     .text BLOCK(4K) : AT ( ADDR(.text) - 0xC0000000 ) {
-        __kernel_start = .;
-        PROVIDE(__ktext_start = .);
+        __kexec_start = .;
+        PROVIDE(__kexec_text_start = .);
         
         *(.text)
 
-        PROVIDE(__ktext_end = .);
+        PROVIDE(__kexec_text_end = .);
     }
 
     .data BLOCK(4K) : AT ( ADDR(.data) - 0xC0000000 ) {
@@ -54,9 +58,29 @@ SECTIONS {
         *(.kpg)
     }
 
+    . = ALIGN(4K);
+
+    /* for generated array, we align to address line size */
+
+    .lga BLOCK(4K) : AT ( ADDR(.lga) - 0xC0000000 ) {
+        PROVIDE(__lga_twiplugin_inits_start = .);
+        
+        KEEP(*(.lga.twiplugin_inits));
+
+        PROVIDE(__lga_twiplugin_inits_end = .);
+
+        /* ---- */
+
+        PROVIDE(__lga_pci_dev_drivers_start = .);
+        
+        KEEP(*(.lga.pci_dev_drivers));
+
+        PROVIDE(__lga_pci_dev_drivers_end = .);
+    }
+
     .bss BLOCK(4K) : AT ( ADDR(.bss) - 0xC0000000 ) {
         *(.bss)
     }
 
-    __kernel_end = ALIGN(4K);
+    __kexec_end = ALIGN(4K);
 }

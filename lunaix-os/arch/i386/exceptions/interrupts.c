@@ -1,8 +1,8 @@
 #include <sys/interrupts.h>
 #include <sys/x86_isa.h>
 
-#include <hal/apic.h>
 #include <hal/cpu.h>
+#include <hal/intc.h>
 
 #include <lunaix/isrm.h>
 #include <lunaix/mm/page.h>
@@ -12,19 +12,9 @@
 #include <lunaix/syslog.h>
 #include <lunaix/tty/tty.h>
 
-#include "i386_intr.h"
+#include <sys/i386_intr.h>
 
 LOG_MODULE("INTR")
-
-extern x86_page_table* __kernel_ptd;
-
-void
-exception_init()
-{
-    exception_install_handler();
-    isrm_init();
-    intr_routine_init();
-}
 
 void
 intr_handler(isr_param* param)
@@ -47,11 +37,8 @@ intr_handler(isr_param* param)
                  execp->eip);
 
 done:
-    // for all external interrupts except the spurious interrupt
-    //  this is required by Intel Manual Vol.3A, section 10.8.1 & 10.8.5
-    if (execp->vector >= IV_EX && execp->vector != APIC_SPIV_IV) {
-        apic_done_servicing();
-    }
+
+    intc_notify_eoi(0, execp->vector);
 
     return;
 }

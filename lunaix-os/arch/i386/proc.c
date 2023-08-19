@@ -1,5 +1,12 @@
 #include <lunaix/process.h>
 
+#include <sys/mm/mempart.h>
+#include <sys/x86_isa.h>
+
+volatile struct x86_tss _tss = { .link = 0,
+                                 .esp0 = KERNEL_STACK_END,
+                                 .ss0 = KDATA_SEG };
+
 void
 proc_init_transfer(struct proc_info* proc,
                    ptr_t stack_top,

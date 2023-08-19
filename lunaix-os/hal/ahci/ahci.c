@@ -12,8 +12,11 @@
 #include <hal/ahci/hba.h>
 #include <hal/ahci/sata.h>
 #include <hal/ahci/scsi.h>
-
 #include <hal/pci.h>
+
+#include <sys/pci_hba.h>
+#include <sys/port_io.h>
+
 #include <klibc/string.h>
 #include <lunaix/block.h>
 #include <lunaix/isrm.h>
@@ -33,7 +36,7 @@
 
 LOG_MODULE("AHCI")
 
-struct llist_header ahcis;
+DEFINE_LLIST(ahcis);
 
 static char sata_ifs[][20] = { "Not detected",
                                "SATA I (1.5Gbps)",
@@ -73,15 +76,8 @@ __hba_reset_port(hba_reg_t* port_reg)
     }
     // 如果port未响应，则继续执行重置
     port_reg[HBA_RPxSCTL] = (port_reg[HBA_RPxSCTL] & ~0xf) | 1;
-    io_delay(100000); // 等待至少一毫秒，差不多就行了
+    port_delay(100000); // 等待至少一毫秒，差不多就行了
     port_reg[HBA_RPxSCTL] &= ~0xf;
-}
-
-void
-ahci_init()
-{
-    llist_init_head(&ahcis);
-    pci_add_driver("Serial ATA AHCI", AHCI_HBA_CLASS, 0, 0, ahci_driver_init);
 }
 
 void*
@@ -203,6 +199,7 @@ ahci_driver_init(struct pci_device* ahci_dev)
 
     return ahci_drv;
 }
+EXPORT_PCI_DEVICE(pci_ahci, AHCI_HBA_CLASS, 0, 0, ahci_driver_init);
 
 void
 ahci_register_device(struct hba_device* hbadev)

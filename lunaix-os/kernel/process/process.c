@@ -11,7 +11,9 @@
 #include <lunaix/status.h>
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
+
 #include <sys/abi.h>
+#include <sys/mm/mempart.h>
 
 LOG_MODULE("PROC")
 
@@ -24,7 +26,7 @@ __dup_pagetable(pid_t pid, ptr_t mount_point)
     x86_page_table* ptd = (x86_page_table*)PG_MOUNT_1;
     x86_page_table* pptd = (x86_page_table*)(mount_point | (0x3FF << 12));
 
-    size_t kspace_l1inx = L1_INDEX(KERNEL_MM_BASE);
+    size_t kspace_l1inx = L1_INDEX(KERNEL_EXEC);
 
     for (size_t i = 0; i < PG_MAX_ENTRIES - 1; i++) {
 
@@ -63,7 +65,7 @@ __del_pagetable(pid_t pid, ptr_t mount_point)
     x86_page_table* pptd = (x86_page_table*)(mount_point | (0x3FF << 12));
 
     // only remove user address space
-    for (size_t i = 0; i < L1_INDEX(KERNEL_MM_BASE); i++) {
+    for (size_t i = 0; i < L1_INDEX(KERNEL_EXEC); i++) {
         x86_pte_t ptde = pptd->entry[i];
         if (!ptde || !(ptde & PG_PRESENT)) {
             continue;
@@ -249,7 +251,7 @@ dup_proc()
     return pcb->pid;
 }
 
-extern void __kernel_end;
+extern void __kexec_end;
 
 void
 copy_kernel_stack(struct proc_info* proc, ptr_t usedMnt)

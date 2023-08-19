@@ -1,5 +1,6 @@
 #include <lunaix/clock.h>
 #include <lunaix/input.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 #include <lunaix/status.h>

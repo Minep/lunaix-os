@@ -3,18 +3,19 @@
 #include <lunaix/common.h>
 #include <lunaix/types.h>
 
+#define PG_SIZE_BITS 12
+#define PG_SIZE (1 << PG_SIZE_BITS)
+
 #define PG_MAX_ENTRIES 1024U
 #define PG_LAST_TABLE PG_MAX_ENTRIES - 1
 #define PG_FIRST_TABLE 0
 
 #define PTE_NULL 0
 
-#define P2V(paddr) ((ptr_t)(paddr) + KERNEL_MM_BASE)
-#define V2P(vaddr) ((ptr_t)(vaddr)-KERNEL_MM_BASE)
-
 #define PG_ALIGN(addr) ((ptr_t)(addr)&0xFFFFF000UL)
 #define PG_MOD(addr) ((ptr_t)(addr) & ~PG_SIZE)
 #define PG_ALIGNED(addr) (!((ptr_t)(addr)&0x00000FFFUL))
+#define PN(addr) (((ptr_t)(addr) >> 12))
 
 #define L1_INDEX(vaddr) (u32_t)(((ptr_t)(vaddr)&0xFFC00000UL) >> 22)
 #define L2_INDEX(vaddr) (u32_t)(((ptr_t)(vaddr)&0x003FF000UL) >> 12)
@@ -96,25 +97,14 @@ typedef struct
     x86_pte_t entry[PG_MAX_ENTRIES];
 } __attribute__((packed, aligned(4))) x86_page_table;
 
-extern void __pg_mount_point;
-
 /* 四个页挂载点，两个页目录挂载点： 用于临时创建&编辑页表 */
 #define PG_MOUNT_RANGE(l1_index) (701 <= l1_index && l1_index <= 703)
-#define VMS_MOUNT_1 (KERNEL_MM_BASE + KSIZE)
-#define PG_MOUNT_BASE (VMS_MOUNT_1 + MEM_4MB)
-#define PG_MOUNT_1 (PG_MOUNT_BASE)
-#define PG_MOUNT_2 (PG_MOUNT_BASE + 0x1000)
-#define PG_MOUNT_3 (PG_MOUNT_BASE + 0x2000)
-#define PG_MOUNT_4 (PG_MOUNT_BASE + 0x3000)
 
 /*
     当前进程内存空间挂载点
 */
 #define VMS_SELF L2_BASE_VADDR
 
-#define CURPROC_PTE(vpn)                                                       \
-    (&((x86_page_table*)(VMS_MOUNT_1 | (((vpn)&0xffc00) << 2)))                \
-        ->entry[(vpn)&0x3ff])
 #define PTE_MOUNTED(mnt, vpn)                                                  \
     (((x86_page_table*)((mnt) | (((vpn)&0xffc00) << 2)))->entry[(vpn)&0x3ff])
 

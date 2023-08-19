@@ -32,10 +32,10 @@
  * SOFTWARE.
  */
 
-#include <hal/io.h>
 #include <klibc/string.h>
 #include <lunaix/peripheral/serial.h>
 #include <sdbg/gdbstub.h>
+#include <sys/port_io.h>
 
 /*****************************************************************************
  * Types
@@ -1191,8 +1191,8 @@ struct gdb_idt_gate
 /*****************************************************************************
  * Prototypes
  ****************************************************************************/
-#define gdb_x86_io_write_8(port, val) io_outb(port, val)
-#define gdb_x86_io_read_8(port) io_inb(port)
+#define gdb_x86_io_write_8(port, val) port_wrbyte(port, val)
+#define gdb_x86_io_read_8(port) port_rdbyte(port)
 
 #define gdb_x86_serial_getc() serial_rx_byte(COM_PORT)
 #define gdb_x86_serial_putchar(ch) serial_tx_byte(COM_PORT, ch)

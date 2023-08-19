@@ -163,7 +163,7 @@
         # 约定
         # arg1: 目标进程PCB地址 (next
 
-        popl %ebx               # next
+        movl %eax, %ebx               # next
         movl __current, %eax    
         movl proc_page_table(%eax), %ecx     # __current->pagetable
         movl proc_page_table(%ebx), %eax     # next->pagetable
@@ -184,7 +184,14 @@
         test %eax, %eax         # do we have signal to handle?
         jz 1f
 
-        # 更新 tss
+        /*
+            将tss.esp0设置为上次调度前的esp值。
+            当处理信号时，上下文信息是不会恢复的，而是保存在用户栈中，然后直接跳转进位于用户空间的sig_wrapper进行
+            信号的处理。当用户自定义的信号处理函数返回时，sigreturn的系统调用才开始进行上下文的恢复（或者说是进行
+            另一次调度。
+            由于这中间没有进行地址空间的交换，所以第二次跳转使用的是同一个内核栈，而之前默认tss.esp0的值是永远指向最顶部
+            这样一来就有可能会覆盖更早的上下文信息（比如嵌套的信号捕获函数）
+        */
         movl proc_intr_ctx(%ebx), %ecx      # __current->intr_ctx
         movl %ecx, (tss_esp0_off + _tss)
 

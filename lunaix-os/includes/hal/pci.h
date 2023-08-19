@@ -1,12 +1,9 @@
 #ifndef __LUNAIX_PCI_H
 #define __LUNAIX_PCI_H
 
-#include <hal/io.h>
+#include <lunaix/ds/ldga.h>
 #include <lunaix/ds/llist.h>
 #include <lunaix/types.h>
-
-#define PCI_CONFIG_ADDR 0xcf8
-#define PCI_CONFIG_DATA 0xcfc
 
 #define PCI_TDEV 0x0
 #define PCI_TPCIBRIDGE 0x1
@@ -61,6 +58,14 @@ typedef unsigned int pci_reg_t;
 #define BAR_TYPE_CACHABLE 0x2
 #define PCI_DRV_NAME_LEN 32
 
+#define EXPORT_PCI_DEVICE(name_, class, vendor_id, dev_id, init_fn)            \
+    static struct pci_driver pcidev_##name_ =                                  \
+      (struct pci_driver){ .name = #name_,                                     \
+                           .create_driver = (init_fn),                         \
+                           .dev_info = ((vendor_id) << 16) | (dev_id),         \
+                           .dev_class = (class) };                             \
+    export_ldga_el(pci_dev_drivers, name_, ptr_t, &pcidev_##name_)
+
 struct pci_driver;
 
 struct pci_base_addr
@@ -97,30 +102,13 @@ struct pci_driver
     char name[PCI_DRV_NAME_LEN];
 };
 
-// PCI Configuration Space (C-Space) r/w:
-//      Refer to "PCI Local Bus Specification, Rev.3, Section 3.2.2.3.2"
-
-static inline pci_reg_t
-pci_read_cspace(u32_t base, int offset)
-{
-    io_outl(PCI_CONFIG_ADDR, base | (offset & ~0x3));
-    return io_inl(PCI_CONFIG_DATA);
-}
-
-static inline void
-pci_write_cspace(u32_t base, int offset, pci_reg_t data)
-{
-    io_outl(PCI_CONFIG_ADDR, base | (offset & ~0x3));
-    io_outl(PCI_CONFIG_DATA, data);
-}
-
 /**
  * @brief 初始化PCI。这主要是通过扫描PCI总线进行拓扑重建。注意，该
  * 初始化不包括针对每个设备的初始化，因为那是设备驱动的事情。
  *
  */
 void
-pci_init();
+pci_load_devices();
 
 /**
  * @brief 根据类型代码（Class Code）去在拓扑中寻找一个设备
@@ -152,17 +140,6 @@ pci_get_device_by_id(u16_t vendorId, u16_t deviceId);
  */
 size_t
 pci_bar_sizing(struct pci_device* dev, u32_t* bar_out, u32_t bar_num);
-
-/**
- * @brief 配置并启用设备MSI支持。
- * 参阅：PCI LB Spec. (Rev 3) Section 6.8 & 6.8.1
- * 以及：Intel Manual, Vol 3, Section 10.11
- *
- * @param device PCI device
- * @param vector interrupt vector.
- */
-void
-pci_setup_msi(struct pci_device* device, int vector);
 
 void
 pci_add_driver(const char* name,

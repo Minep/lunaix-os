@@ -38,7 +38,7 @@ $(kbuild_dir):
 	@mkdir -p $(os_img_dir)/boot/grub
 	@mkdir -p $(os_img_dir)/usr
 
-export BUILD_DIR=$(kbuild_dir)
+export BUILD_DIR=$(kbin_dir)
 export BUILD_NAME=$(kbin)
 $(kbin):
 	$(call status,TASK,$(notdir $@))
@@ -48,7 +48,7 @@ $(kimg): usr/build $(kbin)
 	$(call status,TASK,$(notdir $@))
 	@./config-grub.sh ${OS_NAME} $(os_img_dir)/boot/grub/grub.cfg
 	@cp -r usr/build/* $(os_img_dir)/usr
-	@cp $(kbin) $(os_img_dir)/boot
+	@cp -r $(kbin_dir)/* $(os_img_dir)/boot
 	@grub-mkrescue -o $(kimg) $(os_img_dir) -- -volid "$(OS_ID) $(OS_VER)" -system_id "$(OS_NAME)"
 
 usr/build: user
@@ -91,11 +91,11 @@ debug-qemu: all-debug
 	@qemu-system-i386 $(call get_qemu_options,$(kimg))
 	@sleep 1
 	@$(QEMU_MON_TERM) -- telnet 127.0.0.1 $(QEMU_MON_PORT)
-	@gdb -s $(BUILD_DIR)/kernel.dbg -ex "target remote localhost:1234"
+	@gdb -s $(kbuild_dir)/kernel.dbg -ex "target remote localhost:1234"
 
 debug-qemu-vscode: all-debug
 	@i686-elf-objcopy --only-keep-debug $(kbin) $(kbuild_dir)/kernel.dbg
-	@qemu-system-i386 $(QEMU_OPTIONS)
+	@qemu-system-i386 $(call get_qemu_options,$(kimg))
 	@sleep 0.5
 	@telnet 127.0.0.1 $(QEMU_MON_PORT)
 

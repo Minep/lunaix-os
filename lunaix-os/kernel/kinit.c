@@ -1,8 +1,10 @@
+#include <lunaix/block.h>
+#include <lunaix/boot_generic.h>
 #include <lunaix/common.h>
 #include <lunaix/device.h>
 #include <lunaix/foptions.h>
+#include <lunaix/fs/twifs.h>
 #include <lunaix/input.h>
-#include <lunaix/isrm.h>
 #include <lunaix/lxconsole.h>
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/mmio.h>
@@ -13,27 +15,20 @@
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/spike.h>
-#include <lunaix/syscall.h>
+#include <lunaix/trace.h>
 #include <lunaix/tty/tty.h>
 #include <lunaix/types.h>
 
+#include <hal/acpi/acpi.h>
+#include <hal/intc.h>
+#include <hal/pci.h>
+
 #include <sys/abi.h>
-#include <sys/boot/multiboot.h>
 #include <sys/interrupts.h>
+#include <sys/mm/mempart.h>
 
 #include <klibc/stdio.h>
 #include <klibc/string.h>
-
-extern u8_t __kernel_start;
-extern u8_t __kernel_end;
-extern u8_t __init_hhk_end;
-
-#define PP_KERN_SHARED (PP_FGSHARED | PP_TKERN)
-
-// Set remotely by kernel/asm/x86/prologue.S
-multiboot_info_t* _k_init_mb_info;
-
-x86_page_table* __kernel_ptd;
 
 extern void
 __proc0(); /* proc0.c */
@@ -42,52 +37,54 @@ void
 spawn_proc0();
 
 void
-setup_memory(multiboot_memory_map_t* map, size_t map_size);
+kmem_init(struct boot_handoff* bhctx);
 
 void
-_kernel_pre_init()
+kernel_bootstrap(struct boot_handoff* bhctx)
 {
-    // interrupts
-    exception_init();
-
-    // memory
-    pmm_init(MEM_1MB + (_k_init_mb_info->mem_upper << 10));
+    pmm_init(bhctx->mem.size);
     vmm_init();
 
-    unsigned int map_size =
-      _k_init_mb_info->mmap_length / sizeof(multiboot_memory_map_t);
+    /* Begin kernel bootstrapping sequence */
+    boot_begin(bhctx);
 
-    setup_memory((multiboot_memory_map_t*)_k_init_mb_info->mmap_addr, map_size);
-}
+    /* Setup kernel memory layout and services */
+    kmem_init(bhctx);
 
-void
-_kernel_init()
-{
-    int errno = 0;
-
-    // allocators
-    cake_init();
-    valloc_init();
-
-    sched_init();
+    /* Prepare stack trace environment */
+    trace_modksyms_init(bhctx);
 
     // crt
     tty_init(ioremap(VGA_FRAMEBUFFER, PG_SIZE));
     tty_set_theme(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+    lxconsole_init();
 
-    // file system & device subsys
+    /* Get platform configuration */
+    acpi_init();
+
+    /* Let's get fs online as soon as possible, as things rely on them */
     vfs_init();
     fsm_init();
     input_init();
 
-    vfs_export_attributes();
+    /* Get intc online, this is the cornerstone when initing devices */
+    intc_init();
 
-    lxconsole_init();
+    /* System timing and clock support */
+    clock_init();
+    timer_init();
 
+    block_init();
+
+    /* the bare metal are now happy, let's get software over with */
+    sched_init();
+
+    int errno = 0;
     if ((errno = vfs_mount_root("ramfs", NULL))) {
         panickf("Fail to mount root. (errno=%d)", errno);
     }
 
+    /* Mount these system-wide pseudo-fs */
     vfs_mount("/dev", "devfs", NULL, 0);
     vfs_mount("/sys", "twifs", NULL, MNT_RO);
     vfs_mount("/task", "taskfs", NULL, MNT_RO);
@@ -95,7 +92,10 @@ _kernel_init()
     lxconsole_spawn_ttydev();
     device_init_builtin();
 
-    syscall_install();
+    /* Finish up bootstrapping sequence, we are ready to spawn the root process
+     * and start geting into uspace
+     */
+    boot_end(bhctx);
 
     spawn_proc0();
 }
@@ -154,35 +154,26 @@ spawn_proc0()
 
     // 由于时钟中断与APIC未就绪，我们需要手动进行第一次调度。这里也会同时隐式地恢复我们的eflags.IF位
     proc0->state = PS_RUNNING;
-    asm volatile("pushl %0\n"
-                 "jmp switch_to\n" ::"r"(proc0));
+    switch_context(proc0);
 
     /* Should not return */
     assert_msg(0, "Unexpected Return");
 }
 
-// 按照 Memory map 标识可用的物理页
 void
-setup_memory(multiboot_memory_map_t* map, size_t map_size)
+kmem_init(struct boot_handoff* bhctx)
 {
-
-    // First pass, to mark the physical pages
-    for (unsigned int i = 0; i < map_size; i++) {
-        multiboot_memory_map_t mmap = map[i];
-        if (mmap.type == MULTIBOOT_MEMORY_AVAILABLE) {
-            // 整数向上取整除法
-            ptr_t pg = map[i].addr_low + 0x0fffU;
-            pmm_mark_chunk_free(pg >> PG_SIZE_BITS,
-                                map[i].len_low >> PG_SIZE_BITS);
-        }
-    }
-
+    extern u8_t __kexec_end;
     // 将内核占据的页，包括前1MB，hhk_init 设为已占用
-    size_t pg_count = V2P(&__kernel_end) >> PG_SIZE_BITS;
+    size_t pg_count = ((ptr_t)&__kexec_end - KERNEL_EXEC) >> PG_SIZE_BITS;
     pmm_mark_chunk_occupied(KERNEL_PID, 0, pg_count, PP_FGLOCKED);
 
     // reserve higher half
-    for (size_t i = L1_INDEX(KERNEL_MM_BASE); i < 1023; i++) {
+    for (size_t i = L1_INDEX(KERNEL_EXEC); i < 1023; i++) {
         assert(vmm_set_mapping(VMS_SELF, i << 22, 0, 0, VMAP_NOMAP));
     }
+
+    // allocators
+    cake_init();
+    valloc_init();
 }

@@ -7,8 +7,10 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syscall_utils.h>
 
+#include <sys/mm/mempart.h>
+
 // any size beyond this is bullshit
-#define BS_SIZE (KERNEL_MM_BASE - UMMAP_START)
+#define BS_SIZE (KERNEL_EXEC - UMMAP_START)
 
 int
 mem_has_overlap(vm_regions_t* regions, ptr_t start, ptr_t end)
@@ -101,7 +103,7 @@ mem_map(void** addr_out,
     return ENOMEM;
 
 found:
-    if (found_loc >= KERNEL_MM_BASE || found_loc < USER_START) {
+    if (found_loc >= KERNEL_EXEC || found_loc < USER_START) {
         return ENOMEM;
     }
 

@@ -60,3 +60,4 @@ vfs_export_attributes()
     map = twifs_mapping(NULL, NULL, "version");
     map->read = __version_rd;
 }
+EXPORT_TWIFS_PLUGIN(vfs_general, vfs_export_attributes);

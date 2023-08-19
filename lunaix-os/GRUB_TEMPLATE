@@ -3,4 +3,5 @@ timeout=0
 
 menuentry "$_OS_NAME" {
 	multiboot /boot/kernel.bin
+	module /boot/modksyms modksyms
 }

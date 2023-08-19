@@ -1,6 +1,10 @@
-#include <sys/boot/multiboot.h>
+#define __BOOT_CODE__
+
 #include <lunaix/common.h>
 #include <lunaix/mm/page.h>
+
+#include <sys/boot/bstage.h>
+#include <sys/mm/mempart.h>
 
 #define PT_ADDR(ptd, pt_index) ((ptd_t*)ptd + (pt_index + 1) * 1024)
 #define SET_PDE(ptd, pde_index, pde) *((ptd_t*)ptd + pde_index) = pde;
@@ -9,8 +13,11 @@
 #define sym_val(sym) (ptr_t)(&sym)
 
 #define KERNEL_PAGE_COUNT                                                      \
-    ((sym_val(__kernel_end) - sym_val(__kernel_start) + 0x1000 - 1) >> 12);
-#define HHK_PAGE_COUNT ((sym_val(__init_hhk_end) - 0x100000 + 0x1000 - 1) >> 12)
+    ((sym_val(__kexec_end) - sym_val(__kexec_start) + 0x1000 - 1) >> 12);
+#define HHK_PAGE_COUNT                                                         \
+    ((sym_val(__kexec_boot_end) - 0x100000 + 0x1000 - 1) >> 12)
+
+#define V2P(vaddr) ((ptr_t)(vaddr)-KERNEL_EXEC)
 
 // use table #1
 #define PG_TABLE_IDENTITY 0
@@ -23,16 +30,12 @@
 #define PG_TABLE_STACK 8
 
 // Provided by linker (see linker.ld)
-extern u8_t __kernel_start;
-extern u8_t __kernel_end;
-extern u8_t __ktext_start;
-extern u8_t __ktext_end;
+extern u8_t __kexec_start;
+extern u8_t __kexec_end;
+extern u8_t __kexec_text_start;
+extern u8_t __kexec_text_end;
 
-extern u8_t __init_hhk_end;
-extern u8_t _k_stack;
-
-#define boot_text __attribute__((section(".hhk_init_text")))
-#define boot_data __attribute__((section(".hhk_init_data")))
+extern u8_t __kexec_boot_end;
 
 void boot_text
 _init_page(x86_page_table* ptd)
@@ -60,8 +63,8 @@ _init_page(x86_page_table* ptd)
 
     // 这里是一些计算，主要是计算应当映射进的 页目录 与 页表 的条目索引（Entry
     // Index）
-    u32_t kernel_pde_index = L1_INDEX(sym_val(__kernel_start));
-    u32_t kernel_pte_index = L2_INDEX(sym_val(__kernel_start));
+    u32_t kernel_pde_index = L1_INDEX(sym_val(__kexec_start));
+    u32_t kernel_pte_index = L2_INDEX(sym_val(__kexec_start));
     u32_t kernel_pg_counts = KERNEL_PAGE_COUNT;
 
     // 将内核所需要的页表注册进页目录
@@ -81,9 +84,9 @@ _init_page(x86_page_table* ptd)
     }
 
     // 计算内核.text段的物理地址
-    ptr_t kernel_pm = V2P(&__kernel_start);
-    ptr_t ktext_start = V2P(&__ktext_start);
-    ptr_t ktext_end = V2P(&ktext_end);
+    ptr_t kernel_pm = V2P(&__kexec_start);
+    ptr_t ktext_start = V2P(&__kexec_text_start);
+    ptr_t ktext_end = V2P(&__kexec_text_end);
 
     // 重映射内核至高半区地址（>=0xC0000000）
     for (u32_t i = 0; i < kernel_pg_counts; i++) {
@@ -104,39 +107,8 @@ _init_page(x86_page_table* ptd)
     ptd->entry[PG_MAX_ENTRIES - 1] = NEW_L1_ENTRY(T_SELF_REF_PERM, ptd);
 }
 
-u32_t boot_text
-__save_subset(u8_t* destination, u8_t* base, unsigned int size)
-{
-    unsigned int i = 0;
-    for (; i < size; i++) {
-        *(destination + i) = *(base + i);
-    }
-    return i;
-}
-
 void boot_text
-_save_multiboot_info(multiboot_info_t* info, u8_t* destination)
-{
-    u32_t current = 0;
-    u8_t* info_b = (u8_t*)info;
-    for (; current < sizeof(multiboot_info_t); current++) {
-        *(destination + current) = *(info_b + current);
-    }
-
-    ((multiboot_info_t*)destination)->mmap_addr = (ptr_t)destination + current;
-    current += __save_subset(
-      destination + current, (u8_t*)info->mmap_addr, info->mmap_length);
-
-    if (present(info->flags, MULTIBOOT_INFO_DRIVE_INFO)) {
-        ((multiboot_info_t*)destination)->drives_addr =
-          (ptr_t)destination + current;
-        current += __save_subset(
-          destination + current, (u8_t*)info->drives_addr, info->drives_length);
-    }
-}
-
-void boot_text
-_hhk_init(x86_page_table* ptd, u32_t kpg_size)
+kpg_init(x86_page_table* ptd, u32_t kpg_size)
 {
 
     // 初始化 kpg 全为0

@@ -1,5 +1,5 @@
 #include <hal/acpi/acpi.h>
-#include <hal/ioapic.h>
+#include <hal/intc.h>
 #include <klibc/stdio.h>
 #include <lunaix/isrm.h>
 #include <lunaix/lxconsole.h>

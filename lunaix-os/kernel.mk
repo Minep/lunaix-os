@@ -4,7 +4,6 @@ include toolchain.mkinc
 define ksrc_dirs
 	kernel
 	hal
-	debug
 	libs
 	arch/$(ARCH)
 endef
@@ -39,7 +38,11 @@ $(kbin): $(ksrc_objs) $(kbin_dir)
 	$(call status_,LD,$@)
 	@$(CC) -T link/linker.ld -o $(kbin) $(ksrc_objs) $(LDFLAGS)
 
-all: $(kbin)
+$(kbin_dir)/modksyms: $(kbin)
+	$(call status_,GEN,$@)
+	@$(PY) scripts/syms_export.py --bits=32 --order=little -o "$@"  "$<" 
+
+all: $(kbin) $(kbin_dir)/modksyms
 
 clean:
 	@rm -f $(ksrc_objs)

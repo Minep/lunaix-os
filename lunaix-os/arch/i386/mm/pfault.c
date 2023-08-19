@@ -1,4 +1,3 @@
-#include <sys/interrupts.h>
 #include <lunaix/common.h>
 #include <lunaix/mm/mm.h>
 #include <lunaix/mm/pmm.h>
@@ -8,6 +7,7 @@
 #include <lunaix/signal.h>
 #include <lunaix/status.h>
 #include <lunaix/syslog.h>
+#include <sys/interrupts.h>
 
 #include <klibc/string.h>
 

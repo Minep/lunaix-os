@@ -1,7 +1,6 @@
 #ifndef __LUNAIX_PROCESS_H
 #define __LUNAIX_PROCESS_H
 
-#include <sys/interrupts.h>
 #include <lunaix/clock.h>
 #include <lunaix/ds/waitq.h>
 #include <lunaix/fs.h>
@@ -11,6 +10,7 @@
 #include <lunaix/timer.h>
 #include <lunaix/types.h>
 #include <stdint.h>
+#include <sys/interrupts.h>
 
 // 虽然内核不是进程，但为了区分，这里使用Pid=-1来指代内核。这主要是方便物理页所有权检查。
 #define KERNEL_PID -1

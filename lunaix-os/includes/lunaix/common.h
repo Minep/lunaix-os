@@ -1,10 +1,6 @@
 #ifndef __LUNAIX_CONSTANTS_H
 #define __LUNAIX_CONSTANTS_H
 
-#define PG_SIZE_BITS 12
-#define PG_SIZE (1 << PG_SIZE_BITS)
-#define PG_INDEX_BITS 10
-
 #define MEM_1MB 0x100000
 #define MEM_4MB 0x400000
 
@@ -14,12 +10,6 @@
 #define KSTACK_START (USER_START - KSTACK_SIZE)
 #define KSTACK_TOP ((USER_START - 1) & ~0xf)
 #define within_kstack(addr) (KSTACK_START <= (addr) && (addr) <= KSTACK_TOP)
-
-#define KERNEL_MM_BASE 0xC0000000
-
-#define KCODE_MAX_SIZE MEM_4MB
-// #define KHEAP_START (KERNEL_MM_BASE + KCODE_MAX_SIZE)
-// #define KHEAP_SIZE_MB 256
 
 #define VGA_FRAMEBUFFER 0xB8000
 

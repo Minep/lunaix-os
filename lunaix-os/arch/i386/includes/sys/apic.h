@@ -1,8 +1,9 @@
 #ifndef __LUNAIX_APIC_H
 #define __LUNAIX_APIC_H
 
+#include <hal/intc.h>
 #include <lunaix/common.h>
-#include <stdint.h>
+#include <lunaix/types.h>
 
 #define __APIC_BASE_PADDR 0xFEE00000
 
@@ -75,12 +76,7 @@ apic_write_reg(unsigned int reg, unsigned int val);
 void
 apic_init();
 
-/**
- * @brief Tell the APIC that the handler for current interrupt is finished.
- * This will issue a write action to EOI register.
- *
- */
 void
-apic_done_servicing();
+apic_on_eoi(struct intc_context* intc_ctx, cpu_t cpu, int iv);
 
 #endif /* __LUNAIX_APIC_H */

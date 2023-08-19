@@ -1,10 +1,10 @@
-#ifndef __LUNAIX_IO_H
-#define __LUNAIX_IO_H
+#ifndef __LUNAIX_PORT_IO_H
+#define __LUNAIX_PORT_IO_H
 
 #include <lunaix/types.h>
 
 static inline u8_t
-io_inb(int port)
+port_rdbyte(int port)
 {
     u8_t data;
     asm volatile("inb %w1,%0" : "=a"(data) : "d"(port));
@@ -12,7 +12,7 @@ io_inb(int port)
 }
 
 static inline void
-io_insb(int port, void* addr, int cnt)
+port_rdbytes(int port, void* addr, int cnt)
 {
     asm volatile("cld\n"
                  "repne\n"
@@ -23,7 +23,7 @@ io_insb(int port, void* addr, int cnt)
 }
 
 static inline u16_t
-io_inw(int port)
+port_rdword(int port)
 {
     u16_t data;
     asm volatile("inw %w1,%0" : "=a"(data) : "d"(port));
@@ -31,7 +31,7 @@ io_inw(int port)
 }
 
 static inline void
-io_insw(int port, void* addr, int cnt)
+port_rdwords(int port, void* addr, int cnt)
 {
     asm volatile("cld\n"
                  "repne\n"
@@ -42,7 +42,7 @@ io_insw(int port, void* addr, int cnt)
 }
 
 static inline u32_t
-io_inl(int port)
+port_rddword(int port)
 {
     u32_t data;
     asm volatile("inl %w1,%0" : "=a"(data) : "d"(port));
@@ -50,7 +50,7 @@ io_inl(int port)
 }
 
 static inline void
-io_insl(int port, void* addr, int cnt)
+port_rddwords(int port, void* addr, int cnt)
 {
     asm volatile("cld\n"
                  "repne\n"
@@ -61,13 +61,13 @@ io_insl(int port, void* addr, int cnt)
 }
 
 static inline void
-io_outb(int port, u8_t data)
+port_wrbyte(int port, u8_t data)
 {
     asm volatile("outb %0, %w1" : : "a"(data), "d"(port));
 }
 
 static inline void
-io_outsb(int port, const void* addr, int cnt)
+port_wrbytes(int port, const void* addr, int cnt)
 {
     asm volatile("cld\n"
                  "repne\n"
@@ -78,13 +78,13 @@ io_outsb(int port, const void* addr, int cnt)
 }
 
 static inline void
-io_outw(int port, u16_t data)
+port_wrword(int port, u16_t data)
 {
     asm volatile("outw %0,%w1" : : "a"(data), "d"(port));
 }
 
 static inline void
-io_outsw(int port, const void* addr, int cnt)
+port_wrwords(int port, const void* addr, int cnt)
 {
     asm volatile("cld\n"
                  "repne\n"
@@ -95,7 +95,7 @@ io_outsw(int port, const void* addr, int cnt)
 }
 
 static inline void
-io_outsl(int port, const void* addr, int cnt)
+port_wrdwords(int port, const void* addr, int cnt)
 {
     asm volatile("cld\n"
                  "repne\n"
@@ -106,12 +106,13 @@ io_outsl(int port, const void* addr, int cnt)
 }
 
 static inline void
-io_outl(int port, u32_t data)
+port_wrdword(int port, u32_t data)
 {
     asm volatile("outl %0,%w1" : : "a"(data), "d"(port));
 }
+
 static inline void
-io_delay(int counter)
+port_delay(int counter)
 {
     asm volatile("   test %0, %0\n"
                  "   jz 1f\n"
@@ -120,4 +121,4 @@ io_delay(int counter)
                  "1: dec %0" ::"a"(counter));
 }
 
-#endif /* __LUNAIX_IO_H */
+#endif /* __LUNAIX_PORT_port_H */

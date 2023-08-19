@@ -7,11 +7,13 @@
 // Virtual memory manager
 
 #define VMAP_NULL 0
+
 /**
  * @brief 映射模式：忽略已存在映射
  *
  */
 #define VMAP_IGNORE 1
+
 /**
  * @brief 映射模式：不作实际映射。该功能用于预留出特定的地址空间
  *

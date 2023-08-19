@@ -9,14 +9,10 @@
     .long MB_FLAGS
     .long CHECKSUM(MB_FLAGS)
 
-.section .hhk_init_bss
-    .global mb_info
-    .align 16
-    /* 为Multiboot info struct 预留空间 */
-    mb_info:
-        .skip 4096
+.section .boot.bss
     /* 根据System V ABI，栈地址必须16字节对齐 */
     /* 这里只是一个临时栈，在_hhk_init里面我们会初始化内核专用栈 */
+    .align 16
     stack_bottom:
         .skip 4096, 0
     __stack_top:
@@ -35,7 +31,7 @@
         .skip KPG_SIZE, 0
 
 
-.section .hhk_init_text
+.section .boot.text
     .global start_
     .type start_, @function     /* Optional, this just give the 
                                  * linker more knowledge about the label 
@@ -49,23 +45,20 @@
         subl $16, %esp
 
         /* 
-            将咱们的 multiboot_info 挪个地儿，就是上述预留的空间里
-            而后在_hhk_init里，我们会对所有的高半核初始化代码（arch/i386下的所有）进行Identity map
-            这样，我们能够保证当分页与虚拟地址开启后，我们的内核能够访问到multiboot info table
+            parse multiboot struct into arch-agnostic boot info struct
          */
 
-        movl $mb_info, 4(%esp)
         movl %ebx, (%esp)
-        call _save_multiboot_info
+        call mb_parse
 
         /*
-            _hhk_init用来初始化我们高半核：
+            kpg_init用来初始化内核页表：
                 1. 初始化最简单的PD与PT（重新映射我们的内核至3GiB处，以及对相应的地方进行Identity Map）
         */
 
         movl $(KPG_SIZE), 4(%esp)
         movl $(_k_ptd - 0xC0000000), (%esp)    /* PTD物理地址 */
-        call _hhk_init
+        call kpg_init
 
         /*
             基本的映射定义好了，我们可以放心的打开分页了

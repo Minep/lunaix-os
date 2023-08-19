@@ -1,4 +1,5 @@
 #include <lunaix/block.h>
+#include <lunaix/boot_generic.h>
 #include <lunaix/common.h>
 #include <lunaix/exec.h>
 #include <lunaix/foptions.h>
@@ -21,12 +22,7 @@
 
 #include <hal/acpi/acpi.h>
 #include <hal/ahci/ahci.h>
-#include <hal/apic.h>
-#include <hal/ioapic.h>
 #include <hal/pci.h>
-#include <hal/rtc.h>
-
-#include <sys/boot/multiboot.h>
 
 #include <klibc/string.h>
 
@@ -34,15 +30,6 @@ LOG_MODULE("PROC0")
 
 void
 init_platform();
-
-void
-lock_reserved_memory();
-
-void
-unlock_reserved_memory();
-
-void
-__do_reserved_memory(int unlock);
 
 int
 mount_bootmedium()
@@ -90,6 +77,12 @@ fail:
 void
 __proc0()
 {
+    /*
+     * We must defer boot code/data cleaning after we successfully escape that
+     * area
+     */
+    boot_cleanup();
+
     init_platform();
 
     init_proc_user_space(__current);
@@ -102,11 +95,6 @@ __proc0()
     }
 }
 
-extern u8_t __kernel_start;               /* link/linker.ld */
-extern u8_t __kernel_end;                 /* link/linker.ld */
-extern u8_t __init_hhk_end;               /* link/linker.ld */
-extern multiboot_info_t* _k_init_mb_info; /* k_init.c */
-
 void
 init_platform()
 {
@@ -114,114 +102,20 @@ init_platform()
             __VERSION__,
             __TIME__);
 
-    // 锁定所有系统预留页（内存映射IO，ACPI之类的），并且进行1:1映射
-    lock_reserved_memory();
+    twifs_register_plugins();
 
-    // firmware
-    acpi_init(_k_init_mb_info);
-
-    // die
-    apic_init();
-    ioapic_init();
+    /* we must start probing pci after all drivers are registered! */
+    pci_load_devices();
 
     // debugger
     serial_init();
     sdbg_init();
 
-    // timers & clock
-    rtc_init();
-    timer_init(SYS_TIMER_FREQUENCY_HZ);
-    clock_init();
-
+    // FIXME ps2 kbd is x86 PC specific, not here.
     // peripherals & chipset features
     ps2_kbd_init();
-    block_init();
-    ahci_init();
-
-    pci_init();
 
     // console
     console_start_flushing();
     console_flush();
-
-    // expose cake allocator states to vfs
-    cake_export();
-
-    unlock_reserved_memory();
-
-    // clean up
-    for (size_t i = 0; i < (ptr_t)(&__init_hhk_end); i += PG_SIZE) {
-        vmm_del_mapping(VMS_SELF, (ptr_t)i);
-        pmm_free_page(KERNEL_PID, (ptr_t)i);
-    }
-}
-
-void
-lock_reserved_memory()
-{
-    __do_reserved_memory(0);
-}
-
-void
-unlock_reserved_memory()
-{
-    __do_reserved_memory(1);
-}
-
-void
-__do_reserved_memory(int unlock)
-{
-    multiboot_memory_map_t* mmaps =
-      (multiboot_memory_map_t*)_k_init_mb_info->mmap_addr;
-
-    size_t map_size =
-      _k_init_mb_info->mmap_length / sizeof(multiboot_memory_map_t);
-
-    // v_mapping mapping;
-    for (unsigned int i = 0; i < map_size; i++) {
-        multiboot_memory_map_t mmap = mmaps[i];
-        ptr_t pa = PG_ALIGN(mmap.addr_low);
-
-        if (mmap.type == MULTIBOOT_MEMORY_AVAILABLE || pa <= MEM_4MB) {
-            // Don't fuck up our kernel code or any free area!
-            continue;
-        }
-
-        size_t pg_num = CEIL(mmap.len_low, PG_SIZE_BITS);
-        size_t j = 0;
-
-        if (!unlock) {
-            kprintf("mem: freeze: %p..%p type=%x\n",
-                    pa,
-                    pa + pg_num * PG_SIZE,
-                    mmap.type);
-
-            for (; j < pg_num; j++) {
-                ptr_t _pa = pa + (j << PG_SIZE_BITS);
-                if (_pa >= KERNEL_MM_BASE) {
-                    // Don't fuck up our kernel space!
-                    break;
-                }
-                vmm_set_mapping(VMS_SELF, _pa, _pa, PG_PREM_R, VMAP_NULL);
-                pmm_mark_page_occupied(
-                  KERNEL_PID, _pa >> PG_SIZE_BITS, PP_FGLOCKED);
-            }
-
-            // Save the progress for later unmapping.
-            mmaps[i].len_low = j * PG_SIZE;
-        } else {
-            kprintf("mem: reclaim: %p..%p type=%x\n",
-                    pa,
-                    pa + pg_num * PG_SIZE,
-                    mmap.type);
-
-            for (; j < pg_num; j++) {
-                ptr_t _pa = pa + (j << PG_SIZE_BITS);
-                vmm_del_mapping(VMS_SELF, _pa);
-                if (mmap.type == MULTIBOOT_MEMORY_ACPI_RECLAIMABLE) {
-                    pmm_mark_page_free(_pa >> PG_SIZE_BITS);
-                }
-            }
-        }
-    }
 }

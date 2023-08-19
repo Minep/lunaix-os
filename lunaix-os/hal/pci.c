@@ -8,9 +8,9 @@
  * @copyright Copyright (c) 2022
  *
  */
-#include <hal/acpi/acpi.h>
-#include <hal/apic.h>
 #include <hal/pci.h>
+#include <sys/pci_hba.h>
+
 #include <klibc/string.h>
 #include <lunaix/fs/twifs.h>
 #include <lunaix/mm/valloc.h>
@@ -145,7 +145,7 @@ pci_probe_msi_info(struct pci_device* device)
     }
 }
 
-void
+static void
 __pci_read_cspace(struct twimap* map)
 {
     struct pci_device* pcidev = (struct pci_device*)(map->data);
@@ -158,21 +158,21 @@ __pci_read_cspace(struct twimap* map)
     map->size_acc = 256;
 }
 
-void
+static void
 __pci_read_revid(struct twimap* map)
 {
     int class = twimap_data(map, struct pci_device*)->class_info;
     twimap_printf(map, "0x%x", PCI_DEV_REV(class));
 }
 
-void
+static void
 __pci_read_class(struct twimap* map)
 {
     int class = twimap_data(map, struct pci_device*)->class_info;
     twimap_printf(map, "0x%x", PCI_DEV_CLASS(class));
 }
 
-void
+static void
 __pci_bar_read(struct twimap* map)
 {
     struct pci_device* pcidev = twimap_data(map, struct pci_device*);
@@ -200,7 +200,7 @@ __pci_bar_read(struct twimap* map)
     twimap_printf(map, "\n");
 }
 
-int
+static int
 __pci_bar_gonext(struct twimap* map)
 {
     if (twimap_index(map, int) >= 5) {
@@ -240,6 +240,7 @@ pci_build_fsmapping()
         map->go_next = __pci_bar_gonext;
     }
 }
+EXPORT_TWIFS_PLUGIN(pci_devs, pci_build_fsmapping);
 
 size_t
 pci_bar_sizing(struct pci_device* dev, u32_t* bar_out, u32_t bar_num)
@@ -259,36 +260,6 @@ pci_bar_sizing(struct pci_device* dev, u32_t* bar_out, u32_t bar_num)
     *bar_out = bar;
     pci_write_cspace(dev->cspace_base, PCI_REG_BAR(bar_num), bar);
     return ~sized + 1;
-}
-
-void
-pci_setup_msi(struct pci_device* device, int vector)
-{
-    // Dest: APIC#0, Physical Destination, No redirection
-    u32_t msi_addr = (__APIC_BASE_PADDR);
-
-    // Edge trigger, Fixed delivery
-    u32_t msi_data = vector;
-
-    pci_write_cspace(
-      device->cspace_base, PCI_MSI_ADDR(device->msi_loc), msi_addr);
-
-    pci_reg_t reg1 = pci_read_cspace(device->cspace_base, device->msi_loc);
-    pci_reg_t msg_ctl = reg1 >> 16;
-
-    int offset = !!(msg_ctl & MSI_CAP_64BIT) * 4;
-    pci_write_cspace(device->cspace_base,
-                     PCI_MSI_DATA(device->msi_loc, offset),
-                     msi_data & 0xffff);
-
-    if ((msg_ctl & MSI_CAP_MASK)) {
-        pci_write_cspace(
-          device->cspace_base, PCI_MSI_MASK(device->msi_loc, offset), 0);
-    }
-
-    // manipulate the MSI_CTRL to allow device using MSI to request service.
-    reg1 = (reg1 & 0xff8fffff) | 0x10000;
-    pci_write_cspace(device->cspace_base, device->msi_loc, reg1);
 }
 
 struct pci_device*
@@ -363,16 +334,14 @@ pci_bind_driver(struct pci_device* pci_dev)
 }
 
 void
-pci_init()
+pci_load_devices()
 {
-    acpi_context* acpi = acpi_get_context();
-    assert_msg(acpi, "ACPI not initialized.");
-    if (acpi->mcfg.alloc_num) {
-        // PCIe Enhanced Configuration Mechanism is supported.
-        // TODO: support PCIe addressing mechanism
+    int i = 0;
+    struct pci_driver* dev;
+    ldga_foreach(pci_dev_drivers, struct pci_driver*, i, dev)
+    {
+        llist_append(&pci_drivers, &dev->drivers);
     }
-    // Otherwise, fallback to use legacy PCI 3.0 method.
-    pci_probe();
 
-    pci_build_fsmapping();
+    pci_probe();
 }

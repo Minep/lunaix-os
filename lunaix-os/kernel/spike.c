@@ -1,6 +1,6 @@
-#include <sys/interrupts.h>
 #include <klibc/stdio.h>
 #include <lunaix/spike.h>
+#include <sys/interrupts.h>
 
 static char buffer[1024];
 
@@ -18,9 +18,9 @@ __assert_fail(const char* expr, const char* file, unsigned int line)
     DO_SPIN // never reach
 }
 
-void
+void noret
 panick(const char* msg)
-{       
+{
     cpu_trap_panic(msg);
     DO_SPIN
 }

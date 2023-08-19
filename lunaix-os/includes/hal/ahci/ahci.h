@@ -21,13 +21,6 @@ struct ahci_driver
     int id;
 };
 
-/**
- * @brief 初始化AHCI与HBA
- *
- */
-void
-ahci_init();
-
 void
 ahci_parse_dev_info(struct hba_device* dev_info, u16_t* data);
 

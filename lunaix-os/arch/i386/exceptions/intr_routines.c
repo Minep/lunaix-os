@@ -10,9 +10,8 @@
 
 #include <klibc/stdio.h>
 
-#include <hal/apic.h>
-
-#include "i386_intr.h"
+#include <sys/apic.h>
+#include <sys/i386_intr.h>
 
 LOG_MODULE("INTR")
 
@@ -64,8 +63,8 @@ intr_routine_sys_panic(const isr_param* param)
 void
 intr_routine_fallback(const isr_param* param)
 {
-    console_flush();
     __print_panic_msg("Unknown Interrupt", param);
+    console_flush();
     spin();
 }
 

@@ -1,7 +1,7 @@
 /* Generated from i386_isrdef.c.j2. Do NOT modify */
 
-#include "i386_intr.h"
 #include <lunaix/types.h>
+#include <sys/i386_intr.h>
 
 #define IDT_INTERRUPT 0x70
 #define KERNEL_CS 0x8

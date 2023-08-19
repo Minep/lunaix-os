@@ -1,4 +1,5 @@
 #include <lunaix/device.h>
+#include <lunaix/mm/page.h>
 
 int
 __null_wr_pg(struct device* dev, void* buf, size_t offset)

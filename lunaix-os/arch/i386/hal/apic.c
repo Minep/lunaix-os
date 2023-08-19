@@ -8,20 +8,22 @@
  * @copyright Copyright (c) 2022
  *
  */
-#include <hal/apic.h>
-#include <hal/cpu.h>
-#include <hal/pic.h>
-#include <hal/rtc.h>
 
+#include <hal/cpu.h>
+#include <hal/intc.h>
+
+#include <sys/apic.h>
 #include <sys/interrupts.h>
 
 #include <lunaix/mm/mmio.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 
+#include "pic.h"
+
 LOG_MODULE("APIC")
 
-static volatile uintptr_t _apic_base;
+static volatile ptr_t _apic_base;
 
 void
 apic_setup_lvts();
@@ -100,9 +102,13 @@ apic_setup_lvts()
 }
 
 void
-apic_done_servicing()
+apic_on_eoi(struct intc_context* intc_ctx, cpu_t cpu, int iv)
 {
-    *(unsigned int*)(_apic_base + APIC_EOI) = 0;
+    // for all external interrupts except the spurious interrupt
+    //  this is required by Intel Manual Vol.3A, section 10.8.1 & 10.8.5
+    if (iv >= IV_EX_BEGIN && iv != APIC_SPIV_IV) {
+        *(unsigned int*)(_apic_base + APIC_EOI) = 0;
+    }
 }
 
 unsigned int

@@ -3,6 +3,8 @@
 
 // clang-format off
 
+#define TOTAL_IV 256
+
 #define FAULT_DIVISION_ERROR            0
 #define INSTR_DEBUG                     1
 #define INT_NMI                         2
@@ -26,19 +28,18 @@
 #define FAULT_VIRTUALIZATION_EXCEPTION  20
 #define FAULT_CONTROL_PROTECTION        21
 
+#define IV_BASE_END       31
+
 // LunaixOS related
 #define LUNAIX_SYS_PANIC                32
 #define LUNAIX_SYS_CALL                 33
-#define LUNAIX_SCHED                    34
 
-#define EX_INTERRUPT_BEGIN              200
+// begin allocatable iv resources
+#define IV_EX_BEGIN                     50
+#define LUNAIX_SCHED                    50
 
-// Keyboard
-#define PC_KBD_IV                       201
-#define AHCI_HBA_IV                     202
-#define UART_COM1                       203
-
-#define RTC_TIMER_IV                    210
+// end allocatable iv resources
+#define IV_EX_END             249
 
 // 来自APIC的中断有着最高的优先级。
 // APIC related

@@ -1,7 +1,6 @@
 #ifndef __LUNAIX_PS2KBD_H
 #define __LUNAIX_PS2KBD_H
 
-#include <hal/io.h>
 #include <lunaix/ds/mutex.h>
 #include <lunaix/keyboard.h>
 

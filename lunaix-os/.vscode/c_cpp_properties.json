@@ -10,7 +10,7 @@
             ],
             "compilerArgs": [
                 "-ffreestanding",
-                "-D__ARCH_IA32",
+                "-D__ARCH__=i386",
                 "-D__LUNAIXOS_DEBUG__",
                 "-include flags.h"
             ],

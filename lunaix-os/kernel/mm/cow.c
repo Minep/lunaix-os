@@ -1,6 +1,8 @@
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
 
+#include <sys/mm/mempart.h>
+
 ptr_t
 vmm_dup_page(pid_t pid, ptr_t pa)
 {

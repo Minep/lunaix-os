@@ -1,15 +1,11 @@
 #ifndef __LUNAIX_SYSCALL_H
 #define __LUNAIX_SYSCALL_H
 
-#include <sys/vectors.h>
 #include <usr/lunaix/syscallid.h>
 
 #ifndef __ASM__
 
 #define SYSCALL_ESTATUS(errno) -((errno) != 0)
-
-void
-syscall_install();
 
 #define asmlinkage __attribute__((regparm(0)))
 
@@ -40,9 +36,5 @@ syscall_install();
     asmlinkage rettype __lxsys_##name(                                         \
       __PARAM_MAP5(t1, p1, t2, p2, t3, p3, t4, p4, t5, p5))
 
-#define __SYSCALL_INTERRUPTIBLE(code)                                          \
-    asm("sti");                                                                \
-    { code };                                                                  \
-    asm("cli");
 #endif
 #endif /* __LUNAIX_SYSCALL_H */

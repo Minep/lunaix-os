@@ -1,10 +1,11 @@
-#include <hal/io.h>
 #include <klibc/string.h>
 #include <lunaix/common.h>
 #include <lunaix/spike.h>
 #include <lunaix/tty/console.h>
 #include <lunaix/tty/tty.h>
 #include <stdint.h>
+
+#include <sys/port_io.h>
 
 vga_attribute* tty_vga_buffer;
 
@@ -26,11 +27,11 @@ tty_init(void* vga_buf)
 
     tty_clear();
 
-    io_outb(0x3D4, 0x0A);
-    io_outb(0x3D5, (io_inb(0x3D5) & 0xC0) | 13);
+    port_wrbyte(0x3D4, 0x0A);
+    port_wrbyte(0x3D5, (port_rdbyte(0x3D5) & 0xC0) | 13);
 
-    io_outb(0x3D4, 0x0B);
-    io_outb(0x3D5, (io_inb(0x3D5) & 0xE0) | 15);
+    port_wrbyte(0x3D4, 0x0B);
+    port_wrbyte(0x3D5, (port_rdbyte(0x3D5) & 0xE0) | 15);
 }
 
 void
@@ -40,10 +41,10 @@ tty_set_cursor(u8_t x, u8_t y)
         x = y = 0;
     }
     u32_t pos = y * TTY_WIDTH + x;
-    io_outb(0x3D4, 14);
-    io_outb(0x3D5, pos / 256);
-    io_outb(0x3D4, 15);
-    io_outb(0x3D5, pos % 256);
+    port_wrbyte(0x3D4, 14);
+    port_wrbyte(0x3D5, pos / 256);
+    port_wrbyte(0x3D4, 15);
+    port_wrbyte(0x3D5, pos % 256);
 }
 
 void

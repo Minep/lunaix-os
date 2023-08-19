@@ -1,11 +1,12 @@
 CC := i686-elf-gcc
 AS := i686-elf-as
 AR := i686-elf-ar
+PY := python
 
 
 ARCH_OPT := -D__ARCH_IA32
 O := -O2
-W := -Wall -Wextra -Wno-unknown-pragmas \
+W := -Wall -Wextra -Werror -Wno-unknown-pragmas \
 		-Wno-unused-function \
 		-Wno-unused-variable\
 		-Wno-unused-but-set-variable \

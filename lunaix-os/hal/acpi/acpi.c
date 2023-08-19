@@ -16,12 +16,12 @@ int
 acpi_rsdp_validate(acpi_rsdp_t* rsdp);
 
 acpi_rsdp_t*
-acpi_locate_rsdp(multiboot_info_t* mb_info);
+acpi_locate_rsdp();
 
 int
-acpi_init(multiboot_info_t* mb_info)
+acpi_init()
 {
-    acpi_rsdp_t* rsdp = acpi_locate_rsdp(mb_info);
+    acpi_rsdp_t* rsdp = acpi_locate_rsdp();
 
     assert_msg(rsdp, "Fail to locate ACPI_RSDP");
     assert_msg(acpi_rsdp_validate(rsdp), "Invalid ACPI_RSDP (checksum failed)");
@@ -82,7 +82,7 @@ acpi_rsdp_validate(acpi_rsdp_t* rsdp)
 }
 
 u8_t
-acpi_gistranslate(u8_t old_irq)
+acpi_gsimap(u8_t old_irq)
 {
     if (old_irq >= 24) {
         return old_irq;
@@ -94,37 +94,10 @@ acpi_gistranslate(u8_t old_irq)
 #define VIRTUAL_BOX_PROBLEM
 
 acpi_rsdp_t*
-acpi_locate_rsdp(multiboot_info_t* mb_info)
+acpi_locate_rsdp()
 {
     acpi_rsdp_t* rsdp = NULL;
 
-    // You can't trust memory map from multiboot in virtual box!
-    // They put ACPI RSDP in the FUCKING 0xe0000 !!!
-    // Which is reported to be free area bt multiboot!
-    // SWEET CELESTIA!!!
-#ifndef VIRTUAL_BOX_PROBLEM
-    multiboot_memory_map_t* mmap = (multiboot_memory_map_t*)mb_info->mmap_addr;
-    for (size_t i = 0, j = 0; j < mb_info->mmap_length && !rsdp;
-         i++, j += MB_MMAP_ENTRY_SIZE) {
-        multiboot_memory_map_t entry = mmap[i];
-        if (entry.type != MULTIBOOT_MEMORY_RESERVED ||
-            entry.addr_low > 0x100000) {
-            continue;
-        }
-
-        u8_t* mem_start = entry.addr_low & ~0xf;
-        size_t len = entry.len_low;
-        for (size_t j = 0; j < len; j += 16) {
-            u32_t sig_low = *((u32_t*)(mem_start + j));
-            // u32_t sig_high = *((u32_t*)(mem_start+j) + 1);
-            if (sig_low == ACPI_RSDP_SIG_L) {
-                rsdp = (acpi_rsdp_t*)(mem_start + j);
-                break;
-            }
-        }
-    }
-#else
-    // You know what, I just search the entire 1MiB for Celestia's sake.
     ptr_t mem_start = 0x4000;
     for (; mem_start < 0x100000; mem_start += 16) {
         u32_t sig_low = *((u32_t*)mem_start);
@@ -136,7 +109,6 @@ acpi_locate_rsdp(multiboot_info_t* mb_info)
             break;
         }
     }
-#endif
 
     return rsdp;
 }

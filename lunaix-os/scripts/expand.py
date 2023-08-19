@@ -269,12 +269,20 @@ class MemoryMapObject(DataObject):
         super().__init__("", record)
 
     def _parse(self, record):
-        if "granule" in self._record:
-            self.__g = MemoryMapObject.GranuleObject(self._record["granule"])
-        if "regions" in self._record:
-            self.__regions = ArrayObject(self._record["regions"])
-        if "width" in self._record:
-            self.__width = DataObject.create("width", self._record["width"])
+        for k, v in record.items():
+            if k.startswith("$"):
+                self.ctrl_field[k.strip("$")] = FieldType.create(k, v)
+            elif k.startswith("@"):
+                self.ctrl_field[k.strip("@")] = DataObject.create(k, v)
+        
+        if "granule" in record:
+            self.__g = MemoryMapObject.GranuleObject(record["granule"])
+
+        if "regions" in record:
+            self.__regions = ArrayObject(record["regions"])
+
+        if "width" in record:
+            self.__width = DataObject.create("width", record["width"])
 
     def __process(self, start_addr, idx, regions, size_lookahead = False):
         if idx >= len(regions):
@@ -282,8 +290,8 @@ class MemoryMapObject(DataObject):
         
         e = regions[idx]
 
-        if "boundary" in e:
-            b = e["boundary"] - 1
+        if "block" in e:
+            b = e["block"] - 1
             start_addr = (start_addr + b) & ~b
 
         if "start" not in e:
@@ -305,6 +313,8 @@ class MemoryMapObject(DataObject):
         return start_addr
     
     def expand(self, param={}):
+        super().expand(param)
+
         g = self.__g.expand(param)
 
         param["granule"] = g

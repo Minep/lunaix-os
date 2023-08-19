@@ -2,7 +2,7 @@
 #define __LUNAIX_PMM_H
 // Physical memory manager
 
-#include <lunaix/process.h>
+#include <lunaix/types.h>
 #include <stddef.h>
 #include <stdint.h>
 
