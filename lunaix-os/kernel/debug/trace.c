@@ -1,5 +1,5 @@
-#include <lunaix/mm/mmio.h>
 #include <lunaix/mm/page.h>
+#include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
@@ -23,13 +23,14 @@ trace_modksyms_init(struct boot_handoff* bhctx)
     for (size_t i = 0; i < bhctx->mods.mods_num; i++) {
         struct boot_modent* mod = &bhctx->mods.entries[i];
         if (streq(mod->str, "modksyms")) {
-            // In case boot loader does not place our ksyms on page boundary
-            ptr_t start = PG_ALIGN(mod->start);
-            ptr_t end = ROUNDUP(mod->end, PG_SIZE);
-            ptr_t ksym_va = (ptr_t)ioremap(start, (end - start));
+            assert(PG_ALIGNED(mod->start));
 
-            trace_ctx.ksym_table =
-              (struct ksyms*)(ksym_va + (mod->start - start));
+            ptr_t end = ROUNDUP(mod->end, PG_SIZE);
+            ptr_t ksym_va =
+              (ptr_t)vmm_vmap(mod->start, (end - mod->start), PG_PREM_R);
+
+            assert(ksym_va);
+            trace_ctx.ksym_table = (struct ksyms*)ksym_va;
         }
     }
 }
@@ -126,7 +127,7 @@ trace_printstack()
     trace_printstack_of(cpu_get_fp());
 }
 
-void
+static void
 trace_printswctx(const isr_param* p, char* direction)
 {
 

@@ -10,9 +10,17 @@
 
 LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有浓重个人风格的操作系统。开发过程以视频教程形式在Bilibili呈现：[《从零开始自制操作系统系列》](https://space.bilibili.com/12995787/channel/collectiondetail?sid=196337)。
 
+## 一些实用资源
+
+如果有意研读LunaixOS的内核代码和其中的设计，以下资料可能会对此有用。
+
++ [内核虚拟内存的详细布局](docs/img/lunaix-os-mem.png)
++ [LunaixOS启动流程概览](docs/img/boot_sequence.jpeg)
++ LunaixOS总体架构概览（WIP）
+
 ## 当前进度以及支持的功能
 
-该操作系统支持x86架构，运行在保护模式中，采用宏内核架构，目前仅支持单核心。内存结构采用经典的3:1划分，即低3GiB为用户地址空间（0x400000 ~ 0xBFFFFFFF），内核地址空间重映射至高1GiB（0xC0000000 ~ 0xFFFFFFFF）。内存的详细布局可参考[LunaixOS内存地图](docs/img/lunaix-os-mem.png)
+该操作系统支持x86架构，运行在保护模式中，采用宏内核架构，目前仅支持单核心。架构与内核的解耦合工作正在进行中。
 
 在下述列表中，则列出目前所支持的所用功能和特性。列表项按照项目时间戳进行升序排列。
 
