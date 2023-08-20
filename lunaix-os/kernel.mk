@@ -20,6 +20,7 @@ kbin := $(BUILD_NAME)
 
 ksrc_files := $(foreach f, $(ksrc_dirs), $(shell find $(f) -name "*.[cS]"))
 ksrc_objs := $(addsuffix .o,$(ksrc_files))
+ksrc_deps := $(addsuffix .d,$(ksrc_files))
 
 kinc_opts := $(addprefix -I,$(kinc_dirs))
 
@@ -34,7 +35,7 @@ CFLAGS += -include flags.h
 	$(call status_,CC,$<)
 	@$(CC) $(CFLAGS) $(kinc_opts) -c $< -o $@
 
-$(kbin): $(ksrc_objs) $(kbin_dir)
+$(kbin): $(kbin_dir) $(ksrc_files) $(ksrc_objs)
 	$(call status_,LD,$@)
 	@$(CC) -T link/linker.ld -o $(kbin) $(ksrc_objs) $(LDFLAGS)
 
@@ -46,3 +47,4 @@ all: $(kbin) $(kbin_dir)/modksyms
 
 clean:
 	@rm -f $(ksrc_objs)
+	@rm -f $(ksrc_deps)

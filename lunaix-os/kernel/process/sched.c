@@ -196,7 +196,7 @@ __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
     }
 
     struct proc_info* root_proc = sched_ctx._procs[0];
-    __current->sleep.wakeup_time = clock_systime() + seconds * 1000;
+    __current->sleep.wakeup_time = clock_systime() + seconds;
 
     if (llist_empty(&__current->sleep.sleepers)) {
         llist_append(&root_proc->sleep.sleepers, &__current->sleep.sleepers);
@@ -210,15 +210,12 @@ __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
     return 0;
 }
 
-// FIXME issue with alarm, paused parent process never got wake up, check what
-// has been fucked up by refactoring.
-
 __DEFINE_LXSYSCALL1(unsigned int, alarm, unsigned int, seconds)
 {
     time_t prev_ddl = __current->sleep.alarm_time;
     time_t now = clock_systime();
 
-    __current->sleep.alarm_time = seconds ? now + seconds * 1000 : 0;
+    __current->sleep.alarm_time = seconds ? now + seconds : 0;
 
     struct proc_info* root_proc = sched_ctx._procs[0];
     if (llist_empty(&__current->sleep.sleepers)) {

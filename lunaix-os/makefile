@@ -5,7 +5,6 @@ include $(mkinc_dir)/toolchain.mkinc
 include $(mkinc_dir)/qemu.mkinc
 include $(mkinc_dir)/utils.mkinc
 
-
 ARCH ?= i386
 export ARCH
 

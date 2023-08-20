@@ -20,8 +20,6 @@
 
 #include <sdbg/protocol.h>
 
-#include <hal/acpi/acpi.h>
-#include <hal/ahci/ahci.h>
 #include <hal/pci.h>
 
 #include <klibc/string.h>
@@ -78,8 +76,8 @@ void
 __proc0()
 {
     /*
-     * We must defer boot code/data cleaning after we successfully escape that
-     * area
+     * We must defer boot code/data cleaning to here, after we successfully
+     * escape that area
      */
     boot_cleanup();
 
@@ -104,15 +102,17 @@ init_platform()
 
     twifs_register_plugins();
 
-    /* we must start probing pci after all drivers are registered! */
+    /*
+     * all device registering and loading must defered to here!
+     * due to limited stack size and partial scheduling context
+     */
     pci_load_devices();
 
     // debugger
     serial_init();
     sdbg_init();
 
-    // FIXME ps2 kbd is x86 PC specific, not here.
-    // peripherals & chipset features
+    // FIXME ps2 kbd is a device, must not be here
     ps2_kbd_init();
 
     // console

@@ -23,7 +23,7 @@ OFLAGS := -fno-gcse\
 		  -fno-inline-small-functions \
 		  -fno-indirect-inlining
 
-CFLAGS := -std=gnu99 -ffreestanding $(OFLAGS) $(W) $(ARCH_OPT)
+CFLAGS := -std=gnu99 -ffreestanding -MMD $(OFLAGS) $(W) $(ARCH_OPT)
 
 ifeq ($(BUILD_MODE),debug)
 	O = -Og

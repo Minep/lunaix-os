@@ -198,6 +198,14 @@ proc_clear_signal(struct proc_info* proc);
 // enable interrupt upon transfer
 #define TRANSFER_IE 1
 
+/**
+ * @brief Setup process initial context, used to initiate first switch
+ *
+ * @param proc
+ * @param stop
+ * @param target
+ * @param flags
+ */
 void
 proc_init_transfer(struct proc_info* proc, ptr_t stop, ptr_t target, int flags);
 

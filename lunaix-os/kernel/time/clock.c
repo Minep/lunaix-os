@@ -69,7 +69,7 @@ time_t
 clock_systime()
 {
     ticks_t t = hwtimer_current_systicks();
-    return t / hwtimer_base_frequency();
+    return t / current_timer->running_freq;
 }
 
 void

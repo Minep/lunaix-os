@@ -18,6 +18,8 @@ struct hwtimer_context
     ticks_t running_freq;
 };
 
+extern struct hwtimer_context* current_timer;
+
 void
 hwtimer_init(u32_t hertz, void* tick_callback);
 
