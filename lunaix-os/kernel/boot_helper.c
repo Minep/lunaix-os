@@ -32,6 +32,15 @@ boot_begin(struct boot_handoff* bhctx)
             vmm_set_mapping(VMS_SELF, pa, pa, PG_PREM_RW, VMAP_IGNORE);
         }
     }
+
+    /* Reserve region for all loaded modules */
+    for (size_t i = 0; i < bhctx->mods.mods_num; i++) {
+        struct boot_modent* mod = &bhctx->mods.entries[i];
+        pmm_mark_chunk_occupied(KERNEL_PID,
+                                PN(mod->start),
+                                CEIL(mod->end - mod->start, PG_SIZE_BITS),
+                                PP_FGLOCKED);
+    }
 }
 
 extern u8_t __kexec_boot_end; /* link/linker.ld */

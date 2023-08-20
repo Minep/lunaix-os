@@ -2,7 +2,7 @@
 #include <sys/interrupts.h>
 #include <sys/mm/mempart.h>
 
-#include <hal/cpu.h>
+#include <sys/cpu.h>
 #include <hal/intc.h>
 
 #include <lunaix/fs/taskfs.h>

@@ -6,7 +6,7 @@
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
 
-#include <hal/cpu.h>
+#include <sys/cpu.h>
 #include <hal/intc.h>
 
 #include <klibc/string.h>

@@ -1,7 +1,7 @@
 #include <sys/interrupts.h>
 #include <sys/x86_isa.h>
 
-#include <hal/cpu.h>
+#include <sys/cpu.h>
 #include <hal/intc.h>
 
 #include <lunaix/isrm.h>

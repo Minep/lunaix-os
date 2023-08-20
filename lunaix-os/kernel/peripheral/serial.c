@@ -1,4 +1,4 @@
-#include <hal/cpu.h>
+#include <sys/cpu.h>
 #include <lunaix/peripheral/serial.h>
 #include <lunaix/syslog.h>
 #include <sys/port_io.h>

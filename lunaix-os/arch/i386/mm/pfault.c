@@ -7,6 +7,8 @@
 #include <lunaix/signal.h>
 #include <lunaix/status.h>
 #include <lunaix/syslog.h>
+#include <lunaix/trace.h>
+
 #include <sys/interrupts.h>
 
 #include <klibc/string.h>
@@ -158,6 +160,8 @@ segv_term:
             param->execp->err_code);
 
     sigset_add(__current->sigctx.sig_pending, _SIGSEGV);
+
+    trace_printstack_isr(param);
 
     schedule();
     // should not reach

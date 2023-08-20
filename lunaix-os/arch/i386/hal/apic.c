@@ -9,7 +9,7 @@
  *
  */
 
-#include <hal/cpu.h>
+#include <sys/cpu.h>
 #include <hal/intc.h>
 
 #include <sys/apic.h>

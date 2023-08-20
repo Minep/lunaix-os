@@ -4,7 +4,7 @@ import re
 
 sym_line = re.compile(r"^(?P<addr>[0-9a-f]+)\s[a-z]\s+F\s+\.[a-z._]+\s+[0-9a-f]+(?P<label>.+)$")
 
-def main(kbin, sym_out, endianness='little', bits=32):
+def main(kbin, sym_out, endianness='little', bits=32, just_print=False):
     assert bits >= 32
     assert (1 << int(math.log2(bits))) == bits
 
@@ -35,6 +35,11 @@ def main(kbin, sym_out, endianness='little', bits=32):
         functions.append((addr, label))
 
     functions = sorted(functions, key=lambda x: x[0])
+
+    if just_print:
+        for (a, l) in functions:
+            print(hex(a), ":", l)
+        return
     
     # struct {
     #   ptr_t addr;
@@ -79,8 +84,9 @@ if __name__ == "__main__":
     parser.add_argument('-o', '--outfile', required=True)
     parser.add_argument('--bits', default=32)
     parser.add_argument('--order', default='little')
+    parser.add_argument('-p', '--just-print', action='store_true')
 
     args = parser.parse_args()
 
-    main(args.elf_exec, args.outfile, endianness=args.order, bits=int(args.bits))
+    main(args.elf_exec, args.outfile, endianness=args.order, bits=int(args.bits), just_print=args.just_print)
 

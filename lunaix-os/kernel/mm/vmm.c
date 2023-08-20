@@ -1,4 +1,4 @@
-#include <hal/cpu.h>
+#include <sys/cpu.h>
 #include <klibc/string.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>

@@ -4,7 +4,10 @@
 #include "vectors.h"
 
 #ifndef __ASM__
-#include <hal/cpu.h>
+#include <sys/cpu.h>
+
+#define saved_fp(isrm) ((isrm)->registers.ebp)
+#define uspace_context(isrm) (((isrm)->execp->cs) == 0x8)
 
 struct exec_param;
 

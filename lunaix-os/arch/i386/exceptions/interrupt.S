@@ -33,6 +33,7 @@
 */
 
 .section .text
+    .type interrupt_wrapper, @function
     .global interrupt_wrapper
     interrupt_wrapper:
         cld
@@ -90,6 +91,7 @@
         subl $16, %esp
         movl %eax, (%esp)
 
+        xorl %ebp, %ebp     # marks the boundary of stack walking
         call intr_handler
 
         movl (%esp), %eax
@@ -158,6 +160,7 @@
 
         iret
 
+    .type switch_to, @function
     .global switch_to
     switch_to:
         # 约定
@@ -201,6 +204,7 @@
         movl proc_intr_ctx(%ebx), %eax
         jmp soft_iret
 
+    .type handle_signal, @function 
     .global handle_signal
     handle_signal:
         # 注意1：任何对proc_sig的布局改动，都须及时的保证这里的一致性！

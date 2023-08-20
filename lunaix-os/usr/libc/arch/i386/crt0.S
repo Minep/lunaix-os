@@ -8,8 +8,9 @@
 
 .section .text
     .global _start
-    _start:        
+    _start:      
         xorl %eax, %eax
+        xorl %ebp, %ebp
         fninit
         call main
         

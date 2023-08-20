@@ -6,6 +6,7 @@
 #include <lunaix/sched.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
+#include <lunaix/trace.h>
 #include <lunaix/tty/tty.h>
 
 #include <klibc/stdio.h>
@@ -23,47 +24,42 @@ extern u32_t debug_resv;
 void
 __print_panic_msg(const char* msg, const isr_param* param)
 {
-    volatile struct exec_param* execp = param->execp;
-
-    kprint_panic("  INT %u: (%x) [%p: %p] %s",
-                 execp->vector,
-                 execp->err_code,
-                 execp->cs,
-                 execp->eip,
-                 msg);
+    kprintf(KERROR "panic: %s\n", msg);
+    trace_printstack_isr(param);
 }
 
 void
 intr_routine_divide_zero(const isr_param* param)
 {
+    __print_panic_msg("div zero", param);
+
     console_flush();
-    __print_panic_msg("Divide by zero!", param);
     spin();
 }
 
 void
 intr_routine_general_protection(const isr_param* param)
 {
-    kprintf(KERROR "Pid: %d\n", __current->pid);
-    kprintf(KERROR "Addr: %p\n", (&debug_resv)[0]);
-    kprintf(KERROR "Expected: %p\n", (&debug_resv)[1]);
+    __print_panic_msg("general protection", param);
+
     console_flush();
-    __print_panic_msg("General Protection", param);
     spin();
 }
 
 void
 intr_routine_sys_panic(const isr_param* param)
 {
-    console_flush();
     __print_panic_msg((char*)(param->registers.edi), param);
+
+    console_flush();
     spin();
 }
 
 void
 intr_routine_fallback(const isr_param* param)
 {
-    __print_panic_msg("Unknown Interrupt", param);
+    __print_panic_msg("unknown interrupt", param);
+
     console_flush();
     spin();
 }
@@ -85,8 +81,10 @@ intr_routine_apic_error(const isr_param* param)
     u32_t error_reg = apic_read_reg(APIC_ESR);
     char buf[32];
     ksprintf(buf, "APIC error, ESR=0x%x", error_reg);
-    console_flush();
+
     __print_panic_msg(buf, param);
+
+    console_flush();
     spin();
 }
 

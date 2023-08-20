@@ -1,7 +1,7 @@
-#include <sys/vectors.h>
 #include <cpuid.h>
-#include <hal/cpu.h>
 #include <lunaix/types.h>
+#include <sys/cpu.h>
+#include <sys/vectors.h>
 
 #define BRAND_LEAF 0x80000000UL
 
@@ -46,96 +46,6 @@ cpu_get_id(char* id_out)
     id_out[48] = '\0';
 }
 
-u32_t
-cpu_ldstate()
-{
-    ptr_t val;
-    asm volatile("pushf\n"
-                 "popl %0\n"
-                 : "=r"(val)::);
-    return val;
-}
-
-u32_t
-cpu_ldconfig()
-{
-    ptr_t val;
-    asm volatile("movl %%cr0,%0" : "=r"(val));
-    return val;
-}
-
-void
-cpu_chconfig(u32_t val)
-{
-    asm("mov %0, %%cr0" ::"r"(val));
-}
-
-u32_t
-cpu_ldvmspace()
-{
-    ptr_t val;
-    asm volatile("movl %%cr3,%0" : "=r"(val));
-    return val;
-}
-
-void
-cpu_chvmspace(u32_t val)
-{
-    asm("mov %0, %%cr3" ::"r"(val));
-}
-
-void
-cpu_flush_page(ptr_t va)
-{
-    asm volatile("invlpg (%0)" ::"r"(va) : "memory");
-}
-
-void
-cpu_flush_vmspace()
-{
-    asm("movl %%cr3, %%eax\n"
-        "movl %%eax, %%cr3" ::
-          : "eax");
-}
-
-void
-cpu_enable_interrupt()
-{
-    asm volatile("sti");
-}
-
-void
-cpu_disable_interrupt()
-{
-    asm volatile("cli");
-}
-
-void
-cpu_trap_sched()
-{
-    asm("int %0" ::"i"(LUNAIX_SCHED));
-}
-
-void
-cpu_trap_panic(char* message)
-{
-    asm("int %0" ::"i"(LUNAIX_SYS_PANIC), "D"(message));
-}
-
-void
-cpu_wait()
-{
-    asm("hlt");
-}
-
-ptr_t
-cpu_ldeaddr()
-{
-    ptr_t val;
-    asm volatile("movl %%cr2,%0" : "=r"(val));
-    return val;
-}
-
 void
 cpu_rdmsr(u32_t msr_idx, u32_t* reg_high, u32_t* reg_low)
 {
@@ -150,4 +60,16 @@ void
 cpu_wrmsr(u32_t msr_idx, u32_t reg_high, u32_t reg_low)
 {
     asm volatile("wrmsr" : : "d"(reg_high), "a"(reg_low), "c"(msr_idx));
+}
+
+void
+cpu_trap_sched()
+{
+    asm("int %0" ::"i"(LUNAIX_SCHED));
+}
+
+void
+cpu_trap_panic(char* message)
+{
+    asm("int %0" ::"i"(LUNAIX_SYS_PANIC), "D"(message));
 }
