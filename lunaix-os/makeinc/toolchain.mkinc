@@ -1,7 +1,7 @@
 CC := i686-elf-gcc
 AS := i686-elf-as
 AR := i686-elf-ar
-PY := python
+PY := python3
 
 
 ARCH_OPT := -D__ARCH_IA32

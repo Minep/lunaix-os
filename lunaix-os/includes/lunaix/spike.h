@@ -64,17 +64,13 @@
                                                       : 0)                      \
                              : (31 - __builtin_clz(x)))
 
-#define DO_SPIN                                                                \
-    {                                                                          \
-        volatile int __infloop = 1;                                            \
-        while (__infloop)                                                      \
-            ;                                                                  \
-    }
-
 inline static void noret
 spin()
 {
-    DO_SPIN
+    volatile int __infloop = 1;
+    while (__infloop)
+        ;
+    __builtin_unreachable();
 }
 
 #ifndef __LUNAIXOS_NASSERT__
@@ -97,7 +93,7 @@ __assert_fail(const char* expr, const char* file, unsigned int line)
 #define assert(cond) (void)(cond);          // assert nothing
 #define assert_msg(cond, msg) (void)(cond); // assert nothing
 
-#endif                                      // __LUNAIXOS_NASSERT__
+#endif // __LUNAIXOS_NASSERT__
 
 void noret
 panick(const char* msg);

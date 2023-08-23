@@ -4,7 +4,7 @@
 
 static char buffer[1024];
 
-void
+void noret
 __assert_fail(const char* expr, const char* file, unsigned int line)
 {
     ksprintf(buffer, "%s (%s:%u)", expr, file, line);
@@ -15,14 +15,14 @@ __assert_fail(const char* expr, const char* file, unsigned int line)
     //  kernel/asm/x86/interrupts.c)
     cpu_trap_panic(buffer);
 
-    DO_SPIN // never reach
+    spin(); // never reach
 }
 
 void noret
 panick(const char* msg)
 {
     cpu_trap_panic(msg);
-    DO_SPIN
+    spin();
 }
 
 void
@@ -34,5 +34,5 @@ panickf(const char* fmt, ...)
     va_end(args);
 
     asm("int %0" ::"i"(LUNAIX_SYS_PANIC), "D"(buffer));
-    DO_SPIN
+    spin();
 }
