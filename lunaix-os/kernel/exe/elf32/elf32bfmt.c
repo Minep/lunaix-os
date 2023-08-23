@@ -164,12 +164,19 @@ elf32_read_phdr(struct elf32* elf)
 }
 
 int
-elf32_check_exec(const struct elf32* elf)
+elf32_check_exec(const struct elf32* elf, int type)
+{
+    const struct elf32_ehdr* ehdr = &elf->eheader;
+
+    return (ehdr->e_entry) && ehdr->e_type == type;
+}
+
+int
+elf32_check_arch(const struct elf32* elf)
 {
     const struct elf32_ehdr* ehdr = &elf->eheader;
 
     return *(u32_t*)(ehdr->e_ident) == ELFMAGIC &&
            ehdr->e_ident[EI_CLASS] == ELFCLASS32 &&
-           ehdr->e_ident[EI_DATA] == ELFDATA2LSB && ehdr->e_type == ET_EXEC &&
-           ehdr->e_machine == EM_386;
+           ehdr->e_ident[EI_DATA] == ELFDATA2LSB && ehdr->e_machine == EM_386;
 }

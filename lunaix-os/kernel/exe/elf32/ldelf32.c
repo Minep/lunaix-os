@@ -8,7 +8,8 @@
 int
 elf32_smap(struct load_context* ldctx,
            const struct elf32* elf,
-           struct elf32_phdr* phdre)
+           struct elf32_phdr* phdre,
+           uintptr_t base_va)
 {
     struct v_file* elfile = (struct v_file*)elf->elf_file;
 
@@ -25,21 +26,22 @@ elf32_smap(struct load_context* ldctx,
         proct |= PROT_EXEC;
     }
 
+    uintptr_t va = phdre->p_va + base_va;
     struct exec_container* container = ldctx->container;
     struct mmap_param param = { .vms_mnt = container->vms_mnt,
                                 .pvms = &container->proc->mm,
                                 .proct = proct,
                                 .offset = PG_ALIGN(phdre->p_offset),
                                 .mlen = ROUNDUP(phdre->p_memsz, PG_SIZE),
-                                .flen = phdre->p_filesz + PG_MOD(phdre->p_va),
+                                .flen = phdre->p_filesz,
                                 .flags = MAP_FIXED | MAP_PRIVATE,
                                 .type = REGION_TYPE_CODE };
 
     struct mm_region* seg_reg;
-    int status = mem_map(NULL, &seg_reg, PG_ALIGN(phdre->p_va), elfile, &param);
+    int status = mem_map(NULL, &seg_reg, PG_ALIGN(va), elfile, &param);
 
     if (!status) {
-        size_t next_addr = phdre->p_memsz + phdre->p_va;
+        size_t next_addr = phdre->p_memsz + va;
         ldctx->end = MAX(ldctx->end, ROUNDUP(next_addr, PG_SIZE));
         ldctx->mem_sz += phdre->p_memsz;
     } else {
@@ -63,13 +65,19 @@ load_executable(struct load_context* context, const struct v_file* exefile)
         goto done;
     }
 
-    if (!elf32_check_exec(&elf)) {
+    if (!elf32_check_arch(&elf)) {
+        errno = EINVAL;
+        goto done;
+    }
+
+    if (!(elf32_check_exec(&elf, ET_EXEC) || elf32_check_exec(&elf, ET_DYN))) {
         errno = ENOEXEC;
         goto done;
     }
 
     ldpath = valloc(512);
     errno = elf32_find_loader(&elf, ldpath, 512);
+    uintptr_t load_base = 0;
 
     if (errno < 0) {
         goto done;
@@ -89,35 +97,37 @@ load_executable(struct load_context* context, const struct v_file* exefile)
         }
 
         // Is this the valid loader?
-        if (!elf32_static_linked(&elf) || !elf32_check_exec(&elf)) {
+        if (!elf32_static_linked(&elf) || !elf32_check_exec(&elf, ET_DYN)) {
             errno = ELIBBAD;
             goto done_close_elf32;
         }
 
-        // TODO: relocate loader
-    } else {
-        context->entry = elf.eheader.e_entry;
+        load_base = UMMAP_START;
     }
+
+    context->entry = elf.eheader.e_entry + load_base;
 
     struct v_file* elfile = (struct v_file*)elf.elf_file;
 
     for (size_t i = 0; i < elf.eheader.e_phnum && !errno; i++) {
         struct elf32_phdr* phdr = &elf.pheaders[i];
 
-        if (phdr->p_type == PT_LOAD) {
-            if (phdr->p_align != PG_SIZE) {
-                // surprising alignment!
-                errno = ENOEXEC;
-                continue;
-            }
-
-            errno = elf32_smap(context, &elf, phdr);
+        if (phdr->p_type != PT_LOAD) {
+            continue;
         }
-        // TODO Handle relocation
+
+        if (phdr->p_align != PG_SIZE) {
+            // surprising alignment!
+            errno = ENOEXEC;
+            break;
+        }
+
+        errno = elf32_smap(context, &elf, phdr, load_base);
     }
 
 done_close_elf32:
     elf32_close(&elf);
+
 done:
     vfree_safe(ldpath);
     return errno;

@@ -65,10 +65,13 @@
                              : (31 - __builtin_clz(x)))
 
 #define DO_SPIN                                                                \
-    while (1)                                                                  \
-        ;
+    {                                                                          \
+        volatile int __infloop = 1;                                            \
+        while (__infloop)                                                      \
+            ;                                                                  \
+    }
 
-inline static void
+inline static void noret
 spin()
 {
     DO_SPIN

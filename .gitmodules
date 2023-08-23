@@ -1,0 +1,3 @@
+[submodule "lunaix-os/usr/ld"]
+	path = lunaix-os/usr/ld
+	url = git@github.com:Minep/lunaix-ld.git

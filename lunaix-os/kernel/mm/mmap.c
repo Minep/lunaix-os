@@ -331,6 +331,7 @@ __DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
 
     struct mmap_param param = { .flags = options,
                                 .mlen = ROUNDUP(length, PG_SIZE),
+                                .flen = length,
                                 .offset = offset,
                                 .type = REGION_TYPE_GENERAL,
                                 .proct = proct,

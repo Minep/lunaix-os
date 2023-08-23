@@ -55,7 +55,7 @@ vmm_vmap(ptr_t paddr, size_t size, pt_attr attr)
 done:
     ptr_t alloc_begin = current_addr - examed_size;
     for (size_t i = 0; i < size; i += PG_SIZE) {
-        vmm_set_mapping(VMS_SELF, alloc_begin + i, paddr + i, PG_PREM_RW, 0);
+        vmm_set_mapping(VMS_SELF, alloc_begin + i, paddr + i, attr, 0);
         pmm_ref_page(KERNEL_PID, paddr + i);
     }
     start = alloc_begin + size;

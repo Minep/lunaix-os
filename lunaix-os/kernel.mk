@@ -35,15 +35,17 @@ CFLAGS += -include flags.h
 	$(call status_,CC,$<)
 	@$(CC) $(CFLAGS) $(kinc_opts) -c $< -o $@
 
-$(kbin): $(kbin_dir) $(ksrc_files) $(ksrc_objs)
-	$(call status_,LD,$@)
-	@$(CC) -T link/linker.ld -o $(kbin) $(ksrc_objs) $(LDFLAGS)
-
 $(kbin_dir)/modksyms: $(kbin)
 	$(call status_,GEN,$@)
 	@$(PY) scripts/syms_export.py --bits=32 --order=little -o "$@"  "$<" 
 
-all: $(kbin) $(kbin_dir)/modksyms
+.PHONY: __do_relink
+__do_relink: $(ksrc_objs)
+	$(call status_,LD,$@)
+	@$(CC) -T link/linker.ld -o $(kbin) $(ksrc_objs) $(LDFLAGS)
+
+.PHONY: all
+all: __do_relink $(kbin_dir)/modksyms
 
 clean:
 	@rm -f $(ksrc_objs)

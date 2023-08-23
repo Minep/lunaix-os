@@ -13,7 +13,7 @@
 #define PTE_NULL 0
 
 #define PG_ALIGN(addr) ((ptr_t)(addr)&0xFFFFF000UL)
-#define PG_MOD(addr) ((ptr_t)(addr) & ~PG_SIZE)
+#define PG_MOD(addr) ((ptr_t)(addr) & (PG_SIZE - 1))
 #define PG_ALIGNED(addr) (!((ptr_t)(addr)&0x00000FFFUL))
 #define PN(addr) (((ptr_t)(addr) >> 12))
 

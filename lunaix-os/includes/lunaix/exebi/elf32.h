@@ -11,6 +11,7 @@ typedef unsigned int elf32_wrd_t;
 
 #define ET_NONE 0
 #define ET_EXEC 2
+#define ET_DYN 3
 
 #define PT_LOAD 1
 #define PT_INTERP 3
@@ -78,7 +79,10 @@ struct elf32
     struct elf32 elf = { .elf_file = elf_vfile, .pheaders = (void*)0 }
 
 int
-elf32_check_exec(const struct elf32* elf);
+elf32_check_exec(const struct elf32* elf, int type);
+
+int
+elf32_check_arch(const struct elf32* elf);
 
 int
 elf32_open(struct elf32* elf, const char* path);

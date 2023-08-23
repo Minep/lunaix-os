@@ -133,8 +133,10 @@ trace_printswctx(const isr_param* p, char* direction)
 
     struct ksym_entry* sym = trace_sym_lookup(p->execp->eip);
 
-    kprintf(
-      KDEBUG ">> (sw:%s) iv:%d, errno:%p <<\n", direction, p->execp->vector);
+    kprintf(KDEBUG ">> (sw:%s) iv:%d, errno:%p <<\n",
+            direction,
+            p->execp->vector,
+            p->execp->err_code);
     kprintf(KDEBUG "%p:%s\n", p->execp->eip, ksym_getstr(sym));
 }
 

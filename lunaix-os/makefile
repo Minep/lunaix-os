@@ -37,13 +37,15 @@ $(kbuild_dir):
 	@mkdir -p $(os_img_dir)/boot/grub
 	@mkdir -p $(os_img_dir)/usr
 
+.PHONY: kernel
 export BUILD_DIR=$(kbin_dir)
 export BUILD_NAME=$(kbin)
-$(kbin):
+kernel:
 	$(call status,TASK,$(notdir $@))
 	@$(MAKE) $(MKFLAGS) -I $(mkinc_dir) -f kernel.mk all
 
-$(kimg): usr/build $(kbin)
+.PHONY: image
+image: usr/build kernel
 	$(call status,TASK,$(notdir $@))
 	@./config-grub.sh ${OS_NAME} $(os_img_dir)/boot/grub/grub.cfg
 	@cp -r usr/build/* $(os_img_dir)/usr
@@ -57,10 +59,10 @@ check: $(DEPS) check-cc GRUB_TEMPLATE
 prepare: check $(os_img_dir)
 
 export BUILD_MODE=release
-bootable: $(kbuild_dir) $(kimg)
+bootable: $(kbuild_dir) image
 
 export BUILD_MODE=debug
-bootable-debug: $(kbuild_dir) $(kimg)
+bootable-debug: $(kbuild_dir) image
 
 user:
 	$(call status,$@)
