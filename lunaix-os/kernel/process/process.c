@@ -1,6 +1,5 @@
 #include <klibc/string.h>
 #include <lunaix/clock.h>
-#include <lunaix/common.h>
 #include <lunaix/mm/mmap.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/region.h>
@@ -154,13 +153,13 @@ init_proc_user_space(struct proc_info* pcb)
     struct mm_region* mapped;
     struct mmap_param param = { .vms_mnt = VMS_MOUNT_1,
                                 .pvms = &pcb->mm,
-                                .mlen = USTACK_SIZE,
+                                .mlen = USR_STACK_SIZE,
                                 .proct = PROT_READ | PROT_WRITE,
                                 .flags = MAP_ANON | MAP_PRIVATE | MAP_FIXED,
                                 .type = REGION_TYPE_STACK };
 
     int status = 0;
-    if ((status = mem_map(NULL, &mapped, USTACK_END, NULL, &param))) {
+    if ((status = mem_map(NULL, &mapped, USR_STACK, NULL, &param))) {
         kprint_panic("fail to alloc user stack: %d", status);
     }
 
@@ -263,7 +262,7 @@ copy_kernel_stack(struct proc_info* proc, ptr_t usedMnt)
     vmm_mount_pd(VMS_MOUNT_1, pt_copy); // 将新进程的页表挂载到挂载点#2
 
     // copy the kernel stack
-    for (size_t i = KSTACK_START >> 12; i <= KSTACK_TOP >> 12; i++) {
+    for (size_t i = KERNEL_STACK >> 12; i <= KERNEL_STACK_END >> 12; i++) {
         volatile x86_pte_t* ppte = &PTE_MOUNTED(VMS_MOUNT_1, i);
 
         /*

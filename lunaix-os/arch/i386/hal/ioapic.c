@@ -1,7 +1,6 @@
 #include <hal/acpi/acpi.h>
 #include <hal/intc.h>
 
-#include <lunaix/common.h>
 #include <lunaix/mm/mmio.h>
 
 #include <sys/interrupts.h>

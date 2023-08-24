@@ -1,6 +1,5 @@
 #include <lunaix/block.h>
 #include <lunaix/boot_generic.h>
-#include <lunaix/common.h>
 #include <lunaix/device.h>
 #include <lunaix/foptions.h>
 #include <lunaix/fs/twifs.h>
@@ -55,7 +54,7 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     trace_modksyms_init(bhctx);
 
     // crt
-    tty_init(ioremap(VGA_FRAMEBUFFER, PG_SIZE));
+    tty_init(ioremap(0xB8000, PG_SIZE));
     tty_set_theme(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
     lxconsole_init();
 
@@ -138,16 +137,12 @@ spawn_proc0()
     cpu_chvmspace(proc0->page_table);
 
     // 为内核创建一个专属栈空间。
-    for (size_t i = 0; i < (KSTACK_SIZE >> PG_SIZE_BITS); i++) {
+    for (size_t i = 0; i < KERNEL_STACK_SIZE; i += PG_SIZE) {
         ptr_t pa = pmm_alloc_page(KERNEL_PID, 0);
-        vmm_set_mapping(VMS_SELF,
-                        KSTACK_START + (i << PG_SIZE_BITS),
-                        pa,
-                        PG_PREM_RW,
-                        VMAP_NULL);
+        vmm_set_mapping(VMS_SELF, KERNEL_STACK + i, pa, PG_PREM_RW, VMAP_NULL);
     }
 
-    proc_init_transfer(proc0, KSTACK_TOP, (ptr_t)__proc0, 0);
+    proc_init_transfer(proc0, KERNEL_STACK_END, (ptr_t)__proc0, 0);
 
     // 向调度器注册进程。
     commit_process(proc0);

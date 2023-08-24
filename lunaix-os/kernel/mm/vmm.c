@@ -1,9 +1,9 @@
-#include <sys/cpu.h>
 #include <klibc/string.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
+#include <sys/cpu.h>
 
 LOG_MODULE("VMM")
 
@@ -41,7 +41,8 @@ vmm_set_mapping(ptr_t mnt, ptr_t va, ptr_t pa, pt_attr attr, int options)
     // See if attr make sense
     assert(attr <= 128);
 
-    if (!l1pt->entry[l1_inx]) {
+    x86_pte_t* l1pte = &l1pt->entry[l1_inx];
+    if (!*l1pte) {
         x86_page_table* new_l1pt_pa =
           (x86_page_table*)pmm_alloc_page(KERNEL_PID, PP_FGPERSIST);
 
@@ -51,14 +52,17 @@ vmm_set_mapping(ptr_t mnt, ptr_t va, ptr_t pa, pt_attr attr, int options)
         }
 
         // This must be writable
-        l1pt->entry[l1_inx] =
-          NEW_L1_ENTRY(attr | PG_WRITE | PG_PRESENT, new_l1pt_pa);
+        *l1pte = NEW_L1_ENTRY(attr | PG_WRITE | PG_PRESENT, new_l1pt_pa);
 
         // make sure our new l2 table is visible to CPU
         cpu_flush_page((ptr_t)l2pt);
 
         memset((void*)l2pt, 0, PG_SIZE);
     } else {
+        if ((attr & PG_ALLOW_USER) && !(*l1pte & PG_ALLOW_USER)) {
+            *l1pte |= PG_ALLOW_USER;
+        }
+
         x86_pte_t pte = l2pt->entry[l2_inx];
         if (pte && (options & VMAP_IGNORE)) {
             return 1;

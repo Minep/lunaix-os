@@ -2,7 +2,6 @@
 #define __LUNAIX_APIC_H
 
 #include <hal/intc.h>
-#include <lunaix/common.h>
 #include <lunaix/types.h>
 
 #define __APIC_BASE_PADDR 0xFEE00000

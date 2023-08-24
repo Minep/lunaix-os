@@ -6,7 +6,7 @@
 void*
 ioremap(ptr_t paddr, u32_t size)
 {
-    void* ptr = vmm_vmap(paddr, size, PG_PREM_RW | PG_DISABLE_CACHE);
+    void* ptr = vmap(paddr, size, PG_PREM_RW | PG_DISABLE_CACHE, 0);
 
     if (ptr) {
         pmm_mark_chunk_occupied(KERNEL_PID,

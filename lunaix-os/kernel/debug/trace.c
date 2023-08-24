@@ -27,7 +27,7 @@ trace_modksyms_init(struct boot_handoff* bhctx)
 
             ptr_t end = ROUNDUP(mod->end, PG_SIZE);
             ptr_t ksym_va =
-              (ptr_t)vmm_vmap(mod->start, (end - mod->start), PG_PREM_R);
+              (ptr_t)vmap(mod->start, (end - mod->start), PG_PREM_R, 0);
 
             assert(ksym_va);
             trace_ctx.ksym_table = (struct ksyms*)ksym_va;

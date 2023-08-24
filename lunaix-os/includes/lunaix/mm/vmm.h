@@ -2,8 +2,7 @@
 #define __LUNAIX_VMM_H
 #include <lunaix/mm/page.h>
 #include <lunaix/process.h>
-#include <stddef.h>
-#include <stdint.h>
+#include <lunaix/types.h>
 // Virtual memory manager
 
 #define VMAP_NULL 0
@@ -119,16 +118,6 @@ void*
 vmm_next_free(ptr_t start, int options);
 
 /**
- * @brief 将连续的物理地址空间映射到内核虚拟地址空间
- *
- * @param paddr 物理地址空间的基地址
- * @param size 物理地址空间的大小
- * @return void*
- */
-void*
-vmm_vmap(ptr_t paddr, size_t size, pt_attr attr);
-
-/**
  * @brief 将当前地址空间的虚拟地址转译为物理地址。
  *
  * @param va 虚拟地址
@@ -146,5 +135,55 @@ vmm_v2p(ptr_t va);
  */
 ptr_t
 vmm_v2pat(ptr_t mnt, ptr_t va);
+
+/*
+    表示一个 vmap 区域
+    (One must not get confused with vmap_area in Linux!)
+*/
+struct vmap_area
+{
+    ptr_t start;
+    size_t size;
+    pt_attr area_attr;
+};
+
+/**
+ * @brief 将连续的物理地址空间映射到内核虚拟地址空间
+ *
+ * @param paddr 物理地址空间的基地址
+ * @param size 物理地址空间的大小
+ * @return void*
+ */
+void*
+vmap(ptr_t paddr, size_t size, pt_attr attr, int flags);
+
+/**
+ * @brief 创建一个 vmap 区域
+ *
+ * @param paddr
+ * @param attr
+ * @return ptr_t
+ */
+struct vmap_area*
+vmap_varea(size_t size, pt_attr attr);
+
+/**
+ * @brief 在 vmap区域内映射一个单页
+ *
+ * @param paddr
+ * @param attr
+ * @return ptr_t
+ */
+ptr_t
+vmap_area_page(struct vmap_area* area, ptr_t paddr, pt_attr attr);
+
+/**
+ * @brief 在 vmap区域删除一个已映射的页
+ *
+ * @param paddr
+ * @return ptr_t
+ */
+ptr_t
+vmap_area_rmpage(struct vmap_area* area, ptr_t vaddr);
 
 #endif /* __LUNAIX_VMM_H */

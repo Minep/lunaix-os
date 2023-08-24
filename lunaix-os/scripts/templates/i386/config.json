@@ -59,6 +59,19 @@
                 "stk_align": 16
             },
             {
+                "name": "usr_exec",
+                "start": "4@1M",
+                "size": "512@1M"
+            },
+            {
+                "name": "usr_mmap"
+            },
+            {
+                "name": "usr_stack",
+                "size": "1@4M",
+                "stk_align": 16
+            },
+            {
                 "name": "kernel_exec",
                 "start": "3@1G",
                 "size": "16@4M",

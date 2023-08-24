@@ -32,7 +32,7 @@ __alloc_cake(unsigned int cake_pg)
     if (!pa) {
         return NULL;
     }
-    return vmm_vmap(pa, cake_pg * PG_SIZE, PG_PREM_RW);
+    return vmap(pa, cake_pg * PG_SIZE, PG_PREM_RW, 0);
 }
 
 struct cake_s*

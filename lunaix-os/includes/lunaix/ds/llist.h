@@ -12,7 +12,7 @@
 #ifndef __LUNAIX_LLIST_H
 #define __LUNAIX_LLIST_H
 
-#include <lunaix/common.h>
+#include <lunaix/types.h>
 
 struct llist_header
 {

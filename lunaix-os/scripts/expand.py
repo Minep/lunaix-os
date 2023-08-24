@@ -284,33 +284,35 @@ class MemoryMapObject(DataObject):
         if "width" in record:
             self.__width = DataObject.create("width", record["width"])
 
-    def __process(self, start_addr, idx, regions, size_lookahead = False):
+    def __process(self, start_addr, idx, regions):
         if idx >= len(regions):
             raise Exception("Unbounded region definition")
         
         e = regions[idx]
 
+        if "start" not in e:
+            ne = regions[idx + 1]
+            if "start" not in ne or "size" not in e:
+                e["start"] = start_addr
+            else:
+                self.__process(start_addr + e["size"], idx + 1, regions)
+                e["start"] = ne['start'] - e["size"]
+
         if "block" in e:
             b = e["block"] - 1
-            start_addr = (start_addr + b) & ~b
+            e["start"] = (e["start"] + b) & ~b
 
-        if "start" not in e:
-            e["start"] = start_addr
-        elif e["start"] < start_addr:
+        if e["start"] < start_addr:
             raise Exception(f"starting addr {hex(e['start'])} overrlapping with {hex(start_addr)}")
-        else:
-            start_addr = e["start"]
+        
+        start_addr = e["start"]
         
         if "size" not in e:
-            if size_lookahead:
-                raise Exception("could not infer size from unbounded region")
-            tmp_addr = self.__process(start_addr, idx + 1, regions, size_lookahead=True)
-            e["size"] = tmp_addr - start_addr
+            self.__process(start_addr, idx + 1, regions)
+            ne = regions[idx + 1]
+            e["size"] = ne['start'] - start_addr
         
-        if not size_lookahead:
-            start_addr += e["size"]
-        
-        return start_addr
+        return start_addr + e["size"]
     
     def expand(self, param={}):
         super().expand(param)

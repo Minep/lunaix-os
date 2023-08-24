@@ -1,6 +1,5 @@
 #define __BOOT_CODE__
 
-#include <lunaix/common.h>
 #include <lunaix/mm/page.h>
 
 #include <sys/boot/bstage.h>

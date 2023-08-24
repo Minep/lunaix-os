@@ -1,4 +1,3 @@
-#include <lunaix/common.h>
 #include <lunaix/mm/mm.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/region.h>

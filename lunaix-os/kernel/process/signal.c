@@ -6,15 +6,19 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
 
-LOG_MODULE("SIG")
-
 #include <klibc/string.h>
+
+#include <sys/mm/mempart.h>
+
+LOG_MODULE("SIG")
 
 extern struct scheduler sched_ctx; /* kernel/sched.c */
 
 #define UNMASKABLE (sigset(SIGKILL) | sigset(SIGTERM))
 #define TERMSIG (sigset(SIGSEGV) | sigset(SIGINT) | UNMASKABLE)
 #define CORE (sigset(SIGSEGV))
+#define within_kstack(addr)                                                    \
+    (KERNEL_STACK <= (addr) && (addr) <= KERNEL_STACK_END)
 
 static inline void
 signal_terminate(int errcode)
@@ -57,7 +61,7 @@ signal_dispatch()
 
     ptr_t ustack = __current->ustack_top;
 
-    if ((int)(ustack - USTACK_END) < (int)sizeof(struct proc_sig)) {
+    if ((int)(ustack - USR_STACK) < (int)sizeof(struct proc_sig)) {
         // 用户栈没有空间存放信号上下文
         return 0;
     }

@@ -1,13 +1,12 @@
 #include <lunaix/clock.h>
-#include <lunaix/common.h>
 #include <lunaix/input.h>
 #include <lunaix/isrm.h>
 #include <lunaix/peripheral/ps2kbd.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
 
-#include <sys/cpu.h>
 #include <hal/intc.h>
+#include <sys/cpu.h>
 
 #include <klibc/string.h>
 

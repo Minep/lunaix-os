@@ -1,4 +1,3 @@
-#include <lunaix/common.h>
 #include <lunaix/exebi/elf32.h>
 #include <lunaix/fs.h>
 #include <lunaix/mm/valloc.h>

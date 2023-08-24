@@ -1,12 +1,5 @@
 ENTRY(start_)
 
-/*
-    FUTURE: Use disk reader
-    A bit of messy here.
-    We will pull our higher half kernel out of this shit
-      and load it separately once we have our disk reader.
-*/
-
 SECTIONS {
     . = 0x100000;
 
@@ -33,7 +26,10 @@ SECTIONS {
     }
     __kexec_boot_end = ALIGN(4K);
 
-    /* Relocation of our higher half kernel */
+    /* ---- boot end ---- */
+
+    /* ---- kernel start ---- */
+
     . += 0xC0000000;
 
     /* 好了，我们的内核…… */
@@ -71,11 +67,24 @@ SECTIONS {
 
         /* ---- */
 
+        /* align to 8 bytes, so it can cover both 32 and 64 bits address line*/
+        . = ALIGN(8);
+
         PROVIDE(__lga_pci_dev_drivers_start = .);
         
         KEEP(*(.lga.pci_dev_drivers));
 
         PROVIDE(__lga_pci_dev_drivers_end = .);
+
+        /* ---- */
+
+        . = ALIGN(8);
+
+        PROVIDE(__lga_platdev_db_start = .);
+        
+        KEEP(*(.lga.platdev_db));
+
+        PROVIDE(__lga_platdev_db_end = .);
     }
 
     .bss BLOCK(4K) : AT ( ADDR(.bss) - 0xC0000000 ) {

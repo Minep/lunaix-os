@@ -11,6 +11,7 @@
 #include <lunaix/syscall_utils.h>
 
 #include <sys/abi.h>
+#include <sys/mm/mempart.h>
 
 #include <klibc/string.h>
 
@@ -94,7 +95,7 @@ exec_load(struct exec_container* container, struct v_file* executable)
     if (container->vms_mnt == VMS_SELF) {
         // we are loading executable into current addr space
 
-        ptr_t ustack = USTACK_TOP;
+        ptr_t ustack = USR_STACK_END;
         size_t argv_len = 0, envp_len = 0;
         ptr_t argv_ptr = 0, envp_ptr = 0;
 

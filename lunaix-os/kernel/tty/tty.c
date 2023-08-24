@@ -1,5 +1,4 @@
 #include <klibc/string.h>
-#include <lunaix/common.h>
 #include <lunaix/spike.h>
 #include <lunaix/tty/console.h>
 #include <lunaix/tty/tty.h>

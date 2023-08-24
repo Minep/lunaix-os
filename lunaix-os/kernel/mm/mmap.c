@@ -10,7 +10,7 @@
 #include <sys/mm/mempart.h>
 
 // any size beyond this is bullshit
-#define BS_SIZE (KERNEL_EXEC - UMMAP_START)
+#define BS_SIZE (KERNEL_EXEC - USR_MMAP)
 
 int
 mem_has_overlap(vm_regions_t* regions, ptr_t start, ptr_t end)
@@ -66,7 +66,7 @@ mem_map(void** addr_out,
 {
     assert_msg(addr, "addr can not be NULL");
 
-    ptr_t last_end = USER_START, found_loc = addr;
+    ptr_t last_end = USR_EXEC, found_loc = addr;
     struct mm_region *pos, *n;
 
     vm_regions_t* vm_regions = &param->pvms->regions;
@@ -103,7 +103,7 @@ mem_map(void** addr_out,
     return ENOMEM;
 
 found:
-    if (found_loc >= KERNEL_EXEC || found_loc < USER_START) {
+    if (found_loc >= KERNEL_EXEC || found_loc < USR_EXEC) {
         return ENOMEM;
     }
 
@@ -306,8 +306,8 @@ __DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
     }
 
     if (!addr_ptr) {
-        addr_ptr = UMMAP_START;
-    } else if (addr_ptr < UMMAP_START || addr_ptr + length >= UMMAP_END) {
+        addr_ptr = USR_MMAP;
+    } else if (addr_ptr < USR_MMAP || addr_ptr + length >= USR_MMAP_END) {
         if (!(options & (MAP_FIXED | MAP_FIXED_NOREPLACE))) {
             errno = ENOMEM;
             goto done;

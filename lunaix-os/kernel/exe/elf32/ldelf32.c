@@ -5,6 +5,8 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 
+#include <sys/mm/mempart.h>
+
 int
 elf32_smap(struct load_context* ldctx,
            const struct elf32* elf,
@@ -102,7 +104,7 @@ load_executable(struct load_context* context, const struct v_file* exefile)
             goto done_close_elf32;
         }
 
-        load_base = UMMAP_START;
+        load_base = USR_MMAP;
     }
 
     context->entry = elf.eheader.e_entry + load_base;
