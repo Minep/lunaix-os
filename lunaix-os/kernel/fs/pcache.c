@@ -19,21 +19,49 @@ __pcache_try_evict(struct lru_node* obj)
     return 1;
 }
 
+static void
+pcache_free_page(void* va)
+{
+    ptr_t pa = vmm_del_mapping(VMS_SELF, (ptr_t)va);
+    pmm_free_page(KERNEL_PID, pa);
+}
+
+static void*
+pcache_alloc_page()
+{
+    int i = 0;
+    ptr_t pp = pmm_alloc_page(KERNEL_PID, 0), va = 0;
+
+    if (!pp) {
+        return NULL;
+    }
+
+    if (!(va = (ptr_t)vmap(pp, PG_SIZE, PG_PREM_RW, 0))) {
+        pmm_free_page(KERNEL_PID, pp);
+        return NULL;
+    }
+
+    return (void*)va;
+}
+
 void
 pcache_init(struct pcache* pcache)
 {
     btrie_init(&pcache->tree, PG_SIZE_BITS);
     llist_init_head(&pcache->dirty);
     llist_init_head(&pcache->pages);
+
     pcache_zone = lru_new_zone(__pcache_try_evict);
 }
 
 void
 pcache_release_page(struct pcache* pcache, struct pcache_pg* page)
 {
-    vfree(page->pg);
+    pcache_free_page(page->pg);
 
     llist_delete(&page->pg_list);
+
+    btrie_remove(&pcache->tree, page->fpos);
 
     vfree(page);
 
@@ -44,7 +72,7 @@ struct pcache_pg*
 pcache_new_page(struct pcache* pcache, u32_t index)
 {
     struct pcache_pg* ppg = vzalloc(sizeof(struct pcache_pg));
-    void* pg = valloc(PG_SIZE);
+    void* pg = pcache_alloc_page();
 
     if (!ppg || !pg) {
         lru_evict_one(pcache_zone);
@@ -52,7 +80,7 @@ pcache_new_page(struct pcache* pcache, u32_t index)
             return NULL;
         }
 
-        if (!pg && !(pg = valloc(PG_SIZE))) {
+        if (!pg && !(pg = pcache_alloc_page())) {
             return NULL;
         }
     }
@@ -100,27 +128,33 @@ pcache_get_page(struct pcache* pcache,
 int
 pcache_write(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
 {
+    int errno = 0;
     u32_t pg_off, buf_off = 0;
     struct pcache* pcache = inode->pg_cache;
     struct pcache_pg* pg;
 
     while (buf_off < len) {
+        u32_t wr_bytes = MIN(PG_SIZE - pg_off, len - buf_off);
+
         pcache_get_page(pcache, fpos, &pg_off, &pg);
+
         if (!pg) {
-            return ENOMEM;
+            errno = inode->default_fops->write(inode, data, wr_bytes, fpos);
+            if (errno < 0) {
+                break;
+            }
+        } else {
+            memcpy(pg->pg + pg_off, (data + buf_off), wr_bytes);
+            pcache_set_dirty(pcache, pg);
+
+            pg->len = pg_off + wr_bytes;
         }
 
-        u32_t wr_bytes = MIN(PG_SIZE - pg_off, len - buf_off);
-        memcpy(pg->pg + pg_off, (data + buf_off), wr_bytes);
-
-        pcache_set_dirty(pcache, pg);
-
-        pg->len = pg_off + wr_bytes;
         buf_off += wr_bytes;
         fpos += wr_bytes;
     }
 
-    return buf_off;
+    return errno < 0 ? errno : (int)buf_off;
 }
 
 int
@@ -132,23 +166,28 @@ pcache_read(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
     struct pcache_pg* pg;
 
     while (buf_off < len) {
-        if (pcache_get_page(pcache, fpos, &pg_off, &pg)) {
-
-            if (!pg) {
-                return ENOMEM;
-            }
-
+        int new_page = pcache_get_page(pcache, fpos, &pg_off, &pg);
+        if (new_page) {
             // Filling up the page
             errno =
               inode->default_fops->read_page(inode, pg->pg, PG_SIZE, pg->fpos);
-            if (errno >= 0 && errno < PG_SIZE) {
-                // EOF
-                len = MIN(len, buf_off + errno);
-            } else if (errno < 0) {
+
+            if (errno < 0) {
                 break;
             }
+            if (errno < PG_SIZE) {
+                // EOF
+                len = MIN(len, buf_off + errno);
+            }
+
             pg->len = errno;
+        } else if (!pg) {
+            errno = inode->default_fops->read_page(
+              inode, (data + buf_off), len - buf_off, pg->fpos);
+            buf_off = len;
+            break;
         }
+
         u32_t rd_bytes = MIN(pg->len - pg_off, len - buf_off);
 
         if (!rd_bytes)

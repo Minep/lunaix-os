@@ -3,6 +3,6 @@
 
 #include <hal/hwtimer.h>
 
-struct hwtimer_context* apic_hwtimer_context();
+struct hwtimer* apic_hwtimer_context();
 
 #endif /* __LUNAIX_APIC_TIMER_H */

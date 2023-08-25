@@ -29,10 +29,10 @@ arch_preinit()
     isrm_bindiv(LUNAIX_SYS_CALL, syscall_hndlr);
 }
 
-struct hwtimer_context*
+struct hwtimer*
 hwtimer_choose()
 {
-    struct hwtimer_context* timer;
+    struct hwtimer* timer;
 
     timer = apic_hwtimer_context();
     if (timer->supported(timer)) {
@@ -42,12 +42,4 @@ hwtimer_choose()
     // TODO select alternatives...
 
     panick("no timer to use.");
-}
-
-struct hwrtc*
-hwrtc_choose()
-{
-    struct hwrtc* rtc = mc146818a_rtc_context();
-
-    return rtc;
 }

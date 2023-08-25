@@ -31,7 +31,7 @@ valloc_init()
     for (size_t i = 0; i < CLASS_LEN(piles_names_dma); i++) {
         int size = 1 << (i + 7);
         piles_dma[i] = cake_new_pile(
-          piles_names_dma[i], size, size > 1024 ? 4 : 1, PILE_CACHELINE);
+          piles_names_dma[i], size, size > 1024 ? 4 : 1, PILE_ALIGN_CACHE);
     }
 }
 

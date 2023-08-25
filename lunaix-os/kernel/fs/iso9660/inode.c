@@ -76,8 +76,8 @@ iso9660_fill_inode(struct v_inode* inode, struct iso_drecache* dir, int ino)
     if (dir->xattr_len) {
         struct iso_xattr* xattr = (struct iso_xattr*)valloc(ISO9660_BLKSZ);
         // Only bring in single FU, as we only care about the attributes.
-        errno =
-          dev->read(dev, xattr, ISO9660_BLKSZ * inode->lb_addr, ISO9660_BLKSZ);
+        errno = dev->ops.read(
+          dev, xattr, ISO9660_BLKSZ * inode->lb_addr, ISO9660_BLKSZ);
         if (errno < 0) {
             return EIO;
         }

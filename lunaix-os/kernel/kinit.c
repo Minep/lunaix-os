@@ -64,7 +64,6 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     /* Let's get fs online as soon as possible, as things rely on them */
     vfs_init();
     fsm_init();
-    input_init();
 
     /* Get intc online, this is the cornerstone when initing devices */
     intc_init();
@@ -73,6 +72,7 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     clock_init();
     timer_init();
 
+    input_init();
     block_init();
 
     /* the bare metal are now happy, let's get software over with */
@@ -89,7 +89,7 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     vfs_mount("/task", "taskfs", NULL, MNT_RO);
 
     lxconsole_spawn_ttydev();
-    device_init_builtin();
+    device_install_pseudo();
 
     /* Finish up bootstrapping sequence, we are ready to spawn the root process
      * and start geting into uspace

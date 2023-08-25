@@ -27,7 +27,7 @@ iso9660_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
     u32_t lba = 16;
     int errno = 0;
     do {
-        errno = dev->read(dev, vdesc, ISO9660_BLKSZ * lba, ISO9660_BLKSZ);
+        errno = dev->ops.read(dev, vdesc, ISO9660_BLKSZ * lba, ISO9660_BLKSZ);
         if (errno < 0) {
             errno = EIO;
             goto done;

@@ -31,7 +31,7 @@ blkpart_parse(struct device* master, struct gpt_header* header)
 
     for (size_t i = 0; i < header->ents_len; i++) {
         if (!(i % ENT_PER_BLK)) {
-            errno = master->read(
+            errno = master->ops.read(
               master, ents_parial, LBA2OFF(ent_lba++), GPT_BLKSIZE);
             if (errno < 0) {
                 goto done;
@@ -70,7 +70,8 @@ blkpart_probegpt(struct device* master)
     int errno;
     struct gpt_header* gpt_hdr = (struct gpt_header*)valloc(GPT_BLKSIZE);
 
-    if ((errno = master->read(master, gpt_hdr, LBA2OFF(1), LBA2OFF(1))) < 0) {
+    if ((errno = master->ops.read(master, gpt_hdr, LBA2OFF(1), LBA2OFF(1))) <
+        0) {
         goto done;
     }
 

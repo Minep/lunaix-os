@@ -21,7 +21,7 @@ probe_boot_medium()
     llist_for_each(pos, n, &block_cat->children, siblings)
     {
         int errno =
-          pos->read(pos, (void*)volp, ISO9660_READ_OFF, ISO9660_BLKSZ);
+          pos->ops.read(pos, (void*)volp, ISO9660_READ_OFF, ISO9660_BLKSZ);
         if (errno < 0) {
             kprintf(KWARN "can not probe %x:%s (%d)\n",
                     pos->dev_id,

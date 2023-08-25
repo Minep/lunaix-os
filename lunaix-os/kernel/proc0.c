@@ -10,7 +10,6 @@
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
-#include <lunaix/peripheral/ps2kbd.h>
 #include <lunaix/peripheral/serial.h>
 #include <lunaix/spike.h>
 #include <lunaix/syscall.h>
@@ -110,9 +109,6 @@ init_platform()
     // debugger
     serial_init();
     sdbg_init();
-
-    // FIXME ps2 kbd is a device, must not be here
-    ps2_kbd_init();
 
     // console
     console_start_flushing();

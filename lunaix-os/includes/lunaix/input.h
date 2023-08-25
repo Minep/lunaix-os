@@ -3,6 +3,7 @@
 
 #include <lunaix/clock.h>
 #include <lunaix/device.h>
+#include <lunaix/ds/ldga.h>
 #include <lunaix/ds/llist.h>
 #include <lunaix/ds/waitq.h>
 #include <lunaix/types.h>
@@ -18,6 +19,9 @@
 #define PKT_RELEASE 0x2
 // vector (e.g. mice wheel scroll, mice maneuver)
 #define PKT_VECTOR 0x3
+
+#define EXPORT_INPUT_DEV(id, init_fn)                                          \
+    export_ldga_el(inputdev, id, ptr_t, init_fn)
 
 struct input_evt_pkt
 {

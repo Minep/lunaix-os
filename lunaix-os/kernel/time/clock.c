@@ -75,5 +75,5 @@ clock_systime()
 void
 clock_walltime(datetime_t* datetime)
 {
-    current_rtc->get_walltime(current_rtc, datetime);
+    primary_rtc->get_walltime(primary_rtc, datetime);
 }

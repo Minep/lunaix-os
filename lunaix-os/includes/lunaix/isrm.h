@@ -69,4 +69,10 @@ isrm_bindiv(int iv, isr_cb handler);
 isr_cb
 isrm_get(int iv);
 
+ptr_t
+isrm_get_payload(int iv);
+
+void
+isrm_set_payload(int iv, ptr_t);
+
 #endif /* __LUNAIX_ISRM_H */

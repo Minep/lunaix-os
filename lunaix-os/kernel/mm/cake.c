@@ -77,7 +77,7 @@ __init_pile(struct cake_pile* pile,
     unsigned int offset = sizeof(long);
 
     // 默认每块儿蛋糕对齐到地址总线宽度
-    if ((options & PILE_CACHELINE)) {
+    if ((options & PILE_ALIGN_CACHE)) {
         // 对齐到128字节缓存行大小，主要用于DMA
         offset = CACHE_LINE_SIZE;
     }

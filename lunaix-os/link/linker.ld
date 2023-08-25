@@ -80,11 +80,31 @@ SECTIONS {
 
         . = ALIGN(8);
 
-        PROVIDE(__lga_platdev_db_start = .);
+        PROVIDE(__lga_rtcdev_start = .);
         
-        KEEP(*(.lga.platdev_db));
+        KEEP(*(.lga.rtcdev));
 
-        PROVIDE(__lga_platdev_db_end = .);
+        PROVIDE(__lga_rtcdev_end = .);
+
+        /* ---- */
+
+        . = ALIGN(8);
+
+        PROVIDE(__lga_inputdev_start = .);
+        
+        KEEP(*(.lga.inputdev));
+
+        PROVIDE(__lga_inputdev_end = .);
+
+        /* ---- */
+
+        . = ALIGN(8);
+
+        PROVIDE(__lga_pseudo_dev_start = .);
+        
+        KEEP(*(.lga.pseudo_dev));
+
+        PROVIDE(__lga_pseudo_dev_end = .);
     }
 
     .bss BLOCK(4K) : AT ( ADDR(.bss) - 0xC0000000 ) {

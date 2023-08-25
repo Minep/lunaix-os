@@ -5,7 +5,7 @@
 
 #define PILE_NAME_MAXLEN 20
 
-#define PILE_CACHELINE 1
+#define PILE_ALIGN_CACHE 1
 
 struct cake_pile;
 

@@ -12,11 +12,10 @@
 LOG_MODULE("APIC_TIMER")
 
 #define LVT_ENTRY_TIMER(vector, mode) (LVT_DELIVERY_FIXED | mode | vector)
-#define APIC_CALIBRATION_CONST 0x100000
+#define APIC_BASETICKS 0x100000
 
 // Don't optimize them! Took me an half hour to figure that out...
 
-static volatile u32_t rtc_counter = 0;
 static volatile u8_t apic_timer_done = 0;
 static volatile ticks_t base_freq = 0;
 static volatile ticks_t systicks = 0;
@@ -24,15 +23,8 @@ static volatile ticks_t systicks = 0;
 static timer_tick_cb tick_cb = NULL;
 
 static void
-__rtc_on_tick_cb(struct hwrtc* param)
-{
-    rtc_counter++;
-}
-
-static void
 temp_intr_routine_apic_timer(const isr_param* param)
 {
-    base_freq = APIC_CALIBRATION_CONST / rtc_counter * current_rtc->base_freq;
     apic_timer_done = 1;
 }
 
@@ -47,7 +39,7 @@ apic_timer_tick_isr(const isr_param* param)
 }
 
 static int
-apic_timer_check(struct hwtimer_context* hwt)
+apic_timer_check(struct hwtimer* hwt)
 {
     // TODO check whether apic timer is supported
     return 1;
@@ -66,9 +58,7 @@ apic_get_base_freq()
 }
 
 void
-apic_timer_init(struct hwtimer_context* timer,
-                u32_t hertz,
-                timer_tick_cb timer_cb)
+apic_timer_init(struct hwtimer* timer, u32_t hertz, timer_tick_cb timer_cb)
 {
     ticks_t frequency = hertz;
     tick_cb = timer_cb;
@@ -123,20 +113,22 @@ apic_timer_init(struct hwtimer_context* timer,
     }
 #endif
 
-    rtc_counter = 0;
     apic_timer_done = 0;
 
-    current_rtc->do_ticking(current_rtc, __rtc_on_tick_cb);
-    apic_write_reg(APIC_TIMER_ICR, APIC_CALIBRATION_CONST); // start APIC timer
+    primary_rtc->cls_mask(primary_rtc);
+    apic_write_reg(APIC_TIMER_ICR, APIC_BASETICKS); // start APIC timer
 
     // enable interrupt, just for our RTC start ticking!
     cpu_enable_interrupt();
 
     wait_until(apic_timer_done);
 
-    current_rtc->end_ticking(current_rtc);
-
     cpu_disable_interrupt();
+
+    primary_rtc->set_mask(primary_rtc);
+
+    base_freq = primary_rtc->get_counts(primary_rtc);
+    base_freq = APIC_BASETICKS / base_freq * primary_rtc->base_freq;
 
     assert_msg(base_freq, "Fail to initialize timer (NOFREQ)");
 
@@ -155,13 +147,13 @@ apic_timer_init(struct hwtimer_context* timer,
     apic_write_reg(APIC_TIMER_ICR, tphz);
 }
 
-struct hwtimer_context*
+struct hwtimer*
 apic_hwtimer_context()
 {
-    static struct hwtimer_context apic_hwt = { .name = "apic_timer",
-                                               .init = apic_timer_init,
-                                               .supported = apic_timer_check,
-                                               .systicks = apic_get_systicks };
+    static struct hwtimer apic_hwt = { .name = "apic_timer",
+                                       .init = apic_timer_init,
+                                       .supported = apic_timer_check,
+                                       .systicks = apic_get_systicks };
 
     return &apic_hwt;
 }

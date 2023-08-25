@@ -11,6 +11,8 @@
  */
 
 #include <lunaix/isrm.h>
+#include <lunaix/mm/valloc.h>
+#include <lunaix/status.h>
 
 #include <hal/rtc/mc146818a.h>
 
@@ -39,6 +41,10 @@
 #define RTC_REG_C 0xC
 #define RTC_REG_D 0xD
 
+#define RTC_SET 0x80
+#define RTC_BIN (1 << 2)
+#define RTC_HOURFORM24 (1 << 1)
+
 #define RTC_BIN_ENCODED(reg) (reg & 0x04)
 #define RTC_24HRS_ENCODED(reg) (reg & 0x02)
 
@@ -52,8 +58,7 @@ struct mc146818
 {
     struct hwrtc* rtc_context;
     u32_t rtc_iv;
-    int ticking;
-    void (*on_tick_cb)(const struct hwrtc*);
+    u32_t tick_counts;
 };
 
 #define rtc_state(data) ((struct mc146818*)(data))
@@ -72,28 +77,22 @@ rtc_write_reg(u8_t reg_selector, u8_t val)
     port_wrbyte(RTC_TARGET_PORT, val);
 }
 
-static u8_t
-bcd2dec(u8_t bcd)
-{
-    return ((bcd & 0xF0) >> 1) + ((bcd & 0xF0) >> 3) + (bcd & 0xf);
-}
-
 static void
 rtc_enable_timer()
 {
-    u8_t regB = rtc_read_reg(RTC_REG_B | WITH_NMI_DISABLED);
-    rtc_write_reg(RTC_REG_B | WITH_NMI_DISABLED, regB | RTC_TIMER_ON);
+    u8_t regB = rtc_read_reg(RTC_REG_B);
+    rtc_write_reg(RTC_REG_B, regB | RTC_TIMER_ON);
 }
 
 static void
 rtc_disable_timer()
 {
-    u8_t regB = rtc_read_reg(RTC_REG_B | WITH_NMI_DISABLED);
-    rtc_write_reg(RTC_REG_B | WITH_NMI_DISABLED, regB & ~RTC_TIMER_ON);
+    u8_t regB = rtc_read_reg(RTC_REG_B);
+    rtc_write_reg(RTC_REG_B, regB & ~RTC_TIMER_ON);
 }
 
 static void
-clock_walltime(struct hwrtc* rtc, datetime_t* datetime)
+rtc_getwalltime(struct hwrtc* rtc, datetime_t* datetime)
 {
     datetime_t current;
 
@@ -111,24 +110,26 @@ clock_walltime(struct hwrtc* rtc, datetime_t* datetime)
         datetime->second = rtc_read_reg(RTC_REG_SEC);
     } while (!datatime_eq(datetime, &current));
 
-    u8_t regbv = rtc_read_reg(RTC_REG_B);
-
-    // Convert from bcd to binary when needed
-    if (!RTC_BIN_ENCODED(regbv)) {
-        datetime->year = bcd2dec(datetime->year);
-        datetime->month = bcd2dec(datetime->month);
-        datetime->day = bcd2dec(datetime->day);
-        datetime->hour = bcd2dec(datetime->hour);
-        datetime->minute = bcd2dec(datetime->minute);
-        datetime->second = bcd2dec(datetime->second);
-    }
-
-    // To 24 hour format
-    if (!RTC_24HRS_ENCODED(regbv) && (datetime->hour >> 7)) {
-        datetime->hour = 12 + (datetime->hour & 0x80);
-    }
-
     datetime->year += RTC_CURRENT_CENTRY * 100;
+}
+
+static void
+rtc_setwalltime(struct hwrtc* rtc, datetime_t* datetime)
+{
+    u8_t reg = rtc_read_reg(RTC_REG_B);
+    reg = reg & ~RTC_SET;
+
+    rtc_write_reg(RTC_REG_B, reg | RTC_SET);
+
+    rtc_write_reg(RTC_REG_YRS, datetime->year - RTC_CURRENT_CENTRY * 100);
+    rtc_write_reg(RTC_REG_MTH, datetime->month);
+    rtc_write_reg(RTC_REG_DAY, datetime->day);
+    rtc_write_reg(RTC_REG_WDY, datetime->weekday);
+    rtc_write_reg(RTC_REG_HRS, datetime->hour);
+    rtc_write_reg(RTC_REG_MIN, datetime->minute);
+    rtc_write_reg(RTC_REG_SEC, datetime->second);
+
+    rtc_write_reg(RTC_REG_B, reg & ~RTC_SET);
 }
 
 static int
@@ -142,78 +143,74 @@ mc146818_check_support(struct hwrtc* rtc)
 }
 
 static void
-rtc_init(struct hwrtc* rtc)
-{
-    u8_t regA = rtc_read_reg(RTC_REG_A | WITH_NMI_DISABLED);
-    regA = (regA & ~0x7f) | RTC_FREQUENCY_1024HZ | RTC_DIVIDER_33KHZ;
-    rtc_write_reg(RTC_REG_A | WITH_NMI_DISABLED, regA);
-
-    rtc_state(rtc->data)->rtc_context = rtc;
-
-    // Make sure the rtc timer is disabled by default
-    rtc_disable_timer();
-}
-
-static struct mc146818 rtc_state = { .ticking = 0 };
-
-static void
 __rtc_tick(const isr_param* param)
 {
-    rtc_state.on_tick_cb(rtc_state.rtc_context);
+    struct mc146818* state =
+      (struct mc146818*)isrm_get_payload(param->execp->vector);
+
+    state->tick_counts++;
 
     (void)rtc_read_reg(RTC_REG_C);
 }
 
 static void
-rtc_do_ticking(struct hwrtc* rtc, void (*on_tick)())
+rtc_set_mask(struct hwrtc* rtc)
 {
-    if (!on_tick || rtc_state(rtc->data)->ticking) {
-        return;
-    }
-
-    struct mc146818* state = rtc_state(rtc->data);
-    state->ticking = 1;
-    state->on_tick_cb = on_tick;
-
-    /* We realise that using rtc to tick something has an extremely rare use
-     * case (e.g., calibrating some timer). Therefore, we will release this
-     * allocated IV when rtc ticking is no longer required to save IV
-     * resources.
-     */
-    state->rtc_iv = isrm_bindirq(PC_AT_IRQ_RTC, __rtc_tick);
-
-    rtc_enable_timer();
+    rtc->state = RTC_STATE_MASKED;
+    rtc_disable_timer();
 }
 
 static void
-rtc_end_ticking(struct hwrtc* rtc)
+rtc_cls_mask(struct hwrtc* rtc)
 {
-    if (!rtc_state(rtc->data)->ticking) {
-        return;
-    }
+    struct mc146818* state = rtc_state(rtc->data);
 
+    rtc->state = 0;
+    state->tick_counts = 0;
+    rtc_enable_timer();
+}
+
+static int
+rtc_chfreq(struct hwrtc* rtc, int freq)
+{
+    return ENOTSUP;
+}
+
+static int
+rtc_getcnt(struct hwrtc* rtc)
+{
+    struct mc146818* state = rtc_state(rtc->data);
+    return state->tick_counts;
+}
+
+static void
+rtc_init()
+{
+    u8_t reg = rtc_read_reg(RTC_REG_A);
+    reg = (reg & ~0x7f) | RTC_FREQUENCY_1024HZ | RTC_DIVIDER_33KHZ;
+    rtc_write_reg(RTC_REG_A, reg);
+
+    reg = RTC_BIN | RTC_HOURFORM24;
+    rtc_write_reg(RTC_REG_B, reg);
+
+    // Make sure the rtc timer is disabled by default
     rtc_disable_timer();
 
-    // do some delay, ensure there is no more interrupt from rtc before we
-    // release isr
-    port_delay(1000);
+    struct hwrtc* rtc = hwrtc_alloc_new("mc146818");
+    struct mc146818* state = valloc(sizeof(struct mc146818));
 
-    isrm_ivfree(rtc_state(rtc->data)->rtc_iv);
+    state->rtc_context = rtc;
+    state->rtc_iv = isrm_bindirq(PC_AT_IRQ_RTC, __rtc_tick);
+    isrm_set_payload(state->rtc_iv, (ptr_t)state);
 
-    rtc_state(rtc->data)->ticking = 0;
+    rtc->state = RTC_STATE_MASKED;
+    rtc->data = state;
+    rtc->base_freq = RTC_TIMER_BASE_FREQUENCY;
+    rtc->get_walltime = rtc_getwalltime;
+    rtc->set_walltime = rtc_setwalltime;
+    rtc->set_mask = rtc_set_mask;
+    rtc->cls_mask = rtc_cls_mask;
+    rtc->get_counts = rtc_getcnt;
+    rtc->chfreq = rtc_chfreq;
 }
-
-static struct hwrtc hwrtc_mc146818a = { .name = "mc146818a",
-                                        .data = &rtc_state,
-                                        .init = rtc_init,
-                                        .base_freq = RTC_TIMER_BASE_FREQUENCY,
-                                        .supported = mc146818_check_support,
-                                        .get_walltime = clock_walltime,
-                                        .do_ticking = rtc_do_ticking,
-                                        .end_ticking = rtc_end_ticking };
-
-struct hwrtc*
-mc146818a_rtc_context()
-{
-    return &hwrtc_mc146818a;
-}
+EXPORT_RTC_DEVICE(mc146818, rtc_init);

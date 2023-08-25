@@ -15,6 +15,13 @@ void
 input_init()
 {
     input_devcat = device_addcat(NULL, "input");
+
+    int i;
+    ptr_t input_dev_init;
+    ldga_foreach(inputdev, ptr_t, i, input_dev_init)
+    {
+        ((void (*)())input_dev_init)();
+    }
 }
 
 void
@@ -84,8 +91,8 @@ input_add_device(char* name_fmt, ...)
       device_add(input_devcat, idev, name_fmt, DEV_IFSEQ, args);
 
     idev->dev_if = dev;
-    dev->read = __input_dev_read;
-    dev->read_page = __input_dev_read_pg;
+    dev->ops.read = __input_dev_read;
+    dev->ops.read_page = __input_dev_read_pg;
 
     va_end(args);
 

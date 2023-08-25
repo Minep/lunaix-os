@@ -45,6 +45,19 @@ device_add(struct device* parent,
 }
 
 struct device*
+device_addsys(struct device* parent, void* underlay, char* name_fmt, ...)
+{
+    va_list args;
+    va_start(args, name_fmt);
+
+    struct device* dev =
+      device_add(parent, underlay, name_fmt, DEV_IFSEQ, args);
+
+    va_end(args);
+    return dev;
+}
+
+struct device*
 device_addseq(struct device* parent, void* underlay, char* name_fmt, ...)
 {
     va_list args;
@@ -157,12 +170,12 @@ __DEFINE_LXSYSCALL3(int, ioctl, int, fd, int, req, va_list, args)
         goto done;
     }
 
-    if (!dev->exec_cmd) {
-        errno = EINVAL;
+    if (!dev->ops.exec_cmd) {
+        errno = ENOTSUP;
         goto done;
     }
 
-    errno = dev->exec_cmd(dev, req, args);
+    errno = dev->ops.exec_cmd(dev, req, args);
 
 done:
     return DO_STATUS_OR_RETURN(errno);

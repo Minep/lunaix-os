@@ -320,10 +320,10 @@ __block_register(struct block_dev* bdev)
 
     struct device* dev =
       device_addvol(blk_parent_dev, bdev, "sd%c", 'a' + free_slot);
-    dev->write = __block_write;
-    dev->write_page = __block_write_page;
-    dev->read = __block_read;
-    dev->read_page = __block_read_page;
+    dev->ops.write = __block_write;
+    dev->ops.write_page = __block_write_page;
+    dev->ops.read = __block_read;
+    dev->ops.read_page = __block_read_page;
 
     bdev->dev = dev;
     strcpy(bdev->bdev_id, dev->name_val);
@@ -343,10 +343,10 @@ blk_mount_part(struct block_dev* bdev,
 
     struct device* dev =
       device_addvol(NULL, pbdev, "%sp%d", bdev->bdev_id, index + 1);
-    dev->write = __block_write;
-    dev->write_page = __block_write_page;
-    dev->read = __block_read;
-    dev->read_page = __block_read_page;
+    dev->ops.write = __block_write;
+    dev->ops.write_page = __block_write_page;
+    dev->ops.read = __block_read;
+    dev->ops.read_page = __block_read_page;
 
     pbdev->start_lba = start_lba;
     pbdev->end_lba = end_lba;

@@ -54,7 +54,7 @@ iso9660_read(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
     int errno = 0;
     while (fu_to_read) {
         for (; sec < isoino->fu_size && i < len; sec++) {
-            errno = bdev->read(
+            errno = bdev->ops.read(
               bdev, rd_buffer, true_offset * ISO9660_BLKSZ, ISO9660_BLKSZ);
 
             if (errno < 0) {

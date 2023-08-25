@@ -88,7 +88,8 @@ iso9660_setup_dnode(struct v_dnode* dnode, struct v_inode* inode)
     do {
         if (blk_offset >= ISO9660_BLKSZ - sizeof(struct iso_drecord)) {
             current_pos += ISO9660_BLKSZ;
-            errno = dev->read(dev, records, blk + current_pos, ISO9660_BLKSZ);
+            errno =
+              dev->ops.read(dev, records, blk + current_pos, ISO9660_BLKSZ);
             if (errno < 0) {
                 errno = EIO;
                 goto done;

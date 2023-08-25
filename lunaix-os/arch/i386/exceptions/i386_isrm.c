@@ -12,6 +12,7 @@
 
 static char iv_bmp[(IV_EX_END - IV_BASE_END) / 8];
 static isr_cb handlers[TOTAL_IV];
+static ptr_t ivhand_payload[TOTAL_IV];
 
 extern void
 intr_routine_fallback(const isr_param* param);
@@ -117,4 +118,20 @@ isrm_get(int iv)
     assert(iv < 256);
 
     return handlers[iv];
+}
+
+ptr_t
+isrm_get_payload(int iv)
+{
+    assert(iv < 256);
+
+    return ivhand_payload[iv];
+}
+
+void
+isrm_set_payload(int iv, ptr_t payload)
+{
+    assert(iv < 256);
+
+    ivhand_payload[iv] = payload;
 }

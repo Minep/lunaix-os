@@ -1,29 +1,32 @@
 #ifndef __LUNAIX_HWTIMER_H
 #define __LUNAIX_HWTIMER_H
 
+#include <lunaix/device.h>
 #include <lunaix/time.h>
 #include <lunaix/types.h>
 
 typedef void (*timer_tick_cb)();
 
-struct hwtimer_context
+struct hwtimer
 {
     char* name;
     void* data;
 
-    int (*supported)(struct hwtimer_context*);
-    void (*init)(struct hwtimer_context*, u32_t hertz, timer_tick_cb);
+    struct device* timer_dev;
+
+    int (*supported)(struct hwtimer*);
+    void (*init)(struct hwtimer*, u32_t hertz, timer_tick_cb);
     ticks_t (*systicks)();
     ticks_t base_freq;
     ticks_t running_freq;
 };
 
-extern struct hwtimer_context* current_timer;
+extern struct hwtimer* current_timer;
 
 void
 hwtimer_init(u32_t hertz, void* tick_callback);
 
-struct hwtimer_context*
+struct hwtimer*
 hwtimer_choose();
 
 ticks_t

@@ -15,11 +15,11 @@ devfs_read(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 
     struct device* dev = (struct device*)inode->data;
 
-    if (!dev->read) {
+    if (!dev->ops.read) {
         return ENOTSUP;
     }
 
-    return dev->read(dev, buffer, fpos, len);
+    return dev->ops.read(dev, buffer, fpos, len);
 }
 
 int
@@ -29,11 +29,11 @@ devfs_write(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 
     struct device* dev = (struct device*)inode->data;
 
-    if (!dev->write) {
+    if (!dev->ops.write) {
         return ENOTSUP;
     }
 
-    return dev->write(dev, buffer, fpos, len);
+    return dev->ops.write(dev, buffer, fpos, len);
 }
 
 int
@@ -43,11 +43,11 @@ devfs_read_page(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 
     struct device* dev = (struct device*)inode->data;
 
-    if (!dev->read_page) {
+    if (!dev->ops.read_page) {
         return ENOTSUP;
     }
 
-    return dev->read_page(dev, buffer, fpos);
+    return dev->ops.read_page(dev, buffer, fpos);
 }
 
 int
@@ -57,11 +57,11 @@ devfs_write_page(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 
     struct device* dev = (struct device*)inode->data;
 
-    if (!dev->read_page) {
+    if (!dev->ops.read_page) {
         return ENOTSUP;
     }
 
-    return dev->read_page(dev, buffer, fpos);
+    return dev->ops.read_page(dev, buffer, fpos);
 }
 
 int

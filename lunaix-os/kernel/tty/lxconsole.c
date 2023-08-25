@@ -150,11 +150,11 @@ void
 lxconsole_spawn_ttydev()
 {
     struct device* tty_dev = device_addseq(NULL, &lx_console, "tty");
-    tty_dev->write = __tty_write;
-    tty_dev->write_page = __tty_write_pg;
-    tty_dev->read = __tty_read;
-    tty_dev->read_page = __tty_read_pg;
-    tty_dev->exec_cmd = __tty_exec_cmd;
+    tty_dev->ops.write = __tty_write;
+    tty_dev->ops.write_page = __tty_write_pg;
+    tty_dev->ops.read = __tty_read;
+    tty_dev->ops.read_page = __tty_read_pg;
+    tty_dev->ops.exec_cmd = __tty_exec_cmd;
 
     waitq_init(&lx_reader);
     input_add_listener(__lxconsole_listener);
