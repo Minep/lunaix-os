@@ -6,6 +6,7 @@
 #include <lunaix/ds/btrie.h>
 #include <lunaix/ds/hashtable.h>
 #include <lunaix/ds/hstr.h>
+#include <lunaix/ds/ldga.h>
 #include <lunaix/ds/llist.h>
 #include <lunaix/ds/lru.h>
 #include <lunaix/ds/mutex.h>
@@ -46,6 +47,9 @@
 #define FSTYPE_ROFS 0x1
 
 #define TEST_FD(fd) (fd >= 0 && fd < VFS_MAX_FD)
+
+#define EXPORT_FILE_SYSTEM(fs_id, init_fn)                                        \
+    export_ldga_el(fs, fs_id, ptr_t, init_fn)
 
 #define VFS_VALID_CHAR(chr)                                                    \
     (('A' <= (chr) && (chr) <= 'Z') || ('a' <= (chr) && (chr) <= 'z') ||       \

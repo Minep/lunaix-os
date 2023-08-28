@@ -20,10 +20,79 @@
 LOG_MODULE("PCI")
 
 static DEFINE_LLIST(pci_devices);
-static DEFINE_LLIST(pci_drivers);
 
 void
 pci_probe_msi_info(struct pci_device* device);
+
+static struct pci_device*
+pci_create_device(ptr_t pci_base, int devinfo)
+{
+    pci_reg_t class = pci_read_cspace(pci_base, 0x8);
+    struct hbucket* bucket = device_definitions_byif(DEVIF_PCI);
+
+    u32_t devid = PCI_DEV_DEVID(devinfo);
+    u32_t vendor = PCI_DEV_VENDOR(devinfo);
+
+    kappendf(".%x:%x, ", vendor, devid);
+
+    struct pci_device_def *pos, *n;
+    hashtable_bucket_foreach(bucket, pos, n, devdef.hlist_if)
+    {
+        if (pos->dev_class != PCI_DEV_CLASS(class)) {
+            continue;
+        }
+
+        int result = (pos->dev_vendor & vendor) == vendor &&
+                     (pos->dev_id & devid) == devid;
+
+        if (result) {
+            goto found;
+        }
+    }
+
+    kappendf(KWARN "unknown device\n");
+
+    return NULL;
+
+found:
+    pci_reg_t intr = pci_read_cspace(pci_base, 0x3c);
+
+    struct pci_device* device = vzalloc(sizeof(struct pci_device));
+    device->class_info = class;
+    device->device_info = devinfo;
+    device->cspace_base = pci_base;
+    device->intr_info = intr;
+
+    device_prepare(&device->dev);
+
+    pci_probe_msi_info(device);
+    pci_probe_bar_info(device);
+
+    kappendf("%s (dev.%x:%x:%x) \n",
+             pos->devdef.name,
+             pos->devdef.class.meta,
+             pos->devdef.class.device,
+             pos->devdef.class.variant);
+
+    if (!pos->devdef.init_for) {
+        kappendf(KERROR "bad def\n");
+        goto fail;
+    }
+
+    int errno = pos->devdef.init_for(&pos->devdef, &device->dev);
+    if (errno) {
+        kappendf(KERROR "failed (e=%d)\n", errno);
+        goto fail;
+    }
+
+    llist_append(&pci_devices, &device->dev_chain);
+
+    return device;
+
+fail:
+    vfree(device);
+    return NULL;
+}
 
 void
 pci_probe_device(int bus, int dev, int funct)
@@ -55,43 +124,14 @@ pci_probe_device(int bus, int dev, int funct)
         return;
     }
 
-    pci_reg_t intr = pci_read_cspace(base, 0x3c);
-    pci_reg_t class = pci_read_cspace(base, 0x8);
+    kprintf("pci.%d:%d:%d", bus, dev, funct);
 
-    struct pci_device* device = vzalloc(sizeof(struct pci_device));
-    *device = (struct pci_device){ .cspace_base = base,
-                                   .class_info = class,
-                                   .device_info = reg1,
-                                   .intr_info = intr };
-
-    pci_probe_msi_info(device);
-    pci_probe_bar_info(device);
-
-    llist_append(&pci_devices, &device->dev_chain);
-
-    if (!pci_bind_driver(device)) {
-        kprintf(KWARN "dev.%d:%d:%d %x:%x unknown device\n",
-                bus,
-                dev,
-                funct,
-                PCI_DEV_VENDOR(reg1),
-                PCI_DEV_DEVID(reg1));
-    } else {
-        kprintf("dev.%d:%d:%d %x:%x %s\n",
-                bus,
-                dev,
-                funct,
-                PCI_DEV_VENDOR(reg1),
-                PCI_DEV_DEVID(reg1),
-                device->driver.type->name);
-    }
+    pci_create_device(base, reg1);
 }
 
 void
-pci_probe()
+pci_scan()
 {
-    // 暴力扫描所有PCI设备
-    // XXX: 尽管最多会有256条PCI总线，但就目前而言，只考虑bus #0就足够了
     for (int bus = 0; bus < 256; bus++) {
         for (int dev = 0; dev < 32; dev++) {
             pci_probe_device(bus, dev, 0);
@@ -145,6 +185,55 @@ pci_probe_msi_info(struct pci_device* device)
     }
 }
 
+size_t
+pci_bar_sizing(struct pci_device* dev, u32_t* bar_out, u32_t bar_num)
+{
+    pci_reg_t bar = pci_read_cspace(dev->cspace_base, PCI_REG_BAR(bar_num));
+    if (!bar) {
+        *bar_out = 0;
+        return 0;
+    }
+
+    pci_write_cspace(dev->cspace_base, PCI_REG_BAR(bar_num), 0xffffffff);
+    pci_reg_t sized =
+      pci_read_cspace(dev->cspace_base, PCI_REG_BAR(bar_num)) & ~0x1;
+    if (PCI_BAR_MMIO(bar)) {
+        sized = PCI_BAR_ADDR_MM(sized);
+    }
+    *bar_out = bar;
+    pci_write_cspace(dev->cspace_base, PCI_REG_BAR(bar_num), bar);
+    return ~sized + 1;
+}
+
+struct pci_device*
+pci_get_device_by_id(u16_t vendorId, u16_t deviceId)
+{
+    u32_t dev_info = vendorId | (deviceId << 16);
+    struct pci_device *pos, *n;
+    llist_for_each(pos, n, &pci_devices, dev_chain)
+    {
+        if (pos->device_info == dev_info) {
+            return pos;
+        }
+    }
+
+    return NULL;
+}
+
+struct pci_device*
+pci_get_device_by_class(u32_t class)
+{
+    struct pci_device *pos, *n;
+    llist_for_each(pos, n, &pci_devices, dev_chain)
+    {
+        if (PCI_DEV_CLASS(pos->class_info) == class) {
+            return pos;
+        }
+    }
+
+    return NULL;
+}
+
 static void
 __pci_read_cspace(struct twimap* map)
 {
@@ -157,6 +246,8 @@ __pci_read_cspace(struct twimap* map)
 
     map->size_acc = 256;
 }
+
+/*---------- TwiFS interface definition ----------*/
 
 static void
 __pci_read_revid(struct twimap* map)
@@ -242,106 +333,19 @@ pci_build_fsmapping()
 }
 EXPORT_TWIFS_PLUGIN(pci_devs, pci_build_fsmapping);
 
-size_t
-pci_bar_sizing(struct pci_device* dev, u32_t* bar_out, u32_t bar_num)
+/*---------- PCI 3.0 HBA device definition ----------*/
+
+static int
+pci_load_devices(struct device_def* def)
 {
-    pci_reg_t bar = pci_read_cspace(dev->cspace_base, PCI_REG_BAR(bar_num));
-    if (!bar) {
-        *bar_out = 0;
-        return 0;
-    }
+    pci_scan();
 
-    pci_write_cspace(dev->cspace_base, PCI_REG_BAR(bar_num), 0xffffffff);
-    pci_reg_t sized =
-      pci_read_cspace(dev->cspace_base, PCI_REG_BAR(bar_num)) & ~0x1;
-    if (PCI_BAR_MMIO(bar)) {
-        sized = PCI_BAR_ADDR_MM(sized);
-    }
-    *bar_out = bar;
-    pci_write_cspace(dev->cspace_base, PCI_REG_BAR(bar_num), bar);
-    return ~sized + 1;
-}
-
-struct pci_device*
-pci_get_device_by_id(u16_t vendorId, u16_t deviceId)
-{
-    u32_t dev_info = vendorId | (deviceId << 16);
-    struct pci_device *pos, *n;
-    llist_for_each(pos, n, &pci_devices, dev_chain)
-    {
-        if (pos->device_info == dev_info) {
-            return pos;
-        }
-    }
-
-    return NULL;
-}
-
-struct pci_device*
-pci_get_device_by_class(u32_t class)
-{
-    struct pci_device *pos, *n;
-    llist_for_each(pos, n, &pci_devices, dev_chain)
-    {
-        if (PCI_DEV_CLASS(pos->class_info) == class) {
-            return pos;
-        }
-    }
-
-    return NULL;
-}
-
-void
-pci_add_driver(const char* name,
-               u32_t class,
-               u32_t vendor,
-               u32_t devid,
-               pci_drv_init init)
-{
-    struct pci_driver* pci_drv = valloc(sizeof(*pci_drv));
-    *pci_drv = (struct pci_driver){ .create_driver = init,
-                                    .dev_info = (vendor << 16) | devid,
-                                    .dev_class = class };
-    if (name) {
-        strncpy(pci_drv->name, name, PCI_DRV_NAME_LEN);
-    }
-
-    llist_append(&pci_drivers, &pci_drv->drivers);
-}
-
-int
-pci_bind_driver(struct pci_device* pci_dev)
-{
-    struct pci_driver *pos, *n;
-    llist_for_each(pos, n, &pci_drivers, drivers)
-    {
-        if (pos->dev_info) {
-            if (pos->dev_info == pci_dev->device_info) {
-                goto check_type;
-            }
-            continue;
-        }
-    check_type:
-        if (pos->dev_class) {
-            if (pos->dev_class == PCI_DEV_CLASS(pci_dev->class_info)) {
-                pci_dev->driver.type = pos;
-                pci_dev->driver.instance = pos->create_driver(pci_dev);
-                return 1;
-            }
-        }
-    }
     return 0;
 }
 
-void
-pci_load_devices()
-{
-    int i = 0;
-    struct pci_driver* dev;
-    ldga_foreach(pci_dev_drivers, struct pci_driver*, i, dev)
-    {
-        llist_append(&pci_drivers, &dev->drivers);
-    }
-
-    pci_probe();
-}
+static struct device_def pci_def = {
+    .name = "pci3.0-hba",
+    .class = DEVCLASS(DEVIF_SOC, DEVFN_BUSIF, DEV_BUS, 0),
+    .init = pci_load_devices
+};
+EXPORT_DEVICE(pci3hba, &pci_def, load_poststage);

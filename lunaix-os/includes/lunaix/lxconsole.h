@@ -12,9 +12,6 @@ void
 lxconsole_init();
 
 void
-lxconsole_spawn_ttydev();
-
-void
 console_write_str(char* str);
 
 void

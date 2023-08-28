@@ -241,16 +241,12 @@ twifs_init()
 
     fs_root = twifs_dir_node(NULL, NULL, 0, 0);
 }
+EXPORT_FILE_SYSTEM(twifs, twifs_init);
 
 void
 twifs_register_plugins()
 {
-    int i = 0;
-    ptr_t init_twifs_plugin_fn;
-    ldga_foreach(twiplugin_inits, ptr_t, i, init_twifs_plugin_fn)
-    {
-        ((void (*)())init_twifs_plugin_fn)();
-    }
+    ldga_invoke_fn0(twiplugin_inits);
 }
 
 int

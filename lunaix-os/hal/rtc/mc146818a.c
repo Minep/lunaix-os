@@ -145,8 +145,7 @@ mc146818_check_support(struct hwrtc* rtc)
 static void
 __rtc_tick(const isr_param* param)
 {
-    struct mc146818* state =
-      (struct mc146818*)isrm_get_payload(param->execp->vector);
+    struct mc146818* state = (struct mc146818*)isrm_get_payload(param);
 
     state->tick_counts++;
 
@@ -183,8 +182,8 @@ rtc_getcnt(struct hwrtc* rtc)
     return state->tick_counts;
 }
 
-static void
-rtc_init()
+static int
+rtc_init(struct device_def* devdef)
 {
     u8_t reg = rtc_read_reg(RTC_REG_A);
     reg = (reg & ~0x7f) | RTC_FREQUENCY_1024HZ | RTC_DIVIDER_33KHZ;
@@ -212,5 +211,13 @@ rtc_init()
     rtc->cls_mask = rtc_cls_mask;
     rtc->get_counts = rtc_getcnt;
     rtc->chfreq = rtc_chfreq;
+
+    return 0;
 }
-EXPORT_RTC_DEVICE(mc146818, rtc_init);
+
+static struct device_def devrtc_mc146818 = {
+    .name = "rtc_mc146818",
+    .class = DEVCLASS(DEVIF_SOC, DEVFN_TIME, DEV_RTC, 1),
+    .init = rtc_init
+};
+EXPORT_DEVICE(mc146818, &devrtc_mc146818, load_earlystage);

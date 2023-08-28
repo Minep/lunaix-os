@@ -20,7 +20,6 @@
 
 #include <hal/acpi/acpi.h>
 #include <hal/intc.h>
-#include <hal/pci.h>
 
 #include <sys/abi.h>
 #include <sys/interrupts.h>
@@ -53,6 +52,8 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     /* Prepare stack trace environment */
     trace_modksyms_init(bhctx);
 
+    device_register_all();
+
     // crt
     tty_init(ioremap(0xB8000, PG_SIZE));
     tty_set_theme(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
@@ -68,11 +69,15 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     /* Get intc online, this is the cornerstone when initing devices */
     intc_init();
 
+    input_init();
+    device_earlystage();
+
     /* System timing and clock support */
     clock_init();
     timer_init();
 
-    input_init();
+    device_timerstage();
+
     block_init();
 
     /* the bare metal are now happy, let's get software over with */
@@ -87,9 +92,6 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     vfs_mount("/dev", "devfs", NULL, 0);
     vfs_mount("/sys", "twifs", NULL, MNT_RO);
     vfs_mount("/task", "taskfs", NULL, MNT_RO);
-
-    lxconsole_spawn_ttydev();
-    device_install_pseudo();
 
     /* Finish up bootstrapping sequence, we are ready to spawn the root process
      * and start geting into uspace

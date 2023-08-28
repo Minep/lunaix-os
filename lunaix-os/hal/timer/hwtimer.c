@@ -8,18 +8,21 @@ struct hwtimer* current_timer;
 ticks_t
 hwtimer_base_frequency()
 {
+    assert(current_timer);
     return current_timer->base_freq;
 }
 
 ticks_t
 hwtimer_current_systicks()
 {
+    assert(current_timer);
     return current_timer->systicks();
 }
 
 ticks_t
 hwtimer_to_ticks(u32_t value, int unit)
 {
+    assert(current_timer);
     // in case system frequency is less than 1000Hz
     if (unit != TIME_MS) {
         return current_timer->running_freq * unit * value;

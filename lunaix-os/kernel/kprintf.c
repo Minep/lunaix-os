@@ -8,47 +8,69 @@
 #define MAX_KPRINTF_BUF_SIZE 512
 #define MAX_XFMT_SIZE 512
 
+static char* log_prefix[] = { "- ", "W ", "E ", "D " };
+static char* color_code[] = { "", "\033[6;0m", "\033[12;0m", "\033[9;0m" };
+
 void
 __kprintf_internal(const char* component,
                    int log_level,
+                   const char* prefix,
                    const char* fmt,
                    va_list args)
 {
     char buf[MAX_KPRINTF_BUF_SIZE];
     char expanded_fmt[MAX_XFMT_SIZE];
+    char* color = color_code[log_level];
 
-    switch (log_level) {
-        case 1:
-            // tty_set_theme(VGA_COLOR_BROWN, current_theme >> 12);
-            ksnprintf(expanded_fmt,
-                      MAX_XFMT_SIZE,
-                      "\033[6;0mW %s: %s\033[39;49m",
-                      component,
-                      fmt);
-            break;
-        case 2:
-            // tty_set_theme(VGA_COLOR_LIGHT_RED, current_theme >> 12);
-            ksnprintf(expanded_fmt,
-                      MAX_XFMT_SIZE,
-                      "\033[12;0mE %s: %s\033[39;49m",
-                      component,
-                      fmt);
-            break;
-        case 3:
-            // tty_set_theme(VGA_COLOR_LIGHT_BLUE, current_theme >> 12);
-            ksnprintf(expanded_fmt,
-                      MAX_XFMT_SIZE,
-                      "\033[9;0mD %s: %s\033[39;49m",
-                      component,
-                      fmt);
-            break;
-        default:
-            ksnprintf(expanded_fmt, MAX_XFMT_SIZE, "- %s: %s", component, fmt);
-            break;
+    if (component) {
+        ksnprintf(expanded_fmt,
+                  MAX_XFMT_SIZE,
+                  "%s%s%s: %s\033[39;49m",
+                  color,
+                  prefix,
+                  component,
+                  fmt);
+    } else {
+        ksnprintf(
+          expanded_fmt, MAX_XFMT_SIZE, "%s%s%s\033[39;49m", color, prefix, fmt);
     }
 
     __ksprintf_internal(buf, expanded_fmt, MAX_KPRINTF_BUF_SIZE, args);
     console_write_str(buf);
+}
+
+char*
+__get_loglevel(char* fmt, int* log_level_out)
+{
+    char l = '0';
+    if (*fmt == '\x1b') {
+        l = *(++fmt);
+        fmt++;
+    }
+    l -= '0';
+
+    if (l > 3) {
+        l = 0;
+    }
+
+    *log_level_out = (int)l;
+    return fmt;
+}
+
+void
+kappendf(const char* fmt, ...)
+{
+    char buf[MAX_KPRINTF_BUF_SIZE];
+
+    va_list args;
+    va_start(args, fmt);
+
+    int log_level;
+    fmt = __get_loglevel(fmt, &log_level);
+
+    __kprintf_internal(NULL, log_level, "", fmt, args);
+
+    va_end(args);
 }
 
 void
@@ -56,14 +78,10 @@ __kprintf(const char* component, const char* fmt, va_list args)
 {
     if (!fmt)
         return;
-    char log_level = '0';
 
-    if (*fmt == '\x1b') {
-        log_level = *(++fmt);
-        fmt++;
-    }
-
-    __kprintf_internal(component, log_level - '0', fmt, args);
+    int log_level;
+    fmt = __get_loglevel(fmt, &log_level);
+    __kprintf_internal(component, log_level, log_prefix[log_level], fmt, args);
 }
 
 void
@@ -80,6 +98,8 @@ kprint_panic(const char* fmt, ...)
     tty_put_str_at(buf, 0, 24);
 
     va_end(args);
+
+    spin();
 }
 
 void
@@ -128,5 +148,5 @@ kprint_hex(const void* buffer, unsigned int size)
 
 __DEFINE_LXSYSCALL3(void, syslog, int, level, const char*, fmt, va_list, args)
 {
-    __kprintf_internal("syslog", level, fmt, args);
+    __kprintf_internal("syslog", level, "", fmt, args);
 }

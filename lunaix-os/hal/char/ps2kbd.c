@@ -115,9 +115,6 @@ static void
 ps2_device_post_cmd(char cmd, char arg);
 
 static void
-ps2_kbd_init();
-
-static void
 ps2_process_cmd(void* arg);
 
 #define PS2_DEV_CMD_MAX_ATTEMPTS 5
@@ -215,8 +212,8 @@ ps2_device_post_cmd(char cmd, char arg)
     mutex_unlock(&cmd_q.mutex);
 }
 
-void
-ps2_kbd_init()
+static int
+ps2_kbd_init(struct device_def* devdef)
 {
 
     memset(&cmd_q, 0, sizeof(cmd_q));
@@ -281,14 +278,14 @@ ps2_kbd_init()
     result = ps2_issue_cmd_wretry(PS2_CMD_SELFTEST, PS2_NO_ARG);
     if (result != PS2_RESULT_TEST_OK) {
         kprintf(KWARN "controller self-test failed. (%x)\n", result);
-        // goto done;
+        goto done;
     }
 
     // 5、设备自检（端口1自检，通常是我们的键盘）
     result = ps2_issue_cmd_wretry(PS2_CMD_SELFTEST_PORT1, PS2_NO_ARG);
     if (result != 0) {
         kprintf(KERROR "interface test on port 1 failed. (%x)\n", result);
-        // goto done;
+        goto done;
     }
 
     ps2_post_cmd(PS2_PORT_CTRL_CMDREG, PS2_CMD_PORT2_DISABLE, PS2_NO_ARG);
@@ -321,8 +318,11 @@ ps2_kbd_init()
     isrm_bindirq(PC_AT_IRQ_KBD, intr_ps2_kbd_handler);
 
     cpu_enable_interrupt();
+    return 0;
+
+done:
+    return 1;
 }
-EXPORT_INPUT_DEV(i8042_keyboard, ps2_kbd_init);
 
 static void
 ps2_process_cmd(void* arg)
@@ -573,3 +573,10 @@ ps2_issue_dev_cmd(char cmd, u16_t arg)
 
     return port_rdbyte(PS2_PORT_ENC_CMDREG);
 }
+
+static struct device_def devrtc_i8042kbd = {
+    .name = "ps2 keyboard",
+    .class = DEVCLASS(DEVIF_SOC, DEVFN_INPUT, DEV_X86LEGACY, 0),
+    .init = ps2_kbd_init
+};
+EXPORT_DEVICE(i8042_kbd, &devrtc_i8042kbd, load_timerstage);

@@ -227,3 +227,4 @@ taskfs_init()
 
     export_task_attr();
 }
+EXPORT_FILE_SYSTEM(taskfs, taskfs_init);

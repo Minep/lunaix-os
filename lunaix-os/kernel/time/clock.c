@@ -54,7 +54,7 @@ EXPORT_TWIFS_PLUGIN(sys_clock, clock_build_mapping);
 void
 clock_init()
 {
-    hwrtc_init();
+    // hwrtc_init();
 }
 
 time_t

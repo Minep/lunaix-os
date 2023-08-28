@@ -23,7 +23,7 @@ fsm_init()
 {
     hashtable_init(fs_registry);
 
-    fsm_register_all();
+    ldga_invoke_fn0(fs);
 }
 
 void

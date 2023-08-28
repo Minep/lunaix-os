@@ -15,13 +15,6 @@ void
 input_init()
 {
     input_devcat = device_addcat(NULL, "input");
-
-    int i;
-    ptr_t input_dev_init;
-    ldga_foreach(inputdev, ptr_t, i, input_dev_init)
-    {
-        ((void (*)())input_dev_init)();
-    }
 }
 
 void
@@ -88,7 +81,7 @@ input_add_device(char* name_fmt, ...)
     va_start(args, name_fmt);
 
     struct device* dev =
-      device_add(input_devcat, idev, name_fmt, DEV_IFSEQ, args);
+      device_add_vargs(input_devcat, idev, name_fmt, DEV_IFSEQ, args);
 
     idev->dev_if = dev;
     dev->ops.read = __input_dev_read;

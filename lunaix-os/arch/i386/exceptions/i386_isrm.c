@@ -121,8 +121,9 @@ isrm_get(int iv)
 }
 
 ptr_t
-isrm_get_payload(int iv)
+isrm_get_payload(const isr_param* param)
 {
+    int iv = param->execp->vector;
     assert(iv < 256);
 
     return ivhand_payload[iv];

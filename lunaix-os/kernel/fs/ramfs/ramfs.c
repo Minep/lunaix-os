@@ -146,6 +146,7 @@ ramfs_init()
 
     fsm_register(ramfs);
 }
+EXPORT_FILE_SYSTEM(ramfs, ramfs_init);
 
 int
 ramfs_mksymlink(struct v_inode* this, const char* target)

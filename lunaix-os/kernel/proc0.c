@@ -18,8 +18,6 @@
 
 #include <sdbg/protocol.h>
 
-#include <hal/pci.h>
-
 #include <klibc/string.h>
 
 LOG_MODULE("PROC0")
@@ -98,16 +96,14 @@ init_platform()
             __VERSION__,
             __TIME__);
 
+    device_poststage();
+
     twifs_register_plugins();
 
-    /*
-     * all device registering and loading must defered to here!
-     * due to limited stack size and partial scheduling context
-     */
-    pci_load_devices();
+    // FIXME This 8025 serial should integrated into device layer
+    serial_init();
 
     // debugger
-    serial_init();
     sdbg_init();
 
     // console

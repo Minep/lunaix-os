@@ -12,16 +12,11 @@ static int rtc_count = 0;
 
 DEFINE_LLIST(rtcs);
 
-void
-hwrtc_init()
-{
-    ptr_t init;
-    int index;
-    ldga_foreach(rtcdev, ptr_t, index, init)
-    {
-        ((void (*)())init)();
-    }
-}
+// void
+// hwrtc_init()
+// {
+//     ldga_invoke_fn0(rtcdev);
+// }
 
 void
 hwrtc_walltime(datetime_t* dt)

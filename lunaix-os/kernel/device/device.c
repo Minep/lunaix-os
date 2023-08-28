@@ -12,14 +12,47 @@ static DEFINE_LLIST(root_list);
 
 static volatile dev_t devid = 0;
 
+void
+device_prepare(struct device* dev)
+{
+    dev->magic = DEV_STRUCT_MAGIC;
+    dev->dev_id = devid++;
+
+    llist_init_head(&dev->children);
+}
+
+static void
+device_setname_vargs(struct device* dev, char* fmt, va_list args)
+{
+    size_t strlen =
+      __ksprintf_internal(dev->name_val, fmt, DEVICE_NAME_SIZE, args);
+
+    dev->name = HSTR(dev->name_val, strlen);
+
+    hstr_rehash(&dev->name, HSTR_FULL_HASH);
+}
+
+void
+device_setname(struct device* dev, char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+
+    device_setname_vargs(dev, fmt, args);
+
+    va_end(args);
+}
+
 struct device*
-device_add(struct device* parent,
-           void* underlay,
-           char* name_fmt,
-           u32_t type,
-           va_list args)
+device_add_vargs(struct device* parent,
+                 void* underlay,
+                 char* name_fmt,
+                 u32_t type,
+                 va_list args)
 {
     struct device* dev = vzalloc(sizeof(struct device));
+
+    device_prepare(dev);
 
     if (parent) {
         assert((parent->dev_type & DEV_MSKIF) == DEV_IFCAT);
@@ -28,19 +61,31 @@ device_add(struct device* parent,
         llist_append(&root_list, &dev->siblings);
     }
 
-    size_t strlen =
-      __ksprintf_internal(dev->name_val, name_fmt, DEVICE_NAME_SIZE, args);
+    if (name_fmt) {
+        device_setname_vargs(dev, name_fmt, args);
+    }
 
-    dev->magic = DEV_STRUCT_MAGIC;
-    dev->dev_id = devid++;
-    dev->name = HSTR(dev->name_val, strlen);
     dev->parent = parent;
     dev->underlay = underlay;
     dev->dev_type = type;
 
-    hstr_rehash(&dev->name, HSTR_FULL_HASH);
-    llist_init_head(&dev->children);
+    return dev;
+}
 
+struct device*
+device_add(struct device* parent,
+           void* underlay,
+           u32_t type,
+           char* name_fmt,
+           ...)
+{
+    va_list args;
+    va_start(args, name_fmt);
+
+    struct device* dev =
+      device_add_vargs(parent, underlay, name_fmt, type, args);
+
+    va_end(args);
     return dev;
 }
 
@@ -51,7 +96,7 @@ device_addsys(struct device* parent, void* underlay, char* name_fmt, ...)
     va_start(args, name_fmt);
 
     struct device* dev =
-      device_add(parent, underlay, name_fmt, DEV_IFSEQ, args);
+      device_add_vargs(parent, underlay, name_fmt, DEV_IFSEQ, args);
 
     va_end(args);
     return dev;
@@ -64,7 +109,7 @@ device_addseq(struct device* parent, void* underlay, char* name_fmt, ...)
     va_start(args, name_fmt);
 
     struct device* dev =
-      device_add(parent, underlay, name_fmt, DEV_IFSEQ, args);
+      device_add_vargs(parent, underlay, name_fmt, DEV_IFSEQ, args);
 
     va_end(args);
     return dev;
@@ -77,7 +122,7 @@ device_addvol(struct device* parent, void* underlay, char* name_fmt, ...)
     va_start(args, name_fmt);
 
     struct device* dev =
-      device_add(parent, underlay, name_fmt, DEV_IFVOL, args);
+      device_add_vargs(parent, underlay, name_fmt, DEV_IFVOL, args);
 
     va_end(args);
     return dev;
@@ -89,7 +134,8 @@ device_addcat(struct device* parent, char* name_fmt, ...)
     va_list args;
     va_start(args, name_fmt);
 
-    struct device* dev = device_add(parent, NULL, name_fmt, DEV_IFCAT, args);
+    struct device* dev =
+      device_add_vargs(parent, NULL, name_fmt, DEV_IFCAT, args);
 
     va_end(args);
     return dev;

@@ -34,4 +34,7 @@ kprint_panic(const char* fmt, ...);
 void
 kprint_dbg(const char* fmt, ...);
 
+void
+kappendf(const char* fmt, ...);
+
 #endif /* __LUNAIX_SYSLOG_H */

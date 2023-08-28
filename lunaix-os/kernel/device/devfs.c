@@ -178,6 +178,7 @@ devfs_init()
     fs->mount = devfs_mount;
     fs->unmount = devfs_unmount;
 }
+EXPORT_FILE_SYSTEM(devfs, devfs_init);
 
 struct v_inode_ops devfs_inode_ops = { .dir_lookup = devfs_dirlookup,
                                        .open = default_inode_open,

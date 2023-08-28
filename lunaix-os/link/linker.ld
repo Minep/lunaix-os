@@ -70,41 +70,52 @@ SECTIONS {
         /* align to 8 bytes, so it can cover both 32 and 64 bits address line*/
         . = ALIGN(8);
 
-        PROVIDE(__lga_pci_dev_drivers_start = .);
+        PROVIDE(__lga_devdefs_start = .);
         
-        KEEP(*(.lga.pci_dev_drivers));
+        KEEP(*(.lga.devdefs));
 
-        PROVIDE(__lga_pci_dev_drivers_end = .);
+        PROVIDE(__lga_devdefs_end = .);
 
         /* ---- */
 
         . = ALIGN(8);
 
-        PROVIDE(__lga_rtcdev_start = .);
+        PROVIDE(__lga_dev_ld_early_start = .);
         
-        KEEP(*(.lga.rtcdev));
+        KEEP(*(.lga.devdefs.ld_early));
 
-        PROVIDE(__lga_rtcdev_end = .);
+        PROVIDE(__lga_dev_ld_early_end = .);
 
         /* ---- */
 
         . = ALIGN(8);
 
-        PROVIDE(__lga_inputdev_start = .);
+        PROVIDE(__lga_dev_ld_aftertimer_start = .);
         
-        KEEP(*(.lga.inputdev));
+        KEEP(*(.lga.devdefs.ld_aftertimer));
 
-        PROVIDE(__lga_inputdev_end = .);
+        PROVIDE(__lga_dev_ld_aftertimer_end = .);
 
         /* ---- */
 
         . = ALIGN(8);
 
-        PROVIDE(__lga_pseudo_dev_start = .);
+        PROVIDE(__lga_dev_ld_post_start = .);
         
-        KEEP(*(.lga.pseudo_dev));
+        KEEP(*(.lga.devdefs.ld_post));
 
-        PROVIDE(__lga_pseudo_dev_end = .);
+        PROVIDE(__lga_dev_ld_post_end = .);
+
+        /* ---- */
+
+        . = ALIGN(8);
+
+        PROVIDE(__lga_fs_start = .);
+        
+        KEEP(*(.lga.fs));
+
+        PROVIDE(__lga_fs_end = .);
+
     }
 
     .bss BLOCK(4K) : AT ( ADDR(.bss) - 0xC0000000 ) {

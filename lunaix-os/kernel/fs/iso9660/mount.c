@@ -110,3 +110,4 @@ iso9660_init()
 
     fsm_register(fs);
 }
+EXPORT_FILE_SYSTEM(iso9660, iso9660_init);

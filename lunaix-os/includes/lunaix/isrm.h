@@ -70,7 +70,7 @@ isr_cb
 isrm_get(int iv);
 
 ptr_t
-isrm_get_payload(int iv);
+isrm_get_payload(const isr_param*);
 
 void
 isrm_set_payload(int iv, ptr_t);

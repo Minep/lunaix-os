@@ -1,6 +1,7 @@
 #ifndef __LUNAIX_PCI_H
 #define __LUNAIX_PCI_H
 
+#include <lunaix/device.h>
 #include <lunaix/ds/ldga.h>
 #include <lunaix/ds/llist.h>
 #include <lunaix/types.h>
@@ -16,7 +17,7 @@
 #define PCI_REG_BAR(num) (0x10 + (num - 1) * 4)
 
 #define PCI_DEV_VENDOR(x) ((x)&0xffff)
-#define PCI_DEV_DEVID(x) ((x) >> 16)
+#define PCI_DEV_DEVID(x) (((x)&0xffff0000) >> 16)
 #define PCI_INTR_IRQ(x) ((x)&0xff)
 #define PCI_INTR_PIN(x) (((x)&0xff00) >> 8)
 #define PCI_DEV_CLASS(x) ((x) >> 8)
@@ -49,6 +50,8 @@
     (((bus)&0xff) << 16) | (((dev)&0xff) << 11) | (((funct)&0xff) << 8) |      \
       0x80000000
 
+#define PCI_ID_ANY (-1)
+
 typedef unsigned int pci_reg_t;
 
 // PCI device header format
@@ -57,16 +60,6 @@ typedef unsigned int pci_reg_t;
 #define BAR_TYPE_MMIO 0x1
 #define BAR_TYPE_CACHABLE 0x2
 #define PCI_DRV_NAME_LEN 32
-
-#define EXPORT_PCI_DEVICE(name_, class, vendor_id, dev_id, init_fn)            \
-    static struct pci_driver pcidev_##name_ =                                  \
-      (struct pci_driver){ .name = #name_,                                     \
-                           .create_driver = (init_fn),                         \
-                           .dev_info = ((vendor_id) << 16) | (dev_id),         \
-                           .dev_class = (class) };                             \
-    export_ldga_el(pci_dev_drivers, name_, ptr_t, &pcidev_##name_)
-
-struct pci_driver;
 
 struct pci_base_addr
 {
@@ -77,38 +70,25 @@ struct pci_base_addr
 
 struct pci_device
 {
+    struct device dev;
     struct llist_header dev_chain;
     u32_t device_info;
     u32_t class_info;
     u32_t cspace_base;
     u32_t msi_loc;
     u16_t intr_info;
-    struct
-    {
-        struct pci_driver* type;
-        void* instance;
-    } driver;
     struct pci_base_addr bar[6];
 };
 
 typedef void* (*pci_drv_init)(struct pci_device*);
 
-struct pci_driver
+struct pci_device_def
 {
-    struct llist_header drivers;
-    u32_t dev_info;
     u32_t dev_class;
-    pci_drv_init create_driver;
-    char name[PCI_DRV_NAME_LEN];
+    u32_t dev_vendor;
+    u32_t dev_id;
+    struct device_def devdef;
 };
-
-/**
- * @brief 初始化PCI。这主要是通过扫描PCI总线进行拓扑重建。注意，该
- * 初始化不包括针对每个设备的初始化，因为那是设备驱动的事情。
- *
- */
-void
-pci_load_devices();
 
 /**
  * @brief 根据类型代码（Class Code）去在拓扑中寻找一个设备

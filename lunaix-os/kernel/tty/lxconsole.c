@@ -146,20 +146,6 @@ __tty_read_pg(struct device* dev, void* buf, size_t offset)
     return __tty_read(dev, buf, offset, PG_SIZE);
 }
 
-void
-lxconsole_spawn_ttydev()
-{
-    struct device* tty_dev = device_addseq(NULL, &lx_console, "tty");
-    tty_dev->ops.write = __tty_write;
-    tty_dev->ops.write_page = __tty_write_pg;
-    tty_dev->ops.read = __tty_read;
-    tty_dev->ops.read_page = __tty_read_pg;
-    tty_dev->ops.exec_cmd = __tty_exec_cmd;
-
-    waitq_init(&lx_reader);
-    input_add_listener(__lxconsole_listener);
-}
-
 int
 __tty_write(struct device* dev, void* buf, size_t offset, size_t len)
 {
@@ -353,3 +339,25 @@ console_start_flushing()
       timer_run_ms(20, console_flush, NULL, TIMER_MODE_PERIODIC);
     lx_console.flush_timer = timer;
 }
+
+static int
+lxconsole_spawn_ttydev(struct device_def* devdef)
+{
+    struct device* tty_dev = device_addseq(NULL, &lx_console, "tty");
+    tty_dev->ops.write = __tty_write;
+    tty_dev->ops.write_page = __tty_write_pg;
+    tty_dev->ops.read = __tty_read;
+    tty_dev->ops.read_page = __tty_read_pg;
+    tty_dev->ops.exec_cmd = __tty_exec_cmd;
+
+    waitq_init(&lx_reader);
+    input_add_listener(__lxconsole_listener);
+
+    return 0;
+}
+
+static struct device_def lxconsole_def = {
+    .class = DEVCLASS(DEVIF_NON, DEVFN_TTY, DEV_BUILTIN, 0),
+    .init = lxconsole_spawn_ttydev
+};
+EXPORT_DEVICE(lxconsole, &lxconsole_def, load_earlystage);

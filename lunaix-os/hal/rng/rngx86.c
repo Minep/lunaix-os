@@ -28,11 +28,19 @@ __rand_rd(struct device* dev, void* buf, size_t offset, size_t len)
     return len;
 }
 
-void
-pdev_randdev_init()
+int
+pdev_randdev_init(struct device_def* devdef)
 {
     struct device* devrand = device_addseq(NULL, NULL, "rand");
     devrand->ops.read = __rand_rd;
     devrand->ops.read_page = __rand_rd_pg;
+
+    return 0;
 }
-EXPORT_PSEUDODEV(randdev, pdev_randdev_init);
+
+static struct device_def devrandx86_def = {
+    .name = "null",
+    .class = DEVCLASS(DEVIF_SOC, DEVFN_CHAR, DEV_RNG, 0),
+    .init = pdev_randdev_init
+};
+EXPORT_DEVICE(randdev, &devrandx86_def, load_earlystage);

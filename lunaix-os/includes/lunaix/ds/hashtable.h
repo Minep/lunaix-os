@@ -21,9 +21,9 @@ struct hbucket
     struct hlist_node* head;
 };
 
-#define __hashkey(table, hash) (hash % (sizeof(table) / sizeof(table[0])))
+#define __hashkey(table, hash) ((hash) % (sizeof(table) / sizeof(table[0])))
 
-#define DECLARE_HASHTABLE(name, bucket_num) struct hbucket name[bucket_num];
+#define DECLARE_HASHTABLE(name, bucket_num) struct hbucket name[(bucket_num)];
 
 #define hashtable_bucket_foreach(bucket, pos, n, member)                       \
     for (pos = list_entry((bucket)->head, typeof(*pos), member);               \

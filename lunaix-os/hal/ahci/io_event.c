@@ -6,14 +6,14 @@
 
 LOG_MODULE("io_evt")
 
-extern struct llist_header ahcis;
-
 void
 __ahci_hba_isr(const isr_param* param)
 {
     struct ahci_hba* hba;
     struct ahci_driver *pos, *n;
-    llist_for_each(pos, n, &ahcis, ahci_drvs)
+    struct llist_header* ahcis = (struct llist_header*)isrm_get_payload(param);
+
+    llist_for_each(pos, n, ahcis, ahci_drvs)
     {
         if (pos->id == (int)param->execp->vector) {
             hba = &pos->hba;

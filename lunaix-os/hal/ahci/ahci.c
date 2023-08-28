@@ -61,9 +61,6 @@ achi_register_ops(struct hba_port* port);
 void
 ahci_register_device(struct hba_device* hbadev);
 
-void*
-ahci_driver_init(struct pci_device* ahci_dev);
-
 void
 __hba_reset_port(hba_reg_t* port_reg)
 {
@@ -80,9 +77,11 @@ __hba_reset_port(hba_reg_t* port_reg)
     port_reg[HBA_RPxSCTL] &= ~0xf;
 }
 
-void*
-ahci_driver_init(struct pci_device* ahci_dev)
+int
+ahci_driver_init(struct device_def* def, struct device* dev)
 {
+    struct pci_device* ahci_dev = container_of(dev, struct pci_device, dev);
+
     struct pci_base_addr* bar6 = &ahci_dev->bar[5];
     assert_msg(bar6->type & BAR_TYPE_MMIO, "AHCI: BAR#6 is not MMIO.");
 
@@ -95,6 +94,7 @@ ahci_driver_init(struct pci_device* ahci_dev)
 
     int iv = isrm_ivexalloc(__ahci_hba_isr);
     pci_setup_msi(ahci_dev, iv);
+    isrm_set_payload(iv, (ptr_t)&ahcis);
 
     struct ahci_driver* ahci_drv = vzalloc(sizeof(*ahci_drv));
     struct ahci_hba* hba = &ahci_drv->hba;
@@ -197,9 +197,9 @@ ahci_driver_init(struct pci_device* ahci_dev)
         ahci_register_device(hbadev);
     }
 
-    return ahci_drv;
+    dev->underlay = ahci_drv;
+    return 0;
 }
-EXPORT_PCI_DEVICE(pci_ahci, AHCI_HBA_CLASS, 0, 0, ahci_driver_init);
 
 void
 ahci_register_device(struct hba_device* hbadev)
@@ -437,3 +437,13 @@ achi_register_ops(struct hba_port* port)
         port->device->ops.submit = scsi_submit;
     }
 }
+
+static struct pci_device_def ahcidef = {
+    .dev_class = AHCI_HBA_CLASS,
+    .dev_vendor = PCI_ID_ANY,
+    .dev_id = PCI_ID_ANY,
+    .devdef = { .class = DEVCLASS(DEVIF_PCI, DEVFN_STORAGE, DEV_SATA, 0),
+                .name = "SATA AHCI",
+                .init_for = ahci_driver_init }
+};
+EXPORT_DEVICE(ahci, &ahcidef.devdef, load_on_demand);

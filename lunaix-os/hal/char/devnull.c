@@ -29,13 +29,21 @@ __null_rd(struct device* dev, void* buf, size_t offset, size_t len)
     return 0;
 }
 
-void
-pdev_nulldev_init()
+static int
+pdev_nulldev_init(struct device_def*)
 {
     struct device* devnull = device_addseq(NULL, NULL, "null");
     devnull->ops.write_page = __null_wr_pg;
     devnull->ops.write = __null_wr;
     devnull->ops.read_page = __null_rd_pg;
     devnull->ops.read = __null_rd;
+
+    return 0;
 }
-EXPORT_PSEUDODEV(nulldev, pdev_nulldev_init);
+
+static struct device_def devnull_def = {
+    .name = "null",
+    .class = DEVCLASS(DEVIF_NON, DEVFN_PSEUDO, 0, 0),
+    .init = pdev_nulldev_init
+};
+EXPORT_DEVICE(nulldev, &devnull_def, load_earlystage);
