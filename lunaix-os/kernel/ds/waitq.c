@@ -5,6 +5,7 @@
 void
 pwait(waitq_t* queue)
 {
+    assert(__current);
     // prevent race condition.
     cpu_disable_interrupt();
 

@@ -1,25 +1,25 @@
 #ifndef __LUNAIX_MUTEX_H
 #define __LUNAIX_MUTEX_H
 
-#include "semaphore.h"
 #include <lunaix/types.h>
+#include <stdatomic.h>
 
 typedef struct mutex_s
 {
-    struct sem_t sem;
+    atomic_ulong lk;
     pid_t owner;
 } mutex_t;
 
 static inline void
 mutex_init(mutex_t* mutex)
 {
-    sem_init(&mutex->sem, 1);
+    mutex->lk = ATOMIC_VAR_INIT(0);
 }
 
 static inline int
 mutex_on_hold(mutex_t* mutex)
 {
-    return !atomic_load(&mutex->sem.counter);
+    return atomic_load(&mutex->lk);
 }
 
 void

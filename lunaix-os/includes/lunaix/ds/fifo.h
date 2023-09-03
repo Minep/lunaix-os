@@ -26,6 +26,9 @@ fifo_putone(struct fifo_buf* fbuf, u8_t data);
 size_t
 fifo_readone_async(struct fifo_buf* fbuf, u8_t* data);
 
+size_t
+fifo_readone(struct fifo_buf* fbuf, u8_t* data);
+
 void
 fifo_set_rdptr(struct fifo_buf* fbuf, size_t rdptr);
 

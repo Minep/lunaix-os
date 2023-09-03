@@ -357,6 +357,7 @@ lxconsole_spawn_ttydev(struct device_def* devdef)
 }
 
 static struct device_def lxconsole_def = {
+    .name = "Lunaix Virtual Console",
     .class = DEVCLASS(DEVIF_NON, DEVFN_TTY, DEV_BUILTIN, 0),
     .init = lxconsole_spawn_ttydev
 };

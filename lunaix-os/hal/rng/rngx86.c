@@ -39,7 +39,7 @@ pdev_randdev_init(struct device_def* devdef)
 }
 
 static struct device_def devrandx86_def = {
-    .name = "null",
+    .name = "x86 On-Chip RNG",
     .class = DEVCLASS(DEVIF_SOC, DEVFN_CHAR, DEV_RNG, 0),
     .init = pdev_randdev_init
 };

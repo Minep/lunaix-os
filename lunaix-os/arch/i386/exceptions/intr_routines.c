@@ -7,7 +7,6 @@
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 #include <lunaix/trace.h>
-#include <lunaix/tty/tty.h>
 
 #include <klibc/stdio.h>
 

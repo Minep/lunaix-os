@@ -32,8 +32,8 @@
  * SOFTWARE.
  */
 
+#include <hal/serial.h>
 #include <klibc/string.h>
-#include <lunaix/peripheral/serial.h>
 #include <sdbg/gdbstub.h>
 #include <sys/port_io.h>
 
@@ -74,6 +74,7 @@ enum GDB_REGISTER
 struct gdb_state
 {
     int signum;
+    struct serial_dev* sdev;
     reg registers[GDB_CPU_NUM_REGISTERS];
 };
 
@@ -884,13 +885,9 @@ gdb_send_error_packet(struct gdb_state* state,
 static int
 gdb_write(struct gdb_state* state, const char* buf, unsigned int len)
 {
-    while (len--) {
-        if (gdb_sys_putchar(state, *buf++) == GDB_EOF) {
-            return GDB_EOF;
-        }
-    }
+    int err = serial_rwbuf_sync(state->sdev, buf, len, SERIAL_RW_TX);
 
-    return 0;
+    return err < 0 ? GDB_EOF : 0;
 }
 
 /*
@@ -913,14 +910,9 @@ gdb_read(struct gdb_state* state,
         return GDB_EOF;
     }
 
-    while (len--) {
-        if ((c = gdb_sys_getc(state)) == GDB_EOF) {
-            return GDB_EOF;
-        }
-        *buf++ = c;
-    }
+    int err = serial_rwbuf_sync(state->sdev, buf, buf_len, SERIAL_RW_RX);
 
-    return 0;
+    return err < 0 ? GDB_EOF : 0;
 }
 
 /*****************************************************************************
@@ -1271,7 +1263,7 @@ gdbstub_loop(isr_param* param)
 int
 gdb_sys_putchar(struct gdb_state* state, int ch)
 {
-    gdb_x86_serial_putchar(ch);
+    serial_rwbuf_sync(state->sdev, &ch, 1, SERIAL_RW_TX);
     return ch;
 }
 
@@ -1281,7 +1273,9 @@ gdb_sys_putchar(struct gdb_state* state, int ch)
 int
 gdb_sys_getc(struct gdb_state* state)
 {
-    return gdb_x86_serial_getc() & 0xff;
+    char ch;
+    serial_rwbuf_sync(state->sdev, &ch, 1, SERIAL_RW_RX);
+    return ch & 0xff;
 }
 
 /*

@@ -1,7 +1,8 @@
+#include <sys/cpu.h>
+#include <sys/i386_intr.h>
 #include <sys/interrupts.h>
 #include <sys/x86_isa.h>
 
-#include <sys/cpu.h>
 #include <hal/intc.h>
 
 #include <lunaix/isrm.h>
@@ -10,9 +11,6 @@
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/syslog.h>
-#include <lunaix/tty/tty.h>
-
-#include <sys/i386_intr.h>
 
 LOG_MODULE("INTR")
 

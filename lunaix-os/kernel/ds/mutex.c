@@ -4,7 +4,16 @@
 void
 mutex_lock(mutex_t* mutex)
 {
-    sem_wait(&mutex->sem);
+    if (atomic_load(&mutex->lk) && mutex->owner == __current->pid) {
+        atomic_fetch_add(&mutex->lk, 1);
+        return;
+    }
+
+    while (atomic_load(&mutex->lk)) {
+        sched_yieldk();
+    }
+
+    atomic_fetch_add(&mutex->lk, 1);
     mutex->owner = __current->pid;
 }
 
@@ -17,8 +26,8 @@ mutex_unlock(mutex_t* mutex)
 void
 mutex_unlock_for(mutex_t* mutex, pid_t pid)
 {
-    if (mutex->owner != pid) {
+    if (mutex->owner != pid || !atomic_load(&mutex->lk)) {
         return;
     }
-    sem_post(&mutex->sem);
+    atomic_fetch_sub(&mutex->lk, 1);
 }

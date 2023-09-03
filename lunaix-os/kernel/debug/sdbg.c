@@ -1,13 +1,13 @@
-#include <hal/acpi/acpi.h>
-#include <hal/intc.h>
+// FIXME Re-design needed!!
+
+#include <hal/serial.h>
 #include <klibc/stdio.h>
-#include <lunaix/isrm.h>
-#include <lunaix/lxconsole.h>
-#include <lunaix/peripheral/serial.h>
 #include <lunaix/syslog.h>
 #include <sdbg/gdbstub.h>
 #include <sdbg/lsdbg.h>
 #include <sdbg/protocol.h>
+
+#include <lunaix/isrm.h>
 
 // #define USE_LSDBG_BACKEND
 
@@ -15,61 +15,27 @@ LOG_MODULE("SDBG")
 
 volatile int debug_mode = 0;
 
-void
-sdbg_loop(const isr_param* param)
+// begin: @cmc
+#define DBG_START 0x636d6340UL
+
+// begin: @yay
+#define DBG_END 0x79617940UL
+
+static int
+sdbg_serial_callback(struct serial_dev* sdev)
 {
-    // This is importnat, because we will handle any subsequent RX/TX in a
-    // synchronized way. And we don't want these irq queue up at our APIC and
-    // confuse the CPU after ACK with APIC.
-    serial_disable_irq(SERIAL_COM1);
-    struct exec_param* execp = param->execp;
-    if (execp->vector == 1 || execp->vector == 3) {
-        goto cont;
-    }
+    u32_t dbg_sig = *(u32_t*)sdev->rw.buf;
 
-    if (!debug_mode) {
-        // Oh... C.M.C. is about to help the debugging!
-        if (serial_rx_byte(SERIAL_COM1) != '@') {
-            goto done;
-        }
-        if (serial_rx_byte(SERIAL_COM1) != 'c') {
-            goto done;
-        }
-        if (serial_rx_byte(SERIAL_COM1) != 'm') {
-            goto done;
-        }
-        if (serial_rx_byte(SERIAL_COM1) != 'c') {
-            goto done;
-        }
+    if (dbg_sig == DBG_START) {
         debug_mode = 1;
-    } else {
-        if (serial_rx_byte(SERIAL_COM1) != '@') {
-            goto cont;
-        }
-        if (serial_rx_byte(SERIAL_COM1) != 'y') {
-            goto cont;
-        }
-        if (serial_rx_byte(SERIAL_COM1) != 'a') {
-            goto cont;
-        }
-        if (serial_rx_byte(SERIAL_COM1) != 'y') {
-            goto cont;
-        }
+    } else if (dbg_sig == DBG_END) {
         debug_mode = 0;
-        goto done;
     }
 
-cont:
-    kprint_dbg(" DEBUG");
-#ifdef USE_LSDBG_BACKEND
-    lunaix_sdbg_loop(param);
-#else
-    gdbstub_loop(param);
-#endif
-    console_flush();
+    // Debugger should be run later
+    // TODO implement a defer execution mechanism (i.e., soft interrupt)
 
-done:
-    serial_enable_irq(SERIAL_COM1);
+    return SERIAL_AGAIN;
 }
 
 void
@@ -98,15 +64,29 @@ sdbg_imm(const isr_param* param)
             param->registers.es,
             param->registers.fs,
             param->registers.gs);
-    console_flush();
     while (1)
         ;
 }
+
+static char buf[4];
+
+static void
+__sdbg_breakpoint(const isr_param* param)
+{
+    gdbstub_loop(param);
+}
+
 void
 sdbg_init()
 {
-    isrm_bindiv(INSTR_DEBUG, sdbg_loop); // #DB
-    isrm_bindiv(INSTR_BREAK, sdbg_loop); // #BRK
+    struct serial_dev* sdev = serial_get_avilable();
 
-    isrm_bindirq(COM1_IRQ, sdbg_loop);
+    if (!sdev) {
+        kprintf(KERROR "no serial port available\n");
+        return;
+    }
+
+    kprintf("listening: %s\n", sdev->dev->name.value);
+
+    serial_rwbuf_async(sdev, buf, 4, sdbg_serial_callback, SERIAL_RW_RX);
 }

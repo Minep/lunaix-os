@@ -25,6 +25,10 @@ device_register_all()
         u32_t hash = devclass_hash(devdef->class);
         devdef->class.hash = hash;
 
+        if (!devdef->name) {
+            devdef->name = "<unspecified>";
+        }
+
         hashtable_hash_in(dev_registry, &devdef->hlist, hash);
         hashtable_hash_in(
           dev_byif, &devdef->hlist_if, DEV_IF(devdef->class.meta));
@@ -150,14 +154,14 @@ __devdb_db_gonext(struct twimap* mapping)
 static void
 __devdb_twifs_lsdb(struct twimap* mapping)
 {
-    char flags[32];
+    char flags[64];
     struct device_def* def = twimap_index(mapping, struct device_def*);
 
     int meta = def->class.meta;
-    ksnprintf(flags, 32, "if=%x,fn=%x", DEV_IF(meta), DEV_FN(meta));
+    ksnprintf(flags, 64, "if=%x,fn=%x", DEV_IF(meta), DEV_FN(meta));
 
     twimap_printf(mapping,
-                  "%d:%d:%d %s (%s)\n",
+                  "%xh:%d:%d \"%s\" %s\n",
                   def->class.meta,
                   def->class.device,
                   def->class.variant,
@@ -165,10 +169,18 @@ __devdb_twifs_lsdb(struct twimap* mapping)
                   flags);
 }
 
+void
+__devdb_reset(struct twimap* map)
+{
+    map->index =
+      container_of(dev_registry_flat.next, struct device_def, dev_list);
+}
+
 static void
 devdb_twifs_plugin()
 {
     struct twimap* map = twifs_mapping(NULL, NULL, "devtab");
+    map->reset = __devdb_reset;
     map->read = __devdb_twifs_lsdb;
     map->go_next = __devdb_db_gonext;
 }

@@ -43,7 +43,7 @@ pdev_nulldev_init(struct device_def*)
 
 static struct device_def devnull_def = {
     .name = "null",
-    .class = DEVCLASS(DEVIF_NON, DEVFN_PSEUDO, 0, 0),
+    .class = DEVCLASS(DEVIF_NON, DEVFN_PSEUDO, DEV_BUILTIN, 0),
     .init = pdev_nulldev_init
 };
 EXPORT_DEVICE(nulldev, &devnull_def, load_earlystage);

@@ -1,4 +1,4 @@
-#include <klibc/stdio.h>
+
 #include <lunaix/device.h>
 #include <lunaix/fs.h>
 #include <lunaix/fs/twifs.h>
@@ -7,6 +7,11 @@
 #include <lunaix/spike.h>
 #include <lunaix/syscall.h>
 #include <lunaix/syscall_utils.h>
+
+#include <usr/lunaix/device.h>
+
+#include <klibc/stdio.h>
+#include <klibc/string.h>
 
 static DEFINE_LLIST(root_list);
 
@@ -202,26 +207,50 @@ device_getbyoffset(struct device* root_dev, int offset)
     return NULL;
 }
 
+static inline void
+device_populate_info(struct device* dev, struct dev_info* devinfo)
+{
+    devinfo->dev_id.meta = dev->class.meta;
+    devinfo->dev_id.device = dev->class.device;
+    devinfo->dev_id.variant = dev->class.variant;
+
+    if (!devinfo->dev_name.buf) {
+        return;
+    }
+
+    struct device_def* def = devdef_byclass(&dev->class);
+    size_t buflen = devinfo->dev_name.buf_len;
+
+    strncpy(devinfo->dev_name.buf, def->name, buflen);
+    devinfo->dev_name.buf[buflen - 1] = 0;
+}
+
 __DEFINE_LXSYSCALL3(int, ioctl, int, fd, int, req, va_list, args)
 {
-    int errno;
+    int errno = -1;
     struct v_fd* fd_s;
-    if ((errno = vfs_getfd(fd, &fd_s))) {
+    if ((errno &= vfs_getfd(fd, &fd_s))) {
         goto done;
     }
 
     struct device* dev = (struct device*)fd_s->file->inode->data;
     if (dev->magic != DEV_STRUCT_MAGIC) {
-        errno = ENODEV;
+        errno &= ENODEV;
         goto done;
+    }
+
+    if (req == DEVIOIDENT) {
+        struct dev_info* devinfo = va_arg(args, struct dev_info*);
+        device_populate_info(dev, devinfo);
+        errno = 0;
     }
 
     if (!dev->ops.exec_cmd) {
-        errno = ENOTSUP;
+        errno &= ENOTSUP;
         goto done;
     }
 
-    errno = dev->ops.exec_cmd(dev, req, args);
+    errno &= dev->ops.exec_cmd(dev, req, args);
 
 done:
     return DO_STATUS_OR_RETURN(errno);

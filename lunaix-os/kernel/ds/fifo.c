@@ -78,6 +78,16 @@ fifo_readone_async(struct fifo_buf* fbuf, u8_t* data)
     return 1;
 }
 
+size_t
+fifo_readone(struct fifo_buf* fbuf, u8_t* data)
+{
+    mutex_lock(&fbuf->lock);
+    size_t retval = fifo_readone_async(fbuf, data);
+    mutex_unlock(&fbuf->lock);
+
+    return retval;
+}
+
 void
 fifo_set_rdptr(struct fifo_buf* fbuf, size_t rdptr)
 {
@@ -104,6 +114,10 @@ size_t
 fifo_write(struct fifo_buf* fbuf, void* data, size_t count)
 {
     size_t wr_count = 0, wr_pos = fbuf->wr_pos;
+
+    if (!count) {
+        return 0;
+    }
 
     mutex_lock(&fbuf->lock);
 

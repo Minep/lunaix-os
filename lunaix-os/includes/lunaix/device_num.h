@@ -49,9 +49,9 @@
             device for output into external environment
 */
 
-#define DEV_META(if_, function) (((if_)&0xffff) << 16) | ((function)&0xffff)
+#define DEV_META(if_, function) (((if_) & 0xffff) << 16) | ((function) & 0xffff)
 #define DEV_IF(meta) ((meta) >> 16)
-#define DEV_FN(meta) (((meta)&0xffff))
+#define DEV_FN(meta) (((meta) & 0xffff))
 
 #define DEVIF_NON 0x0
 #define DEVIF_SOC 0x1
@@ -74,6 +74,7 @@
 #define DEV_RTC 0x3
 #define DEV_SATA 0x4
 #define DEV_NVME 0x5
-#define DEV_BUS 0x5
+#define DEV_BUS 0x6
+#define DEV_SERIAL 0x7
 
 #endif /* __LUNAIX_DEVICE_NUM_H */

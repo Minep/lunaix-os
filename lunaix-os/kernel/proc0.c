@@ -100,11 +100,8 @@ init_platform()
 
     twifs_register_plugins();
 
-    // FIXME This 8025 serial should integrated into device layer
-    serial_init();
-
-    // debugger
-    sdbg_init();
+    // FIXME Re-design needed!!
+    // sdbg_init();
 
     // console
     console_start_flushing();

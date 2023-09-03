@@ -216,7 +216,7 @@ rtc_init(struct device_def* devdef)
 }
 
 static struct device_def devrtc_mc146818 = {
-    .name = "rtc_mc146818",
+    .name = "MC146818 RTC",
     .class = DEVCLASS(DEVIF_SOC, DEVFN_TIME, DEV_RTC, 1),
     .init = rtc_init
 };

@@ -575,7 +575,7 @@ ps2_issue_dev_cmd(char cmd, u16_t arg)
 }
 
 static struct device_def devrtc_i8042kbd = {
-    .name = "ps2 keyboard",
+    .name = "i8042 Keyboard",
     .class = DEVCLASS(DEVIF_SOC, DEVFN_INPUT, DEV_X86LEGACY, 0),
     .init = ps2_kbd_init
 };

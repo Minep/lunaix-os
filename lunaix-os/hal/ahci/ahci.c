@@ -443,7 +443,7 @@ static struct pci_device_def ahcidef = {
     .dev_vendor = PCI_ID_ANY,
     .dev_id = PCI_ID_ANY,
     .devdef = { .class = DEVCLASS(DEVIF_PCI, DEVFN_STORAGE, DEV_SATA, 0),
-                .name = "SATA AHCI",
+                .name = "Serial ATA Controller",
                 .init_for = ahci_driver_init }
 };
 EXPORT_DEVICE(ahci, &ahcidef.devdef, load_on_demand);

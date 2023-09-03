@@ -92,6 +92,10 @@ struct device
 
     struct
     {
+        // TODO Think about where will they fit.
+        int (*acquire)(struct device* dev);
+        int (*release)(struct device* dev);
+
         int (*read)(struct device* dev, void* buf, size_t offset, size_t len);
         int (*write)(struct device* dev, void* buf, size_t offset, size_t len);
         int (*read_page)(struct device* dev, void* buf, size_t offset);
@@ -180,6 +184,9 @@ device_create_byclass(struct devclass* class,
 
 struct hbucket*
 device_definitions_byif(int if_type);
+
+struct device_def*
+devdef_byclass(struct devclass* class);
 
 void
 device_register_all();
