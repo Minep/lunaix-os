@@ -171,6 +171,8 @@ serial_create()
     sdev->dev = dev;
     dev->underlay = sdev;
 
+    waitq_init(&sdev->wq_rxdone);
+    waitq_init(&sdev->wq_txdone);
     fifo_init(&sdev->rxbuf, valloc(RXBUF_SIZE), RXBUF_SIZE, 0);
     llist_append(&serial_devs, &sdev->sdev_list);
     // llist_init_head(&sdev->cmds);

@@ -30,9 +30,10 @@
 #define UART_rLS_BI (1 << 4)
 
 #define UART_rII_FIFOEN (0b11 << 6)
-#define UART_rII_ID 0b1110
+#define UART_rII_ID 0b1111
 
 #define UART_rFC_EN 1
+#define UART_rFC_DMA1 (1 << 3)
 #define UART_rFC_XMIT_RESET (1 << 2)
 #define UART_rFC_RCVR_RESET (1 << 1)
 
@@ -80,14 +81,14 @@ uart_setup(struct uart16550* uart)
 }
 
 static inline void
-uart_setie(struct uart16550* uart)
+uart_clrie(struct uart16550* uart)
 {
     uart->cntl_save.rie = uart->read_reg(uart, UART_rIE);
     uart->write_reg(uart, UART_rIE, 0);
 }
 
 static inline void
-uart_clrie(struct uart16550* uart)
+uart_setie(struct uart16550* uart)
 {
     uart->write_reg(uart, UART_rIE, uart->cntl_save.rie | 1);
 }
@@ -155,7 +156,8 @@ uart_eorcv(struct uart16550* uart)
 static inline int
 uart_enable_fifo(struct uart16550* uart, int trig_lvl)
 {
-    uart->cntl_save.rfc = UART_rFC_EN | (trig_lvl & 0b11);
+    uart->cntl_save.rfc =
+      UART_rFC_EN | ((trig_lvl & 0b11) << 6) | UART_rFC_DMA1;
     uart->write_reg(uart, UART_rFC, uart->cntl_save.rfc);
 
     return uart->read_reg(uart, UART_rII) & UART_rII_FIFOEN;
@@ -184,7 +186,7 @@ static inline int
 uart_intr_identify(struct uart16550* uart)
 {
     u32_t rii = uart->read_reg(uart, UART_rII);
-    return (!!(rii & UART_rII_FIFOEN) << 3) | ((rii & UART_rII_ID) >> 1);
+    return (rii & UART_rII_ID);
 }
 
 static inline u8_t

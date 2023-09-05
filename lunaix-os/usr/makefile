@@ -33,6 +33,7 @@ app-list += init
 app-list += signal_demo
 app-list += sh
 app-list += cat
+app-list += testp
 
 mkapp-list := $(addprefix app-, $(app-list))
 

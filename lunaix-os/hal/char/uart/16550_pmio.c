@@ -74,7 +74,6 @@ upiom_init(struct device_def* def)
             *((volatile int*)irqs[i]) = 0;
         }
 
-        uart_setup(uart);
         uart_enable_fifo(uart, UART_FIFO8);
         llist_append(&com_ports, &uart->local_ports);
 
@@ -85,6 +84,8 @@ upiom_init(struct device_def* def)
 
         uart->sdev = sdev;
 
+        uart_setup(uart);
+        uart_setie(uart);
         uart = NULL;
     }
 

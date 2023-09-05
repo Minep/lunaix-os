@@ -66,15 +66,14 @@ uart_general_irq_handler(int iv, struct llist_header* ports)
     llist_for_each(pos, n, ports, local_ports)
     {
         int is = uart_intr_identify(pos);
-        if (iv == pos->iv && is == UART_DATA_OK) {
-            break;
+        if (iv == pos->iv && (is == UART_DATA_OK || is == UART_CHR_TIMEOUT)) {
+            goto done;
         }
     }
 
-    if (!pos) {
-        return;
-    }
+    return;
 
+done:
     char recv;
     int i = 0;
     while ((recv = uart_read_byte(pos))) {

@@ -145,7 +145,7 @@ trace_printstack_isr(const isr_param* isrm)
 {
     isr_param* p = isrm;
     ptr_t fp = cpu_get_fp();
-    int prev_fromusr = uspace_context(p);
+    int prev_fromusr = 0;
 
     kprintf(KDEBUG "\n");
     kprintf(KDEBUG "stack trace (pid=%d)\n", __current->pid);
