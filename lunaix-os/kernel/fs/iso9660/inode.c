@@ -61,6 +61,7 @@ iso9660_fill_inode(struct v_inode* inode, struct iso_drecache* dir, int ino)
 
     inode->id = ino;
     inode->lb_addr = dir->extent_addr;
+    inode->lb_usage = ICEIL(dir->data_size, fu_len);
     inode->ops = &iso_inode_ops;
     inode->default_fops = &iso_file_ops;
 

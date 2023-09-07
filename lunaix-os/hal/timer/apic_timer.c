@@ -151,6 +151,8 @@ struct hwtimer*
 apic_hwtimer_context()
 {
     static struct hwtimer apic_hwt = { .name = "apic_timer",
+                                       .class = DEVCLASS(
+                                         DEVIF_SOC, DEVFN_TIME, DEV_TIMER, 0),
                                        .init = apic_timer_init,
                                        .supported = apic_timer_check,
                                        .systicks = apic_get_systicks };

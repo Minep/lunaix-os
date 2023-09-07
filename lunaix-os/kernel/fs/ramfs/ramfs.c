@@ -65,9 +65,7 @@ __ramfs_mknod(struct v_dnode* dnode, struct v_inode** nod_out, u32_t flags)
     rinode->flags = flags;
     inode->data = rinode;
 
-    if ((flags & RAMF_DIR)) {
-        inode->itype = VFS_IFDIR;
-    } else {
+    if (!(flags & RAMF_DIR)) {
         inode->itype = VFS_IFFILE;
     }
 

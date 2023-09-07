@@ -118,7 +118,7 @@ __twifs_dirlookup(struct v_inode* inode, struct v_dnode* dnode)
 {
     struct twifs_node* twi_node = (struct twifs_node*)inode->data;
 
-    if (!(twi_node->itype & VFS_IFDIR)) {
+    if ((twi_node->itype & F_FILE)) {
         return ENOTDIR;
     }
 
@@ -180,7 +180,7 @@ __twifs_openfile(struct v_inode* inode, struct v_file* file)
 int
 twifs_rm_node(struct twifs_node* node)
 {
-    if ((node->itype & VFS_IFDIR) && !llist_empty(&node->children)) {
+    if (!(node->itype & F_FILE) && !llist_empty(&node->children)) {
         return ENOTEMPTY;
     }
     llist_delete(&node->siblings);

@@ -43,7 +43,7 @@ struct serial_dev
 };
 
 struct serial_dev*
-serial_create();
+serial_create(struct devclass* class);
 
 void
 serial_readone(struct serial_dev* sdev, u8_t* val);

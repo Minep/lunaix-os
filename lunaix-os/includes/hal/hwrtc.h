@@ -35,7 +35,7 @@ void
 hwrtc_init();
 
 struct hwrtc*
-hwrtc_alloc_new(char* driver_id);
+hwrtc_alloc_new(struct device_def* def, char* name);
 
 void
 hwrtc_walltime(datetime_t* dt);

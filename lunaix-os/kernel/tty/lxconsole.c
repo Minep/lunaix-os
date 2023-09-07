@@ -343,7 +343,8 @@ console_start_flushing()
 static int
 lxconsole_spawn_ttydev(struct device_def* devdef)
 {
-    struct device* tty_dev = device_addseq(NULL, &lx_console, "tty");
+    struct device* tty_dev =
+      device_addseq(NULL, &devdef->class, &lx_console, "tty");
     tty_dev->ops.write = __tty_write;
     tty_dev->ops.write_page = __tty_write_pg;
     tty_dev->ops.read = __tty_read;

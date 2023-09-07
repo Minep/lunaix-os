@@ -40,7 +40,7 @@
                     we can do similar thing in Lunaix? A block device emulation
                     above the regular file when we mount it on.
  10. (device) device number (dev_t) allocation
-            [good idea] <class>:<subclass>:<uniq_id> composition
+            [good idea] <class>:<subclass>:<uniq_id> composition (CHECKED)
 */
 
 #include <klibc/string.h>
@@ -201,7 +201,7 @@ vfs_open(struct v_dnode* dnode, struct v_file** file)
     vfile->ref_count = ATOMIC_VAR_INIT(1);
     vfile->ops = inode->default_fops;
 
-    if ((inode->itype & VFS_IFFILE) && !inode->pg_cache) {
+    if ((inode->itype & F_MFILE) && !inode->pg_cache) {
         struct pcache* pcache = vzalloc(sizeof(struct pcache));
         pcache_init(pcache);
         pcache->master = inode;
@@ -515,6 +515,7 @@ vfs_i_free(struct v_inode* inode)
 
 #define FLOCATE_CREATE_EMPTY 1
 #define FLOCATE_CREATE_ONLY 2
+#define FLOCATE_NOFOLLOW 4
 
 int
 vfs_getfd(int fd, struct v_fd** fd_s)
@@ -533,14 +534,18 @@ __vfs_try_locate_file(const char* path,
 {
     char name_str[VFS_NAME_MAXLEN];
     struct hstr name = HSTR(name_str, 0);
-    int errno;
+    int errno, woption = 0;
+
+    if ((options & FLOCATE_NOFOLLOW)) {
+        woption |= VFS_WALK_NOFOLLOW;
+    }
 
     name_str[0] = 0;
-    if ((errno = vfs_walk_proc(path, fdir, &name, VFS_WALK_PARENT))) {
+    if ((errno = vfs_walk_proc(path, fdir, &name, woption | VFS_WALK_PARENT))) {
         return errno;
     }
 
-    errno = vfs_walk(*fdir, name.value, file, NULL, 0);
+    errno = vfs_walk(*fdir, name.value, file, NULL, woption);
 
     if (errno != ENOENT && (options & FLOCATE_CREATE_ONLY)) {
         return EEXIST;
@@ -575,12 +580,17 @@ __vfs_try_locate_file(const char* path,
 int
 vfs_do_open(const char* path, int options)
 {
-    int errno, fd;
+    int errno, fd, loptions = 0;
     struct v_dnode *dentry, *file;
     struct v_file* ofile = NULL;
 
-    errno = __vfs_try_locate_file(
-      path, &dentry, &file, (options & FO_CREATE) ? FLOCATE_CREATE_EMPTY : 0);
+    if ((options & FO_CREATE)) {
+        loptions |= FLOCATE_CREATE_EMPTY;
+    } else if ((options & FO_NOFOLLOW)) {
+        loptions |= FLOCATE_NOFOLLOW;
+    }
+
+    errno = __vfs_try_locate_file(path, &dentry, &file, loptions);
 
     if (!errno && !(errno = vfs_alloc_fdslot(&fd))) {
 
@@ -651,7 +661,7 @@ __DEFINE_LXSYSCALL2(int, sys_readdir, int, fd, struct lx_dirent*, dent)
 
     lock_inode(inode);
 
-    if (!(inode->itype & VFS_IFDIR)) {
+    if ((inode->itype & F_FILE)) {
         errno = ENOTDIR;
     } else {
         struct dir_context dctx =
@@ -689,7 +699,7 @@ __DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
     }
 
     struct v_file* file = fd_s->file;
-    if ((file->inode->itype & VFS_IFDIR)) {
+    if (!(file->inode->itype & F_FILE)) {
         errno = EISDIR;
         goto done;
     }
@@ -730,7 +740,7 @@ __DEFINE_LXSYSCALL3(int, write, int, fd, void*, buf, size_t, count)
         goto done;
     }
 
-    if ((file->inode->itype & VFS_IFDIR)) {
+    if (!(file->inode->itype & F_FILE)) {
         errno = EISDIR;
         goto done;
     }
@@ -852,13 +862,12 @@ vfs_readlink(struct v_dnode* dnode, char* buf, size_t size)
 int
 vfs_get_dtype(int itype)
 {
-    switch (itype) {
-        case VFS_IFDIR:
-            return DT_DIR;
-        case VFS_IFSYMLINK:
-            return DT_SYMLINK;
-        default:
-            return DT_PIPE;
+    if ((itype & VFS_IFSYMLINK)) {
+        return DT_SYMLINK;
+    } else if (!(itype & VFS_IFFILE)) {
+        return DT_DIR;
+    } else {
+        return DT_FILE;
     }
 }
 
@@ -912,6 +921,8 @@ __DEFINE_LXSYSCALL4(int,
     if ((errno = vfs_getfd(dirfd, &fd_s))) {
         goto done;
     }
+
+    pathname = pathname ? pathname : "";
 
     struct v_dnode* dnode;
     if (!(errno = vfs_walk(
@@ -974,7 +985,7 @@ __DEFINE_LXSYSCALL1(int, rmdir, const char*, pathname)
     lock_dnode(parent);
     lock_inode(parent->inode);
 
-    if ((dnode->inode->itype & VFS_IFDIR)) {
+    if (!(dnode->inode->itype & F_MFILE)) {
         errno = parent->inode->ops->rmdir(parent->inode, dnode);
         if (!errno) {
             vfs_dcache_remove(dnode);
@@ -1018,7 +1029,7 @@ __DEFINE_LXSYSCALL1(int, mkdir, const char*, path)
         errno = ENOTSUP;
     } else if (!parent->inode->ops->mkdir) {
         errno = ENOTSUP;
-    } else if (!(parent->inode->itype & VFS_IFDIR)) {
+    } else if ((parent->inode->itype & F_FILE)) {
         errno = ENOTDIR;
     } else if (!(errno = parent->inode->ops->mkdir(parent->inode, dir))) {
         vfs_dcache_add(parent, dir);
@@ -1052,7 +1063,7 @@ __vfs_do_unlink(struct v_dnode* dnode)
 
     if (inode->open_count) {
         errno = EBUSY;
-    } else if (!(inode->itype & VFS_IFDIR)) {
+    } else if ((inode->itype & F_MFILE)) {
         errno = inode->ops->unlink(inode);
         if (!errno) {
             vfs_d_free(dnode);
@@ -1255,7 +1266,7 @@ vfs_do_chdir(struct proc_info* proc, struct v_dnode* dnode)
 
     lock_dnode(dnode);
 
-    if (!(dnode->inode->itype & VFS_IFDIR)) {
+    if ((dnode->inode->itype & F_FILE)) {
         errno = ENOTDIR;
         goto done;
     }
@@ -1428,5 +1439,47 @@ __DEFINE_LXSYSCALL2(int, rename, const char*, oldpath, const char*, newpath)
 
 done:
     vfree((void*)name.value);
+    return DO_STATUS(errno);
+}
+
+__DEFINE_LXSYSCALL2(int, fstat, int, fd, struct file_stat*, stat)
+{
+    int errno = 0;
+    struct v_fd* fds;
+
+    if ((errno = vfs_getfd(fd, &fds))) {
+        goto done;
+    }
+
+    struct v_inode* vino = fds->file->inode;
+    struct device* fdev = vino->sb->dev;
+
+    *stat = (struct file_stat){ .st_ino = vino->id,
+                                .st_blocks = vino->lb_usage,
+                                .st_size = vino->fsize,
+                                .mode = vino->itype,
+                                .st_ioblksize = PG_SIZE,
+                                .st_blksize = vino->sb->blksize };
+
+    if (VFS_DEVFILE(vino->itype)) {
+        struct device* rdev = (struct device*)vino->data;
+        if (!rdev || rdev->magic != DEV_STRUCT_MAGIC) {
+            errno = EINVAL;
+            goto done;
+        }
+
+        stat->st_rdev = (dev_t){ .meta = rdev->class->meta,
+                                 .devident = device_id_from_class(rdev->class),
+                                 .dev_uid = rdev->dev_uid };
+    }
+
+    if (fdev) {
+        u32_t devident = device_id_from_class(fdev->class);
+        stat->st_dev = (dev_t){ .meta = fdev->class->meta,
+                                .devident = devident,
+                                .dev_uid = fdev->dev_uid };
+    }
+
+done:
     return DO_STATUS(errno);
 }

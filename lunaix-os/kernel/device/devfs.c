@@ -73,8 +73,10 @@ devfs_get_itype(struct device* dev)
         itype = VFS_IFDIR;
     } else if (dev_if == DEV_IFVOL) {
         itype |= VFS_IFVOLDEV;
-    } else {
+    } else if (dev_if == DEV_IFSEQ) {
         itype |= VFS_IFSEQDEV;
+    } else {
+        itype |= VFS_IFDEV;
     }
     return itype;
 }
@@ -96,10 +98,10 @@ devfs_mknod(struct v_dnode* dnode, struct device* dev)
 {
     assert(dev);
 
-    struct v_inode* devnod = vfs_i_find(dnode->super_block, dev->dev_id);
+    struct v_inode* devnod = vfs_i_find(dnode->super_block, dev->dev_uid);
     if (!devnod) {
         if ((devnod = vfs_i_alloc(dnode->super_block))) {
-            devnod->id = dev->dev_id;
+            devnod->id = dev->dev_uid;
             devnod->data = dev;
             devnod->itype = devfs_get_itype(dev);
 

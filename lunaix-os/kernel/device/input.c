@@ -70,7 +70,7 @@ __input_dev_read_pg(struct device* dev, void* buf, size_t offset)
 }
 
 struct input_device*
-input_add_device(char* name_fmt, ...)
+input_add_device(struct devclass* class, char* name_fmt, ...)
 {
     assert(input_devcat);
 
@@ -81,7 +81,7 @@ input_add_device(char* name_fmt, ...)
     va_start(args, name_fmt);
 
     struct device* dev =
-      device_add_vargs(input_devcat, idev, name_fmt, DEV_IFSEQ, args);
+      device_add_vargs(input_devcat, idev, name_fmt, DEV_IFSEQ, class, args);
 
     idev->dev_if = dev;
     dev->ops.read = __input_dev_read;

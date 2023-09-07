@@ -85,7 +85,7 @@ device_create_byclass(struct devclass* class,
         return NULL;
     }
 
-    struct device* dev = device_add(adhoc_devcat, NULL, type, NULL);
+    struct device* dev = device_add(adhoc_devcat, class, NULL, type, NULL);
 
     errno = devdef->init_for(devdef, dev);
     if (err_code && !errno) {
@@ -100,7 +100,7 @@ device_create_byclass(struct devclass* class,
                    class->meta,
                    class->device,
                    class->device,
-                   dev->dev_id);
+                   dev->dev_uid);
 
     return dev;
 }

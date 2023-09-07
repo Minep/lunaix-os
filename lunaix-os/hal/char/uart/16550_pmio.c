@@ -77,7 +77,7 @@ upiom_init(struct device_def* def)
         uart_enable_fifo(uart, UART_FIFO8);
         llist_append(&com_ports, &uart->local_ports);
 
-        struct serial_dev* sdev = serial_create();
+        struct serial_dev* sdev = serial_create(&def->class);
         sdev->backend = uart;
         sdev->write = uart_general_tx;
         sdev->exec_cmd = uart_general_exec_cmd;

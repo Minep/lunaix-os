@@ -195,7 +195,7 @@ rtc_init(struct device_def* devdef)
     // Make sure the rtc timer is disabled by default
     rtc_disable_timer();
 
-    struct hwrtc* rtc = hwrtc_alloc_new("mc146818");
+    struct hwrtc* rtc = hwrtc_alloc_new(devdef, "mc146818");
     struct mc146818* state = valloc(sizeof(struct mc146818));
 
     state->rtc_context = rtc;

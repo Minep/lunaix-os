@@ -28,4 +28,13 @@ typedef unsigned long size_t;
 
 typedef unsigned long off_t;
 
+typedef unsigned int ino_t;
+
+typedef struct dev_t
+{
+    unsigned int meta;
+    unsigned int devident;
+    unsigned int dev_uid;
+} dev_t;
+
 #endif /* __LUNAIX_TYPES_H */

@@ -55,6 +55,7 @@ iso9660_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
     vsb->data = isovsb;
     vsb->ops.init_inode = iso9660_init_inode;
     vsb->ops.read_capacity = iso9660_rd_capacity;
+    vsb->blksize = ISO9660_BLKSZ;
 
     struct v_inode* rootino = vfs_i_alloc(vsb);
     struct iso_var_mdu* mdu = (struct iso_var_mdu*)vprim->root_record;

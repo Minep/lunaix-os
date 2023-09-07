@@ -69,7 +69,7 @@ hwrtc_read(struct device* dev, void* buf, size_t offset, size_t len)
 }
 
 struct hwrtc*
-hwrtc_alloc_new(char* name)
+hwrtc_alloc_new(struct device_def* def, char* name)
 {
     struct hwrtc* rtc_instance = valloc(sizeof(struct hwrtc));
 
@@ -85,7 +85,7 @@ hwrtc_alloc_new(char* name)
 
     rtc_instance->name = name;
     struct device* rtcdev =
-      device_addsys(NULL, rtc_instance, "rtc%d", rtc_count);
+      device_addsys(NULL, &def->class, rtc_instance, "rtc%d", rtc_count);
 
     rtcdev->ops.exec_cmd = hwrtc_ioctl;
     rtcdev->ops.read = hwrtc_read;

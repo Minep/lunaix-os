@@ -15,13 +15,16 @@
 
 static DEFINE_LLIST(root_list);
 
-static volatile dev_t devid = 0;
+static volatile u32_t devid = 0;
+
+struct devclass default_devclass = {};
 
 void
-device_prepare(struct device* dev)
+device_prepare(struct device* dev, struct devclass* class)
 {
     dev->magic = DEV_STRUCT_MAGIC;
-    dev->dev_id = devid++;
+    dev->dev_uid = devid++;
+    dev->class = class ? class : &default_devclass;
 
     llist_init_head(&dev->children);
 }
@@ -53,11 +56,12 @@ device_add_vargs(struct device* parent,
                  void* underlay,
                  char* name_fmt,
                  u32_t type,
+                 struct devclass* class,
                  va_list args)
 {
     struct device* dev = vzalloc(sizeof(struct device));
 
-    device_prepare(dev);
+    device_prepare(dev, class);
 
     if (parent) {
         assert((parent->dev_type & DEV_MSKIF) == DEV_IFCAT);
@@ -79,6 +83,7 @@ device_add_vargs(struct device* parent,
 
 struct device*
 device_add(struct device* parent,
+           struct devclass* class,
            void* underlay,
            u32_t type,
            char* name_fmt,
@@ -88,46 +93,58 @@ device_add(struct device* parent,
     va_start(args, name_fmt);
 
     struct device* dev =
-      device_add_vargs(parent, underlay, name_fmt, type, args);
+      device_add_vargs(parent, underlay, name_fmt, type, class, args);
 
     va_end(args);
     return dev;
 }
 
 struct device*
-device_addsys(struct device* parent, void* underlay, char* name_fmt, ...)
+device_addsys(struct device* parent,
+              struct devclass* class,
+              void* underlay,
+              char* name_fmt,
+              ...)
 {
     va_list args;
     va_start(args, name_fmt);
 
     struct device* dev =
-      device_add_vargs(parent, underlay, name_fmt, DEV_IFSEQ, args);
+      device_add_vargs(parent, underlay, name_fmt, DEV_IFSYS, class, args);
 
     va_end(args);
     return dev;
 }
 
 struct device*
-device_addseq(struct device* parent, void* underlay, char* name_fmt, ...)
+device_addseq(struct device* parent,
+              struct devclass* class,
+              void* underlay,
+              char* name_fmt,
+              ...)
 {
     va_list args;
     va_start(args, name_fmt);
 
     struct device* dev =
-      device_add_vargs(parent, underlay, name_fmt, DEV_IFSEQ, args);
+      device_add_vargs(parent, underlay, name_fmt, DEV_IFSEQ, class, args);
 
     va_end(args);
     return dev;
 }
 
 struct device*
-device_addvol(struct device* parent, void* underlay, char* name_fmt, ...)
+device_addvol(struct device* parent,
+              struct devclass* class,
+              void* underlay,
+              char* name_fmt,
+              ...)
 {
     va_list args;
     va_start(args, name_fmt);
 
     struct device* dev =
-      device_add_vargs(parent, underlay, name_fmt, DEV_IFVOL, args);
+      device_add_vargs(parent, underlay, name_fmt, DEV_IFVOL, class, args);
 
     va_end(args);
     return dev;
@@ -140,20 +157,20 @@ device_addcat(struct device* parent, char* name_fmt, ...)
     va_start(args, name_fmt);
 
     struct device* dev =
-      device_add_vargs(parent, NULL, name_fmt, DEV_IFCAT, args);
+      device_add_vargs(parent, NULL, name_fmt, DEV_IFCAT, NULL, args);
 
     va_end(args);
     return dev;
 }
 
 struct device*
-device_getbyid(struct llist_header* devlist, dev_t id)
+device_getbyid(struct llist_header* devlist, u32_t id)
 {
     devlist = devlist ? devlist : &root_list;
     struct device *pos, *n;
     llist_for_each(pos, n, devlist, siblings)
     {
-        if (pos->dev_id == id) {
+        if (pos->dev_uid == id) {
             return pos;
         }
     }
@@ -210,15 +227,15 @@ device_getbyoffset(struct device* root_dev, int offset)
 static inline void
 device_populate_info(struct device* dev, struct dev_info* devinfo)
 {
-    devinfo->dev_id.meta = dev->class.meta;
-    devinfo->dev_id.device = dev->class.device;
-    devinfo->dev_id.variant = dev->class.variant;
+    devinfo->dev_id.meta = dev->class->meta;
+    devinfo->dev_id.device = dev->class->device;
+    devinfo->dev_id.variant = dev->class->variant;
 
     if (!devinfo->dev_name.buf) {
         return;
     }
 
-    struct device_def* def = devdef_byclass(&dev->class);
+    struct device_def* def = devdef_byclass(dev->class);
     size_t buflen = devinfo->dev_name.buf_len;
 
     strncpy(devinfo->dev_name.buf, def->name, buflen);

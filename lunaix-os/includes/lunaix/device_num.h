@@ -76,5 +76,6 @@
 #define DEV_NVME 0x5
 #define DEV_BUS 0x6
 #define DEV_SERIAL 0x7
+#define DEV_TIMER 0x8
 
 #endif /* __LUNAIX_DEVICE_NUM_H */

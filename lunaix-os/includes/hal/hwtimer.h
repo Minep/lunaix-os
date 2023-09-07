@@ -12,6 +12,7 @@ struct hwtimer
     char* name;
     void* data;
 
+    struct devclass class;
     struct device* timer_dev;
 
     int (*supported)(struct hwtimer*);

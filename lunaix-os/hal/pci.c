@@ -63,7 +63,7 @@ found:
     device->cspace_base = pci_base;
     device->intr_info = intr;
 
-    device_prepare(&device->dev);
+    device_prepare(&device->dev, &pos->devdef.class);
 
     pci_probe_msi_info(device);
     pci_probe_bar_info(device);

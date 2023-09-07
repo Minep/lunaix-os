@@ -65,8 +65,6 @@
 #define DEV_IFCAT 0x2 // a device category (as device groupping)
 #define DEV_IFSYS 0x3 // a system device
 
-typedef unsigned int dev_t;
-
 struct devclass
 {
     u32_t meta;
@@ -84,8 +82,8 @@ struct device
     // TODO investigate event polling
 
     struct hstr name;
-    struct devclass class;
-    dev_t dev_id;
+    struct devclass* class;
+    u32_t dev_uid;
     int dev_type;
     char name_val[DEVICE_NAME_SIZE];
     void* underlay;
@@ -123,11 +121,17 @@ static inline u32_t devclass_hash(struct devclass class)
            ~class.meta;
 }
 
+static inline u32_t
+device_id_from_class(struct devclass* class)
+{
+    return ((class->device & 0xffff) << 16) | ((class->variant & 0xffff));
+}
+
 void
 device_register_all();
 
 void
-device_prepare(struct device* dev);
+device_prepare(struct device* dev, struct devclass* class);
 
 void
 device_setname(struct device* dev, char* fmt, ...);
@@ -140,23 +144,37 @@ device_add_vargs(struct device* parent,
                  void* underlay,
                  char* name_fmt,
                  u32_t type,
+                 struct devclass* class,
                  va_list args);
 
 struct device*
 device_add(struct device* parent,
+           struct devclass* class,
            void* underlay,
            u32_t type,
            char* name_fmt,
            ...);
 
 struct device*
-device_addsys(struct device* parent, void* underlay, char* name_fmt, ...);
+device_addsys(struct device* parent,
+              struct devclass* class,
+              void* underlay,
+              char* name_fmt,
+              ...);
 
 struct device*
-device_addseq(struct device* parent, void* underlay, char* name_fmt, ...);
+device_addseq(struct device* parent,
+              struct devclass* class,
+              void* underlay,
+              char* name_fmt,
+              ...);
 
 struct device*
-device_addvol(struct device* parent, void* underlay, char* name_fmt, ...);
+device_addvol(struct device* parent,
+              struct devclass* class,
+              void* underlay,
+              char* name_fmt,
+              ...);
 
 struct device*
 device_addcat(struct device* parent, char* name_fmt, ...);
@@ -165,7 +183,7 @@ void
 device_remove(struct device* dev);
 
 struct device*
-device_getbyid(struct llist_header* devlist, dev_t id);
+device_getbyid(struct llist_header* devlist, u32_t id);
 
 struct device*
 device_getbyhname(struct device* root_dev, struct hstr* name);

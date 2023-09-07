@@ -31,6 +31,7 @@
 #define HBA_CLB_SIZE 1024
 
 #define HBA_MY_IE (HBA_PxINTR_DHR | HBA_PxINTR_TFE | HBA_PxINTR_OF)
+#define AHCI_DEVCLASS DEVCLASS(DEVIF_PCI, DEVFN_STORAGE, DEV_SATA, 0)
 
 // #define DO_HBA_FULL_RESET
 
@@ -42,6 +43,8 @@ static char sata_ifs[][20] = { "Not detected",
                                "SATA I (1.5Gbps)",
                                "SATA II (3.0Gbps)",
                                "SATA III (6.0Gbps)" };
+
+static struct devclass ahci_class = AHCI_DEVCLASS;
 
 extern void
 ahci_fsexport(struct block_dev* bdev, void* fs_node);
@@ -209,6 +212,7 @@ ahci_register_device(struct hba_device* hbadev)
 
     bdev->end_lba = hbadev->max_lba;
     bdev->blk_size = hbadev->block_size;
+    bdev->class = &ahci_class;
 
     block_mount(bdev, ahci_fsexport);
 }

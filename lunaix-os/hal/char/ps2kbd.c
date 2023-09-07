@@ -224,7 +224,7 @@ ps2_kbd_init(struct device_def* devdef)
     kbd_state.translation_table = scancode_set2;
     kbd_state.state = KBD_STATE_KWAIT;
 
-    kbd_idev = input_add_device("i8042-kbd");
+    kbd_idev = input_add_device(&devdef->class, devdef->name);
 
     /* FIXME This require systematical rework! */
     // acpi_context* acpi_ctx = acpi_get_context();

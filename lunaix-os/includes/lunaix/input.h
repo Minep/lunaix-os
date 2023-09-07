@@ -56,6 +56,6 @@ void
 input_add_listener(input_evt_cb listener);
 
 struct input_device*
-input_add_device(char* name_fmt, ...);
+input_add_device(struct devclass* class, char* name_fmt, ...);
 
 #endif /* __LUNAIX_INPUT_H */

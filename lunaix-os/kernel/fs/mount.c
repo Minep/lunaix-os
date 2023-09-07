@@ -137,7 +137,7 @@ vfs_mount_at(const char* fs_name,
         return ENOTBLK;
     }
 
-    if (mnt_point->inode && !(mnt_point->inode->itype & VFS_IFDIR)) {
+    if (mnt_point->inode && (mnt_point->inode->itype & F_MFILE)) {
         return ENOTDIR;
     }
 

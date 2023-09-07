@@ -31,6 +31,7 @@ struct block_dev
     u64_t end_lba;
     u32_t blk_size;
     struct block_dev_ops ops;
+    struct devclass* class;
 };
 
 // Lunaix Partition Table

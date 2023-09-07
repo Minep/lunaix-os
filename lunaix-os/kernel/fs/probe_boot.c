@@ -23,10 +23,11 @@ probe_boot_medium()
         int errno =
           pos->ops.read(pos, (void*)volp, ISO9660_READ_OFF, ISO9660_BLKSZ);
         if (errno < 0) {
-            kprintf(KWARN "can not probe %x:%s (%d)\n",
-                    pos->dev_id,
-                    pos->name.value,
-                    errno);
+            kprintf(KINFO "failed %x:%d:%d, /dev/%s\n",
+                    pos->class->meta,
+                    pos->class->device,
+                    pos->class->variant,
+                    pos->name.value);
             pos = NULL;
             goto done;
         }
@@ -36,8 +37,10 @@ probe_boot_medium()
         }
 
         if (*(u32_t*)volp->sys_id == LUNAIX_ID) {
-            kprintf(KINFO "[%x:%s] %s\n",
-                    pos->dev_id,
+            kprintf(KINFO "%x:%d:%d, /dev/%s, %s\n",
+                    pos->class->meta,
+                    pos->class->device,
+                    pos->class->variant,
                     pos->name.value,
                     (char*)volp->vol_id);
             break;

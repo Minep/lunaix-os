@@ -58,7 +58,8 @@ hwtimer_init(u32_t hertz, void* tick_callback)
 
     current_timer = hwt_ctx;
 
-    struct device* timerdev = device_addsys(NULL, hwt_ctx, hwt_ctx->name);
+    struct device* timerdev =
+      device_addsys(NULL, &hwt_ctx->class, hwt_ctx, hwt_ctx->name);
 
     timerdev->ops.exec_cmd = __hwtimer_ioctl;
 }

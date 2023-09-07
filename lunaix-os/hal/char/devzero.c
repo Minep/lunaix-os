@@ -18,9 +18,9 @@ __zero_rd(struct device* dev, void* buf, size_t offset, size_t len)
 }
 
 static int
-pdev_zerodev_init(struct device_def*)
+pdev_zerodev_init(struct device_def* def)
 {
-    struct device* devzero = device_addseq(NULL, NULL, "zero");
+    struct device* devzero = device_addseq(NULL, &def->class, NULL, "zero");
     devzero->ops.read_page = __zero_rd_pg;
     devzero->ops.read = __zero_rd;
 

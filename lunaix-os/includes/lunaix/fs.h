@@ -11,16 +11,23 @@
 #include <lunaix/ds/lru.h>
 #include <lunaix/ds/mutex.h>
 #include <lunaix/status.h>
+
 #include <stdatomic.h>
+
+#include <usr/lunaix/fstypes.h>
 
 #define VFS_NAME_MAXLEN 128
 #define VFS_MAX_FD 32
 
-#define VFS_IFDIR 0x1
-#define VFS_IFFILE 0x2
-#define VFS_IFSEQDEV 0x4
-#define VFS_IFVOLDEV 0x8
-#define VFS_IFSYMLINK 0x10
+#define VFS_IFDIR F_DIR
+#define VFS_IFFILE F_FILE
+#define VFS_IFDEV (F_DEV | F_FILE)
+#define VFS_IFSEQDEV (F_SEQDEV | F_FILE)
+#define VFS_IFVOLDEV (F_VOLDEV | F_FILE)
+#define VFS_IFSYMLINK (F_SYMLINK | F_FILE)
+
+#define VFS_DEVFILE(type) ((type) & F_DEV)
+#define VFS_DEVTYPE(type) ((type) & ((F_SEQDEV | F_VOLDEV) ^ F_DEV))
 
 // Walk, mkdir if component encountered is non-exists.
 #define VFS_WALK_MKPARENT 0x1
@@ -48,7 +55,7 @@
 
 #define TEST_FD(fd) (fd >= 0 && fd < VFS_MAX_FD)
 
-#define EXPORT_FILE_SYSTEM(fs_id, init_fn)                                        \
+#define EXPORT_FILE_SYSTEM(fs_id, init_fn)                                     \
     export_ldga_el(fs, fs_id, ptr_t, init_fn)
 
 #define VFS_VALID_CHAR(chr)                                                    \
@@ -107,6 +114,7 @@ struct v_superblock
     struct filesystem* fs;
     struct hbucket* i_cache;
     void* data;
+    size_t blksize;
     struct
     {
         u32_t (*read_capacity)(struct v_superblock* vsb);

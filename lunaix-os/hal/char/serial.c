@@ -158,10 +158,11 @@ __serial_exec_command(struct device* dev, u32_t req, va_list args)
 #define RXBUF_SIZE 512
 
 struct serial_dev*
-serial_create()
+serial_create(struct devclass* class)
 {
     struct serial_dev* sdev = valloc(sizeof(struct serial_dev));
-    struct device* dev = device_addseq(NULL, sdev, "ttyS%d", serial_idx++);
+    struct device* dev =
+      device_addseq(NULL, class, sdev, "ttyS%d", serial_idx++);
     dev->ops.read = __serial_read;
     dev->ops.read_page = __serial_read_page;
     dev->ops.write = __serial_write;

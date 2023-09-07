@@ -31,7 +31,7 @@ __rand_rd(struct device* dev, void* buf, size_t offset, size_t len)
 int
 pdev_randdev_init(struct device_def* devdef)
 {
-    struct device* devrand = device_addseq(NULL, NULL, "rand");
+    struct device* devrand = device_addseq(NULL, &devdef->class, NULL, "rand");
     devrand->ops.read = __rand_rd;
     devrand->ops.read_page = __rand_rd_pg;
 

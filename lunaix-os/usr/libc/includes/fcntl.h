@@ -7,4 +7,7 @@
 extern int
 open(const char* path, int flags);
 
+extern int
+fstat(int fd, struct file_stat* stat);
+
 #endif /* __LUNAIX_FCNTL_H */

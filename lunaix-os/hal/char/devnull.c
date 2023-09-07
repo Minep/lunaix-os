@@ -30,9 +30,9 @@ __null_rd(struct device* dev, void* buf, size_t offset, size_t len)
 }
 
 static int
-pdev_nulldev_init(struct device_def*)
+pdev_nulldev_init(struct device_def* def)
 {
-    struct device* devnull = device_addseq(NULL, NULL, "null");
+    struct device* devnull = device_addseq(NULL, &def->class, NULL, "null");
     devnull->ops.write_page = __null_wr_pg;
     devnull->ops.write = __null_wr;
     devnull->ops.read_page = __null_rd_pg;
