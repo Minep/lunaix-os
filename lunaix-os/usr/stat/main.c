@@ -63,10 +63,7 @@ main(int argc, char* argv[])
         dev = &stat.st_rdev;
     }
 
-    printf("Device: %xh:%d:%d;\n",
-           dev->meta,
-           dev->devident >> 16,
-           dev->devident & 0xffff);
+    printf("Device: %xh:%xh@%d;\n", dev->meta, dev->unique, dev->index);
 
     close(fd);
     return 0;

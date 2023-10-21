@@ -3,7 +3,9 @@
 #include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
+
 #include <sys/cpu.h>
+#include <sys/mm/mempart.h>
 
 LOG_MODULE("VMM")
 
@@ -199,4 +201,24 @@ vmm_unmount_pd(ptr_t mnt)
     l1pt->entry[(mnt >> 22)] = 0;
     cpu_flush_page(mnt);
     return mnt;
+}
+
+ptr_t
+vmm_dup_page(pid_t pid, ptr_t pa)
+{
+    ptr_t new_ppg = pmm_alloc_page(pid, 0);
+    vmm_set_mapping(VMS_SELF, PG_MOUNT_3, new_ppg, PG_PREM_RW, VMAP_NULL);
+    vmm_set_mapping(VMS_SELF, PG_MOUNT_4, pa, PG_PREM_RW, VMAP_NULL);
+
+    asm volatile("movl %1, %%edi\n"
+                 "movl %2, %%esi\n"
+                 "rep movsl\n" ::"c"(1024),
+                 "r"(PG_MOUNT_3),
+                 "r"(PG_MOUNT_4)
+                 : "memory", "%edi", "%esi");
+
+    vmm_del_mapping(VMS_SELF, PG_MOUNT_3);
+    vmm_del_mapping(VMS_SELF, PG_MOUNT_4);
+
+    return new_ppg;
 }

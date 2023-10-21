@@ -318,16 +318,19 @@ __block_register(struct block_dev* bdev)
         return 0;
     }
 
-    struct device* dev =
-      device_addvol(blk_parent_dev, bdev->class, bdev, "sd%c", 'a' + free_slot);
+    struct device* dev = device_allocvol(blk_parent_dev, bdev);
     dev->ops.write = __block_write;
     dev->ops.write_page = __block_write_page;
     dev->ops.read = __block_read;
     dev->ops.read_page = __block_read_page;
 
     bdev->dev = dev;
-    strcpy(bdev->bdev_id, dev->name_val);
+
+    device_register(dev, bdev->class, "sd%c", 'a' + free_slot);
     dev_registry[free_slot++] = bdev;
+
+    strcpy(bdev->bdev_id, dev->name_val);
+
     return 1;
 }
 
@@ -341,8 +344,7 @@ blk_mount_part(struct block_dev* bdev,
     struct block_dev* pbdev = cake_grab(lbd_pile);
     memcpy(pbdev, bdev, sizeof(*bdev));
 
-    struct device* dev = device_addvol(
-      NULL, pbdev->class, pbdev, "%sp%d", bdev->bdev_id, index + 1);
+    struct device* dev = device_allocvol(NULL, pbdev);
     dev->ops.write = __block_write;
     dev->ops.write_page = __block_write_page;
     dev->ops.read = __block_read;
@@ -358,6 +360,8 @@ blk_mount_part(struct block_dev* bdev,
     }
 
     llist_append(&bdev->parts, &pbdev->parts);
+
+    device_register(dev, pbdev->class, "%sp%d", bdev->bdev_id, index + 1);
 
     return pbdev;
 }

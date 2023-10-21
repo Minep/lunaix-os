@@ -11,7 +11,7 @@
 static char* log_prefix[] = { "- ", "W ", "E ", "D " };
 static char* color_code[] = { "", "\033[6;0m", "\033[12;0m", "\033[9;0m" };
 
-void
+void 
 __kprintf_internal(const char* component,
                    int log_level,
                    const char* prefix,

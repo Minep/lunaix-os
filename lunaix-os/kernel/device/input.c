@@ -80,8 +80,10 @@ input_add_device(struct devclass* class, char* name_fmt, ...)
     va_list args;
     va_start(args, name_fmt);
 
-    struct device* dev =
-      device_add_vargs(input_devcat, idev, name_fmt, DEV_IFSEQ, class, args);
+    struct device* dev = device_allocseq(input_devcat, idev);
+
+    device_setname_vargs(dev, name_fmt, args);
+    device_register(dev, class, NULL);
 
     idev->dev_if = dev;
     dev->ops.read = __input_dev_read;

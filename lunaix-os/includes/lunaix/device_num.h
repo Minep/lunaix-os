@@ -1,6 +1,8 @@
 #ifndef __LUNAIX_DEVICE_NUM_H
 #define __LUNAIX_DEVICE_NUM_H
 
+#include <lunaix/types.h>
+
 /*
     Device metadata field (device_def::meta)
 
@@ -49,9 +51,15 @@
             device for output into external environment
 */
 
-#define DEV_META(if_, function) (((if_) & 0xffff) << 16) | ((function) & 0xffff)
-#define DEV_IF(meta) ((meta) >> 16)
-#define DEV_FN(meta) (((meta) & 0xffff))
+#define DEV_FNGRP(if_, function)                                               \
+    (((if_) & 0xffff) << 16) | ((function) & 0xffff)
+#define DEV_UNIQUE(devkind, variant)                                           \
+    (((devkind) & 0xffff) << 16) | ((variant) & 0xffff)
+#define DEV_KIND_FROM(unique) ((unique) >> 16)
+#define DEV_VAR_FROM(unique) ((unique) & 0xffff)
+
+#define DEV_IF(fngrp) ((fngrp) >> 16)
+#define DEV_FN(fngrp) (((fngrp) & 0xffff))
 
 #define DEVIF_NON 0x0
 #define DEVIF_SOC 0x1
@@ -67,15 +75,41 @@
 #define DEVFN_TIME 0x6
 #define DEVFN_BUSIF 0x7
 #define DEVFN_TTY 0x8
+#define DEVFN_DISP 0x9
 
-#define DEV_BUILTIN 0x0
-#define DEV_X86LEGACY 0x1
-#define DEV_RNG 0x2
-#define DEV_RTC 0x3
-#define DEV_SATA 0x4
-#define DEV_NVME 0x5
-#define DEV_BUS 0x6
-#define DEV_SERIAL 0x7
-#define DEV_TIMER 0x8
+#define DEV_BUILTIN 0
+#define DEV_BUILTIN_NULL 0
+#define DEV_BUILTIN_ZERO 1
+
+#define DEV_VTERM 1
+#define DEV_RNG 2
+#define DEV_RTC 3
+#define DEV_SATA 4
+#define DEV_NVME 5
+#define DEV_PCI 6
+#define DEV_UART16550 7
+
+#define DEV_TIMER 8
+#define DEV_TIMER_APIC 0
+#define DEV_TIMER_HEPT 1
+
+#define DEV_NULL 9
+#define DEV_ZERO 10
+#define DEV_KBD 11
+#define DEV_VGA 12
+
+struct devident
+{
+    u32_t fn_grp;
+    u32_t unique;
+};
+
+struct devclass
+{
+    u32_t fn_grp;
+    u32_t device;
+    u32_t variant;
+    u32_t hash;
+};
 
 #endif /* __LUNAIX_DEVICE_NUM_H */

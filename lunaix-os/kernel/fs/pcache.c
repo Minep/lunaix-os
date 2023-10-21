@@ -133,23 +133,32 @@ pcache_write(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
     struct pcache* pcache = inode->pg_cache;
     struct pcache_pg* pg;
 
-    while (buf_off < len) {
+    while (buf_off < len && errno >= 0) {
         u32_t wr_bytes = MIN(PG_SIZE - pg_off, len - buf_off);
 
-        pcache_get_page(pcache, fpos, &pg_off, &pg);
+        int new_page = pcache_get_page(pcache, fpos, &pg_off, &pg);
 
-        if (!pg) {
-            errno = inode->default_fops->write(inode, data, wr_bytes, fpos);
+        if (new_page) {
+            // Filling up the page
+            errno =
+              inode->default_fops->read_page(inode, pg->pg, PG_SIZE, pg->fpos);
+
             if (errno < 0) {
                 break;
             }
-        } else {
-            memcpy(pg->pg + pg_off, (data + buf_off), wr_bytes);
-            pcache_set_dirty(pcache, pg);
-
-            pg->len = pg_off + wr_bytes;
+            if (errno < PG_SIZE) {
+                // EOF
+                len = MIN(len, buf_off + errno);
+            }
+        } else if (!pg) {
+            errno = inode->default_fops->write(inode, data, wr_bytes, fpos);
+            continue;
         }
 
+        memcpy(pg->pg + pg_off, (data + buf_off), wr_bytes);
+        pcache_set_dirty(pcache, pg);
+
+        pg->len = pg_off + wr_bytes;
         buf_off += wr_bytes;
         fpos += wr_bytes;
     }

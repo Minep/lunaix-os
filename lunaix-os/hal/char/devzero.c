@@ -20,16 +20,18 @@ __zero_rd(struct device* dev, void* buf, size_t offset, size_t len)
 static int
 pdev_zerodev_init(struct device_def* def)
 {
-    struct device* devzero = device_addseq(NULL, &def->class, NULL, "zero");
+    struct device* devzero = device_allocseq(NULL, NULL);
     devzero->ops.read_page = __zero_rd_pg;
     devzero->ops.read = __zero_rd;
+
+    device_register(devzero, &def->class, "zero");
 
     return 0;
 }
 
 static struct device_def devzero_def = {
     .name = "zero",
-    .class = DEVCLASS(DEVIF_NON, DEVFN_PSEUDO, DEV_BUILTIN, 1),
+    .class = DEVCLASSV(DEVIF_NON, DEVFN_PSEUDO, DEV_ZERO, DEV_BUILTIN_ZERO),
     .init = pdev_zerodev_init
 };
 EXPORT_DEVICE(zerodev, &devzero_def, load_earlystage);

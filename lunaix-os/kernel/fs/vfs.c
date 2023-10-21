@@ -1468,16 +1468,15 @@ __DEFINE_LXSYSCALL2(int, fstat, int, fd, struct file_stat*, stat)
             goto done;
         }
 
-        stat->st_rdev = (dev_t){ .meta = rdev->class->meta,
-                                 .devident = device_id_from_class(rdev->class),
-                                 .dev_uid = rdev->dev_uid };
+        stat->st_rdev = (dev_t){ .meta = rdev->ident.fn_grp,
+                                 .unique = rdev->ident.unique,
+                                 .index = rdev->dev_uid };
     }
 
     if (fdev) {
-        u32_t devident = device_id_from_class(fdev->class);
-        stat->st_dev = (dev_t){ .meta = fdev->class->meta,
-                                .devident = devident,
-                                .dev_uid = fdev->dev_uid };
+        stat->st_dev = (dev_t){ .meta = fdev->ident.fn_grp,
+                                .unique = fdev->ident.unique,
+                                .index = fdev->dev_uid };
     }
 
 done:

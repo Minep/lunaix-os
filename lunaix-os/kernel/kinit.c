@@ -52,7 +52,7 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     /* Prepare stack trace environment */
     trace_modksyms_init(bhctx);
 
-    device_register_all();
+    device_scan_drivers();
 
     // crt
     tty_init(ioremap(0xB8000, PG_SIZE));

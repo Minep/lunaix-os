@@ -9,9 +9,8 @@ struct dev_info
 
     struct
     {
-        unsigned int meta;
-        unsigned int device;
-        unsigned int variant;
+        unsigned int group;
+        unsigned int unique;
     } dev_id;
 
     struct

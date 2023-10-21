@@ -24,7 +24,6 @@ struct serial_dev
 {
     struct llist_header sdev_list;
     struct device* dev;
-    mutex_t lock;
     struct waitq wq_rxdone;
     struct waitq wq_txdone;
     void* backend;

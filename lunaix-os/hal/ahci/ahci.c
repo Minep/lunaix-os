@@ -31,7 +31,7 @@
 #define HBA_CLB_SIZE 1024
 
 #define HBA_MY_IE (HBA_PxINTR_DHR | HBA_PxINTR_TFE | HBA_PxINTR_OF)
-#define AHCI_DEVCLASS DEVCLASS(DEVIF_PCI, DEVFN_STORAGE, DEV_SATA, 0)
+#define AHCI_DEVCLASS DEVCLASS(DEVIF_PCI, DEVFN_STORAGE, DEV_SATA)
 
 // #define DO_HBA_FULL_RESET
 
@@ -444,10 +444,9 @@ achi_register_ops(struct hba_port* port)
 
 static struct pci_device_def ahcidef = {
     .dev_class = AHCI_HBA_CLASS,
-    .dev_vendor = PCI_ID_ANY,
-    .dev_id = PCI_ID_ANY,
-    .devdef = { .class = DEVCLASS(DEVIF_PCI, DEVFN_STORAGE, DEV_SATA, 0),
+    .ident_mask = 0x0,
+    .devdef = { .class = DEVCLASS(DEVIF_PCI, DEVFN_STORAGE, DEV_SATA),
                 .name = "Serial ATA Controller",
                 .init_for = ahci_driver_init }
 };
-EXPORT_DEVICE(ahci, &ahcidef.devdef, load_on_demand);
+EXPORT_DEVICE(ahci, &ahcidef.devdef, load_pci_probe);

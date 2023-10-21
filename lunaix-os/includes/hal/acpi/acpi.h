@@ -15,8 +15,8 @@
 #define ACPI_RSDP_SIG_L 0x20445352 // 'RSD '
 #define ACPI_RSDP_SIG_H 0x20525450 // 'PTR '
 
-#define ACPI_MADT_SIG 0x43495041   // 'APIC'
-#define ACPI_FADT_SIG 0x50434146   // 'FACP' Notice that it is not 'FADT'.
+#define ACPI_MADT_SIG 0x43495041 // 'APIC'
+#define ACPI_FADT_SIG 0x50434146 // 'FACP' Notice that it is not 'FADT'.
 
 // 'MCFG' (Not part of ACPI standard. See PCI Firmware Spec.)
 #define ACPI_MCFG_SIG 0x4746434d

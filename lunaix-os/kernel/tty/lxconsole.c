@@ -343,8 +343,7 @@ console_start_flushing()
 static int
 lxconsole_spawn_ttydev(struct device_def* devdef)
 {
-    struct device* tty_dev =
-      device_addseq(NULL, &devdef->class, &lx_console, "tty");
+    struct device* tty_dev = device_allocseq(NULL, &lx_console);
     tty_dev->ops.write = __tty_write;
     tty_dev->ops.write_page = __tty_write_pg;
     tty_dev->ops.read = __tty_read;
@@ -354,12 +353,14 @@ lxconsole_spawn_ttydev(struct device_def* devdef)
     waitq_init(&lx_reader);
     input_add_listener(__lxconsole_listener);
 
+    device_register(tty_dev, &devdef->class, "tty");
+
     return 0;
 }
 
 static struct device_def lxconsole_def = {
     .name = "Lunaix Virtual Console",
-    .class = DEVCLASS(DEVIF_NON, DEVFN_TTY, DEV_BUILTIN, 0),
+    .class = DEVCLASSV(DEVIF_NON, DEVFN_TTY, DEV_BUILTIN, 12),
     .init = lxconsole_spawn_ttydev
 };
 EXPORT_DEVICE(lxconsole, &lxconsole_def, load_earlystage);

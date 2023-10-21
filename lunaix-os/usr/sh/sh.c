@@ -175,7 +175,6 @@ sh_loop()
 void
 main()
 {
-    printf("\n Simple shell. Use <PG_UP> or <PG_DOWN> to scroll.\n\n");
     sh_loop();
     _exit(0);
 }

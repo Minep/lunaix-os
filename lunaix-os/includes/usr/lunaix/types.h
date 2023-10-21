@@ -33,8 +33,8 @@ typedef unsigned int ino_t;
 typedef struct dev_t
 {
     unsigned int meta;
-    unsigned int devident;
-    unsigned int dev_uid;
+    unsigned int unique;
+    unsigned int index;
 } dev_t;
 
 #endif /* __LUNAIX_TYPES_H */

@@ -84,15 +84,16 @@ hwrtc_alloc_new(struct device_def* def, char* name)
     }
 
     rtc_instance->name = name;
-    struct device* rtcdev =
-      device_addsys(NULL, &def->class, rtc_instance, "rtc%d", rtc_count);
+    struct device* rtcdev = device_allocsys(NULL, rtc_instance);
 
     rtcdev->ops.exec_cmd = hwrtc_ioctl;
     rtcdev->ops.read = hwrtc_read;
 
     rtc_instance->rtc_dev = rtcdev;
 
-    rtc_count++;
+    device_register(rtcdev, &def->class, "rtc%d", def->class.variant);
+
+    def->class.variant++;
 
     return rtc_instance;
 }

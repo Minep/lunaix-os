@@ -40,11 +40,11 @@ serial_end_xmit(struct serial_dev* sdev, size_t len)
 int
 serial_readone_nowait(struct serial_dev* sdev, u8_t* val)
 {
-    mutex_lock(&sdev->lock);
+    device_lock(sdev->dev);
 
     int rd_len = fifo_readone(&sdev->rxbuf, val);
 
-    mutex_unlock(&sdev->lock);
+    device_unlock(sdev->dev);
 
     return rd_len;
 }
@@ -52,26 +52,26 @@ serial_readone_nowait(struct serial_dev* sdev, u8_t* val)
 void
 serial_readone(struct serial_dev* sdev, u8_t* val)
 {
-    mutex_lock(&sdev->lock);
+    device_lock(sdev->dev);
 
     while (!fifo_readone(&sdev->rxbuf, val)) {
         pwait(&sdev->wq_rxdone);
     }
 
-    mutex_unlock(&sdev->lock);
+    device_unlock(sdev->dev);
 }
 
 size_t
 serial_readbuf(struct serial_dev* sdev, u8_t* buf, size_t len)
 {
-    mutex_lock(&sdev->lock);
+    device_lock(sdev->dev);
 
     size_t rdlen;
     while (!(rdlen = fifo_read(&sdev->rxbuf, buf, len))) {
         pwait(&sdev->wq_rxdone);
     }
 
-    mutex_unlock(&sdev->lock);
+    device_unlock(sdev->dev);
 
     return rdlen;
 }
@@ -79,11 +79,11 @@ serial_readbuf(struct serial_dev* sdev, u8_t* buf, size_t len)
 int
 serial_readbuf_nowait(struct serial_dev* sdev, u8_t* buf, size_t len)
 {
-    mutex_lock(&sdev->lock);
+    device_lock(sdev->dev);
 
     int rdlen = fifo_read(&sdev->rxbuf, buf, len);
 
-    mutex_unlock(&sdev->lock);
+    device_unlock(sdev->dev);
 
     return rdlen;
 }
@@ -91,7 +91,7 @@ serial_readbuf_nowait(struct serial_dev* sdev, u8_t* buf, size_t len)
 int
 serial_writebuf(struct serial_dev* sdev, u8_t* buf, size_t len)
 {
-    mutex_lock(&sdev->lock);
+    device_lock(sdev->dev);
 
     if (sdev->write(sdev, buf, len) == RXTX_DONE) {
         goto done;
@@ -101,7 +101,7 @@ serial_writebuf(struct serial_dev* sdev, u8_t* buf, size_t len)
 
 done:
     int rdlen = sdev->wr_len;
-    mutex_unlock(&sdev->lock);
+    device_unlock(sdev->dev);
 
     return rdlen;
 }
@@ -109,12 +109,12 @@ done:
 int
 serial_writebuf_nowait(struct serial_dev* sdev, u8_t* buf, size_t len)
 {
-    mutex_lock(&sdev->lock);
+    device_lock(sdev->dev);
 
     sdev->write(sdev, buf, len);
     int rdlen = sdev->wr_len;
 
-    mutex_unlock(&sdev->lock);
+    device_unlock(sdev->dev);
 
     return rdlen;
 }
@@ -161,8 +161,7 @@ struct serial_dev*
 serial_create(struct devclass* class)
 {
     struct serial_dev* sdev = valloc(sizeof(struct serial_dev));
-    struct device* dev =
-      device_addseq(NULL, class, sdev, "ttyS%d", serial_idx++);
+    struct device* dev = device_allocseq(NULL, sdev);
     dev->ops.read = __serial_read;
     dev->ops.read_page = __serial_read_page;
     dev->ops.write = __serial_write;
@@ -178,6 +177,9 @@ serial_create(struct devclass* class)
     llist_append(&serial_devs, &sdev->sdev_list);
     // llist_init_head(&sdev->cmds);
 
+    class->variant++;
+    device_register(dev, class, "ttyS%d", class->variant);
+
     return sdev;
 }
 
@@ -187,7 +189,7 @@ serial_get_avilable()
     struct serial_dev *pos, *n;
     llist_for_each(pos, n, &serial_devs, sdev_list)
     {
-        if (!mutex_on_hold(&pos->lock)) {
+        if (!device_locked(pos->dev)) {
             return pos;
         }
     }

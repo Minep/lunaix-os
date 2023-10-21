@@ -19,8 +19,6 @@ main(int argc, const char** argv)
         return 0;
     }
 
-    printf("(%p) user space!\n", (void*)main);
-
     if ((err = symlink("/usr", "/mnt/lunaix-os/usr"))) {
         syslog(2, "symlink /usr:/mnt/lunaix-os/usr (%d)\n", errno);
         return 0;

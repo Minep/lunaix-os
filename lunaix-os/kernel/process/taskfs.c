@@ -129,7 +129,7 @@ taskfs_dirlookup(struct v_inode* this, struct v_dnode* dnode)
         return ENOENT;
     }
 
-    return taskfs_mknod(dnode, pid, 0, F_FILE);
+    return taskfs_mknod(dnode, pid, 0, F_DIR);
 }
 
 static struct v_file_ops taskfs_file_ops = { .close = default_file_close,

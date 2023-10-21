@@ -89,7 +89,7 @@ cpu_chvmspace(u32_t val)
 }
 
 /**
- * @brief Flush TLB
+ * @brief Flush a certain TLB record
  *
  * @return u32_t
  */
@@ -99,6 +99,10 @@ cpu_flush_page(ptr_t va)
     asm volatile("invlpg (%0)" ::"r"(va) : "memory");
 }
 
+/**
+ * @brief Flush entire TLB
+ *
+ */
 static inline void
 cpu_flush_vmspace()
 {
@@ -125,6 +129,11 @@ cpu_wait()
     asm("hlt");
 }
 
+/**
+ * @brief Read exeception address
+ *
+ * @return ptr_t
+ */
 static inline ptr_t
 cpu_ldeaddr()
 {

@@ -8,8 +8,10 @@
 #include <lunaix/ds/hstr.h>
 #include <lunaix/ds/ldga.h>
 #include <lunaix/ds/llist.h>
-#include <lunaix/ds/semaphore.h>
+#include <lunaix/ds/mutex.h>
 #include <lunaix/types.h>
+
+#include <usr/lunaix/device.h>
 
 /**
  * @brief Export a device definition
@@ -20,6 +22,7 @@
     export_ldga_el_sfx(devdefs, id##_ldorder, ptr_t, devdef, load_order);
 
 #define load_on_demand ld_ondemand
+#define load_pci_probe ld_ondemand
 
 /**
  * @brief Mark the device definition should be loaded automatically as earlier
@@ -49,10 +52,16 @@
  * @brief Declare a device class
  *
  */
-#define DEVCLASS(devif, devfn, devkind, devvar)                                \
+#define DEVCLASS(devif, devfn, dev)                                            \
     (struct devclass)                                                          \
     {                                                                          \
-        .meta = DEV_META(devif, devfn), .device = (devkind),                   \
+        .fn_grp = DEV_FNGRP(devif, devfn), .device = (dev), .variant = 0       \
+    }
+
+#define DEVCLASSV(devif, devfn, dev, devvar)                                   \
+    (struct devclass)                                                          \
+    {                                                                          \
+        .fn_grp = DEV_FNGRP(devif, devfn), .device = (dev),                    \
         .variant = (devvar)                                                    \
     }
 
@@ -65,24 +74,19 @@
 #define DEV_IFCAT 0x2 // a device category (as device groupping)
 #define DEV_IFSYS 0x3 // a system device
 
-struct devclass
-{
-    u32_t meta;
-    u32_t device;
-    u32_t variant;
-    u32_t hash;
-};
-
 struct device
 {
     u32_t magic;
     struct llist_header siblings;
     struct llist_header children;
     struct device* parent;
+    mutex_t lock;
+
     // TODO investigate event polling
 
     struct hstr name;
-    struct devclass* class;
+    struct devident ident;
+
     u32_t dev_uid;
     int dev_type;
     char name_val[DEVICE_NAME_SIZE];
@@ -115,12 +119,6 @@ struct device_def
     int (*init_for)(struct device_def*, struct device*);
 };
 
-static inline u32_t devclass_hash(struct devclass class)
-{
-    return (((class.device & 0xffff) << 16) | (class.variant & 0xffff)) ^
-           ~class.meta;
-}
-
 static inline u32_t
 device_id_from_class(struct devclass* class)
 {
@@ -128,53 +126,43 @@ device_id_from_class(struct devclass* class)
 }
 
 void
-device_register_all();
+device_scan_drivers();
 
 void
-device_prepare(struct device* dev, struct devclass* class);
-
-void
-device_setname(struct device* dev, char* fmt, ...);
+device_setname_vargs(struct device* dev, char* fmt, va_list args);
 
 void
 device_setname(struct device* dev, char* fmt, ...);
 
-struct device*
-device_add_vargs(struct device* parent,
-                 void* underlay,
-                 char* name_fmt,
-                 u32_t type,
-                 struct devclass* class,
-                 va_list args);
+void
+device_register(struct device* dev, struct devclass* class, char* fmt, ...);
+
+void
+device_create(struct device* dev,
+              struct device* parent,
+              u32_t type,
+              void* underlay);
 
 struct device*
-device_add(struct device* parent,
-           struct devclass* class,
-           void* underlay,
-           u32_t type,
-           char* name_fmt,
-           ...);
+device_alloc(struct device* parent, u32_t type, void* underlay);
 
-struct device*
-device_addsys(struct device* parent,
-              struct devclass* class,
-              void* underlay,
-              char* name_fmt,
-              ...);
+static inline struct device*
+device_allocsys(struct device* parent, void* underlay)
+{
+    return device_alloc(parent, DEV_IFSYS, underlay);
+}
 
-struct device*
-device_addseq(struct device* parent,
-              struct devclass* class,
-              void* underlay,
-              char* name_fmt,
-              ...);
+static inline struct device*
+device_allocseq(struct device* parent, void* underlay)
+{
+    return device_alloc(parent, DEV_IFSEQ, underlay);
+}
 
-struct device*
-device_addvol(struct device* parent,
-              struct devclass* class,
-              void* underlay,
-              char* name_fmt,
-              ...);
+static inline struct device*
+device_allocvol(struct device* parent, void* underlay)
+{
+    return device_alloc(parent, DEV_IFVOL, underlay);
+}
 
 struct device*
 device_addcat(struct device* parent, char* name_fmt, ...);
@@ -195,19 +183,19 @@ struct device*
 device_getbyoffset(struct device* root_dev, int pos);
 
 struct device*
-device_create_byclass(struct devclass* class,
-                      u32_t type,
-                      char* name,
-                      int* err_code);
+device_cast(void* obj);
 
 struct hbucket*
 device_definitions_byif(int if_type);
 
 struct device_def*
-devdef_byclass(struct devclass* class);
+devdef_byident(struct devident* class);
 
 void
-device_register_all();
+device_populate_info(struct device* dev, struct dev_info* devinfo);
+
+void
+device_scan_drivers();
 
 /*------ Load hooks ------*/
 
@@ -219,5 +207,23 @@ device_poststage();
 
 void
 device_timerstage();
+
+static inline void
+device_lock(struct device* dev)
+{
+    mutex_lock(&dev->lock);
+}
+
+static inline void
+device_unlock(struct device* dev)
+{
+    mutex_unlock(&dev->lock);
+}
+
+static inline int
+device_locked(struct device* dev)
+{
+    return mutex_on_hold(&dev->lock);
+}
 
 #endif /* __LUNAIX_DEVICE_H */

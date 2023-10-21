@@ -91,8 +91,7 @@ debug-qemu: all-debug
 	@i686-elf-objcopy --only-keep-debug $(kbin) $(kbuild_dir)/kernel.dbg
 	@qemu-system-i386 $(call get_qemu_options,$(kimg))
 	@sleep 1
-	@$(QEMU_MON_TERM) -- telnet 127.0.0.1 $(QEMU_MON_PORT)
-	@gdb -s $(kbuild_dir)/kernel.dbg -ex "target remote localhost:1234"
+	@QMPORT=$(QEMU_MON_PORT) gdb -s $(kbuild_dir)/kernel.dbg -ex "target remote localhost:1234"
 
 debug-qemu-vscode: all-debug
 	@i686-elf-objcopy --only-keep-debug $(kbin) $(kbuild_dir)/kernel.dbg

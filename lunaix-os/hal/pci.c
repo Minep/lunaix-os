@@ -21,6 +21,8 @@ LOG_MODULE("PCI")
 
 static DEFINE_LLIST(pci_devices);
 
+static struct device* pcidev_cat;
+
 void
 pci_probe_msi_info(struct pci_device* device);
 
@@ -42,8 +44,8 @@ pci_create_device(ptr_t pci_base, int devinfo)
             continue;
         }
 
-        int result = (pos->dev_vendor & vendor) == vendor &&
-                     (pos->dev_id & devid) == devid;
+        u32_t idm = pos->ident_mask;
+        int result = (pos->dev_ident & idm) == (devinfo & idm);
 
         if (result) {
             goto found;
@@ -63,14 +65,14 @@ found:
     device->cspace_base = pci_base;
     device->intr_info = intr;
 
-    device_prepare(&device->dev, &pos->devdef.class);
+    device_create(&device->dev, pcidev_cat, DEV_IFSYS, NULL);
 
     pci_probe_msi_info(device);
     pci_probe_bar_info(device);
 
     kappendf("%s (dev.%x:%x:%x) \n",
              pos->devdef.name,
-             pos->devdef.class.meta,
+             pos->devdef.class.fn_grp,
              pos->devdef.class.device,
              pos->devdef.class.variant);
 
@@ -86,6 +88,7 @@ found:
     }
 
     llist_append(&pci_devices, &device->dev_chain);
+    device_register(&device->dev, &pos->devdef.class, "%x:%x", vendor, devid);
 
     return device;
 
@@ -338,6 +341,8 @@ EXPORT_TWIFS_PLUGIN(pci_devs, pci_build_fsmapping);
 static int
 pci_load_devices(struct device_def* def)
 {
+    pcidev_cat = device_addcat(NULL, "pci");
+
     pci_scan();
 
     return 0;
@@ -345,7 +350,7 @@ pci_load_devices(struct device_def* def)
 
 static struct device_def pci_def = {
     .name = "pci3.0-hba",
-    .class = DEVCLASS(DEVIF_SOC, DEVFN_BUSIF, DEV_BUS, 0),
+    .class = DEVCLASS(DEVIF_SOC, DEVFN_BUSIF, DEV_PCI),
     .init = pci_load_devices
 };
 EXPORT_DEVICE(pci3hba, &pci_def, load_poststage);

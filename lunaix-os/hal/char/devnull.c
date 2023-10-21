@@ -32,18 +32,20 @@ __null_rd(struct device* dev, void* buf, size_t offset, size_t len)
 static int
 pdev_nulldev_init(struct device_def* def)
 {
-    struct device* devnull = device_addseq(NULL, &def->class, NULL, "null");
+    struct device* devnull = device_allocseq(NULL, NULL);
     devnull->ops.write_page = __null_wr_pg;
     devnull->ops.write = __null_wr;
     devnull->ops.read_page = __null_rd_pg;
     devnull->ops.read = __null_rd;
+
+    device_register(devnull, &def->class, "null");
 
     return 0;
 }
 
 static struct device_def devnull_def = {
     .name = "null",
-    .class = DEVCLASS(DEVIF_NON, DEVFN_PSEUDO, DEV_BUILTIN, 0),
+    .class = DEVCLASSV(DEVIF_NON, DEVFN_PSEUDO, DEV_NULL, DEV_BUILTIN_NULL),
     .init = pdev_nulldev_init
 };
 EXPORT_DEVICE(nulldev, &devnull_def, load_earlystage);

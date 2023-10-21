@@ -2,6 +2,8 @@
 #include <lunaix/fs/twifs.h>
 #include <lunaix/status.h>
 
+#include <lib/hash.h>
+
 #include <klibc/stdio.h>
 
 static DECLARE_HASHTABLE(dev_registry, 32);
@@ -10,8 +12,14 @@ static DEFINE_LLIST(dev_registry_flat);
 
 static struct device* adhoc_devcat;
 
+static inline u32_t
+hash_dev(u32_t fngrp, u32_t dev)
+{
+    return (hash_32(fngrp, 16) << 16) | (hash_32(dev, 16));
+}
+
 void
-device_register_all()
+device_scan_drivers()
 {
     adhoc_devcat = device_addcat(NULL, "adhoc");
 
@@ -22,16 +30,16 @@ device_register_all()
     struct device_def* devdef;
     ldga_foreach(devdefs, struct device_def*, idx, devdef)
     {
-        u32_t hash = devclass_hash(devdef->class);
-        devdef->class.hash = hash;
+        struct devclass* devc = &devdef->class;
+        u32_t hash = hash_dev(devc->fn_grp, devc->device);
+        devc->hash = hash;
 
         if (!devdef->name) {
             devdef->name = "<unspecified>";
         }
 
         hashtable_hash_in(dev_registry, &devdef->hlist, hash);
-        hashtable_hash_in(
-          dev_byif, &devdef->hlist_if, DEV_IF(devdef->class.meta));
+        hashtable_hash_in(dev_byif, &devdef->hlist_if, DEV_IF(devc->fn_grp));
 
         llist_append(&dev_registry_flat, &devdef->dev_list);
     }
@@ -40,14 +48,13 @@ device_register_all()
 static int
 devclass_eq(struct devclass* c1, struct devclass* c2)
 {
-    return c1->meta == c2->meta && c1->variant == c2->variant &&
-           c1->device == c2->device;
+    return c1->fn_grp == c2->fn_grp && c1->device == c2->device;
 }
 
 struct device_def*
-devdef_byclass(struct devclass* class)
+devdef_byclass(struct devclass* devc)
 {
-    u32_t hash = devclass_hash(*class);
+    u32_t hash = hash_dev(devc->fn_grp, devc->device);
     int errno;
 
     struct device_def *pos, *n;
@@ -56,7 +63,7 @@ devdef_byclass(struct devclass* class)
         if (pos->class.hash != hash) {
             continue;
         }
-        if (devclass_eq(class, &pos->class)) {
+        if (devclass_eq(devc, &pos->class)) {
             break;
         }
     }
@@ -64,45 +71,12 @@ devdef_byclass(struct devclass* class)
     return pos;
 }
 
-struct device*
-device_create_byclass(struct devclass* class,
-                      u32_t type,
-                      char* name,
-                      int* err_code)
+struct device_def*
+devdef_byident(struct devident* ident)
 {
-    int errno;
-    struct device_def* devdef = devdef_byclass(class);
-
-    if (!devdef) {
-        *err_code = ENOENT;
-        return NULL;
-    }
-
-    if (!devdef->init_for) {
-        if (err_code) {
-            *err_code = ENOTSUP;
-        }
-        return NULL;
-    }
-
-    struct device* dev = device_add(adhoc_devcat, class, NULL, type, NULL);
-
-    errno = devdef->init_for(devdef, dev);
-    if (err_code && !errno) {
-        *err_code = errno;
-        device_remove(dev);
-        return NULL;
-    }
-
-    device_setname(dev,
-                   "%s_%d:%d:%d_%d",
-                   name,
-                   class->meta,
-                   class->device,
-                   class->device,
-                   dev->dev_uid);
-
-    return dev;
+    struct devclass derived = { .device = DEV_KIND_FROM(ident->unique),
+                                .fn_grp = ident->fn_grp };
+    return devdef_byclass(&derived);
 }
 
 struct hbucket*
@@ -157,14 +131,13 @@ __devdb_twifs_lsdb(struct twimap* mapping)
     char flags[64];
     struct device_def* def = twimap_index(mapping, struct device_def*);
 
-    int meta = def->class.meta;
+    int meta = def->class.fn_grp;
     ksnprintf(flags, 64, "if=%x,fn=%x", DEV_IF(meta), DEV_FN(meta));
 
     twimap_printf(mapping,
-                  "%xh:%d:%d \"%s\" %s\n",
-                  def->class.meta,
+                  "%xh:%d \"%s\" %s\n",
+                  def->class.fn_grp,
                   def->class.device,
-                  def->class.variant,
                   def->name,
                   flags);
 }

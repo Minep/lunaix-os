@@ -97,7 +97,7 @@ upiom_init(struct device_def* def)
 }
 
 static struct device_def uart_pmio_def = {
-    .class = DEVCLASS(DEVIF_SOC, DEVFN_CHAR, DEV_SERIAL, 0),
+    .class = DEVCLASS(DEVIF_SOC, DEVFN_CHAR, DEV_UART16550),
     .name = "16550 Generic UART (I/O)",
     .init = upiom_init
 };
