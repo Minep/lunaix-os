@@ -63,7 +63,7 @@ vga_mmio_set_regs(struct vga* v, u32_t type, size_t off, u32_t* seq, size_t len)
 }
 
 static void
-vga_mmio_set_dacp(struct vga* v)
+vga_mmio_set_dacp(struct vga* v, u32_t* lut, size_t len)
 {
 #define R(c) (u8_t)(((c) & 0xff0000) >> 16)
 #define G(c) (u8_t)(((c) & 0x00ff00) >> 8)
@@ -72,11 +72,9 @@ vga_mmio_set_dacp(struct vga* v)
     vga_reg8* reg_ix = regaddr(VGA_DACX, VGA_REG_X, v);
     vga_reg8* reg_dat = regaddr(VGA_DACX, VGA_REG_D, v);
 
-    u32_t* color_map = v->lut.colors;
-
     *reg_ix = 0;
-    for (size_t i = 0; i < v->lut.len; i++) {
-        u32_t color = color_map[i];
+    for (size_t i = 0; i < len; i++) {
+        u32_t color = lut[i];
         *reg_dat = R(color);
         *reg_dat = G(color);
         *reg_dat = B(color);

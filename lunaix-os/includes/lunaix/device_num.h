@@ -96,7 +96,8 @@
 #define DEV_NULL 9
 #define DEV_ZERO 10
 #define DEV_KBD 11
-#define DEV_VGA 12
+#define DEV_GFXA 12
+#define DEV_VGA 13
 
 struct devident
 {

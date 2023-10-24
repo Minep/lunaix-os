@@ -304,6 +304,19 @@ __pci_bar_gonext(struct twimap* map)
     return 1;
 }
 
+static void
+__pci_read_binding(struct twimap* map)
+{
+    struct pci_device* pcidev = twimap_data(map, struct pci_device*);
+    // check if device binding has been initialized
+    struct device* dev = device_cast(&pcidev->dev);
+    if (!dev) {
+        return;
+    }
+
+    twimap_printf(map, "0x%x:0x%x", dev->ident.fn_grp, dev->ident.unique);
+}
+
 void
 pci_build_fsmapping()
 {
@@ -328,6 +341,9 @@ pci_build_fsmapping()
 
         map = twifs_mapping(pci_dev, pos, "class");
         map->read = __pci_read_class;
+
+        map = twifs_mapping(pci_dev, pos, "binding");
+        map->read = __pci_read_binding;
 
         map = twifs_mapping(pci_dev, pos, "io_bases");
         map->read = __pci_bar_read;

@@ -176,7 +176,7 @@ struct vga_regops
     void (*write)(struct vga*, u32_t type, u32_t index, u32_t val, u32_t mask);
     void (
       *set_seq)(struct vga*, u32_t type, size_t off, u32_t* seq, size_t len);
-    void (*set_dac_palette)(struct vga*);
+    void (*set_dac_palette)(struct vga*, u32_t*, size_t);
 };
 
 struct vga
@@ -193,13 +193,8 @@ struct vga
         size_t pel_dot; // pixel per dot clock
         size_t freq;
         size_t fb_off;
+        size_t depth;
     } crt;
-
-    struct
-    {
-        u32_t* colors;
-        u32_t len;
-    } lut;
 
     struct vga_regops reg_ops;
 };
@@ -226,7 +221,10 @@ vga_new_state(ptr_t reg_base, ptr_t fb, ptr_t fb_sz);
 void
 vga_config_rect(struct vga*, size_t width, size_t hight, size_t freq, int d9);
 
-void
+int
 vga_reload_config(struct vga*);
+
+void
+vga_update_palette(struct vga* state, u32_t* lut, size_t len);
 
 #endif /* __LUNAIX_VGA_H */

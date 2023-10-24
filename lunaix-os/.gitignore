@@ -10,5 +10,7 @@ draft/
 iso_inspect/
 unused/
 
+.gdb_history
+
 **.o
 **.d

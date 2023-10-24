@@ -13,6 +13,7 @@
 #include <lunaix/device.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
+#include <lunaix/status.h>
 
 #include <sys/cpu.h>
 
@@ -119,7 +120,7 @@ vga_crt_update(struct vga* state)
 
     // framebuffer: 16bit granule
     u32_t divsor = 2 * 2;
-    if (state->lut.len == 256) {
+    if (state->crt.depth == 256) {
         // if 8 bit color is used, 2 pixels per granule
         divsor *= 2;
     } else if ((state->options & VGA_MODE_GFX)) {
@@ -135,32 +136,35 @@ vga_crt_update(struct vga* state)
 }
 
 void
-vga_update_palette(struct vga* state)
+vga_update_palette(struct vga* state, u32_t* lut, size_t len)
 {
-    state->reg_ops.set_dac_palette(state);
-
     u32_t index[16];
-    u32_t clr_len = MIN(state->lut.len, 16);
+    u32_t clr_len = MIN(len, 16);
     for (size_t i = 0; i < clr_len; i++) {
         index[i] = i;
     }
 
+    state->reg_ops.set_dac_palette(state, lut, len);
     state->reg_ops.set_seq(state, VGA_ARX, 0, index, clr_len);
 }
 
-void
+int
 vga_reload_config(struct vga* state)
 {
     cpu_disable_interrupt();
 
+    int err = 0;
     struct vga_regops* reg = &state->reg_ops;
 
-    u32_t color = state->lut.len;
-    assert_msg((color == 2 || color == 4 || color == 16 || color == 256),
-               "invalid color depth");
+    u32_t color = state->crt.depth;
+    if (!(color == 2 || color == 4 || color == 16 || color == 256)) {
+        err = EINVAL;
+        goto done;
+    }
 
-    if (!(state->options & VGA_MODE_GFX)) {
-        assert(color < 256);
+    if (!(state->options & VGA_MODE_GFX) && color > 256) {
+        err = EINVAL;
+        goto done;
     }
 
     // estimate actual fb size
@@ -173,17 +177,20 @@ vga_reload_config(struct vga* state)
         total_px = total_px * 2;
     }
 
-    assert(state->fb_sz >= total_px);
-    state->fb_sz = total_px;
+    if (state->fb_sz && state->fb_sz < total_px) {
+        err = EINVAL;
+    }
 
-    reg->write(state, VGA_SRX, VGA_SR00, 0x0, ALL_FIELDS);
+    state->fb_sz = total_px;
 
     // RAM Enable, I/OAS
     u32_t clk_f = state->crt.h_cclk * state->crt.v_cclk * state->crt.freq;
     u32_t misc = 0b11;
     clk_f = (clk_f * dpc_sq) / 1000000;
 
-    assert(clk_f && clk_f <= 28);
+    if (!(clk_f && clk_f <= 28)) {
+        err = EINVAL;
+    }
 
     // require 28 MHz clock
     if (clk_f > 25) {
@@ -191,6 +198,7 @@ vga_reload_config(struct vga* state)
     }
     // 25 MHz clock: 0b00 << 2
 
+    reg->write(state, VGA_SRX, VGA_SR00, 0x0, ALL_FIELDS);
     reg->write(state, VGA_MISCX, 0, misc, 0b1111);
 
     // SEQN_CLK: shift every CCLK, DCLK passthrough, 8/9 DCLK
@@ -219,8 +227,8 @@ vga_reload_config(struct vga* state)
         reg->write(
           state, VGA_GRX, VGA_GR05, (c256 << 6) | (1 << 4), ALL_FIELDS);
 
-        // Legacy GFX FB: 0xA000, GFX mode
-        reg->write(state, VGA_GRX, VGA_GR06, 0b0011, ALL_FIELDS);
+        // Legacy GFX FB (for compatibility): 0xb8000, GFX mode
+        reg->write(state, VGA_GRX, VGA_GR06, 0b1111, ALL_FIELDS);
 
     } else { // AN MOODE
         // Only map 0,1 enabled, (ascii and attribute)
@@ -252,9 +260,9 @@ vga_reload_config(struct vga* state)
     reg->write(state, VGA_ARX, VGA_AR13, 0, ALL_FIELDS);
     reg->write(state, VGA_ARX, VGA_AR14, 0, ALL_FIELDS);
 
-    vga_update_palette(state);
-
     reg->write(state, VGA_SRX, VGA_SR00, 0x3, ALL_FIELDS);
 
+done:
     cpu_enable_interrupt();
+    return err;
 }

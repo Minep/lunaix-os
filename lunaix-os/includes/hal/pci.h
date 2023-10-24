@@ -6,6 +6,13 @@
 #include <lunaix/ds/llist.h>
 #include <lunaix/types.h>
 
+#define EXPORT_PCI_DEVICE(id, pci_devdef)                                      \
+    EXPORT_DEVICE(id, &(pci_devdef)->devdef, load_pci_probe)
+
+#define PCI_MATCH_EXACT -1
+#define PCI_MATCH_ANY 0
+#define PCI_MATCH_VENDOR 0xffff
+
 #define PCI_TDEV 0x0
 #define PCI_TPCIBRIDGE 0x1
 #define PCI_TCARDBRIDGE 0x2

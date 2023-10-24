@@ -4,6 +4,7 @@
 #include <lunaix/spike.h>
 #include <lunaix/status.h>
 
+#include <hal/gfxm.h>
 #include <hal/pci.h>
 #include <sys/pci_hba.h>
 
@@ -81,14 +82,17 @@ vga_pci_init(struct device_def* devdef, struct device* pcidev_base)
     struct vga* vga_state =
       vga_new_state(mmio_mapped + VGA_REG_OFF, fb_mapped, FB256K);
     vga_state->reg_ops = vga_default_mmio_ops;
-    vga_state->lut.colors = palette;
-    vga_state->lut.len = 256;
-    vga_state->options = VGA_MODE_GFX;
 
-    vga_config_rect(vga_state, 640, 360, 60, 0);
+    struct gfxa* vga_gfxa = gfxm_alloc_adapter(vga_state);
+    extern struct gfxa_ops vga_gfxa_ops;
+    vga_gfxa->ops = vga_gfxa_ops;
 
-    // TEMP: Test the change of VGA display mode and resolution
-    // vga_reload_config(vga_state);
+    // Preload a VESA-compilant configuration
+    vga_gfxa->disp_info = (struct disp_profile){
+        .mon = { .w_px = 640, .h_px = 480, .freq = 60, .depth = 16 }
+    };
+
+    gfxm_register(vga_gfxa);
 
     return 0;
 }
@@ -98,9 +102,9 @@ vga_pci_init(struct device_def* devdef, struct device* pcidev_base)
 static struct pci_device_def vga_pci_devdef = {
     .dev_class = VGA_PCI_CLASS,
     .dev_ident = PCI_DEVIDENT(0x1234, 0x1111),
-    .ident_mask = -1,
+    .ident_mask = PCI_MATCH_EXACT,
     .devdef = { .class = DEVCLASS(DEVIF_PCI, DEVFN_DISP, DEV_VGA),
-                .name = "VGA Generic Driver",
+                .name = "Generic VGA",
                 .init_for = vga_pci_init }
 };
-EXPORT_DEVICE(vga_pci, &vga_pci_devdef.devdef, load_pci_probe);
+EXPORT_PCI_DEVICE(vga_pci, &vga_pci_devdef);

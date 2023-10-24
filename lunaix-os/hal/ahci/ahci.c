@@ -444,9 +444,9 @@ achi_register_ops(struct hba_port* port)
 
 static struct pci_device_def ahcidef = {
     .dev_class = AHCI_HBA_CLASS,
-    .ident_mask = 0x0,
+    .ident_mask = PCI_MATCH_ANY,
     .devdef = { .class = DEVCLASS(DEVIF_PCI, DEVFN_STORAGE, DEV_SATA),
                 .name = "Serial ATA Controller",
                 .init_for = ahci_driver_init }
 };
-EXPORT_DEVICE(ahci, &ahcidef.devdef, load_pci_probe);
+EXPORT_PCI_DEVICE(ahci, &ahcidef);
