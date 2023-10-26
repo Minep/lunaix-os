@@ -20,22 +20,64 @@
 LOG_MODULE("PCI")
 
 static DEFINE_LLIST(pci_devices);
+static DECLARE_HASHTABLE(pci_devcache, 8);
 
 static struct device* pcidev_cat;
+static struct device_def pci_def;
 
 void
 pci_probe_msi_info(struct pci_device* device);
 
+static inline void
+pci_log_device(struct pci_device* pcidev)
+{
+    pciaddr_t loc = pcidev->loc;
+    struct device_def* binddef = pcidev->binding.def;
+
+    if (!binddef) {
+        kprintf("pci.%d:%d:%d, no binding\n",
+                PCILOC_BUS(loc),
+                PCILOC_DEV(loc),
+                PCILOC_FN(loc));
+        return;
+    }
+
+    kprintf("pci.%d:%d:%d, dev.%xh:%xh.%d, %s\n",
+            PCILOC_BUS(loc),
+            PCILOC_DEV(loc),
+            PCILOC_FN(loc),
+            binddef->class.fn_grp,
+            binddef->class.device,
+            binddef->class.variant,
+            binddef->name);
+}
+
 static struct pci_device*
-pci_create_device(ptr_t pci_base, int devinfo)
+pci_create_device(pciaddr_t loc, ptr_t pci_base, int devinfo)
 {
     pci_reg_t class = pci_read_cspace(pci_base, 0x8);
     struct hbucket* bucket = device_definitions_byif(DEVIF_PCI);
 
     u32_t devid = PCI_DEV_DEVID(devinfo);
     u32_t vendor = PCI_DEV_VENDOR(devinfo);
+    pci_reg_t intr = pci_read_cspace(pci_base, 0x3c);
 
-    kappendf(".%x:%x, ", vendor, devid);
+    struct pci_device* device = vzalloc(sizeof(struct pci_device));
+    device->class_info = class;
+    device->device_info = devinfo;
+    device->cspace_base = pci_base;
+    device->intr_info = intr;
+
+    device_create(&device->dev, pcidev_cat, DEV_IFSYS, NULL);
+
+    pci_probe_msi_info(device);
+    pci_probe_bar_info(device);
+
+    llist_append(&pci_devices, &device->dev_chain);
+    device_register(&device->dev, &pci_def.class, "%x", loc);
+    pci_def.class.variant++;
+
+    // find a suitable binding
 
     struct pci_device_def *pos, *n;
     hashtable_bucket_foreach(bucket, pos, n, devdef.hlist_if)
@@ -52,55 +94,39 @@ pci_create_device(ptr_t pci_base, int devinfo)
         }
     }
 
-    kappendf(KWARN "unknown device\n");
-
-    return NULL;
+    goto done;
 
 found:
-    pci_reg_t intr = pci_read_cspace(pci_base, 0x3c);
-
-    struct pci_device* device = vzalloc(sizeof(struct pci_device));
-    device->class_info = class;
-    device->device_info = devinfo;
-    device->cspace_base = pci_base;
-    device->intr_info = intr;
-
-    device_create(&device->dev, pcidev_cat, DEV_IFSYS, NULL);
-
-    pci_probe_msi_info(device);
-    pci_probe_bar_info(device);
-
-    kappendf("%s (dev.%x:%x:%x) \n",
-             pos->devdef.name,
-             pos->devdef.class.fn_grp,
-             pos->devdef.class.device,
-             pos->devdef.class.variant);
-
-    if (!pos->devdef.init_for) {
-        kappendf(KERROR "bad def\n");
-        goto fail;
+    if (!pos->devdef.bind) {
+        kprintf(KERROR "pci_loc:%x, (%xh:%xh.%d) unbindable\n",
+                loc,
+                pos->devdef.class.fn_grp,
+                pos->devdef.class.device,
+                pos->devdef.class.variant);
+        goto done;
     }
 
-    int errno = pos->devdef.init_for(&pos->devdef, &device->dev);
+    int errno = pos->devdef.bind(&pos->devdef, &device->dev);
     if (errno) {
-        kappendf(KERROR "failed (e=%d)\n", errno);
-        goto fail;
+        kprintf(KERROR "pci_loc:%x, (%xh:%xh.%d) failed, e=%d\n",
+                loc,
+                pos->devdef.class.fn_grp,
+                pos->devdef.class.device,
+                pos->devdef.class.variant,
+                errno);
+        goto done;
     }
 
-    llist_append(&pci_devices, &device->dev_chain);
-    device_register(&device->dev, &pos->devdef.class, "%x:%x", vendor, devid);
+    device->binding.def = &pos->devdef;
 
+done:
     return device;
-
-fail:
-    vfree(device);
-    return NULL;
 }
 
 void
-pci_probe_device(int bus, int dev, int funct)
+pci_probe_device(pciaddr_t pci_loc)
 {
-    u32_t base = PCI_ADDRESS(bus, dev, funct);
+    u32_t base = PCI_CFGADDR(pci_loc);
     pci_reg_t reg1 = pci_read_cspace(base, 0);
 
     // Vendor=0xffff则表示设备不存在
@@ -114,31 +140,36 @@ pci_probe_device(int bus, int dev, int funct)
     // 防止堆栈溢出
     // QEMU的ICH9/Q35实现似乎有点问题，对于多功能设备的每一个功能的header type
     //  都将第七位置位。而virtualbox 就没有这个毛病。
-    if ((hdr_type & 0x80) && funct == 0) {
+    if ((hdr_type & 0x80) && PCILOC_FN(pci_loc) == 0) {
         hdr_type = hdr_type & ~0x80;
         // 探测多用途设备（multi-function device）
         for (int i = 1; i < 7; i++) {
-            pci_probe_device(bus, dev, i);
+            pci_probe_device(pci_loc + i);
         }
     }
 
-    if (hdr_type != PCI_TDEV) {
-        // XXX: 目前忽略所有桥接设备，比如PCI-PCI桥接器，或者是CardBus桥接器
-        return;
+    struct pci_device *pos, *n;
+    hashtable_hash_foreach(pci_devcache, pci_loc, pos, n, dev_cache)
+    {
+        if (pos->loc == pci_loc) {
+            pci_log_device(pos);
+            return;
+        }
     }
 
-    kprintf("pci.%d:%d:%d", bus, dev, funct);
-
-    pci_create_device(base, reg1);
+    struct pci_device* pcidev = pci_create_device(pci_loc, base, reg1);
+    if (pcidev) {
+        pcidev->loc = pci_loc;
+        hashtable_hash_in(pci_devcache, &pcidev->dev_cache, pci_loc);
+        pci_log_device(pcidev);
+    }
 }
 
 void
 pci_scan()
 {
-    for (int bus = 0; bus < 256; bus++) {
-        for (int dev = 0; dev < 32; dev++) {
-            pci_probe_device(bus, dev, 0);
-        }
+    for (u32_t loc = 0; loc < (pciaddr_t)-1; loc += 8) {
+        pci_probe_device((pciaddr_t)loc);
     }
 }
 
@@ -267,6 +298,14 @@ __pci_read_class(struct twimap* map)
 }
 
 static void
+__pci_read_devinfo(struct twimap* map)
+{
+    int devinfo = twimap_data(map, struct pci_device*)->device_info;
+    twimap_printf(
+      map, "%x:%x", PCI_DEV_VENDOR(devinfo), PCI_DEV_DEVID(devinfo));
+}
+
+static void
 __pci_bar_read(struct twimap* map)
 {
     struct pci_device* pcidev = twimap_data(map, struct pci_device*);
@@ -308,13 +347,22 @@ static void
 __pci_read_binding(struct twimap* map)
 {
     struct pci_device* pcidev = twimap_data(map, struct pci_device*);
-    // check if device binding has been initialized
-    struct device* dev = device_cast(&pcidev->dev);
-    if (!dev) {
+    struct device_def* devdef = pcidev->binding.def;
+    if (!devdef) {
         return;
     }
 
-    twimap_printf(map, "0x%x:0x%x", dev->ident.fn_grp, dev->ident.unique);
+    twimap_printf(map,
+                  "%xh:%xh.%d",
+                  devdef->class.fn_grp,
+                  devdef->class.device,
+                  devdef->class.variant);
+}
+
+static void
+__pci_trigger_bus_rescan(struct twimap* map)
+{
+    pci_scan();
 }
 
 void
@@ -323,15 +371,13 @@ pci_build_fsmapping()
     struct twifs_node *pci_class = twifs_dir_node(NULL, "pci"), *pci_dev;
     struct pci_device *pos, *n;
     struct twimap* map;
+
+    map = twifs_mapping(pci_class, NULL, "rescan");
+    map->read = __pci_trigger_bus_rescan;
+
     llist_for_each(pos, n, &pci_devices, dev_chain)
     {
-        pci_dev = twifs_dir_node(pci_class,
-                                 "%.2d:%.2d:%.2d.%.4x:%.4x",
-                                 PCI_BUS_NUM(pos->cspace_base),
-                                 PCI_SLOT_NUM(pos->cspace_base),
-                                 PCI_FUNCT_NUM(pos->cspace_base),
-                                 PCI_DEV_VENDOR(pos->device_info),
-                                 PCI_DEV_DEVID(pos->device_info));
+        pci_dev = twifs_dir_node(pci_class, "%x", pos->loc);
 
         map = twifs_mapping(pci_dev, pos, "config");
         map->read = __pci_read_cspace;
@@ -362,6 +408,13 @@ pci_load_devices(struct device_def* def)
     pci_scan();
 
     return 0;
+}
+
+void
+pci_bind_instance(struct pci_device* pcidev, void* devobj)
+{
+    pcidev->dev.underlay = devobj;
+    pcidev->binding.dev = devobj;
 }
 
 static struct device_def pci_def = {

@@ -116,7 +116,8 @@ struct device_def
     struct devclass class;
 
     int (*init)(struct device_def*);
-    int (*init_for)(struct device_def*, struct device*);
+    int (*bind)(struct device_def*, struct device*);
+    int (*free)(struct device_def*, void* instance);
 };
 
 static inline u32_t
@@ -225,5 +226,7 @@ device_locked(struct device* dev)
 {
     return mutex_on_hold(&dev->lock);
 }
+
+#define devprintf_expand(devident) (devident)->fn_grp, (devident)->unique
 
 #endif /* __LUNAIX_DEVICE_H */

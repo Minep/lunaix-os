@@ -105,6 +105,6 @@ static struct pci_device_def vga_pci_devdef = {
     .ident_mask = PCI_MATCH_EXACT,
     .devdef = { .class = DEVCLASS(DEVIF_PCI, DEVFN_DISP, DEV_VGA),
                 .name = "Generic VGA",
-                .init_for = vga_pci_init }
+                .bind = vga_pci_init }
 };
 EXPORT_PCI_DEVICE(vga_pci, &vga_pci_devdef);

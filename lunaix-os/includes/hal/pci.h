@@ -53,13 +53,18 @@
 #define PCI_RCMD_MM_ACCESS (1 << 1)
 #define PCI_RCMD_IO_ACCESS 1
 
-#define PCI_ADDRESS(bus, dev, funct)                                           \
-    (((bus) & 0xff) << 16) | (((dev) & 0xff) << 11) |                          \
-      (((funct) & 0xff) << 8) | 0x80000000
+#define PCI_CFGADDR(pciloc) ((u32_t)(pciloc) << 8) | 0x80000000UL
+
+#define PCILOC(bus, dev, funct)                                                \
+    (((bus) & 0xff) << 8) | (((dev) & 0x1f) << 3) | ((funct) & 0x7)
+#define PCILOC_BUS(loc) (((loc) >> 8) & 0xff)
+#define PCILOC_DEV(loc) (((loc) >> 3) & 0x1f)
+#define PCILOC_FN(loc) ((loc) & 0x7)
 
 #define PCI_ID_ANY (-1)
 
 typedef unsigned int pci_reg_t;
+typedef u16_t pciaddr_t;
 
 // PCI device header format
 // Ref: "PCI Local Bus Specification, Rev.3, Section 6.1"
@@ -79,11 +84,20 @@ struct pci_device
 {
     struct device dev;
     struct llist_header dev_chain;
+    struct hlist_node dev_cache;
+
+    struct
+    {
+        struct device* dev;
+        struct device_def* def;
+    } binding;
+
+    pciaddr_t loc;
+    u16_t intr_info;
     u32_t device_info;
     u32_t class_info;
     u32_t cspace_base;
     u32_t msi_loc;
-    u16_t intr_info;
     struct pci_base_addr bar[6];
 };
 #define PCI_DEVICE(devbase) (container_of((devbase), struct pci_device, dev))
@@ -132,15 +146,14 @@ pci_get_device_by_id(u16_t vendorId, u16_t deviceId);
 size_t
 pci_bar_sizing(struct pci_device* dev, u32_t* bar_out, u32_t bar_num);
 
+/**
+ * @brief Bind an abstract device instance to the pci device
+ *
+ * @param pcidev pci device
+ * @param devobj abstract device instance
+ */
 void
-pci_add_driver(const char* name,
-               u32_t class,
-               u32_t vendor,
-               u32_t devid,
-               pci_drv_init init);
-
-int
-pci_bind_driver(struct pci_device* pci_dev);
+pci_bind_instance(struct pci_device* pcidev, void* devobj);
 
 void
 pci_probe_bar_info(struct pci_device* device);

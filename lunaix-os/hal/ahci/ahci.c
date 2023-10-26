@@ -200,7 +200,7 @@ ahci_driver_init(struct device_def* def, struct device* dev)
         ahci_register_device(hbadev);
     }
 
-    dev->underlay = ahci_drv;
+    pci_bind_instance(ahci_dev, ahci_drv);
     return 0;
 }
 
@@ -447,6 +447,6 @@ static struct pci_device_def ahcidef = {
     .ident_mask = PCI_MATCH_ANY,
     .devdef = { .class = DEVCLASS(DEVIF_PCI, DEVFN_STORAGE, DEV_SATA),
                 .name = "Serial ATA Controller",
-                .init_for = ahci_driver_init }
+                .bind = ahci_driver_init }
 };
 EXPORT_PCI_DEVICE(ahci, &ahcidef);
