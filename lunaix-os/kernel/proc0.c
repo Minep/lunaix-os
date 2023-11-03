@@ -92,10 +92,6 @@ __proc0()
 void
 init_platform()
 {
-    kprintf(KINFO "\033[11;0mLunaixOS (gcc v%s, %s)\033[39;49m\n",
-            __VERSION__,
-            __TIME__);
-
     device_poststage();
 
     twifs_register_plugins();

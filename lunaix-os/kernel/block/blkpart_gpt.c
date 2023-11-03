@@ -8,7 +8,7 @@
 #include <lib/crc.h>
 
 #define GPT_BLKSIZE 512
-#define LBA2OFF(lba) ((lba)*GPT_BLKSIZE)
+#define LBA2OFF(lba) ((lba) * GPT_BLKSIZE)
 #define ENT_PER_BLK (GPT_BLKSIZE / sizeof(struct gpt_entry))
 
 #define GPTSIG_LO 0x20494645UL
@@ -50,7 +50,7 @@ blkpart_parse(struct device* master, struct gpt_header* header)
           (ent->start_lba * GPT_BLKSIZE) / (u64_t)bdev->blk_size;
         u64_t elba_local = (ent->end_lba * GPT_BLKSIZE) / (u64_t)bdev->blk_size;
 
-        kprintf("%s: guid part#%d: %d..%d\n",
+        kprintf("%s: guid part#%d: %d..%d",
                 bdev->bdev_id,
                 i,
                 (u32_t)slba_local,
@@ -83,7 +83,7 @@ blkpart_probegpt(struct device* master)
     u32_t crc = gpt_hdr->hdr_cksum;
     gpt_hdr->hdr_cksum = 0;
     if (crc32b((void*)gpt_hdr, sizeof(*gpt_hdr)) != crc) {
-        kprintf(KWARN "checksum failed\n");
+        kprintf(KWARN "checksum failed");
         // FUTURE check the backup header
         return EINVAL;
     }

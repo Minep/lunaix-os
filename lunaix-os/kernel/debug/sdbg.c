@@ -1,7 +1,7 @@
 // FIXME Re-design needed!!
 
 #include <hal/serial.h>
-#include <klibc/stdio.h>
+#include <klibc/strfmt.h>
 #include <lunaix/syslog.h>
 #include <sdbg/gdbstub.h>
 #include <sdbg/lsdbg.h>

@@ -1,4 +1,4 @@
-#include <klibc/stdio.h>
+#include <klibc/strfmt.h>
 #include <lunaix/spike.h>
 #include <sys/interrupts.h>
 
@@ -30,7 +30,7 @@ panickf(const char* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    __ksprintf_internal(buffer, fmt, 1024, args);
+    ksnprintfv(buffer, fmt, 1024, args);
     va_end(args);
 
     asm("int %0" ::"i"(LUNAIX_SYS_PANIC), "D"(buffer));

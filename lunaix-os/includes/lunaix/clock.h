@@ -2,10 +2,6 @@
 #define __LUNAIX_CLOCK_H
 
 #include <lunaix/time.h>
-
-void
-clock_init();
-
 void
 clock_walltime(datetime_t* datetime);
 

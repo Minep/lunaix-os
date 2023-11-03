@@ -59,4 +59,11 @@ twifs_rm_node(struct twifs_node* node);
 struct twimap*
 twifs_mapping(struct twifs_node* parent, void* data, const char* fmt, ...);
 
+#define twimap_entry_simple(parent, name, data, read_cb)                       \
+    ({                                                                         \
+        struct twimap* map = twifs_mapping((parent), (data), (name));          \
+        map->read = (read_cb);                                                 \
+        map;                                                                   \
+    })
+
 #endif /* __LUNAIX_TWIFS_H */

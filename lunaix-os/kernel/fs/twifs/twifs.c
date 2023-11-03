@@ -8,7 +8,7 @@
  * @copyright Copyright (c) 2022
  *
  */
-#include <klibc/stdio.h>
+#include <klibc/strfmt.h>
 #include <klibc/string.h>
 #include <lunaix/clock.h>
 #include <lunaix/fs.h>
@@ -192,7 +192,7 @@ struct twifs_node*
 twifs_file_node_vargs(struct twifs_node* parent, const char* fmt, va_list args)
 {
     char buf[VFS_NAME_MAXLEN];
-    size_t len = __ksprintf_internal(buf, fmt, VFS_NAME_MAXLEN, args);
+    size_t len = ksnprintfv(buf, fmt, VFS_NAME_MAXLEN, args);
 
     return __twifs_new_node(parent ? parent : fs_root, buf, len, VFS_IFSEQDEV);
 }
@@ -217,7 +217,7 @@ twifs_dir_node(struct twifs_node* parent, const char* fmt, ...)
     va_start(args, fmt);
 
     char buf[VFS_NAME_MAXLEN];
-    size_t len = __ksprintf_internal(buf, fmt, VFS_NAME_MAXLEN, args);
+    size_t len = ksnprintfv(buf, fmt, VFS_NAME_MAXLEN, args);
     struct twifs_node* twi_node =
       __twifs_new_node(parent ? parent : fs_root, buf, len, VFS_IFDIR);
 

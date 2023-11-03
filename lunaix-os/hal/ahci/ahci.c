@@ -186,12 +186,12 @@ ahci_driver_init(struct device_def* def, struct device* dev)
         port_regs[HBA_RPxCMD] |= HBA_PxCMD_ST;
 
         if (!ahci_init_device(port)) {
-            kprintf(KERROR "init fail: 0x%x@p%d\n", port->regs[HBA_RPxSIG], i);
+            kprintf(KERROR "init fail: 0x%x@p%d", port->regs[HBA_RPxSIG], i);
             continue;
         }
 
         struct hba_device* hbadev = port->device;
-        kprintf(KINFO "sata%d: %s, blk_size=%d, blk=0..%d\n",
+        kprintf(KINFO "sata%d: %s, blk_size=%d, blk=0..%d",
                 i,
                 hbadev->model,
                 hbadev->block_size,

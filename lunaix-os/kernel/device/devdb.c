@@ -4,7 +4,7 @@
 
 #include <lib/hash.h>
 
-#include <klibc/stdio.h>
+#include <klibc/strfmt.h>
 
 static DECLARE_HASHTABLE(dev_registry, 32);
 static DECLARE_HASHTABLE(dev_byif, 8);

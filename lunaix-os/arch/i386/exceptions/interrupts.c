@@ -28,11 +28,11 @@ intr_handler(isr_param* param)
         goto done;
     }
 
-    kprint_panic("INT %u: (%x) [%p: %p] Unknown",
-                 execp->vector,
-                 execp->err_code,
-                 execp->cs,
-                 execp->eip);
+    kprintf(KERROR "INT %u: (%x) [%p: %p] Unknown",
+            execp->vector,
+            execp->err_code,
+            execp->cs,
+            execp->eip);
 
 done:
 

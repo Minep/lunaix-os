@@ -25,7 +25,7 @@
 #include <sys/interrupts.h>
 #include <sys/mm/mempart.h>
 
-#include <klibc/stdio.h>
+#include <klibc/strfmt.h>
 #include <klibc/string.h>
 
 extern void
@@ -62,26 +62,35 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     /* Get platform configuration */
     acpi_init();
 
-    /* Let's get fs online as soon as possible, as things rely on them */
-    vfs_init();
-    fsm_init();
-
     /* Get intc online, this is the cornerstone when initing devices */
     intc_init();
 
+    /*
+        TODO autoload these init function that do not have dependency between
+       them
+    */
+
+    /* Let's get fs online as soon as possible, as things rely on them */
+    vfs_init();
+    fsm_init();
     input_init();
+    block_init();
+    sched_init();
+
     device_earlystage();
 
     /* System timing and clock support */
-    clock_init();
+    /*
+        FIXME we must get timer as earlier as possible
+
+        A decoupling between rtc and general device sub-sys is needed.
+        Otherwise we timer can only be loaded after device_earlystage.
+
+        We need a dedicated timer&clock subsystem
+    */
     timer_init();
 
-    device_timerstage();
-
-    block_init();
-
     /* the bare metal are now happy, let's get software over with */
-    sched_init();
 
     int errno = 0;
     if ((errno = vfs_mount_root("ramfs", NULL))) {

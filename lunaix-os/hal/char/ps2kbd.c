@@ -277,14 +277,14 @@ ps2_kbd_init(struct device_def* devdef)
     // 4、控制器自检
     result = ps2_issue_cmd_wretry(PS2_CMD_SELFTEST, PS2_NO_ARG);
     if (result != PS2_RESULT_TEST_OK) {
-        kprintf(KWARN "controller self-test failed. (%x)\n", result);
+        kprintf(KWARN "controller self-test failed. (%x)", result);
         goto done;
     }
 
     // 5、设备自检（端口1自检，通常是我们的键盘）
     result = ps2_issue_cmd_wretry(PS2_CMD_SELFTEST_PORT1, PS2_NO_ARG);
     if (result != 0) {
-        kprintf(KERROR "interface test on port 1 failed. (%x)\n", result);
+        kprintf(KERROR "interface test on port 1 failed. (%x)", result);
         goto done;
     }
 
@@ -298,12 +298,6 @@ ps2_kbd_init(struct device_def* devdef)
     ps2_post_cmd(PS2_PORT_CTRL_CMDREG, PS2_CMD_WRITE_CFG, result);
 
     // 至此，PS/2控制器和设备已完成初始化，可以正常使用。
-
-    // 搞一个计时器，将我们的 ps2_process_cmd
-    // 挂上去。每隔5毫秒执行排在队头的命令。
-    //  为什么只执行队头的命令，而不是全部的命令？
-    //      因为我们需要保证isr尽量的简短，运行起来快速。而发送这些命令非常的耗时。
-    timer_run_ms(5, ps2_process_cmd, NULL, TIMER_MODE_PERIODIC);
 
     /*
      *   一切准备就绪后，我们才教ioapic去启用IRQ#1。
@@ -456,6 +450,7 @@ intr_ps2_kbd_handler(const isr_param* param)
 
 #ifdef KBD_ENABLE_SPIRQ_FIX2
     if (scancode == PS2_RESULT_ACK || scancode == PS2_RESULT_NAK) {
+        ps2_process_cmd(NULL);
         return;
     }
 #endif
@@ -537,7 +532,7 @@ ps2_issue_cmd_wretry(char cmd, u16_t arg)
         c++;
     }
     if (c >= 5) {
-        kprintf(KWARN "max attempt reached.\n");
+        kprintf(KWARN "max attempt reached.");
     }
     return r;
 }
@@ -579,4 +574,4 @@ static struct device_def devrtc_i8042kbd = {
     .class = DEVCLASS(DEVIF_SOC, DEVFN_INPUT, DEV_KBD),
     .init = ps2_kbd_init
 };
-EXPORT_DEVICE(i8042_kbd, &devrtc_i8042kbd, load_timerstage);
+EXPORT_DEVICE(i8042_kbd, &devrtc_i8042kbd, load_earlystage);

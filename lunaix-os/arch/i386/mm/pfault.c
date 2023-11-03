@@ -67,7 +67,7 @@ intr_routine_page_fault(const isr_param* param)
     if (PG_IS_PRESENT(*pte)) {
         if (((errcode ^ mapping.flags) & PG_ALLOW_USER)) {
             // invalid access
-            kprintf(KDEBUG "invalid user access. (%p->%p, attr:0x%x)\n",
+            kprintf(KDEBUG "invalid user access. (%p->%p, attr:0x%x)",
                     mapping.va,
                     mapping.pa,
                     mapping.flags);
@@ -133,7 +133,7 @@ intr_routine_page_fault(const isr_param* param)
         }
 
         if (errno < 0) {
-            kprintf(KERROR "fail to populate page (%d)\n", errno);
+            kprintf(KERROR "fail to populate page (%d)", errno);
             goto segv_term;
         }
 
@@ -148,10 +148,10 @@ intr_routine_page_fault(const isr_param* param)
         ;
 
 oom:
-    kprintf(KERROR "out of memory\n");
+    kprintf(KERROR "out of memory");
 
 segv_term:
-    kprintf(KERROR "(pid: %d) Segmentation fault on %p (%p:%p,e=0x%x)\n",
+    kprintf(KERROR "(pid: %d) Segmentation fault on %p (%p:%p,e=0x%x)",
             __current->pid,
             ptr,
             param->execp->cs,

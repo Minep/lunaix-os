@@ -1,4 +1,4 @@
-#include <klibc/stdio.h>
+#include <klibc/strfmt.h>
 #include <klibc/string.h>
 
 #include <hal/ahci/hba.h>
@@ -295,7 +295,7 @@ block_mount(struct block_dev* bdev, devfs_exporter fs_export)
 
     errno = blkpart_probegpt(bdev->dev);
     if (errno < 0) {
-        kprintf(KERROR "Fail to parse partition table (%d)\n", errno);
+        kprintf(KERROR "Fail to parse partition table (%d)", errno);
     } else if (!errno) {
         // TODO try other PT parser...
     }
@@ -307,7 +307,7 @@ block_mount(struct block_dev* bdev, devfs_exporter fs_export)
     return errno;
 
 error:
-    kprintf(KERROR "Fail to mount block device: %s (%x)\n", bdev->name, -errno);
+    kprintf(KERROR "Fail to mount block device: %s (%x)", bdev->name, -errno);
     return errno;
 }
 

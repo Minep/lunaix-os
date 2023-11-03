@@ -160,7 +160,7 @@ init_proc_user_space(struct proc_info* pcb)
 
     int status = 0;
     if ((status = mem_map(NULL, &mapped, USR_STACK, NULL, &param))) {
-        kprint_panic("fail to alloc user stack: %d", status);
+        kprintf(KFATAL "fail to alloc user stack: %d", status);
     }
 
     mapped->region_copied = __stack_copied;

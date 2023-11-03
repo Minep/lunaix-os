@@ -170,7 +170,7 @@ vfs_mount_at(const char* fs_name,
             goto cleanup;
         }
 
-        kprintf("mount: dev=%s, fs=%s, mode=%d\n", dev_name, fs_name, options);
+        kprintf("mount: dev=%s, fs=%s, mode=%d", dev_name, fs_name, options);
 
         mnt_point->mnt->flags = options;
     } else {
@@ -180,7 +180,7 @@ vfs_mount_at(const char* fs_name,
     return errno;
 
 cleanup:
-    kprintf(KERROR "mount: dev=%s, fs=%s, mode=%d, err=%d\n",
+    kprintf(KERROR "mount: dev=%s, fs=%s, mode=%d, err=%d",
             dev_name,
             fs_name,
             options,

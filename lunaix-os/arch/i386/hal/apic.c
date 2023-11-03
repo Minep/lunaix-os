@@ -9,8 +9,8 @@
  *
  */
 
-#include <sys/cpu.h>
 #include <hal/intc.h>
+#include <sys/cpu.h>
 
 #include <sys/apic.h>
 #include <sys/interrupts.h>
@@ -60,7 +60,7 @@ apic_init()
     u32_t apic_id = apic_read_reg(APIC_IDR) >> 24;
     u32_t apic_ver = apic_read_reg(APIC_VER);
 
-    kprintf(KINFO "ID: %x, Version: %x, Max LVT: %u\n",
+    kprintf(KINFO "ID: %x, Version: %x, Max LVT: %u",
             apic_id,
             apic_ver & 0xff,
             (apic_ver >> 16) & 0xff);

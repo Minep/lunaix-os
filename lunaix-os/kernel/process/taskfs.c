@@ -4,7 +4,7 @@
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 
-#include <klibc/stdio.h>
+#include <klibc/strfmt.h>
 #include <klibc/string.h>
 
 #include <usr/lunaix/dirent_defs.h>

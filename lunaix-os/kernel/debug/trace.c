@@ -113,11 +113,11 @@ trace_printstack_of(ptr_t fp)
     int n = trace_walkback(tbs, fp, NB_TRACEBACK, &fp);
 
     if (fp) {
-        kprintf(KDEBUG "...<truncated>\n");
+        kprintf(KDEBUG "...<truncated>");
     }
 
     for (int i = 0; i < n; i++) {
-        kprintf(KDEBUG "%p: %s\n", tbs[i].pc, tbs[i].symbol);
+        kprintf(KDEBUG "%p: %s", tbs[i].pc, tbs[i].symbol);
     }
 }
 
@@ -133,11 +133,11 @@ trace_printswctx(const isr_param* p, char* direction)
 
     struct ksym_entry* sym = trace_sym_lookup(p->execp->eip);
 
-    kprintf(KDEBUG ">> (sw:%s) iv:%d, errno:%p <<\n",
+    kprintf(KDEBUG ">> (sw:%s) iv:%d, errno:%p <<",
             direction,
             p->execp->vector,
             p->execp->err_code);
-    kprintf(KDEBUG "%p:%s\n", p->execp->eip, ksym_getstr(sym));
+    kprintf(KDEBUG "%p:%s", p->execp->eip, ksym_getstr(sym));
 }
 
 void
@@ -147,7 +147,6 @@ trace_printstack_isr(const isr_param* isrm)
     ptr_t fp = cpu_get_fp();
     int prev_fromusr = 0;
 
-    kprintf(KDEBUG "\n");
     kprintf(KDEBUG "stack trace (pid=%d)\n", __current->pid);
 
     trace_printstack_of(fp);
@@ -170,5 +169,4 @@ trace_printstack_isr(const isr_param* isrm)
 
         p = p->execp->saved_prev_ctx;
     }
-    kprintf(KDEBUG "\n");
 }

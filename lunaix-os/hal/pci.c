@@ -35,14 +35,14 @@ pci_log_device(struct pci_device* pcidev)
     struct device_def* binddef = pcidev->binding.def;
 
     if (!binddef) {
-        kprintf("pci.%d:%d:%d, no binding\n",
+        kprintf("pci.%d:%d:%d, no binding",
                 PCILOC_BUS(loc),
                 PCILOC_DEV(loc),
                 PCILOC_FN(loc));
         return;
     }
 
-    kprintf("pci.%d:%d:%d, dev.%xh:%xh.%d, %s\n",
+    kprintf("pci.%d:%d:%d, dev.%xh:%xh.%d, %s",
             PCILOC_BUS(loc),
             PCILOC_DEV(loc),
             PCILOC_FN(loc),
@@ -98,7 +98,7 @@ pci_create_device(pciaddr_t loc, ptr_t pci_base, int devinfo)
 
 found:
     if (!pos->devdef.bind) {
-        kprintf(KERROR "pci_loc:%x, (%xh:%xh.%d) unbindable\n",
+        kprintf(KERROR "pci_loc:%x, (%xh:%xh.%d) unbindable",
                 loc,
                 pos->devdef.class.fn_grp,
                 pos->devdef.class.device,
@@ -108,7 +108,7 @@ found:
 
     int errno = pos->devdef.bind(&pos->devdef, &device->dev);
     if (errno) {
-        kprintf(KERROR "pci_loc:%x, (%xh:%xh.%d) failed, e=%d\n",
+        kprintf(KERROR "pci_loc:%x, (%xh:%xh.%d) failed, e=%d",
                 loc,
                 pos->devdef.class.fn_grp,
                 pos->devdef.class.device,

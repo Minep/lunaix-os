@@ -8,7 +8,7 @@
 #include <lunaix/syslog.h>
 #include <lunaix/trace.h>
 
-#include <klibc/stdio.h>
+#include <klibc/strfmt.h>
 
 #include <sys/apic.h>
 #include <sys/i386_intr.h>
@@ -23,7 +23,7 @@ extern u32_t debug_resv;
 void
 __print_panic_msg(const char* msg, const isr_param* param)
 {
-    kprintf(KERROR "panic: %s\n", msg);
+    kprintf(KERROR "panic: %s", msg);
     trace_printstack_isr(param);
 }
 

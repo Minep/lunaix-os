@@ -51,12 +51,6 @@ clock_build_mapping()
 }
 EXPORT_TWIFS_PLUGIN(sys_clock, clock_build_mapping);
 
-void
-clock_init()
-{
-    // hwrtc_init();
-}
-
 time_t
 clock_unixtime()
 {
@@ -68,6 +62,10 @@ clock_unixtime()
 time_t
 clock_systime()
 {
+    if (!current_timer) {
+        return 0;
+    }
+
     ticks_t t = hwtimer_current_systicks();
     return t / current_timer->running_freq;
 }

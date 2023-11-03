@@ -132,7 +132,7 @@ apic_timer_init(struct hwtimer* timer, u32_t hertz, timer_tick_cb timer_cb)
 
     assert_msg(base_freq, "Fail to initialize timer (NOFREQ)");
 
-    kprintf(KINFO "hw: %u Hz; os: %u Hz\n", base_freq, frequency);
+    kprintf(KINFO "hw: %u Hz; os: %u Hz", base_freq, frequency);
 
     // cleanup
     isrm_ivfree(iv_timer);

@@ -8,7 +8,7 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syscall_utils.h>
 
-#include <klibc/stdio.h>
+#include <klibc/strfmt.h>
 #include <klibc/string.h>
 
 static DEFINE_LLIST(root_list);
@@ -21,7 +21,7 @@ void
 device_setname_vargs(struct device* dev, char* fmt, va_list args)
 {
     size_t strlen =
-      __ksprintf_internal(dev->name_val, fmt, DEVICE_NAME_SIZE, args);
+      ksnprintfv(dev->name_val, fmt, DEVICE_NAME_SIZE, args);
 
     dev->name = HSTR(dev->name_val, strlen);
 

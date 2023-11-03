@@ -3,7 +3,7 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 
-#include <klibc/stdio.h>
+#include <klibc/strfmt.h>
 #include <klibc/string.h>
 
 #define TWIMAP_BUFFER_SIZE 4096
@@ -80,7 +80,7 @@ twimap_printf(struct twimap* mapping, const char* fmt, ...)
     char* buf = mapping->buffer + mapping->size_acc;
 
     mapping->size_acc +=
-      __ksprintf_internal(buf, fmt, TWIMAP_BUFFER_SIZE, args) - 1;
+      ksnprintfv(buf, fmt, TWIMAP_BUFFER_SIZE, args) - 1;
 
     va_end(args);
 }
