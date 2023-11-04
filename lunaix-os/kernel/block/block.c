@@ -47,6 +47,21 @@ block_init()
     blk_parent_dev = device_addcat(NULL, "block");
 }
 
+static int
+__block_commit(struct blkio_context* blkio, struct blkio_req* req, int flags)
+{
+    int errno;
+    blkio_commit(blkio, req, flags);
+
+    if ((errno = req->errcode)) {
+        errno = -errno;
+    }
+
+    vbuf_free(req->vbuf);
+    blkio_free_req(req);
+    return errno;
+}
+
 int
 __block_read(struct device* dev, void* buf, size_t offset, size_t len)
 {
@@ -78,21 +93,16 @@ __block_read(struct device* dev, void* buf, size_t offset, size_t len)
     }
 
     req = blkio_vrd(vbuf, rd_block, NULL, NULL, 0);
-    blkio_commit(bdev->blkio, req, BLKIO_WAIT);
 
-    if (!(errno = req->errcode)) {
+    if (!(errno = __block_commit(bdev->blkio, req, BLKIO_WAIT))) {
         memcpy(buf, head_buf + r, rd_size);
         errno = len;
-    } else {
-        errno = -errno;
     }
 
     if (head_buf) {
         vfree(head_buf);
     }
 
-    blkio_free_req(req);
-    vbuf_free(vbuf);
     return errno;
 }
 
@@ -126,21 +136,16 @@ __block_write(struct device* dev, void* buf, size_t offset, size_t len)
     }
 
     req = blkio_vwr(vbuf, wr_block, NULL, NULL, 0);
-    blkio_commit(bdev->blkio, req, BLKIO_WAIT);
 
-    int errno = req->errcode;
-    if (!errno) {
+    int errno;
+    if (!(errno = __block_commit(bdev->blkio, req, BLKIO_WAIT))) {
         errno = len;
-    } else {
-        errno = -errno;
     }
 
     if (tmp_buf) {
         vfree(tmp_buf);
     }
 
-    blkio_free_req(req);
-    vbuf_free(vbuf);
     return errno;
 }
 
@@ -163,17 +168,11 @@ __block_read_page(struct device* dev, void* buf, size_t offset)
 
     struct blkio_req* req = blkio_vrd(vbuf, lba, NULL, NULL, 0);
 
-    blkio_commit(bdev->blkio, req, BLKIO_WAIT);
-
-    int errno = req->errcode;
-    if (!errno) {
+    int errno;
+    if (!(errno = __block_commit(bdev->blkio, req, BLKIO_WAIT))) {
         errno = rd_lba * bdev->blk_size;
-    } else {
-        errno = -errno;
     }
 
-    blkio_free_req(req);
-    vbuf_free(vbuf);
     return errno;
 }
 
@@ -184,29 +183,23 @@ __block_write_page(struct device* dev, void* buf, size_t offset)
     struct block_dev* bdev = (struct block_dev*)dev->underlay;
 
     u32_t lba = offset / bdev->blk_size + bdev->start_lba;
-    u32_t rd_lba = MIN(lba + PG_SIZE / bdev->blk_size, bdev->end_lba);
+    u32_t wr_lba = MIN(lba + PG_SIZE / bdev->blk_size, bdev->end_lba);
 
-    if (rd_lba <= lba) {
+    if (wr_lba <= lba) {
         return 0;
     }
 
-    rd_lba -= lba;
+    wr_lba -= lba;
 
-    vbuf_alloc(&vbuf, buf, rd_lba * bdev->blk_size);
+    vbuf_alloc(&vbuf, buf, wr_lba * bdev->blk_size);
 
     struct blkio_req* req = blkio_vwr(vbuf, lba, NULL, NULL, 0);
 
-    blkio_commit(bdev->blkio, req, BLKIO_WAIT);
-
-    int errno = req->errcode;
-    if (!errno) {
-        errno = rd_lba * bdev->blk_size;
-    } else {
-        errno = -errno;
+    int errno;
+    if (!(errno = __block_commit(bdev->blkio, req, BLKIO_WAIT))) {
+        errno = wr_lba * bdev->blk_size;
     }
 
-    blkio_free_req(req);
-    vbuf_free(vbuf);
     return errno;
 }
 
@@ -217,17 +210,11 @@ __block_rd_lb(struct block_dev* bdev, void* buf, u64_t start, size_t count)
     vbuf_alloc(&vbuf, buf, bdev->blk_size * count);
 
     struct blkio_req* req = blkio_vrd(vbuf, start, NULL, NULL, 0);
-    blkio_commit(bdev->blkio, req, BLKIO_WAIT);
 
-    int errno = req->errcode;
-    if (!errno) {
+    int errno;
+    if (!(errno = __block_commit(bdev->blkio, req, BLKIO_WAIT))) {
         errno = count;
-    } else {
-        errno = -errno;
     }
-
-    blkio_free_req(req);
-    vbuf_free(vbuf);
 
     return errno;
 }
@@ -239,17 +226,11 @@ __block_wr_lb(struct block_dev* bdev, void* buf, u64_t start, size_t count)
     vbuf_alloc(&vbuf, buf, bdev->blk_size * count);
 
     struct blkio_req* req = blkio_vwr(vbuf, start, NULL, NULL, 0);
-    blkio_commit(bdev->blkio, req, BLKIO_WAIT);
 
-    int errno = req->errcode;
-    if (!errno) {
+    int errno;
+    if (!(errno = __block_commit(bdev->blkio, req, BLKIO_WAIT))) {
         errno = count;
-    } else {
-        errno = -errno;
     }
-
-    blkio_free_req(req);
-    vbuf_free(vbuf);
 
     return errno;
 }
@@ -295,7 +276,7 @@ block_mount(struct block_dev* bdev, devfs_exporter fs_export)
 
     errno = blkpart_probegpt(bdev->dev);
     if (errno < 0) {
-        kprintf(KERROR "Fail to parse partition table (%d)", errno);
+        ERROR("Fail to parse partition table (%d)", errno);
     } else if (!errno) {
         // TODO try other PT parser...
     }
@@ -307,7 +288,7 @@ block_mount(struct block_dev* bdev, devfs_exporter fs_export)
     return errno;
 
 error:
-    kprintf(KERROR "Fail to mount block device: %s (%x)", bdev->name, -errno);
+    ERROR("Fail to mount block device: %s (%x)", bdev->name, -errno);
     return errno;
 }
 

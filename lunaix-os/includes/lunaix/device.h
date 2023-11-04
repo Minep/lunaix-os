@@ -14,39 +14,58 @@
 #include <usr/lunaix/device.h>
 
 /**
- * @brief Export a device definition
+ * @brief Export a device definition (i.e., device driver metadata)
  *
  */
 #define EXPORT_DEVICE(id, devdef, load_order)                                  \
     export_ldga_el(devdefs, id, ptr_t, devdef);                                \
     export_ldga_el_sfx(devdefs, id##_ldorder, ptr_t, devdef, load_order);
 
+/**
+ * @brief Mark the device definition can be loaded on demand, all other loading
+ * options are extended from this
+ */
 #define load_on_demand ld_ondemand
-#define load_pci_probe ld_ondemand
 
 /**
- * @brief Mark the device definition should be loaded automatically as earlier
- * as possible in the kernel bootstrapping stage (before initialization of file
- * systems). Load here if your driver is standalone and require no other than
- * basic memory allocation services
+ * @brief Mark the device definition to be loaded as system configuration
+ * device. These kind of devices are defined to be the devices that talk to the
+ * system firmware to do config, or collecting crucial information about the
+ * system. For instances, ACPI, SoC components, and other **interconnection**
+ * buese (not USB!). Such device driver must only rely on basic memory
+ * management service, and must not try accessing subsystems other than the mm
+ * unit, for example, timer, interrupt, file-system, must not assumed exist.
  *
  */
-#define load_earlystage ld_early
+#define load_sysconf ld_sysconf
 
 /**
- * @brief Mark the device definition should be loaded automatically after timer
- * is ready. Load here if your driver require a basic timing service
+ * @brief Mark the device definition should be loaded as time device, for
+ * example a real time clock device. Such device will be loaded and managed by
+ * clock subsystem
+ */
+#define load_timedev ld_timedev
+
+/**
+ * @brief Mark the device definition should be loaded automatically during the
+ * bootstrapping stage. Most of the driver do load there.
  *
  */
-#define load_timerstage ld_aftertimer
+#define load_onboot ld_kboot
 
 /**
  * @brief Mark the device definition should be loaded automatically in
- * the post boostrapping stage (i.e., the start up of proc0). Load here if your
- * driver involves async mechanism
+ * the post boostrapping stage (i.e., the start up of proc0), where most of
+ * kernel sub-system are became ready to use. Do your load there if your driver
+ * depends on such condition
  *
  */
-#define load_poststage ld_post
+#define load_postboot ld_post
+
+#define __foreach_exported_device_of(stage, index, pos)                        \
+    ldga_foreach(dev_##stage, struct device_def*, index, pos)
+#define foreach_exported_device_of(stage, index, pos)                          \
+    __foreach_exported_device_of(stage, index, pos)
 
 /**
  * @brief Declare a device class
@@ -115,8 +134,24 @@ struct device_def
 
     struct devclass class;
 
+    /**
+     * @brief Called when the driver is required to initialize itself.
+     *
+     */
     int (*init)(struct device_def*);
+
+    /**
+     * @brief Called when the driver is required to bind with a device. This is
+     * the case for a real-hardware-oriented driver
+     *
+     */
     int (*bind)(struct device_def*, struct device*);
+
+    /**
+     * @brief Called when a driver is requested to detach from the device and
+     * free up all it's resources
+     *
+     */
     int (*free)(struct device_def*, void* instance);
 };
 
@@ -201,13 +236,13 @@ device_scan_drivers();
 /*------ Load hooks ------*/
 
 void
-device_earlystage();
+device_onbooot_load();
 
 void
-device_poststage();
+device_postboot_load();
 
 void
-device_timerstage();
+device_sysconf_load();
 
 static inline void
 device_lock(struct device* dev)

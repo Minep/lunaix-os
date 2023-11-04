@@ -49,9 +49,6 @@ typedef struct
     struct acpi_mcfg_toc mcfg;
 } acpi_context;
 
-int
-acpi_init();
-
 acpi_context*
 acpi_get_context();
 

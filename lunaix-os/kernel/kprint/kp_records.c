@@ -7,7 +7,7 @@
 #include "kp_records.h"
 
 struct kp_records*
-kp_rec_create(int max_recs)
+kprec_create(int max_recs)
 {
     struct kp_records* recs = (struct kp_records*)valloc(KP_RECS_SIZE);
 
@@ -21,18 +21,18 @@ kp_rec_create(int max_recs)
 }
 
 static inline int
-kp_recs_full(struct kp_records* recs)
+kprecs_full(struct kp_records* recs)
 {
     return recs->cur_recs >= recs->max_recs;
 }
 
-void
-kp_rec_put(struct kp_records* recs, int lvl, char* content, size_t len)
+struct kp_entry*
+kprec_put(struct kp_records* recs, int lvl, char* content, size_t len)
 {
     assert(len < 256);
 
     struct kp_entry* ent;
-    if (!kp_recs_full(recs)) {
+    if (!kprecs_full(recs)) {
         assert(recs->kp_ent_wp == &recs->kp_ents.ents);
 
         ent = (struct kp_entry*)vzalloc(KP_ENT_SIZE);
@@ -51,4 +51,6 @@ kp_rec_put(struct kp_records* recs, int lvl, char* content, size_t len)
     ent->lvl = lvl;
     ent->content = _content;
     ent->time = clock_systime();
+
+    return ent;
 }

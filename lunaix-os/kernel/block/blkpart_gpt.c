@@ -83,7 +83,7 @@ blkpart_probegpt(struct device* master)
     u32_t crc = gpt_hdr->hdr_cksum;
     gpt_hdr->hdr_cksum = 0;
     if (crc32b((void*)gpt_hdr, sizeof(*gpt_hdr)) != crc) {
-        kprintf(KWARN "checksum failed");
+        WARN("checksum failed");
         // FUTURE check the backup header
         return EINVAL;
     }

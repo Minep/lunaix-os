@@ -1,5 +1,6 @@
 #include <hal/acpi/acpi.h>
 
+#include <lunaix/device.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
@@ -14,48 +15,6 @@ LOG_MODULE("ACPI")
 
 int
 acpi_rsdp_validate(acpi_rsdp_t* rsdp);
-
-acpi_rsdp_t*
-acpi_locate_rsdp();
-
-int
-acpi_init()
-{
-    acpi_rsdp_t* rsdp = acpi_locate_rsdp();
-
-    assert_msg(rsdp, "Fail to locate ACPI_RSDP");
-    assert_msg(acpi_rsdp_validate(rsdp), "Invalid ACPI_RSDP (checksum failed)");
-
-    acpi_rsdt_t* rsdt = rsdp->rsdt;
-
-    ctx = vzalloc(sizeof(acpi_context));
-    assert_msg(ctx, "Fail to create ACPI context");
-
-    strncpy(ctx->oem_id, rsdt->header.oem_id, 6);
-    ctx->oem_id[6] = '\0';
-
-    size_t entry_n = (rsdt->header.length - sizeof(acpi_sdthdr_t)) >> 2;
-    for (size_t i = 0; i < entry_n; i++) {
-        acpi_sdthdr_t* sdthdr =
-          (acpi_sdthdr_t*)((acpi_apic_t**)&(rsdt->entry))[i];
-        switch (sdthdr->signature) {
-            case ACPI_MADT_SIG:
-                madt_parse((acpi_madt_t*)sdthdr, ctx);
-                break;
-            case ACPI_FADT_SIG:
-                // FADT just a plain structure, no need to parse.
-                ctx->fadt = *(acpi_fadt_t*)sdthdr;
-                break;
-            case ACPI_MCFG_SIG:
-                mcfg_parse(sdthdr, ctx);
-                break;
-            default:
-                break;
-        }
-    }
-
-    return 0;
-}
 
 acpi_context*
 acpi_get_context()
@@ -107,3 +66,48 @@ acpi_locate_rsdp()
 
     return rsdp;
 }
+
+static int
+acpi_init(struct device_def* devdef)
+{
+    acpi_rsdp_t* rsdp = acpi_locate_rsdp();
+
+    assert_msg(rsdp, "Fail to locate ACPI_RSDP");
+    assert_msg(acpi_rsdp_validate(rsdp), "Invalid ACPI_RSDP (checksum failed)");
+
+    acpi_rsdt_t* rsdt = rsdp->rsdt;
+
+    ctx = vzalloc(sizeof(acpi_context));
+    assert_msg(ctx, "Fail to create ACPI context");
+
+    strncpy(ctx->oem_id, rsdt->header.oem_id, 6);
+    ctx->oem_id[6] = '\0';
+
+    size_t entry_n = (rsdt->header.length - sizeof(acpi_sdthdr_t)) >> 2;
+    for (size_t i = 0; i < entry_n; i++) {
+        acpi_sdthdr_t* sdthdr =
+          (acpi_sdthdr_t*)((acpi_apic_t**)&(rsdt->entry))[i];
+        switch (sdthdr->signature) {
+            case ACPI_MADT_SIG:
+                madt_parse((acpi_madt_t*)sdthdr, ctx);
+                break;
+            case ACPI_FADT_SIG:
+                // FADT just a plain structure, no need to parse.
+                ctx->fadt = *(acpi_fadt_t*)sdthdr;
+                break;
+            case ACPI_MCFG_SIG:
+                mcfg_parse(sdthdr, ctx);
+                break;
+            default:
+                break;
+        }
+    }
+
+    return 0;
+}
+
+struct device_def acpi_sysdev = { .name = "ACPI Proxy",
+                                  .class =
+                                    DEVCLASS(DEVIF_FMW, DEVFN_CFG, DEV_ACPI),
+                                  .init = acpi_init };
+EXPORT_DEVICE(acpi, &acpi_sysdev, load_sysconf);

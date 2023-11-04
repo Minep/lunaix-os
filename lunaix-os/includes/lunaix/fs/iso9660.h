@@ -21,11 +21,11 @@
 #define ISO_SIGNATURE_HI 0x31
 
 // Volume Types
-#define ISO_VOLBOOT 0     // Boot Record
-#define ISO_VOLPRIM 1     // Primary
-#define ISO_VOLSUPP 2     // Supplementary
-#define ISO_VOLPART 3     // Partition
-#define ISO_VOLTERM 255   // Volume descriptor set terminator
+#define ISO_VOLBOOT 0   // Boot Record
+#define ISO_VOLPRIM 1   // Primary
+#define ISO_VOLSUPP 2   // Supplementary
+#define ISO_VOLPART 3   // Partition
+#define ISO_VOLTERM 255 // Volume descriptor set terminator
 
 #define ISO_FHIDDEN 0x1   // a hidden file
 #define ISO_FDIR 0x2      // a directory file
@@ -156,8 +156,8 @@ struct iso_drecord
     iso_bbo32_t data_size;
     struct iso_datetime2 mktime; // Time the record is made, see 9.1.5
     u8_t flags;
-    u8_t fu_sz;                  // size of file unit (FU)
-    u8_t gap_sz;                 // size of gap if FU is interleaved.
+    u8_t fu_sz;  // size of file unit (FU)
+    u8_t gap_sz; // size of gap if FU is interleaved.
     iso_bbo16_t vol_seq;
     struct iso_var_mdu name;
 } PACKED;
@@ -339,6 +339,12 @@ iso9660_read(struct v_inode* inode, void* buffer, size_t len, size_t fpos);
 
 int
 iso9660_write(struct v_inode* inode, void* buffer, size_t len, size_t fpos);
+
+int
+iso9660_read_page(struct v_inode* inode, void* buffer, size_t fpos);
+
+int
+iso9660_write_page(struct v_inode* inode, void* buffer, size_t fpos);
 
 int
 iso9660_seek(struct v_inode* inode, size_t offset);

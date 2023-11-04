@@ -11,4 +11,13 @@
 #define stringify(v) #v
 #define stringify__(v) stringify(v)
 
+inline static void noret
+spin()
+{
+    volatile int __infloop = 1;
+    while (__infloop)
+        ;
+    __builtin_unreachable();
+}
+
 #endif /* __LUNAIX_COMPILER_H */

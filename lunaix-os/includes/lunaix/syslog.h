@@ -10,11 +10,6 @@
 #define KLOG_ERROR 3
 #define KLOG_FATAL 4
 
-#define _LEVEL_INFO "0"
-#define _LEVEL_WARN "1"
-#define _LEVEL_ERROR "2"
-#define _LEVEL_DEBUG "3"
-
 #define KMSG_LVLSTART '\x1b'
 #define KMSG_LOGLEVEL(c) ((c) - '0')
 
@@ -29,11 +24,38 @@
     {                                                                          \
         va_list args;                                                          \
         va_start(args, fmt);                                                   \
-        __kprintf(module, fmt, args);                                          \
+        kprintf_m(module, fmt, args);                                          \
         va_end(args);                                                          \
     }
 
+#define DEBUG(fmt, ...) kprintf(KDEBUG fmt, ##__VA_ARGS__)
+#define WARN(fmt, ...) kprintf(KWARN fmt, ##__VA_ARGS__)
+#define ERROR(fmt, ...) kprintf(KERROR fmt, ##__VA_ARGS__)
+#define FATAL(fmt, ...)                                                        \
+    ({                                                                         \
+        kprintf(KFATAL fmt, ##__VA_ARGS__);                                    \
+        spin();                                                                \
+    })
+
 void
-__kprintf(const char* component, const char* fmt, va_list args);
+kprintf_m(const char* component, const char* fmt, va_list args);
+
+// TODO need more thought on it
+
+// struct klog_chunk
+// {
+//     void* log_entry;
+//     size_t max_len;
+//     size_t len;
+// };
+
+// struct klog_chunk*
+// kprintf_lcstart_m(const char* component, size_t size);
+
+// void
+// kprintf_lcappend_m(struct klog_chunk*, const char* fmt, va_list args);
+
+// void
+// kprintf_lcdone_m(struct klog_chunk*);
 
 #endif /* __LUNAIX_SYSLOG_H */

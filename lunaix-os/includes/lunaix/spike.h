@@ -64,15 +64,6 @@
                                                       : 0)                      \
                              : (31 - __builtin_clz(x)))
 
-inline static void noret
-spin()
-{
-    volatile int __infloop = 1;
-    while (__infloop)
-        ;
-    __builtin_unreachable();
-}
-
 #ifndef __LUNAIXOS_NASSERT__
 #define assert(cond)                                                           \
     if (!(cond)) {                                                             \

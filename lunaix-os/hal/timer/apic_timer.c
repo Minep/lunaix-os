@@ -1,7 +1,7 @@
 #include <hal/apic_timer.h>
-#include <hal/hwrtc.h>
 #include <hal/hwtimer.h>
 
+#include <lunaix/clock.h>
 #include <lunaix/compiler.h>
 #include <lunaix/isrm.h>
 #include <lunaix/spike.h>
@@ -109,13 +109,13 @@ apic_timer_init(struct hwtimer* timer, u32_t hertz, timer_tick_cb timer_cb)
 
 #ifdef __LUNAIXOS_DEBUG__
     if (frequency < 1000) {
-        kprintf(KWARN "Frequency too low. Millisecond timer might be dodgy.");
+        WARN("Frequency too low. Millisecond timer might be dodgy.");
     }
 #endif
 
     apic_timer_done = 0;
 
-    primary_rtc->cls_mask(primary_rtc);
+    sysrtc->cls_mask(sysrtc);
     apic_write_reg(APIC_TIMER_ICR, APIC_BASETICKS); // start APIC timer
 
     // enable interrupt, just for our RTC start ticking!
@@ -125,14 +125,14 @@ apic_timer_init(struct hwtimer* timer, u32_t hertz, timer_tick_cb timer_cb)
 
     cpu_disable_interrupt();
 
-    primary_rtc->set_mask(primary_rtc);
+    sysrtc->set_mask(sysrtc);
 
-    base_freq = primary_rtc->get_counts(primary_rtc);
-    base_freq = APIC_BASETICKS / base_freq * primary_rtc->base_freq;
+    base_freq = sysrtc->get_counts(sysrtc);
+    base_freq = APIC_BASETICKS / base_freq * sysrtc->base_freq;
 
     assert_msg(base_freq, "Fail to initialize timer (NOFREQ)");
 
-    kprintf(KINFO "hw: %u Hz; os: %u Hz", base_freq, frequency);
+    kprintf("hw: %u Hz; os: %u Hz", base_freq, frequency);
 
     // cleanup
     isrm_ivfree(iv_timer);

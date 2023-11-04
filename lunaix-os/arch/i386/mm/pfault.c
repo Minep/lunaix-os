@@ -12,6 +12,8 @@
 
 #include <klibc/string.h>
 
+LOG_MODULE("pf")
+
 static u32_t
 get_ptattr(struct mm_region* vmr)
 {
@@ -23,15 +25,6 @@ get_ptattr(struct mm_region* vmr)
     }
 
     return ptattr & 0xfff;
-}
-
-static void
-kprintf(const char* fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    __kprintf("PFAULT", fmt, args);
-    va_end(args);
 }
 
 #define COW_MASK (REGION_RSHARED | REGION_READ | REGION_WRITE)
@@ -67,10 +60,10 @@ intr_routine_page_fault(const isr_param* param)
     if (PG_IS_PRESENT(*pte)) {
         if (((errcode ^ mapping.flags) & PG_ALLOW_USER)) {
             // invalid access
-            kprintf(KDEBUG "invalid user access. (%p->%p, attr:0x%x)",
-                    mapping.va,
-                    mapping.pa,
-                    mapping.flags);
+            DEBUG("invalid user access. (%p->%p, attr:0x%x)",
+                  mapping.va,
+                  mapping.pa,
+                  mapping.flags);
             goto segv_term;
         }
         if ((hit_region->attr & COW_MASK) == COW_MASK) {
@@ -128,12 +121,11 @@ intr_routine_page_fault(const isr_param* param)
 
         int errno = 0;
         if (mseg_off < hit_region->flen) {
-            errno =
-              file->ops->read_page(file->inode, (void*)ptr, PG_SIZE, mfile_off);
+            errno = file->ops->read_page(file->inode, (void*)ptr, mfile_off);
         }
 
         if (errno < 0) {
-            kprintf(KERROR "fail to populate page (%d)", errno);
+            ERROR("fail to populate page (%d)", errno);
             goto segv_term;
         }
 
@@ -148,15 +140,15 @@ intr_routine_page_fault(const isr_param* param)
         ;
 
 oom:
-    kprintf(KERROR "out of memory");
+    ERROR("out of memory");
 
 segv_term:
-    kprintf(KERROR "(pid: %d) Segmentation fault on %p (%p:%p,e=0x%x)",
-            __current->pid,
-            ptr,
-            param->execp->cs,
-            param->execp->eip,
-            param->execp->err_code);
+    ERROR("(pid: %d) Segmentation fault on %p (%p:%p,e=0x%x)",
+          __current->pid,
+          ptr,
+          param->execp->cs,
+          param->execp->eip,
+          param->execp->err_code);
 
     sigset_add(__current->sigctx.sig_pending, _SIGSEGV);
 

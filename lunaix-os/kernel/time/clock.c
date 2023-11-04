@@ -1,6 +1,5 @@
-#include <hal/hwrtc.h>
-#include <hal/hwtimer.h>
 #include <lunaix/clock.h>
+#include <lunaix/device.h>
 #include <lunaix/fs/twifs.h>
 #include <lunaix/spike.h>
 
@@ -62,16 +61,32 @@ clock_unixtime()
 time_t
 clock_systime()
 {
-    if (!current_timer) {
+    if (!systimer) {
         return 0;
     }
 
     ticks_t t = hwtimer_current_systicks();
-    return t / current_timer->running_freq;
+    ticks_t tu = systimer->running_freq / 1000;
+    return t / (tu + 1);
 }
 
 void
 clock_walltime(datetime_t* datetime)
 {
-    primary_rtc->get_walltime(primary_rtc, datetime);
+    sysrtc->get_walltime(sysrtc, datetime);
+}
+
+void
+clock_init()
+{
+    int idx = 0;
+    struct device_def* pos;
+    foreach_exported_device_of(load_timedev, idx, pos)
+    {
+        if (pos->class.device != DEV_RTC) {
+            continue;
+        }
+
+        pos->init(pos);
+    }
 }

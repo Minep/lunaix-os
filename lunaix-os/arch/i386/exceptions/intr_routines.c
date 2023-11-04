@@ -23,7 +23,7 @@ extern u32_t debug_resv;
 void
 __print_panic_msg(const char* msg, const isr_param* param)
 {
-    kprintf(KERROR "panic: %s", msg);
+    ERROR("panic: %s", msg);
     trace_printstack_isr(param);
 }
 

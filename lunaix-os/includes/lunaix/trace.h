@@ -13,6 +13,7 @@ struct ksym_entry
 struct trace_record
 {
     ptr_t pc;
+    ptr_t sym_pc;
     char* symbol;
 };
 

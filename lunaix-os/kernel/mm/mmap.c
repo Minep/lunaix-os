@@ -174,8 +174,7 @@ mem_sync_pages(ptr_t mnt,
             size_t offset = mapping.va - region->start + region->foff;
             struct v_inode* inode = region->mfile->inode;
 
-            region->mfile->ops->write_page(
-              inode, (void*)mapping.va, PG_SIZE, offset);
+            region->mfile->ops->write_page(inode, (void*)mapping.va, offset);
 
             *mapping.pte &= ~PG_DIRTY;
 

@@ -28,7 +28,7 @@ intr_handler(isr_param* param)
         goto done;
     }
 
-    kprintf(KERROR "INT %u: (%x) [%p: %p] Unknown",
+    ERROR("INT %u: (%x) [%p: %p] Unknown",
             execp->vector,
             execp->err_code,
             execp->cs,

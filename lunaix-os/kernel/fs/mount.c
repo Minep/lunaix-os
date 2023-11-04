@@ -180,11 +180,11 @@ vfs_mount_at(const char* fs_name,
     return errno;
 
 cleanup:
-    kprintf(KERROR "mount: dev=%s, fs=%s, mode=%d, err=%d",
-            dev_name,
-            fs_name,
-            options,
-            errno);
+    ERROR("mount: dev=%s, fs=%s, mode=%d, err=%d",
+          dev_name,
+          fs_name,
+          options,
+          errno);
     mnt_point->super_block = old_sb;
     vfs_sb_free(sb);
     return errno;
@@ -234,12 +234,11 @@ __DEFINE_LXSYSCALL4(int,
                     int,
                     options)
 {
-    struct v_dnode *dev, *mnt;
+    struct v_dnode *dev = NULL, *mnt = NULL;
     int errno = 0;
 
-    if ((errno = vfs_walk(__current->cwd, source, &dev, NULL, 0))) {
-        goto done;
-    }
+    // It is fine if source is not exist, as some mounting don't require it
+    vfs_walk(__current->cwd, source, &dev, NULL, 0);
 
     if ((errno = vfs_walk(__current->cwd, target, &mnt, NULL, 0))) {
         goto done;
@@ -252,11 +251,14 @@ __DEFINE_LXSYSCALL4(int,
 
     // By our convention.
     // XXX could we do better?
-    struct device* device = (struct device*)dev->inode->data;
+    struct device* device = NULL;
 
-    if (!(dev->inode->itype & VFS_IFVOLDEV) || !device) {
-        errno = ENOTDEV;
-        goto done;
+    if (dev) {
+        if (!(dev->inode->itype & VFS_IFVOLDEV)) {
+            errno = ENOTDEV;
+            goto done;
+        }
+        device = (struct device*)dev->inode->data;
     }
 
     errno = vfs_mount_at(fstype, device, mnt, options);

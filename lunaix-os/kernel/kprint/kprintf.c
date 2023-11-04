@@ -3,6 +3,8 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
 
+#include <lunaix/lxconsole.h>
+
 #include <klibc/strfmt.h>
 
 #include "kp_records.h"
@@ -33,23 +35,27 @@ shift_level(const char* str, int* level)
     return str;
 }
 
-static void
-__kprintf_level(const char* component, int level, const char* fmt, va_list args)
+static inline void
+kprintf_ml(const char* component, int level, const char* fmt, va_list args)
 {
     char* buf = &tmp_buf[MAX_BUFSZ_HLF];
     ksnprintf(buf, MAX_BUFSZ_HLF, "%s: %s", component, fmt);
 
     size_t sz = ksnprintfv(tmp_buf, buf, MAX_BUFSZ_HLF, args);
-    kp_rec_put(&kprecs, level, tmp_buf, sz);
+    kprec_put(&kprecs, level, tmp_buf, sz);
+
+    // FIXME temp measure, get some output
+    console_write_str(tmp_buf);
+    console_write_char('\n');
 }
 
 void
-__kprintf(const char* component, const char* fmt, va_list args)
+kprintf_m(const char* component, const char* fmt, va_list args)
 {
     int level;
     fmt = shift_level(fmt, &level);
 
-    __kprintf_level(component, level, fmt, args);
+    kprintf_ml(component, level, fmt, args);
 }
 
 static void
@@ -64,7 +70,9 @@ __twimap_kprintf_read(struct twimap* map)
     struct kp_entry *pos, *n;
     llist_for_each(pos, n, kprecs->kp_ent_wp, ents)
     {
-        twimap_printf(map, "[%05d] %s\n", pos->time, pos->content);
+        time_t s = pos->time / 1000;
+        time_t ms = pos->time % 1000;
+        twimap_printf(map, "[%05d.%03d] %s\n", s, ms, pos->content);
     }
 }
 
@@ -77,5 +85,5 @@ EXPORT_TWIFS_PLUGIN(kprintf, kprintf_mapping_init);
 
 __DEFINE_LXSYSCALL3(void, syslog, int, level, const char*, fmt, va_list, args)
 {
-    __kprintf_level("syslog", level, fmt, args);
+    kprintf_ml("syslog", level, fmt, args);
 }

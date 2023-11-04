@@ -26,9 +26,9 @@ struct kp_records
 #define KP_RECS_SIZE sizeof(struct kp_records)
 
 struct kp_records*
-kp_rec_create(int max_recs);
+kprec_create(int max_recs);
 
-void
-kp_rec_put(struct kp_records*, int lvl, char* content, size_t len);
+struct kp_entry*
+kprec_put(struct kp_records*, int lvl, char* content, size_t len);
 
 #endif /* __LUNAIX_KP_RECORDS_H */

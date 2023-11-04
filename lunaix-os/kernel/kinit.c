@@ -59,11 +59,13 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     tty_set_theme(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
     lxconsole_init();
 
-    /* Get platform configuration */
-    acpi_init();
+    device_sysconf_load();
 
     /* Get intc online, this is the cornerstone when initing devices */
     intc_init();
+
+    clock_init();
+    timer_init();
 
     /*
         TODO autoload these init function that do not have dependency between
@@ -77,18 +79,7 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     block_init();
     sched_init();
 
-    device_earlystage();
-
-    /* System timing and clock support */
-    /*
-        FIXME we must get timer as earlier as possible
-
-        A decoupling between rtc and general device sub-sys is needed.
-        Otherwise we timer can only be loaded after device_earlystage.
-
-        We need a dedicated timer&clock subsystem
-    */
-    timer_init();
+    device_onbooot_load();
 
     /* the bare metal are now happy, let's get software over with */
 
@@ -96,11 +87,6 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     if ((errno = vfs_mount_root("ramfs", NULL))) {
         panickf("Fail to mount root. (errno=%d)", errno);
     }
-
-    /* Mount these system-wide pseudo-fs */
-    vfs_mount("/dev", "devfs", NULL, 0);
-    vfs_mount("/sys", "twifs", NULL, MNT_RO);
-    vfs_mount("/task", "taskfs", NULL, MNT_RO);
 
     /* Finish up bootstrapping sequence, we are ready to spawn the root process
      * and start geting into uspace

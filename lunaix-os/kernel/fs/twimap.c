@@ -6,7 +6,9 @@
 #include <klibc/strfmt.h>
 #include <klibc/string.h>
 
-#define TWIMAP_BUFFER_SIZE 4096
+#include <sys/mm/mempart.h>
+
+#define TWIMAP_BUFFER_SIZE MEM_PAGE
 
 void
 __twimap_default_reset(struct twimap* map)
@@ -20,11 +22,17 @@ __twimap_default_gonext(struct twimap* map)
     return 0;
 }
 
-int
+static int
 __twimap_file_read(struct v_inode* inode, void* buf, size_t len, size_t fpos)
 {
     struct twimap* map = (struct twimap*)(inode->data);
     return twimap_read(map, buf, len, fpos);
+}
+
+static int
+__twimap_file_read_page(struct v_inode* inode, void* buf, size_t fpos)
+{
+    return __twimap_file_read(inode, buf, MEM_PAGE, fpos);
 }
 
 int
@@ -79,8 +87,7 @@ twimap_printf(struct twimap* mapping, const char* fmt, ...)
 
     char* buf = mapping->buffer + mapping->size_acc;
 
-    mapping->size_acc +=
-      ksnprintfv(buf, fmt, TWIMAP_BUFFER_SIZE, args) - 1;
+    mapping->size_acc += ksnprintfv(buf, fmt, TWIMAP_BUFFER_SIZE, args) - 1;
 
     va_end(args);
 }
@@ -117,7 +124,7 @@ twimap_create(void* data)
 
 struct v_file_ops twimap_file_ops = { .close = default_file_close,
                                       .read = __twimap_file_read,
-                                      .read_page = __twimap_file_read,
+                                      .read_page = __twimap_file_read_page,
                                       .readdir = default_file_readdir,
                                       .seek = default_file_seek,
                                       .write = default_file_write };

@@ -101,4 +101,4 @@ static struct device_def uart_pmio_def = {
     .name = "16550 Generic UART (I/O)",
     .init = upiom_init
 };
-EXPORT_DEVICE(uart16550_pmio, &uart_pmio_def, load_earlystage);
+EXPORT_DEVICE(uart16550_pmio, &uart_pmio_def, load_onboot);

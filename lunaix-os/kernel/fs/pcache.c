@@ -140,8 +140,7 @@ pcache_write(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
 
         if (new_page) {
             // Filling up the page
-            errno =
-              inode->default_fops->read_page(inode, pg->pg, PG_SIZE, pg->fpos);
+            errno = inode->default_fops->read_page(inode, pg->pg, pg->fpos);
 
             if (errno < 0) {
                 break;
@@ -178,8 +177,7 @@ pcache_read(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
         int new_page = pcache_get_page(pcache, fpos, &pg_off, &pg);
         if (new_page) {
             // Filling up the page
-            errno =
-              inode->default_fops->read_page(inode, pg->pg, PG_SIZE, pg->fpos);
+            errno = inode->default_fops->read_page(inode, pg->pg, pg->fpos);
 
             if (errno < 0) {
                 break;
@@ -191,7 +189,7 @@ pcache_read(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
 
             pg->len = errno;
         } else if (!pg) {
-            errno = inode->default_fops->read_page(
+            errno = inode->default_fops->read(
               inode, (data + buf_off), len - buf_off, pg->fpos);
             buf_off = len;
             break;
@@ -231,8 +229,7 @@ pcache_commit(struct v_inode* inode, struct pcache_pg* page)
         return 0;
     }
 
-    int errno =
-      inode->default_fops->write_page(inode, page->pg, PG_SIZE, page->fpos);
+    int errno = inode->default_fops->write_page(inode, page->pg, page->fpos);
 
     if (!errno) {
         page->flags &= ~PCACHE_DIRTY;

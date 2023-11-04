@@ -59,7 +59,7 @@ static u32_t palette[] = {
 #define VGA_REG_OFF 0x0400
 
 static int
-vga_pci_init(struct device_def* devdef, struct device* pcidev_base)
+vga_pci_bind(struct device_def* devdef, struct device* pcidev_base)
 {
     struct pci_device* pcidev = PCI_DEVICE(pcidev_base);
 
@@ -97,6 +97,12 @@ vga_pci_init(struct device_def* devdef, struct device* pcidev_base)
     return 0;
 }
 
+static int
+vga_pci_init(struct device_def* def)
+{
+    return pci_bind_definition_all(pcidev_def(def));
+}
+
 #define VGA_PCI_CLASS 0x30000
 
 static struct pci_device_def vga_pci_devdef = {
@@ -105,6 +111,7 @@ static struct pci_device_def vga_pci_devdef = {
     .ident_mask = PCI_MATCH_EXACT,
     .devdef = { .class = DEVCLASS(DEVIF_PCI, DEVFN_DISP, DEV_VGA),
                 .name = "Generic VGA",
-                .bind = vga_pci_init }
+                .init = vga_pci_init,
+                .bind = vga_pci_bind }
 };
-EXPORT_PCI_DEVICE(vga_pci, &vga_pci_devdef);
+EXPORT_PCI_DEVICE(vga_pci, &vga_pci_devdef, load_onboot);

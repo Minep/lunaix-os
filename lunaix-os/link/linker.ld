@@ -80,21 +80,31 @@ SECTIONS {
 
         . = ALIGN(8);
 
-        PROVIDE(__lga_dev_ld_early_start = .);
+        PROVIDE(__lga_dev_ld_kboot_start = .);
         
-        KEEP(*(.lga.devdefs.ld_early));
+        KEEP(*(.lga.devdefs.ld_kboot));
 
-        PROVIDE(__lga_dev_ld_early_end = .);
+        PROVIDE(__lga_dev_ld_kboot_end = .);
 
         /* ---- */
 
         . = ALIGN(8);
 
-        PROVIDE(__lga_dev_ld_aftertimer_start = .);
+        PROVIDE(__lga_dev_ld_sysconf_start = .);
         
-        KEEP(*(.lga.devdefs.ld_aftertimer));
+        KEEP(*(.lga.devdefs.ld_sysconf));
 
-        PROVIDE(__lga_dev_ld_aftertimer_end = .);
+        PROVIDE(__lga_dev_ld_sysconf_end = .);
+
+        /* ---- */
+
+        . = ALIGN(8);
+
+        PROVIDE(__lga_dev_ld_timedev_start = .);
+        
+        KEEP(*(.lga.devdefs.ld_timedev));
+
+        PROVIDE(__lga_dev_ld_timedev_end = .);
 
         /* ---- */
 

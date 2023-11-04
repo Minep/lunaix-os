@@ -2,6 +2,7 @@
 #define __LUNAIX_AHCI_H
 
 #include "hba.h"
+#include <lunaix/isrm.h>
 
 /*
  * Macro naming rule:
@@ -19,6 +20,13 @@ struct ahci_driver
     struct llist_header ahci_drvs;
     struct ahci_hba hba;
     int id;
+};
+
+struct ahci_driver_param
+{
+    ptr_t mmio_base;
+    size_t mmio_size;
+    int ahci_iv;
 };
 
 void
@@ -46,5 +54,11 @@ ahci_try_send(struct hba_port* port, int slot);
  */
 void
 ahci_post(struct hba_port* port, struct hba_cmd_state* state, int slot);
+
+struct ahci_driver*
+ahci_driver_init(struct ahci_driver_param* param);
+
+void
+ahci_hba_isr(const isr_param* param);
 
 #endif /* __LUNAIX_AHCI_H */

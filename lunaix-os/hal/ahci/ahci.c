@@ -50,9 +50,6 @@ extern void
 ahci_fsexport(struct block_dev* bdev, void* fs_node);
 
 extern void
-__ahci_hba_isr(const isr_param* param);
-
-extern void
 __ahci_blkio_handler(struct blkio_req* req);
 
 int
@@ -80,32 +77,18 @@ __hba_reset_port(hba_reg_t* port_reg)
     port_reg[HBA_RPxSCTL] &= ~0xf;
 }
 
-int
-ahci_driver_init(struct device_def* def, struct device* dev)
+struct ahci_driver*
+ahci_driver_init(struct ahci_driver_param* param)
 {
-    struct pci_device* ahci_dev = container_of(dev, struct pci_device, dev);
-
-    struct pci_base_addr* bar6 = &ahci_dev->bar[5];
-    assert_msg(bar6->type & BAR_TYPE_MMIO, "AHCI: BAR#6 is not MMIO.");
-
-    pci_reg_t cmd = pci_read_cspace(ahci_dev->cspace_base, PCI_REG_STATUS_CMD);
-
-    // 禁用传统中断（因为我们使用MSI），启用MMIO访问，允许PCI设备间访问
-    cmd |= (PCI_RCMD_MM_ACCESS | PCI_RCMD_DISABLE_INTR | PCI_RCMD_BUS_MASTER);
-
-    pci_write_cspace(ahci_dev->cspace_base, PCI_REG_STATUS_CMD, cmd);
-
-    int iv = isrm_ivexalloc(__ahci_hba_isr);
-    pci_setup_msi(ahci_dev, iv);
-    isrm_set_payload(iv, (ptr_t)&ahcis);
-
     struct ahci_driver* ahci_drv = vzalloc(sizeof(*ahci_drv));
     struct ahci_hba* hba = &ahci_drv->hba;
-    ahci_drv->id = iv;
+    ahci_drv->id = param->ahci_iv;
+
+    isrm_set_payload(param->ahci_iv, (ptr_t)&ahcis);
 
     llist_append(&ahcis, &ahci_drv->ahci_drvs);
 
-    hba->base = (hba_reg_t*)ioremap(bar6->start, bar6->size);
+    hba->base = (hba_reg_t*)ioremap(param->mmio_base, param->mmio_size);
 
 #ifdef DO_HBA_FULL_RESET
     // 重置HBA
@@ -186,7 +169,7 @@ ahci_driver_init(struct device_def* def, struct device* dev)
         port_regs[HBA_RPxCMD] |= HBA_PxCMD_ST;
 
         if (!ahci_init_device(port)) {
-            kprintf(KERROR "init fail: 0x%x@p%d", port->regs[HBA_RPxSIG], i);
+            ERROR("init fail: 0x%x@p%d", port->regs[HBA_RPxSIG], i);
             continue;
         }
 
@@ -200,8 +183,7 @@ ahci_driver_init(struct device_def* def, struct device* dev)
         ahci_register_device(hbadev);
     }
 
-    pci_bind_instance(ahci_dev, ahci_drv);
-    return 0;
+    return ahci_drv;
 }
 
 void
@@ -441,12 +423,3 @@ achi_register_ops(struct hba_port* port)
         port->device->ops.submit = scsi_submit;
     }
 }
-
-static struct pci_device_def ahcidef = {
-    .dev_class = AHCI_HBA_CLASS,
-    .ident_mask = PCI_MATCH_ANY,
-    .devdef = { .class = DEVCLASS(DEVIF_PCI, DEVFN_STORAGE, DEV_SATA),
-                .name = "Serial ATA Controller",
-                .bind = ahci_driver_init }
-};
-EXPORT_PCI_DEVICE(ahci, &ahcidef);

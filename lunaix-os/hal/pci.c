@@ -34,29 +34,19 @@ pci_log_device(struct pci_device* pcidev)
     pciaddr_t loc = pcidev->loc;
     struct device_def* binddef = pcidev->binding.def;
 
-    if (!binddef) {
-        kprintf("pci.%d:%d:%d, no binding",
-                PCILOC_BUS(loc),
-                PCILOC_DEV(loc),
-                PCILOC_FN(loc));
-        return;
-    }
-
-    kprintf("pci.%d:%d:%d, dev.%xh:%xh.%d, %s",
+    kprintf("pci.%03d:%02d:%02d, class=%p, vendor:dev=%04x:%04x",
             PCILOC_BUS(loc),
             PCILOC_DEV(loc),
             PCILOC_FN(loc),
-            binddef->class.fn_grp,
-            binddef->class.device,
-            binddef->class.variant,
-            binddef->name);
+            pcidev->class_info,
+            PCI_DEV_VENDOR(pcidev->device_info),
+            PCI_DEV_DEVID(pcidev->device_info));
 }
 
 static struct pci_device*
 pci_create_device(pciaddr_t loc, ptr_t pci_base, int devinfo)
 {
     pci_reg_t class = pci_read_cspace(pci_base, 0x8);
-    struct hbucket* bucket = device_definitions_byif(DEVIF_PCI);
 
     u32_t devid = PCI_DEV_DEVID(devinfo);
     u32_t vendor = PCI_DEV_VENDOR(devinfo);
@@ -77,50 +67,83 @@ pci_create_device(pciaddr_t loc, ptr_t pci_base, int devinfo)
     device_register(&device->dev, &pci_def.class, "%x", loc);
     pci_def.class.variant++;
 
-    // find a suitable binding
+    return device;
+}
 
-    struct pci_device_def *pos, *n;
-    hashtable_bucket_foreach(bucket, pos, n, devdef.hlist_if)
+int
+pci_bind_definition(struct pci_device_def* pcidev_def, int* more)
+{
+    u32_t class = pcidev_def->dev_class;
+    u32_t devid_mask = pcidev_def->ident_mask;
+    u32_t devid = pcidev_def->dev_ident & devid_mask;
+
+    if (!pcidev_def->devdef.bind) {
+        ERROR("pcidev %xh:%xh.%d is unbindable",
+              pcidev_def->devdef.class.fn_grp,
+              pcidev_def->devdef.class.device,
+              pcidev_def->devdef.class.variant);
+        return EINVAL;
+    }
+
+    *more = 0;
+
+    int bind_attempted = 0;
+    int errno = 0;
+
+    struct device_def* devdef;
+    struct pci_device *pos, *n;
+    llist_for_each(pos, n, &pci_devices, dev_chain)
     {
-        if (pos->dev_class != PCI_DEV_CLASS(class)) {
+        if (binded_pcidev(pos)) {
             continue;
         }
 
-        u32_t idm = pos->ident_mask;
-        int result = (pos->dev_ident & idm) == (devinfo & idm);
-
-        if (result) {
-            goto found;
+        if (class != PCI_DEV_CLASS(pos->class_info)) {
+            continue;
         }
+
+        int matched = (pos->device_info & devid_mask) == devid;
+
+        if (!matched) {
+            continue;
+        }
+
+        if (bind_attempted) {
+            *more = 1;
+            break;
+        }
+
+        bind_attempted = 1;
+        devdef = &pcidev_def->devdef;
+        errno = devdef->bind(devdef, &pos->dev);
+
+        if (errno) {
+            ERROR("pci_loc:%x, bind (%xh:%xh.%d) failed, e=%d",
+                  pos->loc,
+                  devdef->class.fn_grp,
+                  devdef->class.device,
+                  devdef->class.variant,
+                  errno);
+            continue;
+        }
+
+        pos->binding.def = &pcidev_def->devdef;
     }
 
-    goto done;
+    return errno;
+}
 
-found:
-    if (!pos->devdef.bind) {
-        kprintf(KERROR "pci_loc:%x, (%xh:%xh.%d) unbindable",
-                loc,
-                pos->devdef.class.fn_grp,
-                pos->devdef.class.device,
-                pos->devdef.class.variant);
-        goto done;
-    }
+int
+pci_bind_definition_all(struct pci_device_def* pcidef)
+{
+    int more = 0, e = 0;
+    do {
+        if (!(e = pci_bind_definition(pcidef, &more))) {
+            break;
+        }
+    } while (more);
 
-    int errno = pos->devdef.bind(&pos->devdef, &device->dev);
-    if (errno) {
-        kprintf(KERROR "pci_loc:%x, (%xh:%xh.%d) failed, e=%d",
-                loc,
-                pos->devdef.class.fn_grp,
-                pos->devdef.class.device,
-                pos->devdef.class.variant,
-                errno);
-        goto done;
-    }
-
-    device->binding.def = &pos->devdef;
-
-done:
-    return device;
+    return e;
 }
 
 void
@@ -418,8 +441,8 @@ pci_bind_instance(struct pci_device* pcidev, void* devobj)
 }
 
 static struct device_def pci_def = {
-    .name = "pci3.0-hba",
+    .name = "Generic PCI",
     .class = DEVCLASS(DEVIF_SOC, DEVFN_BUSIF, DEV_PCI),
     .init = pci_load_devices
 };
-EXPORT_DEVICE(pci3hba, &pci_def, load_poststage);
+EXPORT_DEVICE(pci3hba, &pci_def, load_sysconf);

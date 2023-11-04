@@ -363,4 +363,4 @@ static struct device_def lxconsole_def = {
     .class = DEVCLASSV(DEVIF_NON, DEVFN_TTY, DEV_BUILTIN, 12),
     .init = lxconsole_spawn_ttydev
 };
-EXPORT_DEVICE(lxconsole, &lxconsole_def, load_earlystage);
+EXPORT_DEVICE(lxconsole, &lxconsole_def, load_onboot);

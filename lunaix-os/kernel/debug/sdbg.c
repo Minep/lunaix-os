@@ -42,23 +42,23 @@ void
 sdbg_imm(const isr_param* param)
 {
     struct exec_param* execp = param->execp;
-    kprintf(KDEBUG "Quick debug mode\n");
-    kprintf(KDEBUG "cs=%p eip=%p eax=%p ebx=%p\n",
+    DEBUG("Quick debug mode\n");
+    DEBUG("cs=%p eip=%p eax=%p ebx=%p\n",
             execp->cs,
             execp->eip,
             param->registers.eax,
             param->registers.ebx);
-    kprintf(KDEBUG "ecx=%p edx=%p edi=%p esi=%p\n",
+    DEBUG("ecx=%p edx=%p edi=%p esi=%p\n",
             param->registers.ecx,
             param->registers.edx,
             param->registers.edi,
             param->registers.esi);
-    kprintf(KDEBUG "u.esp=%p k.esp=%p ebp=%p ps=%p\n",
+    DEBUG("u.esp=%p k.esp=%p ebp=%p ps=%p\n",
             param->esp,
             execp->esp,
             param->registers.ebp,
             execp->eflags);
-    kprintf(KDEBUG "ss=%p ds=%p es=%p fs=%p gs=%p\n",
+    DEBUG("ss=%p ds=%p es=%p fs=%p gs=%p\n",
             execp->ss,
             param->registers.ds,
             param->registers.es,
@@ -82,7 +82,7 @@ sdbg_init()
     struct serial_dev* sdev = serial_get_avilable();
 
     if (!sdev) {
-        kprintf(KERROR "no serial port available\n");
+        ERROR("no serial port available\n");
         return;
     }
 

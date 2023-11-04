@@ -13,6 +13,7 @@
 #define BLKIO_PENDING 0x8
 
 #define BLKIO_WAIT 0x1
+#define BLKIO_NOASYNC 0x2
 
 // Free on complete
 #define BLKIO_FOC 0x10

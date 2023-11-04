@@ -48,4 +48,4 @@ static struct device_def devnull_def = {
     .class = DEVCLASSV(DEVIF_NON, DEVFN_PSEUDO, DEV_NULL, DEV_BUILTIN_NULL),
     .init = pdev_nulldev_init
 };
-EXPORT_DEVICE(nulldev, &devnull_def, load_earlystage);
+EXPORT_DEVICE(nulldev, &devnull_def, load_onboot);

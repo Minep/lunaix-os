@@ -18,6 +18,8 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 
+#include <sys/mm/mempart.h>
+
 static struct twifs_node* fs_root;
 
 static struct cake_pile* twi_pile;
@@ -88,6 +90,12 @@ __twifs_fwrite(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 }
 
 int
+__twifs_fwrite_pg(struct v_inode* inode, void* buffer, size_t fpos)
+{
+    return __twifs_fwrite(inode, buffer, MEM_PAGE, fpos);
+}
+
+int
 __twifs_fread(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 {
     struct twifs_node* twi_node = (struct twifs_node*)inode->data;
@@ -95,6 +103,12 @@ __twifs_fread(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
         return ENOTSUP;
     }
     return twi_node->ops.read(inode, buffer, len, fpos);
+}
+
+int
+__twifs_fread_pg(struct v_inode* inode, void* buffer, size_t fpos)
+{
+    return __twifs_fread(inode, buffer, MEM_PAGE, fpos);
 }
 
 struct twifs_node*
@@ -275,9 +289,9 @@ twifs_mapping(struct twifs_node* parent, void* data, const char* fmt, ...)
 
 const struct v_file_ops twifs_file_ops = { .close = default_file_close,
                                            .read = __twifs_fread,
-                                           .read_page = __twifs_fread,
+                                           .read_page = __twifs_fread_pg,
                                            .write = __twifs_fwrite,
-                                           .write_page = __twifs_fwrite,
+                                           .write_page = __twifs_fwrite_pg,
                                            .readdir = __twifs_iterate_dir };
 
 const struct v_inode_ops twifs_inode_ops = { .dir_lookup = __twifs_dirlookup,

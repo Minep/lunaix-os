@@ -1,27 +1,19 @@
-#include <hal/hwrtc.h>
-
 #include <lunaix/fs/twifs.h>
 #include <lunaix/fs/twimap.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/status.h>
 
-#include <usr/lunaix/ioctl_defs.h>
+#include <hal/hwrtc.h>
 
-const struct hwrtc* primary_rtc;
+const struct hwrtc* sysrtc;
 static int rtc_count = 0;
 
 DEFINE_LLIST(rtcs);
 
-// void
-// hwrtc_init()
-// {
-//     ldga_invoke_fn0(rtcdev);
-// }
-
 void
 hwrtc_walltime(datetime_t* dt)
 {
-    primary_rtc->get_walltime(primary_rtc, dt);
+    sysrtc->get_walltime(sysrtc, dt);
 }
 
 static int
@@ -69,7 +61,7 @@ hwrtc_read(struct device* dev, void* buf, size_t offset, size_t len)
 }
 
 struct hwrtc*
-hwrtc_alloc_new(struct device_def* def, char* name)
+hwrtc_alloc_new(char* name)
 {
     struct hwrtc* rtc_instance = valloc(sizeof(struct hwrtc));
 
@@ -79,10 +71,7 @@ hwrtc_alloc_new(struct device_def* def, char* name)
 
     llist_append(&rtcs, &rtc_instance->rtc_list);
 
-    if (!primary_rtc) {
-        primary_rtc = rtc_instance;
-    }
-
+    rtc_instance->id = rtc_count++;
     rtc_instance->name = name;
     struct device* rtcdev = device_allocsys(NULL, rtc_instance);
 
@@ -91,18 +80,25 @@ hwrtc_alloc_new(struct device_def* def, char* name)
 
     rtc_instance->rtc_dev = rtcdev;
 
-    device_register(rtcdev, &def->class, "rtc%d", def->class.variant);
-
-    def->class.variant++;
-
     return rtc_instance;
+}
+
+void
+hwrtc_register(struct devclass* class, struct hwrtc* rtc)
+{
+    if (unlikely(!sysrtc)) {
+        sysrtc = rtc;
+    }
+
+    class->variant = rtc->id;
+    device_register(rtc->rtc_dev, class, "rtc%d", rtc->id);
 }
 
 static void
 __hwrtc_readinfo(struct twimap* mapping)
 {
     struct hwrtc* rtc = twimap_data(mapping, struct hwrtc*);
-    twimap_printf(mapping, "device: %s\n", rtc->name);
+    twimap_printf(mapping, "name: %s\n", rtc->name);
     twimap_printf(mapping, "frequency: %dHz\n", rtc->base_freq);
     twimap_printf(mapping, "ticks count: %d\n", rtc->get_counts(rtc));
     twimap_printf(

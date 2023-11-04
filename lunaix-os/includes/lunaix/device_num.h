@@ -26,6 +26,8 @@
 
         I2C: device connected through the IIC protocol
 
+        FMW: device is a system board firmware
+
     The function defines the functionality that the device is designated to
    serve. Lunaix identify the following values:
 
@@ -49,6 +51,11 @@
 
         TTY: a device which can be called as teletypewriter, system can use such
             device for output into external environment
+
+        CFG: device that provide configuration service to the system or other
+   devices
+
+
 */
 
 #define DEV_FNGRP(if_, function)                                               \
@@ -67,6 +74,7 @@
 #define DEVIF_USB 0x3
 #define DEVIF_SPI 0x4
 #define DEVIF_I2C 0x5
+#define DEVIF_FMW 0x6
 
 #define DEVFN_PSEUDO 0x0
 #define DEVFN_CHAR 0x1
@@ -76,6 +84,7 @@
 #define DEVFN_BUSIF 0x7
 #define DEVFN_TTY 0x8
 #define DEVFN_DISP 0x9
+#define DEVFN_CFG 0xa
 
 #define DEV_BUILTIN 0
 #define DEV_BUILTIN_NULL 0
@@ -98,6 +107,7 @@
 #define DEV_KBD 11
 #define DEV_GFXA 12
 #define DEV_VGA 13
+#define DEV_ACPI 14
 
 struct devident
 {

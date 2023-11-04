@@ -32,12 +32,12 @@ mount_bootmedium()
     int errno = 0;
     struct device* dev = probe_boot_medium();
     if (!dev) {
-        kprintf(KERROR "fail to acquire device. (%d)", errno);
+        ERROR("fail to acquire device. (%d)", errno);
         return 0;
     }
 
     if ((errno = vfs_mount("/mnt/lunaix-os", "iso9660", dev, 0))) {
-        kprintf(KERROR "fail to mount boot medium. (%d)", errno);
+        ERROR("fail to mount boot medium. (%d)", errno);
         return 0;
     }
 
@@ -56,7 +56,7 @@ exec_initd()
     fail("should not reach");
 
 fail:
-    kprintf(KERROR "fail to load initd. (%d)", errno);
+    ERROR("fail to load initd. (%d)", errno);
     return 0;
 }
 
@@ -92,7 +92,7 @@ __proc0()
 void
 init_platform()
 {
-    device_poststage();
+    device_postboot_load();
 
     twifs_register_plugins();
 

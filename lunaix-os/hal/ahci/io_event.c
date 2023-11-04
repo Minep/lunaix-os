@@ -7,7 +7,7 @@
 LOG_MODULE("io_evt")
 
 void
-__ahci_hba_isr(const isr_param* param)
+ahci_hba_isr(const isr_param* param)
 {
     struct ahci_hba* hba;
     struct ahci_driver *pos, *n;

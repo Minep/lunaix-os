@@ -144,8 +144,8 @@ struct v_file_ops
     // These additional operations allow underlying fs to use more specialized
     // and optimized code.
 
-    int (*write_page)(struct v_inode* inode, void* pg, size_t len, size_t fpos);
-    int (*read_page)(struct v_inode* inode, void* pg, size_t len, size_t fpos);
+    int (*write_page)(struct v_inode* inode, void* pg, size_t fpos);
+    int (*read_page)(struct v_inode* inode, void* pg, size_t fpos);
 
     int (*readdir)(struct v_file* file, struct dir_context* dctx);
     int (*seek)(struct v_inode* inode, size_t offset); // optional
@@ -496,6 +496,12 @@ default_file_write(struct v_inode* inode,
                    void* buffer,
                    size_t len,
                    size_t fpos);
+
+int
+default_file_read_page(struct v_inode* inode, void* buffer, size_t fpos);
+
+int
+default_file_write_page(struct v_inode* inode, void* buffer, size_t fpos);
 
 int
 default_file_readdir(struct v_file* file, struct dir_context* dctx);

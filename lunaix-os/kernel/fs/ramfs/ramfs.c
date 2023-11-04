@@ -216,7 +216,8 @@ const struct v_inode_ops ramfs_inode_ops = { .mkdir = ramfs_mkdir,
 const struct v_file_ops ramfs_file_ops = { .readdir = ramfs_readdir,
                                            .close = default_file_close,
                                            .read = default_file_read,
-                                           .read_page = default_file_read,
+                                           .read_page = default_file_read_page,
                                            .write = default_file_write,
-                                           .write_page = default_file_write,
+                                           .write_page =
+                                             default_file_write_page,
                                            .seek = default_file_seek };

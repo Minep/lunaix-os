@@ -16,6 +16,7 @@ struct hwrtc
     struct llist_header rtc_list;
     struct device* rtc_dev;
 
+    int id;
     char* name;
     void* data;
     ticks_t base_freq;
@@ -29,15 +30,13 @@ struct hwrtc
     int (*chfreq)(struct hwrtc*, int);
 };
 
-extern const struct hwrtc* primary_rtc;
-
-void
-hwrtc_init();
-
 struct hwrtc*
-hwrtc_alloc_new(struct device_def* def, char* name);
+hwrtc_alloc_new(char* name);
 
 void
 hwrtc_walltime(datetime_t* dt);
+
+void
+hwrtc_register(struct devclass* class, struct hwrtc* rtc);
 
 #endif /* __LUNAIX_HWRTC_H */

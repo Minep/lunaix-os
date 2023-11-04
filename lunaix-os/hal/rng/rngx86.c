@@ -45,4 +45,4 @@ static struct device_def devrandx86_def = {
     .class = DEVCLASS(DEVIF_SOC, DEVFN_CHAR, DEV_RNG),
     .init = pdev_randdev_init
 };
-EXPORT_DEVICE(randdev, &devrandx86_def, load_earlystage);
+EXPORT_DEVICE(randdev, &devrandx86_def, load_onboot);

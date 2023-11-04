@@ -195,7 +195,7 @@ rtc_init(struct device_def* devdef)
     // Make sure the rtc timer is disabled by default
     rtc_disable_timer();
 
-    struct hwrtc* rtc = hwrtc_alloc_new(devdef, "mc146818");
+    struct hwrtc* rtc = hwrtc_alloc_new("mc146818");
     struct mc146818* state = valloc(sizeof(struct mc146818));
 
     state->rtc_context = rtc;
@@ -212,6 +212,8 @@ rtc_init(struct device_def* devdef)
     rtc->get_counts = rtc_getcnt;
     rtc->chfreq = rtc_chfreq;
 
+    hwrtc_register(&devdef->class, rtc);
+
     return 0;
 }
 
@@ -220,4 +222,4 @@ static struct device_def devrtc_mc146818 = {
     .class = DEVCLASS(DEVIF_SOC, DEVFN_TIME, DEV_RTC),
     .init = rtc_init
 };
-EXPORT_DEVICE(mc146818, &devrtc_mc146818, load_earlystage);
+EXPORT_DEVICE(mc146818, &devrtc_mc146818, load_timedev);

@@ -37,7 +37,7 @@ devfs_write(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 }
 
 int
-devfs_read_page(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
+devfs_read_page(struct v_inode* inode, void* buffer, size_t fpos)
 {
     assert(inode->data);
 
@@ -51,7 +51,7 @@ devfs_read_page(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 }
 
 int
-devfs_write_page(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
+devfs_write_page(struct v_inode* inode, void* buffer, size_t fpos)
 {
     assert(inode->data);
 

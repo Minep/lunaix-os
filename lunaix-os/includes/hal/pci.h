@@ -6,8 +6,8 @@
 #include <lunaix/ds/llist.h>
 #include <lunaix/types.h>
 
-#define EXPORT_PCI_DEVICE(id, pci_devdef)                                      \
-    EXPORT_DEVICE(id, &(pci_devdef)->devdef, load_pci_probe)
+#define EXPORT_PCI_DEVICE(id, pci_devdef, stage)                               \
+    EXPORT_DEVICE(id, &(pci_devdef)->devdef, stage)
 
 #define PCI_MATCH_EXACT -1
 #define PCI_MATCH_ANY 0
@@ -102,6 +102,12 @@ struct pci_device
 };
 #define PCI_DEVICE(devbase) (container_of((devbase), struct pci_device, dev))
 
+struct pci_device_list
+{
+    struct llist_header peers;
+    struct pci_device* pcidev;
+};
+
 typedef void* (*pci_drv_init)(struct pci_device*);
 
 #define PCI_DEVIDENT(vendor, id)                                               \
@@ -114,6 +120,10 @@ struct pci_device_def
     u32_t ident_mask;
     struct device_def devdef;
 };
+#define pcidev_def(dev_def_ptr)                                                \
+    container_of((dev_def_ptr), struct pci_device_def, devdef)
+
+#define binded_pcidev(pcidev) ((pcidev)->binding.def)
 
 /**
  * @brief 根据类型代码（Class Code）去在拓扑中寻找一个设备
@@ -160,5 +170,11 @@ pci_probe_bar_info(struct pci_device* device);
 
 void
 pci_probe_msi_info(struct pci_device* device);
+
+int
+pci_bind_definition(struct pci_device_def* pcidev_def, int* more);
+
+int
+pci_bind_definition_all(struct pci_device_def* pcidef);
 
 #endif /* __LUNAIX_PCI_H */

@@ -31,6 +31,18 @@ default_file_write(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 }
 
 int
+default_file_read_page(struct v_inode* inode, void* buffer, size_t fpos)
+{
+    return ENOTSUP;
+}
+
+int
+default_file_write_page(struct v_inode* inode, void* buffer, size_t fpos)
+{
+    return ENOTSUP;
+}
+
+int
 default_file_readdir(struct v_file* file, struct dir_context* dctx)
 {
     int i = 0;

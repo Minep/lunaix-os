@@ -173,6 +173,11 @@ vfs_walk(struct v_dnode* start,
          struct hstr* component,
          int options)
 {
+    if (!path) {
+        *dentry = NULL;
+        return 0;
+    }
+
     // allocate a file name stack for path walking and recursion to resolve
     // symlink
     char* name_buffer = valloc(2048);

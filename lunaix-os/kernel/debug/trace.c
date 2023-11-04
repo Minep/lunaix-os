@@ -91,8 +91,10 @@ trace_walkback(struct trace_record* tb_buffer,
         ptr_t pc = *(frame + 1);
 
         current = trace_sym_lookup(pc);
-        tb_buffer[i] = (struct trace_record){ .pc = current ? current->pc : pc,
-                                              .symbol = ksym_getstr(current) };
+        tb_buffer[i] =
+          (struct trace_record){ .pc = pc,
+                                 .sym_pc = current ? current->pc : 0,
+                                 .symbol = ksym_getstr(current) };
 
         frame = (ptr_t*)*frame;
         i++;
@@ -105,19 +107,27 @@ trace_walkback(struct trace_record* tb_buffer,
     return i;
 }
 
+static inline void
+trace_print_code_entry(ptr_t sym_pc, ptr_t inst_pc, char* sym)
+{
+    DEBUG("%p+%p: %s", sym_pc, inst_pc - sym_pc, sym);
+}
+
 void
 trace_printstack_of(ptr_t fp)
 {
     struct trace_record tbs[NB_TRACEBACK];
 
+    // Let's get our Stackwalker does his job ;)
     int n = trace_walkback(tbs, fp, NB_TRACEBACK, &fp);
 
     if (fp) {
-        kprintf(KDEBUG "...<truncated>");
+        DEBUG("...<truncated>");
     }
 
     for (int i = 0; i < n; i++) {
-        kprintf(KDEBUG "%p: %s", tbs[i].pc, tbs[i].symbol);
+        struct trace_record* tb = &tbs[i];
+        trace_print_code_entry(tb->sym_pc, tb->pc, tb->symbol);
     }
 }
 
@@ -133,11 +143,12 @@ trace_printswctx(const isr_param* p, char* direction)
 
     struct ksym_entry* sym = trace_sym_lookup(p->execp->eip);
 
-    kprintf(KDEBUG ">> (sw:%s) iv:%d, errno:%p <<",
-            direction,
-            p->execp->vector,
-            p->execp->err_code);
-    kprintf(KDEBUG "%p:%s", p->execp->eip, ksym_getstr(sym));
+    DEBUG(">> (sw:%s) iv:%d, errno:%p <<",
+          direction,
+          p->execp->vector,
+          p->execp->err_code);
+
+    trace_print_code_entry(sym->pc, p->execp->eip, ksym_getstr(sym));
 }
 
 void
@@ -147,7 +158,7 @@ trace_printstack_isr(const isr_param* isrm)
     ptr_t fp = cpu_get_fp();
     int prev_fromusr = 0;
 
-    kprintf(KDEBUG "stack trace (pid=%d)\n", __current->pid);
+    DEBUG("stack trace (pid=%d)\n", __current->pid);
 
     trace_printstack_of(fp);
 

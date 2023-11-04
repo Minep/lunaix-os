@@ -85,32 +85,33 @@ device_definitions_byif(int if_type)
     return &dev_byif[__hashkey(dev_byif, if_type)];
 }
 
-#define device_load_on_stage(stage)                                            \
+#define __device_load_on_stage(stage)                                          \
     ({                                                                         \
         int idx = 0;                                                           \
         struct device_def* devdef;                                             \
-        ldga_foreach(dev_ld_##stage, struct device_def*, idx, devdef)          \
+        ldga_foreach(dev_##stage, struct device_def*, idx, devdef)             \
         {                                                                      \
             devdef->init(devdef);                                              \
         }                                                                      \
     })
+#define device_load_on_stage(stage) __device_load_on_stage(stage)
 
 void
-device_earlystage()
+device_onbooot_load()
 {
-    device_load_on_stage(early);
+    device_load_on_stage(load_onboot);
 }
 
 void
-device_timerstage()
+device_postboot_load()
 {
-    device_load_on_stage(aftertimer);
+    device_load_on_stage(load_postboot);
 }
 
 void
-device_poststage()
+device_sysconf_load()
 {
-    device_load_on_stage(post);
+    device_load_on_stage(load_sysconf);
 }
 
 static int
