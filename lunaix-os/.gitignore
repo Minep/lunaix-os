@@ -9,6 +9,7 @@ machine/
 draft/
 iso_inspect/
 unused/
+__pycache__/
 
 .gdb_history
 

@@ -22,6 +22,9 @@ struct mm_region*
 region_get(vm_regions_t* lead, unsigned long vaddr);
 
 void
-region_copy(struct proc_mm* src, struct proc_mm* dest);
+region_copy_mm(struct proc_mm* src, struct proc_mm* dest);
+
+struct mm_region*
+region_dup(struct mm_region* origin);
 
 #endif /* __LUNAIX_REGION_H */

@@ -2,8 +2,8 @@
 #include <sys/interrupts.h>
 #include <sys/mm/mempart.h>
 
-#include <sys/cpu.h>
 #include <hal/intc.h>
+#include <sys/cpu.h>
 
 #include <lunaix/fs/taskfs.h>
 #include <lunaix/mm/cake.h>
@@ -112,7 +112,7 @@ check_sleepers()
 {
     struct proc_info* leader = sched_ctx._procs[0];
     struct proc_info *pos, *n;
-    time_t now = clock_systime();
+    time_t now = clock_systime() / 1000;
     llist_for_each(pos, n, &leader->sleep.sleepers, sleep.sleepers)
     {
         if (proc_terminated(pos)) {
@@ -191,12 +191,14 @@ __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
         return 0;
     }
 
+    time_t systime = clock_systime() / 1000;
+
     if (__current->sleep.wakeup_time) {
-        return (__current->sleep.wakeup_time - clock_systime()) / 1000U;
+        return (__current->sleep.wakeup_time - systime);
     }
 
     struct proc_info* root_proc = sched_ctx._procs[0];
-    __current->sleep.wakeup_time = clock_systime() + seconds;
+    __current->sleep.wakeup_time = systime + seconds;
 
     if (llist_empty(&__current->sleep.sleepers)) {
         llist_append(&root_proc->sleep.sleepers, &__current->sleep.sleepers);
@@ -213,7 +215,7 @@ __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
 __DEFINE_LXSYSCALL1(unsigned int, alarm, unsigned int, seconds)
 {
     time_t prev_ddl = __current->sleep.alarm_time;
-    time_t now = clock_systime();
+    time_t now = clock_systime() / 1000;
 
     __current->sleep.alarm_time = seconds ? now + seconds : 0;
 
@@ -222,7 +224,7 @@ __DEFINE_LXSYSCALL1(unsigned int, alarm, unsigned int, seconds)
         llist_append(&root_proc->sleep.sleepers, &__current->sleep.sleepers);
     }
 
-    return prev_ddl ? (prev_ddl - now) / 1000 : 0;
+    return prev_ddl ? (prev_ddl - now) : 0;
 }
 
 __DEFINE_LXSYSCALL1(void, exit, int, status)

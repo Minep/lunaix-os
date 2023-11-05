@@ -54,7 +54,7 @@ timer_init()
 
     timer_ctx->base_frequency = hwtimer_base_frequency();
 
-    sched_ticks = SYS_TIMER_FREQUENCY_HZ / 1000 * SCHED_TIME_SLICE;
+    sched_ticks = (SYS_TIMER_FREQUENCY_HZ * SCHED_TIME_SLICE) / 1000;
     sched_ticks_counter = 0;
 }
 

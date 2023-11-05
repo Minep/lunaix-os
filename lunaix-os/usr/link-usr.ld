@@ -3,19 +3,19 @@ ENTRY(_start)
 SECTIONS {
     . = 0x400000;
 
-    .text : {
+    .text BLOCK(4K) : {
         *(.text)
     }
 
-    .data : {
+    .data BLOCK(4K) : {
         *(.data)
     }
 
-    .ro.data : {
+    .ro.data BLOCK(4K) : {
         *(.ro.data)
     }
 
-    .bss : {
+    .bss BLOCK(4K) : {
         *(.bss)
     }
 }

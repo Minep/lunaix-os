@@ -67,7 +67,12 @@ clock_systime()
 
     ticks_t t = hwtimer_current_systicks();
     ticks_t tu = systimer->running_freq / 1000;
-    return t / (tu + 1);
+
+    if (unlikely(!tu)) {
+        return t;
+    }
+
+    return t / (tu);
 }
 
 void

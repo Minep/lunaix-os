@@ -137,14 +137,13 @@ apic_timer_init(struct hwtimer* timer, u32_t hertz, timer_tick_cb timer_cb)
     // cleanup
     isrm_ivfree(iv_timer);
 
+    ticks_t tphz = base_freq / frequency;
+    timer->base_freq = base_freq;
+    apic_write_reg(APIC_TIMER_ICR, tphz);
+
     apic_write_reg(
       APIC_TIMER_LVT,
       LVT_ENTRY_TIMER(isrm_ivexalloc(apic_timer_tick_isr), LVT_TIMER_PERIODIC));
-
-    timer->base_freq = base_freq;
-
-    ticks_t tphz = base_freq / frequency;
-    apic_write_reg(APIC_TIMER_ICR, tphz);
 }
 
 struct hwtimer*

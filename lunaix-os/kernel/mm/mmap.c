@@ -94,7 +94,7 @@ mem_map(void** addr_out,
             if (pos->start > found_loc && avail_space > param->mlen) {
                 goto found;
             }
-            found_loc = pos->end + PG_SIZE;
+            found_loc = pos->end + MEM_PAGE;
         }
 
         last_end = pos->end;
@@ -238,6 +238,82 @@ mem_unmap_region(ptr_t mnt, struct mm_region* region)
     region_release(region);
 }
 
+// Case: head inseted, tail inseted
+#define CASE_HITI(vmr, addr, len)                                              \
+    ((vmr)->start <= (addr) && ((addr) + (len)) <= (vmr)->end)
+
+// Case: head inseted, tail extruded
+#define CASE_HITE(vmr, addr, len)                                              \
+    ((vmr)->start <= (addr) && ((addr) + (len)) > (vmr)->end)
+
+// Case: head extruded, tail inseted
+#define CASE_HETI(vmr, addr, len)                                              \
+    ((vmr)->start > (addr) && ((addr) + (len)) <= (vmr)->end)
+
+// Case: head extruded, tail extruded
+#define CASE_HETE(vmr, addr, len)                                              \
+    ((vmr)->start > (addr) && ((addr) + (len)) > (vmr)->end)
+
+static void
+__unmap_overlapped_cases(struct mm_region* vmr, ptr_t* addr, size_t* length)
+{
+    // seg start, umapped segement start
+    ptr_t seg_start = *addr, umps_start = 0;
+
+    // seg len, umapped segement len
+    size_t seg_len = *length, umps_len = 0;
+
+    size_t displ = 0, shrink = 0;
+
+    if (CASE_HITI(vmr, seg_start, seg_len)) {
+        size_t new_start = seg_start + seg_len;
+        if (new_start < vmr->end) {
+            struct mm_region* region = region_dup(vmr);
+            if (region->mfile) {
+                size_t f_shifted = new_start - region->start;
+                region->foff += f_shifted;
+                region->flen = MAX(region->flen, f_shifted) - f_shifted;
+            }
+            region->start = new_start;
+            llist_insert_after(&vmr->head, &region->head);
+        }
+
+        shrink = vmr->end - seg_start;
+        umps_len = shrink;
+        umps_start = seg_start;
+    } else if (CASE_HITE(vmr, seg_start, seg_len)) {
+        shrink = vmr->end - seg_start;
+        umps_len = shrink;
+        umps_start = seg_start;
+    } else if (CASE_HETI(vmr, seg_start, seg_len)) {
+        displ = seg_len - (vmr->start - seg_start);
+        umps_len = displ;
+        umps_start = vmr->start;
+    } else if (CASE_HETE(vmr, seg_start, seg_len)) {
+        shrink = vmr->end - vmr->start;
+        umps_len = shrink;
+        umps_start = vmr->start;
+    } else {
+        fail("invalid case");
+    }
+
+    vmr->start += displ;
+    vmr->end -= shrink;
+
+    if (vmr->start >= vmr->end) {
+        llist_delete(&vmr->head);
+        region_release(vmr);
+    } else if (vmr->mfile) {
+        vmr->foff += displ;
+        vmr->flen = MAX(vmr->flen, displ) - displ;
+    }
+
+    *addr = umps_start + umps_len;
+
+    size_t ump_len = *addr - seg_start;
+    *length = MAX(seg_len, ump_len) - ump_len;
+}
+
 int
 mem_unmap(ptr_t mnt, vm_regions_t* regions, ptr_t addr, size_t length)
 {
@@ -247,42 +323,17 @@ mem_unmap(ptr_t mnt, vm_regions_t* regions, ptr_t addr, size_t length)
 
     llist_for_each(pos, n, regions, head)
     {
-        if (pos->start <= cur_addr && pos->end >= cur_addr) {
+        u32_t l = pos->start - cur_addr;
+        if ((pos->start <= cur_addr && cur_addr < pos->end) || l <= length) {
             break;
         }
     }
 
-    while (&pos->head != regions && cur_addr >= pos->start) {
-        u32_t l = pos->end - cur_addr;
-        pos->end = cur_addr;
-
-        if (l > length) {
-            // unmap cause discontinunity in a memory region -  do split
-            struct mm_region* region = valloc(sizeof(struct mm_region));
-            *region = *pos;
-            region->start = cur_addr + length;
-            llist_insert_after(&pos->head, &region->head);
-            l = length;
-        }
-
-        mem_sync_pages(mnt, pos, cur_addr, l, 0);
-
-        for (size_t i = 0; i < l; i += PG_SIZE) {
-            ptr_t pa = vmm_del_mapping(mnt, cur_addr + i);
-            if (pa) {
-                pmm_free_page(pos->proc_vms->pid, pa);
-            }
-        }
-
+    while (&pos->head != regions && length) {
         n = container_of(pos->head.next, typeof(*pos), head);
-        if (pos->end == pos->start) {
-            llist_delete(&pos->head);
-            region_release(pos);
-        }
+        __unmap_overlapped_cases(pos, &cur_addr, &length);
 
         pos = n;
-        length -= l;
-        cur_addr += length;
     }
 
     return 0;

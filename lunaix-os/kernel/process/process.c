@@ -218,7 +218,7 @@ dup_proc()
     }
 
     __copy_fdtable(pcb);
-    region_copy(&__current->mm, &pcb->mm);
+    region_copy_mm(&__current->mm, &pcb->mm);
 
     /*
      *  store the return value for forked process.

@@ -45,6 +45,9 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + 远程GDB串口调试 (COM1@9600Bd)
 + 用户程序加载与执行
 + 动态链接 (WIP)
++ 通用设备抽象层
++ 通用图形设备抽象层
+  + 标准VGA实现
 
 已经测试过的环境：
 
@@ -97,7 +100,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 
 **※：由于在`-O2`模式下，GCC会进行CSE优化，这导致LunaixOS会出现一些非常奇怪、离谱的bug，从而影响到基本运行。具体原因有待调查。**
 
-## 运行，分支以及Issue
+## 运行，分支以及 Issue
 
 运行该操作系统需要一个虚拟磁盘镜像，可以使用如下命令快速创建一个：
 
@@ -134,6 +137,20 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 #### 问题#3：Bochs无法运行，提示找不到AHCI控制器
 
 正常，**因为Bochs不支持SATA**。请使用QEMU或VirtualBox。
+
+## 调试 Lunaix 内核
+
+除了[附录4：串口GDB远程调试](#appendix4)描述的一种用于实机调试的方式以外。LunaixOS还提供了LunaDBG调试套件。这是一个GDB客户端插件，包含了对GDB原生命令集的一些扩充，主要用于改善与简化内核调试的过程。目前包含以下几个命令：
+
++ `vmrs [pid]` 列举进程`<pid>`的内存区域图（Memory Regions），如果`<pid>`未指定，则默认为正在运行的进程（smp=1）。
++ `proc [pid]` 打印进程`<pid>`的进程控制块状态，如果`<pid>`未指定，则默认为正在运行的进程（smp=1）。
++ `proc_table` 列举所有非终止的进程以及他们的状态。
+
+该插件可以通过运行以下命令来进行安装：
+
+```shell
+./scripts/gdb/install_lunadbg
+```
 
 ## 参考教程
 
@@ -172,8 +189,6 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 
 + *Computer System - A Programmer's Perspective Third Edition (CS:APP)* (Bryant, R & O'Hallaron, D)
 + *Modern Operating System* (Tanenbaum, A)
-+ 《汇编语言》（王爽） - 用于入门Intel语法的x86汇编（对于AT&T语法，推荐阅读CS:APP）
-+ ~~《微机原理与接口技术》 - 用于大致了解x86架构的微机体系（更加细致的了解可以阅读Intel Manual）~~ （已过时，推荐阅读CS:APP）
 
 #### 网站
 
@@ -339,7 +354,7 @@ make all-gcc &&\
 + （如可能）提供错误发生时，EIP附近的指令（精确到函数）。如果使用`make all-debug`，会提供`build/kdump.txt`，你可以在这里面定位。或者也可以直接`objdump`
 + （如可能）虚拟内存映射信息（QEMU下可使用`info mem`查看）。
 
-## 附录4：串口GDB远程调试
+## 附录4：串口GDB远程调试<a id="appendix4"></a>
 
 LunaixOS内核集成了最基本的GDB远程调试服务器。可通过串口COM1在9600波特率上与之建立链接。但是，在将GDB与内核链接起来之前，还需要让内核处在调试模式下。
 

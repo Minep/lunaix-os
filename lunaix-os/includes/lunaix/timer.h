@@ -5,7 +5,7 @@
 #include <lunaix/time.h>
 #include <sys/interrupts.h>
 
-#define SYS_TIMER_FREQUENCY_HZ 1024
+#define SYS_TIMER_FREQUENCY_HZ 1000
 
 #define TIMER_MODE_PERIODIC 0x1
 

@@ -148,7 +148,8 @@ trace_printswctx(const isr_param* p, char* direction)
           p->execp->vector,
           p->execp->err_code);
 
-    trace_print_code_entry(sym->pc, p->execp->eip, ksym_getstr(sym));
+    ptr_t sym_pc = sym ? sym->pc : p->execp->eip;
+    trace_print_code_entry(sym_pc, p->execp->eip, ksym_getstr(sym));
 }
 
 void

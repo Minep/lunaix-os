@@ -3,6 +3,8 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 
+#include <sys/mm/mempart.h>
+
 #include <klibc/string.h>
 
 struct mm_region*
@@ -24,7 +26,21 @@ region_create_range(ptr_t start, size_t length, u32_t attr)
     struct mm_region* region = valloc(sizeof(struct mm_region));
     *region = (struct mm_region){ .attr = attr,
                                   .start = start,
-                                  .end = PG_ALIGN(start + length - 1) };
+                                  .end = ROUNDUP(start + length, MEM_PAGE) };
+    return region;
+}
+
+struct mm_region*
+region_dup(struct mm_region* origin)
+{
+    struct mm_region* region = valloc(sizeof(struct mm_region));
+    *region = *origin;
+
+    if (region->mfile) {
+        vfs_ref_file(region->mfile);
+    }
+
+    llist_init_head(&region->head);
     return region;
 }
 
@@ -36,20 +52,20 @@ region_add(vm_regions_t* lead, struct mm_region* vmregion)
         return;
     }
 
+    struct mm_region *pos = (struct mm_region*)lead->next,
+                     *n = list_entry(pos->head.next, struct mm_region, head);
     ptr_t cur_end = 0;
-    struct mm_region *pos = (struct mm_region*)lead,
-                     *n = list_entry(lead->next, struct mm_region, head);
-    do {
-        if (vmregion->start > cur_end && vmregion->end < n->start) {
+
+    llist_for_each(pos, n, lead, head)
+    {
+        if (vmregion->start >= cur_end && vmregion->end <= pos->start) {
             break;
         }
-        cur_end = n->end;
-        pos = n;
-        n = list_entry(n->head.next, struct mm_region, head);
-    } while ((ptr_t)&n->head != (ptr_t)lead);
+        cur_end = pos->end;
+    }
 
     // XXX caution. require mm_region::head to be the lead of struct
-    llist_insert_after(&pos->head, &vmregion->head);
+    llist_append(&pos->head, &vmregion->head);
 }
 
 void
@@ -82,7 +98,7 @@ region_release_all(vm_regions_t* lead)
 }
 
 void
-region_copy(struct proc_mm* src, struct proc_mm* dest)
+region_copy_mm(struct proc_mm* src, struct proc_mm* dest)
 {
     struct mm_region *pos, *n, *dup;
 
@@ -118,7 +134,7 @@ region_get(vm_regions_t* lead, unsigned long vaddr)
 
     llist_for_each(pos, n, lead, head)
     {
-        if (pos->start <= vaddr && vaddr <= pos->end) {
+        if (pos->start <= vaddr && vaddr < pos->end) {
             return pos;
         }
     }
