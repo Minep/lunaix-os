@@ -255,7 +255,10 @@ mem_unmap_region(ptr_t mnt, struct mm_region* region)
     ((vmr)->start > (addr) && ((addr) + (len)) > (vmr)->end)
 
 static void
-__unmap_overlapped_cases(struct mm_region* vmr, ptr_t* addr, size_t* length)
+__unmap_overlapped_cases(ptr_t mnt,
+                         struct mm_region* vmr,
+                         ptr_t* addr,
+                         size_t* length)
 {
     // seg start, umapped segement start
     ptr_t seg_start = *addr, umps_start = 0;
@@ -267,6 +270,8 @@ __unmap_overlapped_cases(struct mm_region* vmr, ptr_t* addr, size_t* length)
 
     if (CASE_HITI(vmr, seg_start, seg_len)) {
         size_t new_start = seg_start + seg_len;
+
+        // Require a split
         if (new_start < vmr->end) {
             struct mm_region* region = region_dup(vmr);
             if (region->mfile) {
@@ -293,8 +298,14 @@ __unmap_overlapped_cases(struct mm_region* vmr, ptr_t* addr, size_t* length)
         shrink = vmr->end - vmr->start;
         umps_len = shrink;
         umps_start = vmr->start;
-    } else {
-        fail("invalid case");
+    }
+
+    mem_sync_pages(mnt, vmr, vmr->start, umps_len, 0);
+    for (size_t i = 0; i < umps_len; i += PG_SIZE) {
+        ptr_t pa = vmm_del_mapping(mnt, vmr->start + i);
+        if (pa) {
+            pmm_free_page(vmr->proc_vms->pid, pa);
+        }
     }
 
     vmr->start += displ;
@@ -331,7 +342,7 @@ mem_unmap(ptr_t mnt, vm_regions_t* regions, ptr_t addr, size_t length)
 
     while (&pos->head != regions && length) {
         n = container_of(pos->head.next, typeof(*pos), head);
-        __unmap_overlapped_cases(pos, &cur_addr, &length);
+        __unmap_overlapped_cases(mnt, pos, &cur_addr, &length);
 
         pos = n;
     }

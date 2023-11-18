@@ -324,6 +324,8 @@ alloc_process()
     llist_init_head(&proc->children);
     llist_init_head(&proc->grp_member);
     llist_init_head(&proc->sleep.sleepers);
+
+    iopoll_init(&proc->pollctx);
     waitq_init(&proc->waitqueue);
 
     sched_ctx._procs[i] = proc;
@@ -372,6 +374,8 @@ destroy_process(pid_t pid)
     llist_delete(&proc->grp_member);
     llist_delete(&proc->tasks);
     llist_delete(&proc->sleep.sleepers);
+
+    iopoll_free(pid, &proc->pollctx);
 
     taskfs_invalidate(pid);
 

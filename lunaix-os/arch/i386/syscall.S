@@ -63,6 +63,7 @@
         .long __lxsys_munmap
         .long __lxsys_execve
         .long __lxsys_fstat         /* 55 */
+        .long __lxsys_pollctl
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
             .long 0

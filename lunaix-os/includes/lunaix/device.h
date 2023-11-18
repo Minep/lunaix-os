@@ -9,6 +9,7 @@
 #include <lunaix/ds/ldga.h>
 #include <lunaix/ds/llist.h>
 #include <lunaix/ds/mutex.h>
+#include <lunaix/iopoll.h>
 #include <lunaix/types.h>
 
 #include <usr/lunaix/device.h>
@@ -95,13 +96,16 @@
 
 struct device
 {
+    /* -- device structing -- */
+
     u32_t magic;
     struct llist_header siblings;
     struct llist_header children;
     struct device* parent;
-    mutex_t lock;
 
-    // TODO investigate event polling
+    /* -- device state -- */
+
+    mutex_t lock;
 
     struct hstr name;
     struct devident ident;
@@ -110,6 +114,10 @@ struct device
     int dev_type;
     char name_val[DEVICE_NAME_SIZE];
     void* underlay;
+
+    /* -- polling -- */
+    int poll_evflags;
+    poll_evt_q pollers;
 
     struct
     {
@@ -122,6 +130,7 @@ struct device
         int (*read_page)(struct device* dev, void* buf, size_t offset);
         int (*write_page)(struct device* dev, void* buf, size_t offset);
         int (*exec_cmd)(struct device* dev, u32_t req, va_list args);
+        int (*poll)(struct device* dev);
     } ops;
 };
 

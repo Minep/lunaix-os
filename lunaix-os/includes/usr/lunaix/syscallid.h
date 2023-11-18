@@ -64,6 +64,7 @@
 #define __SYSCALL_execve 54
 
 #define __SYSCALL_fstat 55
+#define __SYSCALL_pollctl 56
 
 #define __SYSCALL_MAX 0x100
 

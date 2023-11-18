@@ -4,6 +4,7 @@
 #include <lunaix/clock.h>
 #include <lunaix/ds/waitq.h>
 #include <lunaix/fs.h>
+#include <lunaix/iopoll.h>
 #include <lunaix/mm/mm.h>
 #include <lunaix/mm/region.h>
 #include <lunaix/signal.h>
@@ -110,26 +111,32 @@ struct proc_info
     struct v_fdtable* fdtable;
     struct v_dnode* cwd;
     pid_t pgid;
+
+    struct iopoll pollctx;
 };
 
 extern volatile struct proc_info* __current;
 
+#define resume_process(proc) (proc)->state = PS_READY
+#define pause_process(proc) (proc)->state = PS_PAUSED
+#define block_process(proc) (proc)->state = PS_BLOCKED
+
 static inline void
 block_current()
 {
-    __current->state = PS_BLOCKED;
+    block_process(__current);
 }
 
 static inline void
 pause_current()
 {
-    __current->state = PS_PAUSED;
+    pause_process(__current);
 }
 
 static inline void
 resume_current()
 {
-    __current->state = PS_RUNNING;
+    resume_process(__current);
 }
 
 /**

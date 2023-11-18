@@ -56,7 +56,7 @@ struct mm_region
     // mapped file offset
     off_t foff;
     // mapped file length
-    u32_t flen;
+    u32_t flen; // XXX it seems that we don't need this actually..
 
     ptr_t start;
     ptr_t end;

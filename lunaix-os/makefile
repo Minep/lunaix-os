@@ -75,7 +75,6 @@ instable: all
 
 all-debug: bootable-debug
 	@echo "Dumping the disassembled kernel code to $(kbuild_dir)/kdump.txt"
-	@i686-elf-objdump -S $(kbin) > $(kbuild_dir)/kdump.txt
 
 clean:
 	@rm -rf $(kbuild_dir) || exit 1

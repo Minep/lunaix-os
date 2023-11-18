@@ -119,10 +119,7 @@ intr_routine_page_fault(const isr_param* param)
 
         memset((void*)ptr, 0, PG_SIZE);
 
-        int errno = 0;
-        if (mseg_off < hit_region->flen) {
-            errno = file->ops->read_page(file->inode, (void*)ptr, mfile_off);
-        }
+        int errno = file->ops->read_page(file->inode, (void*)ptr, mfile_off);
 
         if (errno < 0) {
             ERROR("fail to populate page (%d)", errno);
