@@ -92,7 +92,7 @@ intr_routine_page_fault(const isr_param* param)
                 goto oom;
             }
 
-            *pte = *pte | pa | get_ptattr(hit_region);
+            *pte = pa | get_ptattr(hit_region);
             memset((void*)PG_ALIGN(ptr), 0, PG_SIZE);
             goto resolved;
         }
@@ -115,7 +115,7 @@ intr_routine_page_fault(const isr_param* param)
         }
 
         cpu_flush_page((ptr_t)pte);
-        *pte = (*pte & 0xFFF) | pa | get_ptattr(hit_region);
+        *pte = pa | get_ptattr(hit_region);
 
         memset((void*)ptr, 0, PG_SIZE);
 

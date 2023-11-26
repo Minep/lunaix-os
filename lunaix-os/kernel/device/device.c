@@ -20,8 +20,7 @@ struct devclass default_devclass = {};
 void
 device_setname_vargs(struct device* dev, char* fmt, va_list args)
 {
-    size_t strlen =
-      ksnprintfv(dev->name_val, fmt, DEVICE_NAME_SIZE, args);
+    size_t strlen = ksnprintfv(dev->name_val, fmt, DEVICE_NAME_SIZE, args);
 
     dev->name = HSTR(dev->name_val, strlen);
 
@@ -70,6 +69,7 @@ device_create(struct device* dev,
 
     llist_init_head(&dev->children);
     mutex_init(&dev->lock);
+    iopoll_init_evt_q(&dev->pollers);
 }
 
 struct device*
@@ -199,6 +199,13 @@ device_cast(void* obj)
     }
 
     return NULL;
+}
+
+void
+device_alert_poller(struct device* dev, int poll_evt)
+{
+    dev->poll_evflags = poll_evt;
+    iopoll_wake_pollers(&dev->pollers);
 }
 
 __DEFINE_LXSYSCALL3(int, ioctl, int, fd, int, req, va_list, args)

@@ -27,6 +27,10 @@ typedef unsigned int cpu_t;
 
 typedef u64_t lba_t;
 
+#define true 1
+#define false 0
+typedef int bool;
+
 /**
  * container_of - cast a member of a structure out to the containing structure
  *

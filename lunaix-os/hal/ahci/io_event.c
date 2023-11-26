@@ -65,7 +65,7 @@ proceed:
 
     blkio_schedule(ioreq->io_ctx);
     blkio_complete(ioreq);
-    vfree(cmdstate->cmd_table);
+    vfree_dma(cmdstate->cmd_table);
 
 done:
     hba_clear_reg(port->regs[HBA_RPxIS]);

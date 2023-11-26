@@ -15,24 +15,28 @@ static int serial_idx = 0;
 int
 serial_accept_one(struct serial_dev* sdev, u8_t val)
 {
-    return !!fifo_putone(&sdev->rxbuf, val);
+    return !!rbuffer_put(&sdev->rxbuf, val);
 }
 
 int
 serial_accept_buffer(struct serial_dev* sdev, void* val, size_t len)
 {
-    return !!fifo_write(&sdev->rxbuf, val, len);
+    return !!rbuffer_puts(&sdev->rxbuf, val, len);
 }
 
 void
 serial_end_recv(struct serial_dev* sdev)
 {
+    mark_device_done_read(sdev->dev);
+
     pwake_one(&sdev->wq_rxdone);
 }
 
 void
 serial_end_xmit(struct serial_dev* sdev, size_t len)
 {
+    mark_device_done_write(sdev->dev);
+
     sdev->wr_len = len;
     pwake_one(&sdev->wq_txdone);
 }
@@ -42,7 +46,7 @@ serial_readone_nowait(struct serial_dev* sdev, u8_t* val)
 {
     device_lock(sdev->dev);
 
-    int rd_len = fifo_readone(&sdev->rxbuf, val);
+    int rd_len = rbuffer_get(&sdev->rxbuf, (char*)val);
 
     device_unlock(sdev->dev);
 
@@ -54,7 +58,9 @@ serial_readone(struct serial_dev* sdev, u8_t* val)
 {
     device_lock(sdev->dev);
 
-    while (!fifo_readone(&sdev->rxbuf, val)) {
+    mark_device_doing_read(sdev->dev);
+
+    while (!rbuffer_get(&sdev->rxbuf, (char*)val)) {
         pwait(&sdev->wq_rxdone);
     }
 
@@ -66,8 +72,10 @@ serial_readbuf(struct serial_dev* sdev, u8_t* buf, size_t len)
 {
     device_lock(sdev->dev);
 
+    mark_device_doing_read(sdev->dev);
+
     size_t rdlen;
-    while (!(rdlen = fifo_read(&sdev->rxbuf, buf, len))) {
+    while (!(rdlen = rbuffer_gets(&sdev->rxbuf, (char*)buf, len))) {
         pwait(&sdev->wq_rxdone);
     }
 
@@ -81,7 +89,9 @@ serial_readbuf_nowait(struct serial_dev* sdev, u8_t* buf, size_t len)
 {
     device_lock(sdev->dev);
 
-    int rdlen = fifo_read(&sdev->rxbuf, buf, len);
+    mark_device_doing_read(sdev->dev);
+
+    int rdlen = rbuffer_gets(&sdev->rxbuf, (char*)buf, len);
 
     device_unlock(sdev->dev);
 
@@ -92,6 +102,8 @@ int
 serial_writebuf(struct serial_dev* sdev, u8_t* buf, size_t len)
 {
     device_lock(sdev->dev);
+
+    mark_device_doing_write(sdev->dev);
 
     if (sdev->write(sdev, buf, len) == RXTX_DONE) {
         goto done;
@@ -110,6 +122,8 @@ int
 serial_writebuf_nowait(struct serial_dev* sdev, u8_t* buf, size_t len)
 {
     device_lock(sdev->dev);
+
+    mark_device_doing_write(sdev->dev);
 
     sdev->write(sdev, buf, len);
     int rdlen = sdev->wr_len;
@@ -155,10 +169,18 @@ __serial_exec_command(struct device* dev, u32_t req, va_list args)
     return sdev->exec_cmd(sdev, req, args);
 }
 
+static int
+__serial_poll_event(struct device* dev)
+{
+    struct serial_dev* sdev = serial_device(dev);
+
+    return sdev->dev->poll_evflags;
+}
+
 #define RXBUF_SIZE 512
 
 struct serial_dev*
-serial_create(struct devclass* class)
+serial_create(struct devclass* class, char* if_ident)
 {
     struct serial_dev* sdev = valloc(sizeof(struct serial_dev));
     struct device* dev = device_allocseq(NULL, sdev);
@@ -167,19 +189,21 @@ serial_create(struct devclass* class)
     dev->ops.write = __serial_write;
     dev->ops.write_page = __serial_write_page;
     dev->ops.exec_cmd = __serial_exec_command;
+    dev->ops.poll = __serial_poll_event;
 
     sdev->dev = dev;
     dev->underlay = sdev;
 
     waitq_init(&sdev->wq_rxdone);
     waitq_init(&sdev->wq_txdone);
-    fifo_init(&sdev->rxbuf, valloc(RXBUF_SIZE), RXBUF_SIZE, 0);
+    rbuffer_init(&sdev->rxbuf, valloc(RXBUF_SIZE), RXBUF_SIZE);
     llist_append(&serial_devs, &sdev->sdev_list);
-    // llist_init_head(&sdev->cmds);
+
+    device_register(dev, class, "port%s%d", if_ident, class->variant);
+
+    sdev->at_term = term_create(dev, if_ident);
 
     class->variant++;
-    device_register(dev, class, "ttyS%d", class->variant);
-
     return sdev;
 }
 

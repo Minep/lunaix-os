@@ -149,7 +149,7 @@ __append_pollers(int* ds, int npoller)
     return nc;
 }
 
-static int
+static void
 __wait_until_event()
 {
     block_current();
@@ -159,7 +159,7 @@ __wait_until_event()
 void
 iopoll_init(struct iopoll* ctx)
 {
-    ctx->pollers = valloc(sizeof(ptr_t) * MAX_POLLER_COUNT);
+    ctx->pollers = vzalloc(sizeof(ptr_t) * MAX_POLLER_COUNT);
     ctx->n_poller = 0;
 }
 
@@ -173,9 +173,9 @@ iopoll_free(pid_t pid, struct iopoll* ctx)
             llist_delete(&poller->evt_listener);
             vfree(poller);
         }
-
-        vfree(ctx->pollers);
     }
+    
+    vfree(ctx->pollers);
 }
 
 void
@@ -257,7 +257,7 @@ __DEFINE_LXSYSCALL2(int, pollctl, int, action, va_list, va)
 
             time_t t1 = clock_systime() + timeout;
             while (!(retcode == __do_poll_round(pinfos, npinfos))) {
-                if (timeout >= 0 && t1 >= clock_systime()) {
+                if (timeout >= 0 && t1 < clock_systime()) {
                     break;
                 }
                 __wait_until_event();
@@ -269,7 +269,7 @@ __DEFINE_LXSYSCALL2(int, pollctl, int, action, va_list, va)
 
             time_t t1 = clock_systime() + timeout;
             while (!(retcode == __do_poll_all(pinfo))) {
-                if (timeout >= 0 && t1 >= clock_systime()) {
+                if (timeout >= 0 && t1 < clock_systime()) {
                     break;
                 }
                 __wait_until_event();

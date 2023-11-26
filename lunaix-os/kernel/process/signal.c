@@ -111,7 +111,7 @@ signal_send(pid_t pid, int signum)
     } else if (!pid) {
         proc = __current;
         goto send_grp;
-    } else if (pid < -1) {
+    } else if (pid < 0) {
         proc = get_process(-pid);
         goto send_grp;
     } else {

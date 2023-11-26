@@ -13,10 +13,6 @@
 #define TIOCSPGRP IOREQ(1, 1)
 #define TIOCCLSBUF IOREQ(2, 0)
 #define TIOCFLUSH IOREQ(3, 0)
-#define TIOCPUSH IOREQ(4, 1)
-#define TIOCPOP IOREQ(5, 0)
-#define TIOCSCDEV IOREQ(6, 1)
-#define TIOCGCDEV IOREQ(7, 0)
 
 #define RTCIO_IUNMSK IOREQ(1, 0)
 #define RTCIO_IMSK IOREQ(2, 0)

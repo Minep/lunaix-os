@@ -1,57 +1,34 @@
+/**
+ * @file ansi_cntl.c
+ * @author Lunaixsky (lunaxisky@qq.com)
+ * @brief Line controller slave that handle all non-POSIX control code or ANSI
+ * escape sequence
+ * @version 0.1
+ * @date 2023-11-25
+ *
+ * @copyright Copyright (c) 2023
+ *
+ */
 #include <hal/term.h>
-
-#include <lunaix/process.h>
+#include <usr/lunaix/term.h>
 
 #define CTRL_MNEMO(chr) (chr - 'A' + 1)
 
-static inline int
-__ansi_actcontrol(struct term* termdev, char chr)
+static inline size_t
+__ansi_actcontrol(struct term* termdev, struct linebuffer* lbuf, char chr)
 {
-    struct linebuffer* lbuf = &termdev->line;
+    struct rbuffer* cooked = lbuf->next;
     switch (chr) {
-        case '\0':            // EOL
-        case CTRL_MNEMO('D'): // EOF
-            return 0;
-
-        case CTRL_MNEMO('C'): // INTR
-            signal_send(termdev->fggrp, SIGINT);
-            break;
-
-        case '\r': // CR
-            termdev->line.ptr = 0;
-            return 1;
-
-        case '\x08': // ERASE
-            return line_put_next(lbuf, chr, -1);
-
-        case CTRL_MNEMO('Q'): // QUIT
-            signal_send(termdev->fggrp, SIGKILL);
-            return 1;
-
-        case CTRL_MNEMO('Z'): // SUSP
-            signal_send(termdev->fggrp, SIGSTOP);
-            return 1;
-
         default:
             if ((int)chr < 32) {
-                line_put_next(lbuf, '^', 0);
+                rbuffer_put(cooked, '^');
                 chr += 64;
             }
             break;
     }
 
-    return line_put_next(lbuf, chr, 0);
+    return rbuffer_put(cooked, chr);
 }
 
-static size_t
-ansi_lcntl_process(struct term* termdev, char* line, size_t len)
-{
-    size_t i = 0;
-    while (i < len && __ansi_actcontrol(termdev, line[i])) {
-        i++;
-    }
-
-    return i;
-}
-
-struct term_lcntl ansi_line_controller = { .apply = ansi_lcntl_process };
+struct term_lcntl ansi_line_controller = { .process_and_put =
+                                             __ansi_actcontrol };

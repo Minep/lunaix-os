@@ -77,6 +77,10 @@ ksym_getstr(struct ksym_entry* sym)
                    trace_ctx.ksym_table->ksym_label_off + sym->label_off);
 }
 
+static inline bool valid_fp(ptr_t ptr) {
+    return KERNEL_STACK < ptr && ptr < KERNEL_EXEC_END;
+}
+
 int
 trace_walkback(struct trace_record* tb_buffer,
                ptr_t fp,
@@ -87,7 +91,7 @@ trace_walkback(struct trace_record* tb_buffer,
     struct ksym_entry* current = NULL;
     int i = 0;
 
-    while (frame && i < limit) {
+    while (valid_fp((ptr_t)frame) && i < limit) {
         ptr_t pc = *(frame + 1);
 
         current = trace_sym_lookup(pc);

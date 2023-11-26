@@ -3,9 +3,10 @@
 
 #include <lunaix/device.h>
 #include <lunaix/ds/llist.h>
-#include <lunaix/fs.h>
 
 #include <usr/lunaix/poll.h>
+
+struct v_fd; // <lunaix/fs.h>
 
 typedef struct llist_header poll_evt_q;
 
@@ -33,6 +34,12 @@ static inline void
 iopoll_listen_on(struct iopoller* listener, poll_evt_q* source)
 {
     llist_append(source, &listener->evt_listener);
+}
+
+static inline void
+iopoll_init_evt_q(poll_evt_q* source)
+{
+    llist_init_head(source);
 }
 
 void

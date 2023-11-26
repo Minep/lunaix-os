@@ -84,7 +84,7 @@ __init_pile(struct cake_pile* pile,
 
     piece_size = ROUNDUP(piece_size, offset);
     *pile = (struct cake_pile){ .piece_size = piece_size,
-                                .cakes_count = 1,
+                                .cakes_count = 0,
                                 .pieces_per_cake =
                                   (pg_per_cake * PG_SIZE) /
                                   (piece_size + sizeof(piece_index_t)),
@@ -149,7 +149,7 @@ cake_grab(struct cake_pile* pile)
     pile->alloced_pieces++;
 
     llist_delete(&pos->cakes);
-    if (pos->next_free == EO_FREE_PIECE) {
+    if (pos->free_list[pos->next_free] == EO_FREE_PIECE) {
         llist_append(&pile->full, &pos->cakes);
     } else {
         llist_append(&pile->partial, &pos->cakes);
@@ -169,6 +169,7 @@ int
 cake_release(struct cake_pile* pile, void* area)
 {
     piece_index_t piece_index;
+    size_t dsize = 0;
     struct cake_s *pos, *n;
     struct llist_header* hdrs[2] = { &pile->full, &pile->partial };
 
@@ -178,7 +179,8 @@ cake_release(struct cake_pile* pile, void* area)
             if (pos->first_piece > area) {
                 continue;
             }
-            piece_index = (ptr_t)(area - pos->first_piece) / pile->piece_size;
+            dsize = (ptr_t)(area - pos->first_piece);
+            piece_index = dsize / pile->piece_size;
             if (piece_index < pile->pieces_per_cake) {
                 goto found;
             }
@@ -188,8 +190,12 @@ cake_release(struct cake_pile* pile, void* area)
     return 0;
 
 found:
+    assert(!(dsize % pile->piece_size));
     pos->free_list[piece_index] = pos->next_free;
     pos->next_free = piece_index;
+
+    assert_msg(pos->free_list[piece_index] != pos->next_free, "double free");
+
     pos->used_pieces--;
     pile->alloced_pieces--;
 

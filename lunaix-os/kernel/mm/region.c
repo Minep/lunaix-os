@@ -52,8 +52,7 @@ region_add(vm_regions_t* lead, struct mm_region* vmregion)
         return;
     }
 
-    struct mm_region *pos = (struct mm_region*)lead->next,
-                     *n = list_entry(pos->head.next, struct mm_region, head);
+    struct mm_region *pos, *n;
     ptr_t cur_end = 0;
 
     llist_for_each(pos, n, lead, head)
@@ -117,7 +116,7 @@ region_copy_mm(struct proc_mm* src, struct proc_mm* dest)
             dup->region_copied(dup);
         }
 
-        region_add(&dest->regions, dup);
+        llist_append(&dest->regions, &dup->head);
     }
 }
 

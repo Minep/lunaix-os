@@ -42,9 +42,8 @@ sched_init()
     proc_pile = cake_new_pile("proc", sizeof(struct proc_info), 1, 0);
     cake_set_constructor(proc_pile, cake_ctor_zeroing);
 
-    sched_ctx = (struct scheduler){ ._procs = vzalloc(PROC_TABLE_SIZE),
-                                    .ptable_len = 0,
-                                    .procs_index = 0 };
+    sched_ctx = (struct scheduler){
+        ._procs = vzalloc(PROC_TABLE_SIZE), .ptable_len = 0, .procs_index = 0};
 
     // TODO initialize dummy_proc
     sched_init_dummy();
@@ -95,6 +94,9 @@ can_schedule(struct proc_info* proc)
 
     if ((proc->state & PS_PAUSED)) {
         return !!(sh->sig_pending & ~1);
+    }
+    if ((proc->state & PS_BLOCKED)) {
+        return sigset_test(sh->sig_pending, _SIGINT);
     }
 
     if (sigset_test(sh->sig_pending, _SIGCONT)) {

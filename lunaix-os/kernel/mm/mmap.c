@@ -114,7 +114,6 @@ found:
 
     region->mfile = file;
     region->foff = param->offset;
-    region->flen = param->flen;
     region->proc_vms = param->pvms;
 
     region_add(vm_regions, region);
@@ -277,7 +276,6 @@ __unmap_overlapped_cases(ptr_t mnt,
             if (region->mfile) {
                 size_t f_shifted = new_start - region->start;
                 region->foff += f_shifted;
-                region->flen = MAX(region->flen, f_shifted) - f_shifted;
             }
             region->start = new_start;
             llist_insert_after(&vmr->head, &region->head);
@@ -316,7 +314,6 @@ __unmap_overlapped_cases(ptr_t mnt,
         region_release(vmr);
     } else if (vmr->mfile) {
         vmr->foff += displ;
-        vmr->flen = MAX(vmr->flen, displ) - displ;
     }
 
     *addr = umps_start + umps_len;

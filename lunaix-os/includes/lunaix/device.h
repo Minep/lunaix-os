@@ -125,12 +125,14 @@ struct device
         int (*acquire)(struct device* dev);
         int (*release)(struct device* dev);
 
-        int (*read)(struct device* dev, void* buf, size_t offset, size_t len);
-        int (*write)(struct device* dev, void* buf, size_t offset, size_t len);
-        int (*read_page)(struct device* dev, void* buf, size_t offset);
-        int (*write_page)(struct device* dev, void* buf, size_t offset);
-        int (*exec_cmd)(struct device* dev, u32_t req, va_list args);
-        int (*poll)(struct device* dev);
+        int (*read)(struct device*, void*, off_t, size_t);
+        int (*write)(struct device*, void*, off_t, size_t);
+
+        int (*read_page)(struct device*, void*, off_t);
+        int (*write_page)(struct device*, void*, off_t);
+
+        int (*exec_cmd)(struct device*, u32_t, va_list);
+        int (*poll)(struct device*);
     } ops;
 };
 
@@ -163,6 +165,15 @@ struct device_def
      */
     int (*free)(struct device_def*, void* instance);
 };
+
+#define mark_device_doing_write(dev_ptr) (dev_ptr)->poll_evflags &= ~_POLLOUT
+#define mark_device_done_write(dev_ptr) (dev_ptr)->poll_evflags |= _POLLOUT
+
+#define mark_device_doing_read(dev_ptr) (dev_ptr)->poll_evflags &= ~_POLLIN
+#define mark_device_done_read(dev_ptr) (dev_ptr)->poll_evflags |= _POLLIN
+
+#define mark_device_hanging(dev_ptr) (dev_ptr)->poll_evflags &= ~_POLLHUP
+#define mark_device_grounded(dev_ptr) (dev_ptr)->poll_evflags |= _POLLHUP
 
 static inline u32_t
 device_id_from_class(struct devclass* class)

@@ -2,10 +2,12 @@
 #define __LUNAIX_SERIAL_H
 
 #include <lunaix/device.h>
-#include <lunaix/ds/fifo.h>
 #include <lunaix/ds/llist.h>
 #include <lunaix/ds/mutex.h>
 #include <lunaix/ds/waitq.h>
+#include <lunaix/ds/rbuffer.h>
+
+#include <hal/term.h>
 
 #define SERIAL_RW_RX 0x0
 #define SERIAL_RW_TX 0x1
@@ -26,9 +28,10 @@ struct serial_dev
     struct device* dev;
     struct waitq wq_rxdone;
     struct waitq wq_txdone;
+    struct term* at_term;
     void* backend;
 
-    struct fifo_buf rxbuf;
+    struct rbuffer rxbuf;
     int wr_len;
 
     /**
@@ -41,8 +44,18 @@ struct serial_dev
     int (*exec_cmd)(struct serial_dev* sdev, u32_t, va_list);
 };
 
+/**
+ * @brief Create a serial device.
+ *
+ *
+ * @param if_ident a string that differentiate the underlying interface of
+ * serial ports
+ * @param with_tty whether a `/dev/tty*` will be automatically created and
+ * attach to it.
+ * @return struct serial_dev*
+ */
 struct serial_dev*
-serial_create(struct devclass* class);
+serial_create(struct devclass* class, char* if_ident);
 
 void
 serial_readone(struct serial_dev* sdev, u8_t* val);
