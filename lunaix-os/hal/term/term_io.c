@@ -20,7 +20,7 @@ do_read_raw(struct term* tdev)
 
     char* inbuffer = line_in->current->buffer;
     size_t min = tdev->cc[_VMIN] - 1;
-    size_t sz = chdev->ops.read(chdev, inbuffer, 0, max_lb_sz);
+    size_t sz = chdev->ops.read_async(chdev, inbuffer, 0, max_lb_sz);
     time_t t = clock_systime(), dt = 0;
     time_t expr = (tdev->cc[_VTIME] * 100) - 1;
 
@@ -33,8 +33,7 @@ do_read_raw(struct term* tdev)
         max_lb_sz -= sz;
 
         // TODO pass a flags to read to indicate it is non blocking ops
-        sz +=
-        chdev->ops.read(chdev, inbuffer, sz, max_lb_sz);
+        sz += chdev->ops.read_async(chdev, inbuffer, sz, max_lb_sz);
     }
 
     rbuffer_puts(line_in->next, inbuffer, sz);
@@ -44,7 +43,8 @@ do_read_raw(struct term* tdev)
 }
 
 static int
-do_read_raw_canno(struct term* tdev) {
+do_read_raw_canno(struct term* tdev)
+{
     struct device* chdev = tdev->chdev;
     struct linebuffer* line_in = &tdev->line_in;
     struct rbuffer* current_buf = line_in->current;
@@ -60,7 +60,8 @@ static int
 term_read_noncano(struct term* tdev)
 {
     struct device* chdev = tdev->chdev;
-    return do_read_raw(tdev);;
+    return do_read_raw(tdev);
+    ;
 }
 
 static int

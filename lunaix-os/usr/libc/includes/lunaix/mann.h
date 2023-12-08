@@ -1,6 +1,7 @@
 #ifndef __LUNAIX_SYS_MANN_H
 #define __LUNAIX_SYS_MANN_H
 
+#include <stddef.h>
 #include <lunaix/mann_flags.h>
 #include <lunaix/types.h>
 

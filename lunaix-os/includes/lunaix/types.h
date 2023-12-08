@@ -3,7 +3,6 @@
 
 #include <lunaix/compiler.h>
 #include <stdarg.h>
-#include <stddef.h>
 #include <usr/lunaix/types.h>
 
 #define PACKED __attribute__((packed))
@@ -18,10 +17,10 @@ typedef unsigned int u32_t;
 typedef unsigned long long u64_t;
 typedef unsigned long ptr_t;
 
-typedef signed long ssize_t;
 typedef int pid_t;
-typedef unsigned long size_t;
-typedef unsigned long off_t;
+typedef signed long ssize_t;
+// typedef unsigned long size_t;
+// typedef unsigned long off_t;
 
 typedef unsigned int cpu_t;
 

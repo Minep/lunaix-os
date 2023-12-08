@@ -24,9 +24,9 @@ typedef signed long ssize_t;
 
 typedef int pid_t;
 
-typedef unsigned long size_t;
+typedef __SIZE_TYPE__ size_t;
 
-typedef unsigned long off_t;
+typedef __SIZE_TYPE__ off_t;
 
 typedef unsigned int ino_t;
 

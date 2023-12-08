@@ -5,6 +5,8 @@
 #include <lunaix/status.h>
 #include <lunaix/syslog.h>
 
+#include <sys/muldiv64.h>
+
 #include <lib/crc.h>
 
 #define GPT_BLKSIZE 512
@@ -46,9 +48,8 @@ blkpart_parse(struct device* master, struct gpt_header* header)
         }
 
         // Convert UEFI's 512B LB representation into local LBA range.
-        u64_t slba_local =
-          (ent->start_lba * GPT_BLKSIZE) / (u64_t)bdev->blk_size;
-        u64_t elba_local = (ent->end_lba * GPT_BLKSIZE) / (u64_t)bdev->blk_size;
+        u64_t slba_local = udiv64(ent->start_lba * GPT_BLKSIZE, bdev->blk_size);
+        u64_t elba_local = udiv64(ent->end_lba * GPT_BLKSIZE, bdev->blk_size);
 
         kprintf("%s: guid part#%d: %d..%d",
                 bdev->bdev_id,

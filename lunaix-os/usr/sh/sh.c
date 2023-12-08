@@ -111,7 +111,7 @@ void
 sh_exec(const char* name, const char** argv)
 {
     if (!strcmp(name, "cd")) {
-        chdir(argv[0]);
+        chdir(argv[0] ? argv[0] : ".");
         sh_printerr();
         return;
     }
@@ -139,7 +139,7 @@ sh_loop()
     // stdout (by default, unless user did smth) is the tty we are currently at
     ioctl(stdout, TIOCSPGRP, getpgid());
 
-    char* argv[] = { 0, 0 };
+    char* argv[] = {0, 0};
 
     while (1) {
         getcwd(pwd, 512);

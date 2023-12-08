@@ -32,6 +32,5 @@ pdev_zerodev_init(struct device_def* def)
 static struct device_def devzero_def = {
     .name = "zero",
     .class = DEVCLASSV(DEVIF_NON, DEVFN_PSEUDO, DEV_ZERO, DEV_BUILTIN_ZERO),
-    .init = pdev_zerodev_init
-};
+    .init = pdev_zerodev_init};
 EXPORT_DEVICE(zerodev, &devzero_def, load_onboot);

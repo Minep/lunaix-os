@@ -7,6 +7,15 @@
 
 #include <hal/serial.h>
 
+#define lock_sdev(sdev) device_lock((sdev)->dev)
+#define unlock_sdev(sdev) device_unlock((sdev)->dev)
+#define unlock_and_wait(sdev, wq)                                              \
+    ({                                                                         \
+        unlock_sdev(sdev);                                                     \
+        pwait(&(sdev)->wq);                                                    \
+        lock_sdev(sdev);                                                       \
+    })
+
 static DEFINE_LLIST(serial_devs);
 static int serial_idx = 0;
 
@@ -44,11 +53,11 @@ serial_end_xmit(struct serial_dev* sdev, size_t len)
 int
 serial_readone_nowait(struct serial_dev* sdev, u8_t* val)
 {
-    device_lock(sdev->dev);
+    lock_sdev(sdev);
 
     int rd_len = rbuffer_get(&sdev->rxbuf, (char*)val);
 
-    device_unlock(sdev->dev);
+    unlock_sdev(sdev);
 
     return rd_len;
 }
@@ -56,30 +65,30 @@ serial_readone_nowait(struct serial_dev* sdev, u8_t* val)
 void
 serial_readone(struct serial_dev* sdev, u8_t* val)
 {
-    device_lock(sdev->dev);
+    lock_sdev(sdev);
 
     mark_device_doing_read(sdev->dev);
 
     while (!rbuffer_get(&sdev->rxbuf, (char*)val)) {
-        pwait(&sdev->wq_rxdone);
+        unlock_and_wait(sdev, wq_rxdone);
     }
 
-    device_unlock(sdev->dev);
+    unlock_sdev(sdev);
 }
 
 size_t
 serial_readbuf(struct serial_dev* sdev, u8_t* buf, size_t len)
 {
-    device_lock(sdev->dev);
+    lock_sdev(sdev);
 
     mark_device_doing_read(sdev->dev);
 
     size_t rdlen;
     while (!(rdlen = rbuffer_gets(&sdev->rxbuf, (char*)buf, len))) {
-        pwait(&sdev->wq_rxdone);
+        unlock_and_wait(sdev, wq_rxdone);
     }
 
-    device_unlock(sdev->dev);
+    unlock_sdev(sdev);
 
     return rdlen;
 }
@@ -87,13 +96,13 @@ serial_readbuf(struct serial_dev* sdev, u8_t* buf, size_t len)
 int
 serial_readbuf_nowait(struct serial_dev* sdev, u8_t* buf, size_t len)
 {
-    device_lock(sdev->dev);
+    lock_sdev(sdev);
 
     mark_device_doing_read(sdev->dev);
 
     int rdlen = rbuffer_gets(&sdev->rxbuf, (char*)buf, len);
 
-    device_unlock(sdev->dev);
+    unlock_sdev(sdev);
 
     return rdlen;
 }
@@ -101,7 +110,7 @@ serial_readbuf_nowait(struct serial_dev* sdev, u8_t* buf, size_t len)
 int
 serial_writebuf(struct serial_dev* sdev, u8_t* buf, size_t len)
 {
-    device_lock(sdev->dev);
+    lock_sdev(sdev);
 
     mark_device_doing_write(sdev->dev);
 
@@ -109,11 +118,11 @@ serial_writebuf(struct serial_dev* sdev, u8_t* buf, size_t len)
         goto done;
     }
 
-    pwait(&sdev->wq_txdone);
+    unlock_and_wait(sdev, wq_txdone);
 
 done:
     int rdlen = sdev->wr_len;
-    device_unlock(sdev->dev);
+    unlock_sdev(sdev);
 
     return rdlen;
 }
@@ -121,14 +130,14 @@ done:
 int
 serial_writebuf_nowait(struct serial_dev* sdev, u8_t* buf, size_t len)
 {
-    device_lock(sdev->dev);
+    lock_sdev(sdev);
 
     mark_device_doing_write(sdev->dev);
 
     sdev->write(sdev, buf, len);
     int rdlen = sdev->wr_len;
 
-    device_unlock(sdev->dev);
+    unlock_sdev(sdev);
 
     return rdlen;
 }
@@ -137,6 +146,13 @@ static int
 __serial_read(struct device* dev, void* buf, size_t offset, size_t len)
 {
     return serial_readbuf(serial_device(dev), &((u8_t*)buf)[offset], len);
+}
+
+static int
+__serial_read_async(struct device* dev, void* buf, size_t offset, size_t len)
+{
+    return serial_readbuf_nowait(
+        serial_device(dev), &((u8_t*)buf)[offset], len);
 }
 
 static int
@@ -149,6 +165,13 @@ static int
 __serial_write(struct device* dev, void* buf, size_t offset, size_t len)
 {
     return serial_writebuf(serial_device(dev), &((u8_t*)buf)[offset], len);
+}
+
+static int
+__serial_write_async(struct device* dev, void* buf, size_t offset, size_t len)
+{
+    return serial_writebuf_nowait(
+        serial_device(dev), &((u8_t*)buf)[offset], len);
 }
 
 static int

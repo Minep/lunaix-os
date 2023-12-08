@@ -14,7 +14,7 @@
 
 #define CTRL_MNEMO(chr) (chr - 'A' + 1)
 
-static inline size_t
+static inline int
 __ansi_actcontrol(struct term* termdev, struct linebuffer* lbuf, char chr)
 {
     struct rbuffer* cooked = lbuf->next;
@@ -30,5 +30,4 @@ __ansi_actcontrol(struct term* termdev, struct linebuffer* lbuf, char chr)
     return rbuffer_put(cooked, chr);
 }
 
-struct term_lcntl ansi_line_controller = { .process_and_put =
-                                             __ansi_actcontrol };
+struct term_lcntl ansi_line_controller = {.process_and_put = __ansi_actcontrol};

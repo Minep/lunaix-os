@@ -39,7 +39,7 @@ signal_dispatch()
     struct sigact* prev_working = psig->inprogress;
     sigset_t mask = psig->sig_mask | (prev_working ? prev_working->sa_mask : 0);
 
-    int sig_selected = 31 - __builtin_clz(psig->sig_pending & ~mask);
+    int sig_selected = 31 - clz(psig->sig_pending & ~mask);
 
     sigset_clear(psig->sig_pending, sig_selected);
 
@@ -67,7 +67,7 @@ signal_dispatch()
     }
 
     struct proc_sig* sigframe =
-      (struct proc_sig*)((ustack - sizeof(struct proc_sig)) & ~0xf);
+        (struct proc_sig*)((ustack - sizeof(struct proc_sig)) & ~0xf);
 
     sigframe->sig_num = sig_selected;
     sigframe->sigact = action->sa_actor;
@@ -178,14 +178,8 @@ __DEFINE_LXSYSCALL1(int, sigreturn, struct proc_sig, *sig_ctx)
     return 0;
 }
 
-__DEFINE_LXSYSCALL3(int,
-                    sigprocmask,
-                    int,
-                    how,
-                    const sigset_t,
-                    *set,
-                    sigset_t,
-                    *oldset)
+__DEFINE_LXSYSCALL3(
+    int, sigprocmask, int, how, const sigset_t, *set, sigset_t, *oldset)
 {
     struct sighail* sh = &__current->sigctx;
     *oldset = sh->sig_mask;

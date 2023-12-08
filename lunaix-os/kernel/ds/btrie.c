@@ -19,7 +19,7 @@ struct btrie_node*
 __btrie_traversal(struct btrie* root, u32_t index, int options)
 {
     index = index >> root->truncated;
-    u32_t lz = index ? ROUNDDOWN(31 - __builtin_clz(index), BTRIE_BITS) : 0;
+    u32_t lz = index ? ROUNDDOWN(31 - clz(index), BTRIE_BITS) : 0;
     u32_t bitmask = ((1 << BTRIE_BITS) - 1) << lz;
     u32_t i = 0;
     struct btrie_node* tree = root->btrie_root;

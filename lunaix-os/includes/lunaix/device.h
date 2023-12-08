@@ -127,6 +127,8 @@ struct device
 
         int (*read)(struct device*, void*, off_t, size_t);
         int (*write)(struct device*, void*, off_t, size_t);
+        int (*read_async)(struct device*, void*, off_t, size_t);
+        int (*write_async)(struct device*, void*, off_t, size_t);
 
         int (*read_page)(struct device*, void*, off_t);
         int (*write_page)(struct device*, void*, off_t);

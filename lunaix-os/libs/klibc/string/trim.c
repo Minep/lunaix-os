@@ -6,8 +6,8 @@
 void
 strrtrim(char* str)
 {
-    size_t l = strlen(str);
-    while (l < (size_t)-1) {
+    unsigned long l = strlen(str);
+    while (l < (unsigned long)-1) {
         char c = str[l];
         if (!c || WS_CHAR(c)) {
             l--;
@@ -21,7 +21,7 @@ strrtrim(char* str)
 char*
 strltrim_safe(char* str)
 {
-    size_t l = 0;
+    unsigned long l = 0;
     char c = 0;
     while ((c = str[l]) && WS_CHAR(c)) {
         l++;

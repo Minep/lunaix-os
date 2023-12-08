@@ -19,8 +19,8 @@ static const char flag_chars[] = "#0- +";
 #define FLAG_ALT2 (1 << 8)
 #define FLAG_CAPS (1 << 9)
 
-size_t
-ksnprintfv(char* buffer, const char* fmt, size_t max_len, va_list vargs)
+unsigned long
+ksnprintfv(char* buffer, const char* fmt, unsigned long max_len, va_list vargs)
 {
     // This sprintf just a random implementation I found it on Internet . lol.
     //      Of course, with some modifications for porting to LunaixOS :)
@@ -198,22 +198,22 @@ ksnprintfv(char* buffer, const char* fmt, size_t max_len, va_list vargs)
     return ptr;
 }
 
-size_t
+unsigned long
 ksprintf(char* buffer, char* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    size_t len = ksnprintfv(buffer, fmt, 0, args);
+    unsigned long len = ksnprintfv(buffer, fmt, 0, args);
     va_end(args);
     return len;
 }
 
-size_t
-ksnprintf(char* buffer, size_t n, char* fmt, ...)
+unsigned long
+ksnprintf(char* buffer, unsigned long n, char* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    size_t len = ksnprintfv(buffer, fmt, n, args);
+    unsigned long len = ksnprintfv(buffer, fmt, n, args);
     va_end(args);
     return len;
 }

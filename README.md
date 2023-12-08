@@ -6,11 +6,11 @@
   <a href="#lunaixos-project">简体中文</a> | <a href="docs/README_en.md">English</a>
 </p>
 
-# LunaixOS Project
+# The LunaixOS Project
 
 LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有浓重个人风格的操作系统。开发过程以视频教程形式在Bilibili呈现：[《从零开始自制操作系统系列》](https://space.bilibili.com/12995787/channel/collectiondetail?sid=196337)。
 
-## 一些实用资源
+## 1. 一些实用资源
 
 如果有意研读LunaixOS的内核代码和其中的设计，以下资料可能会对此有用。
 
@@ -18,7 +18,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + [LunaixOS启动流程概览](docs/img/boot_sequence.jpeg)
 + LunaixOS总体架构概览（WIP）
 
-## 当前进度以及支持的功能
+## 2. 当前进度以及支持的功能
 
 该操作系统支持x86架构，运行在保护模式中，采用宏内核架构，目前仅支持单核心。架构与内核的解耦合工作正在进行中。
 
@@ -28,7 +28,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + APIC/IOAPIC作为中断管理器和计时器
 + ACPI
 + 虚拟内存
-+ 内存管理与按需分页（Demand Paging）
++ 内存管理与按需分页
 + 键盘输入
 + 多进程
 + 54个常见的Linux/POSIX系统调用（[附录1](#appendix1)）
@@ -48,6 +48,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + 通用设备抽象层
 + 通用图形设备抽象层
   + 标准VGA实现
++ 虚拟终端设备接口（兼容 POSIX.1-2008）
 
 已经测试过的环境：
 
@@ -56,7 +57,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + Virtualbox
 + Dell G3 3779
 
-## 目录结构
+## 3. 目录结构
 
 |                                           |                              |
 | ----------------------------------------- | ---------------------------- |
@@ -64,25 +65,32 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 | [slides](slides/)                         | 视频中所用的幻灯片和补充材料 |
 | [reference-material](reference-material/) | 标准，技术文档和参考文献     |
 
-## 编译与构建
-
-### 环境搭建
+## 4. 编译与构建
 
 构建该项目需要满足以下条件：
 
-+ gcc (目标平台: i686-elf)
-+ binutils
++ gcc 工具链
 + make
 + xorriso
 + grub-mkrescue
 
-**注意：gcc不能是本机自带的，必须要从源码编译，并配置目标平台为：`i686-elf`，以进行交叉编译。配置过程可参考[附录二：编译gcc作为交叉编译器](#appendix2)。**
+### 4.1 使用 GNU CC 工具链
 
-### Docker镜像
+正如同大多数OS一样，LunaixOS 是一个混合了 C 和汇编的产物。这就意味着你得要使用一些标准的C编译器来构建Lunaix。在这里，我推荐使用 GNU CC 工具链来进行构建。至于其他的工具链，如llvm，也可以去尝试，但对此我就不能作任何的保证了。
+
+如果你使用的是基于 x86 指令集的Linux系统，不论是64位还是32位，**其本机自带的gcc就足以编译Lunaix**。 当然了，如果说你的平台是其他非x86的，你也可以指定使用某个针对x86_32的gcc套件来进行交叉编译——在`make`时通过`CX_PREFIX`变量来指定gcc套件的前缀。如下例所示，我们可以在任意平台上，如risc-v，单独使用一个面向x86_32的gcc来进行交叉编译：
+
+```
+make CX_PREFIX=i686-linux-gnu- all
+```
+
+由于目前Lunaix仅支持x86_32微架构， `CX_PREFIX` 指向的gcc必须具有针对x86_32架构进行交叉编译的能力。
+
+### 4.2 Docker镜像
 
 对于开发环境，本项目也提供了Docker镜像封装。开箱即用，无需配置，非常适合懒人或惜时者。详细使用方法请转到：[Lunaix OSDK项目](https://github.com/Minep/os-devkit)。
 
-### 构建选项
+### 4.3 构建选项
 
 假若条件满足，那么可以直接执行`make all`进行构建，完成后可在生成的`build`目录下找到可引导的iso。
 
@@ -100,9 +108,11 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 
 **※：由于在`-O2`模式下，GCC会进行CSE优化，这导致LunaixOS会出现一些非常奇怪、离谱的bug，从而影响到基本运行。具体原因有待调查。**
 
-## 运行，分支以及 Issue
+## 5. 运行，分支以及 Issue
 
-运行该操作系统需要一个虚拟磁盘镜像，可以使用如下命令快速创建一个：
+### 5.1 虚拟磁盘（非必须）
+
+你可以绑定一个虚拟磁盘镜像，可以使用如下命令快速创建一个：
 
 ```bash
 qemu-img create -f vdi machine/disk0.vdi 128M
@@ -119,6 +129,8 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 然后把`machine/disk0.vdi`替换成你的磁盘路径。
 
 有很多办法去创建一个虚拟磁盘，比如[qemu-img](https://qemu-project.gitlab.io/qemu/system/images.html)。
+
+### 5.2 代码稳定性
 
 主分支一般是稳定的。因为在大多数情况下，我都会尽量保证本机运行无误后，push到该分支中。至于其他的分支，则是作为标记或者是开发中的功能。前者标记用分支一般会很快删掉；后者开发分支不能保证稳定性，这些分支的代码有可能没有经过测试，但可以作为Lunaix当前开发进度的参考。
 
@@ -138,7 +150,7 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 
 正常，**因为Bochs不支持SATA**。请使用QEMU或VirtualBox。
 
-## 调试 Lunaix 内核
+## 6. 调试 Lunaix 内核
 
 除了[附录4：串口GDB远程调试](#appendix4)描述的一种用于实机调试的方式以外。LunaixOS还提供了LunaDBG调试套件。这是一个GDB客户端插件，包含了对GDB原生命令集的一些扩充，主要用于改善与简化内核调试的过程。目前包含以下几个命令：
 
@@ -152,7 +164,7 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 ./scripts/gdb/install_lunadbg
 ```
 
-## 参考教程
+## 7. 参考教程
 
 **没有！！** 本教程以及该操作系统均为原创，没有基于任何市面上现行的操作系统开发教程，且并非是基于任何的开源内核的二次开发。
 
@@ -270,96 +282,17 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 
 ( **※**：该系统调用暂未经过测试 )
 
-## 附录2：编译gcc作为交叉编译器<a id="appendix2"></a>
+## 附录2：Issue的提交<a id="appendix3"></a>
 
-注意，gcc需要从源码构建，并配置为交叉编译器，即目标平台为`i686-elf`。你可以使用本项目提供的[自动化脚本](slides/c0-workspace/gcc-build.sh)，这将会涵盖gcc和binutils源码的下载，配置和编译（没什么时间去打磨脚本，目前只知道在笔者的Ubuntu系统上可以运行）。
-
-**推荐**手动编译。以下编译步骤搬运自：<https://wiki.osdev.org/GCC_Cross-Compiler>
-
-**首先安装构建依赖项：**
-
-```bash
-sudo apt update &&\
-     apt install -y \
-        build-essential \
-        bison\
-        flex\
-        libgmp3-dev\
-        libmpc-dev\
-        libmpfr-dev\
-        texinfo
-```
-
-**开始编译：**
-
-1. 获取[gcc](https://ftp.gnu.org/gnu/gcc/)和[binutils](https://ftp.gnu.org/gnu/binutils)源码
-2. 解压，并在同级目录为gcc和binutil新建专门的build文件夹
-
-现在假设你的目录结构如下：
-
-```
-+ folder
-  + gcc-src
-  + binutils-src
-  + gcc-build
-  + binutils-build
-```
-
-3. 确定gcc和binutil安装的位置，并设置环境变量：`export PREFIX=<安装路径>` 然后设置PATH： `export PATH="$PREFIX/bin:$PATH"`
-4. 设置目标平台：`export TARGET=i686-elf`
-5. 进入`binutils-build`进行配置
-
-```bash
-../binutils-src/configure --target="$TARGET" --prefix="$PREFIX" \
- --with-sysroot --disable-nls --disable-werror
-```
-
-然后 `make && make install`
-
-6. 确保上述的`binutils`已经正常安装：执行：`which i686-elf-as`，应该会给出一个位于你安装目录下的路径。
-6. 进入`gcc-build`进行配置
-
-```bash
-../gcc-src/configure --target="$TARGET" --prefix="$PREFIX" \
- --disable-nls --enable-languages=c,c++ --without-headers
-```
-
-然后编译安装（取决性能，大约10~20分钟）：
-
-```bash
-make all-gcc &&\
- make all-target-libgcc &&\
- make install-gcc &&\
- make install-target-libgcc
-```
-
-8. 验证安装：执行`i686-elf-gcc -dumpmachine`，输出应该为：`i686-elf`
-
-**将新编译好的GCC永久添加到`PATH`环境变量**
-
-虽然这是一个常识性的操作，但考虑到许多人都会忽略这一个额外的步骤，在这里特此做出提示。
-
-要想实现这一点，只需要在shell的配置文件的末尾添加：`export PATH="<上述的安装路径>/bin:$PATH"`。
-
-这个配置文件是取决于你使用的shell，如zsh就是`${HOME}/.zshrc`，bash则是`${HOME}/.bashrc`；或者你嫌麻烦的，懒得区分，你也可以直接修改全局的`/etc/profile`文件，一劳永逸（但不推荐这样做）。
-
-至于其他的情况，由于这个步骤其实在网上是随处可查的，所以就不在这里赘述了。
-
-## 附录3：Issue的提交<a id="appendix3"></a>
-
-由于目前LunaixOS没有一个完善强大的内核追踪功能。假若Lunaix的运行出现任何问题，还请按照以下的描述，在Issue里面提供详细的信息。
-
-最好提供：
+假若Lunaix的运行出现任何问题，还请按照以下的描述，在Issue里面提供详细的信息。
 
 + 可用于复现问题的描述和指引（如Lunaix运行平台的软硬件配置）
 + 错误症状描述
-+ （如可能）运行截图
-+ 错误消息（如果给出）
-+ 寄存器状态的dump
-+ （如可能）提供错误发生时，EIP附近的指令（精确到函数）。如果使用`make all-debug`，会提供`build/kdump.txt`，你可以在这里面定位。或者也可以直接`objdump`
-+ （如可能）虚拟内存映射信息（QEMU下可使用`info mem`查看）。
++ LunaixOS在panic时打印的调试信息（如无法复制，可以截图）
 
-## 附录4：串口GDB远程调试<a id="appendix4"></a>
+## 附录3：串口GDB远程调试<a id="appendix4"></a>
+
+**（该功能正在重构，目前不可用）**
 
 LunaixOS内核集成了最基本的GDB远程调试服务器。可通过串口COM1在9600波特率上与之建立链接。但是，在将GDB与内核链接起来之前，还需要让内核处在调试模式下。
 
@@ -370,7 +303,3 @@ LunaixOS内核集成了最基本的GDB远程调试服务器。可通过串口COM
 在目前，为了防止代码过于臃肿，LunaixOS实现的是GDB远程协议要求的最小服务端命令子集：`g`, `G`, `p`, `P`, `Q`, `S`, `k`, `?`, `m`, `M`, `X`。足以满足大部分的调试需求。
 
 当结束调试的时候，请使用GDB的`kill`指令进行连接的断开。注意，这个指令会使得LunaixOS恢复所有暂停的活动，进入正常的运行序列，但并不会退出调试模式。GDB的挂载请求依然在LunaixOS中享有最高优先权。如果需要退出调试模式，需要往串口写入字节串：`0x40` `0x79` `0x61` `0x79`。
-
-### GDB调试注意事项
-
-在调试中，请避免使用`info stack`，`bt`或者任何涉及 **栈展开（Stack Unwinding）** 或者 **栈回溯（Stack Backtracing）** 的指令。否则，LunaixOS很有可能会出现 **不可预料的行为** 。

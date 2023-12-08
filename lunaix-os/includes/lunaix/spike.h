@@ -22,6 +22,8 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+#define is_pot(val) (((val) != 0) || ((val) & ((val)-1)) == 0)
+
 /**
  * @brief Fast log base 2 for integer, utilizing constant unfolding.
  * Adopted from
@@ -62,7 +64,7 @@
                                 : ((x) & (1ul << 2))  ? 2                      \
                                 : ((x) & (1ul << 1))  ? 1                      \
                                                       : 0)                      \
-                             : (31 - __builtin_clz(x)))
+                             : (31 - clz(x)))
 
 #ifndef __LUNAIXOS_NASSERT__
 #define assert(cond)                                                           \
@@ -79,7 +81,7 @@
 
 void
 __assert_fail(const char* expr, const char* file, unsigned int line)
-  __attribute__((noinline, noreturn));
+    __attribute__((noinline, noreturn));
 #else
 #define assert(cond) (void)(cond);          // assert nothing
 #define assert_msg(cond, msg) (void)(cond); // assert nothing

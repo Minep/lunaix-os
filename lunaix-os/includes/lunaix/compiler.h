@@ -8,6 +8,12 @@
 #define weak __attribute__((weak))
 #define noret __attribute__((noreturn))
 #define optimize(opt) __attribute__((optimize(opt)))
+#define must_inline __attribute__((always_inline))
+
+#define clz(bits) __builtin_clz(bits)
+#define sadd_overflow(a, b, of) __builtin_sadd_overflow(a, b, of)
+#define umul_overflow(a, b, of) __builtin_umul_overflow(a, b, of)
+#define offsetof(f, m) __builtin_offsetof(f, m)
 
 #define prefetch_rd(ptr, ll) __builtin_prefetch((ptr), 0, ll)
 #define prefetch_wr(ptr, ll) __builtin_prefetch((ptr), 1, ll)

@@ -664,11 +664,10 @@ __DEFINE_LXSYSCALL2(int, sys_readdir, int, fd, struct lx_dirent*, dent)
     if ((inode->itype & F_FILE)) {
         errno = ENOTDIR;
     } else {
-        struct dir_context dctx =
-          (struct dir_context){ .cb_data = dent,
-                                .index = dent->d_offset,
-                                .read_complete_callback =
-                                  __vfs_readdir_callback };
+        struct dir_context dctx = (struct dir_context){
+          .cb_data = dent,
+          .index = dent->d_offset,
+          .read_complete_callback = __vfs_readdir_callback};
         errno = 1;
         if (dent->d_offset == 0) {
             __vfs_readdir_callback(&dctx, vfs_dot.value, vfs_dot.len, DT_DIR);
@@ -788,11 +787,10 @@ __DEFINE_LXSYSCALL3(int, lseek, int, fd, int, offset, int, options)
     int fpos = file->f_pos;
     switch (options) {
         case FSEEK_CUR:
-            overflow = __builtin_sadd_overflow((int)file->f_pos, offset, &fpos);
+            overflow = sadd_overflow((int)file->f_pos, offset, &fpos);
             break;
         case FSEEK_END:
-            overflow =
-              __builtin_sadd_overflow((int)file->inode->fsize, offset, &fpos);
+            overflow = sadd_overflow((int)file->inode->fsize, offset, &fpos);
             break;
         case FSEEK_SET:
             fpos = offset;
@@ -905,16 +903,8 @@ __DEFINE_LXSYSCALL3(int, readlink, const char*, path, char*, buf, size_t, size)
     return DO_STATUS(errno);
 }
 
-__DEFINE_LXSYSCALL4(int,
-                    readlinkat,
-                    int,
-                    dirfd,
-                    const char*,
-                    pathname,
-                    char*,
-                    buf,
-                    size_t,
-                    size)
+__DEFINE_LXSYSCALL4(
+  int, readlinkat, int, dirfd, const char*, pathname, char*, buf, size_t, size)
 {
     int errno;
     struct v_fd* fd_s;
@@ -1206,12 +1196,8 @@ done:
     return DO_STATUS(errno);
 }
 
-__DEFINE_LXSYSCALL2(int,
-                    symlink,
-                    const char*,
-                    pathname,
-                    const char*,
-                    link_target)
+__DEFINE_LXSYSCALL2(
+  int, symlink, const char*, pathname, const char*, link_target)
 {
     int errno;
     struct v_dnode *dnode, *file;
@@ -1454,12 +1440,12 @@ __DEFINE_LXSYSCALL2(int, fstat, int, fd, struct file_stat*, stat)
     struct v_inode* vino = fds->file->inode;
     struct device* fdev = vino->sb->dev;
 
-    *stat = (struct file_stat){ .st_ino = vino->id,
-                                .st_blocks = vino->lb_usage,
-                                .st_size = vino->fsize,
-                                .mode = vino->itype,
-                                .st_ioblksize = PG_SIZE,
-                                .st_blksize = vino->sb->blksize };
+    *stat = (struct file_stat){.st_ino = vino->id,
+                               .st_blocks = vino->lb_usage,
+                               .st_size = vino->fsize,
+                               .mode = vino->itype,
+                               .st_ioblksize = PG_SIZE,
+                               .st_blksize = vino->sb->blksize};
 
     if (VFS_DEVFILE(vino->itype)) {
         struct device* rdev = (struct device*)vino->data;
@@ -1468,15 +1454,15 @@ __DEFINE_LXSYSCALL2(int, fstat, int, fd, struct file_stat*, stat)
             goto done;
         }
 
-        stat->st_rdev = (dev_t){ .meta = rdev->ident.fn_grp,
-                                 .unique = rdev->ident.unique,
-                                 .index = rdev->dev_uid };
+        stat->st_rdev = (dev_t){.meta = rdev->ident.fn_grp,
+                                .unique = rdev->ident.unique,
+                                .index = rdev->dev_uid};
     }
 
     if (fdev) {
-        stat->st_dev = (dev_t){ .meta = fdev->ident.fn_grp,
-                                .unique = fdev->ident.unique,
-                                .index = fdev->dev_uid };
+        stat->st_dev = (dev_t){.meta = fdev->ident.fn_grp,
+                               .unique = fdev->ident.unique,
+                               .index = fdev->dev_uid};
     }
 
 done:

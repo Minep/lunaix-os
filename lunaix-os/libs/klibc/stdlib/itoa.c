@@ -1,6 +1,6 @@
 #define __LUNAIX_LIBC
-#include <stddef.h>
 #include <klibc/stdlib.h>
+#include <lunaix/types.h>
 
 char base_char[] = "0123456789abcdefghijklmnopqrstuvwxyz";
 

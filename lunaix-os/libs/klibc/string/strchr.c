@@ -1,4 +1,5 @@
 #include <klibc/string.h>
+#include <lunaix/types.h>
 
 const char*
 strchr(const char* str, int character)

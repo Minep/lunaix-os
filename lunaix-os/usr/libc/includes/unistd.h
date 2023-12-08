@@ -2,6 +2,7 @@
 #define __LUNAIX_SYS_UNISTD_H
 
 #include <lunaix/types.h>
+#include <stddef.h>
 
 extern const char** environ;
 

@@ -101,16 +101,17 @@ __hwrtc_readinfo(struct twimap* mapping)
     twimap_printf(mapping, "name: %s\n", rtc->name);
     twimap_printf(mapping, "frequency: %dHz\n", rtc->base_freq);
     twimap_printf(mapping, "ticks count: %d\n", rtc->get_counts(rtc));
-    twimap_printf(
-      mapping, "ticking: %s\n", (rtc->state & RTC_STATE_MASKED) ? "no" : "yes");
+    twimap_printf(mapping,
+                  "ticking: %s\n",
+                  (rtc->state & RTC_STATE_MASKED) ? "no" : "yes");
 
     datetime_t dt;
     rtc->get_walltime(rtc, &dt);
 
     twimap_printf(
-      mapping, "recorded date: %d/%d/%d\n", dt.year, dt.month, dt.day);
+        mapping, "recorded date: %d/%d/%d\n", dt.year, dt.month, dt.day);
     twimap_printf(
-      mapping, "recorded time: %d:%d:%d\n", dt.hour, dt.minute, dt.second);
+        mapping, "recorded time: %d:%d:%d\n", dt.hour, dt.minute, dt.second);
     twimap_printf(mapping, "recorded weekday: %d\n", dt.weekday);
 }
 

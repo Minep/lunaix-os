@@ -43,6 +43,5 @@ pdev_randdev_init(struct device_def* devdef)
 static struct device_def devrandx86_def = {
     .name = "x86 On-Chip RNG",
     .class = DEVCLASS(DEVIF_SOC, DEVFN_CHAR, DEV_RNG),
-    .init = pdev_randdev_init
-};
+    .init = pdev_randdev_init};
 EXPORT_DEVICE(randdev, &devrandx86_def, load_onboot);

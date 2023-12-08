@@ -14,7 +14,7 @@ strcpy(char* dest, const char* src)
 }
 
 char*
-strncpy(char* dest, const char* src, size_t n)
+strncpy(char* dest, const char* src, unsigned long n)
 {
     char c;
     unsigned int i = 0;

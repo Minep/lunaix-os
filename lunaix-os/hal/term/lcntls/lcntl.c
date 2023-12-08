@@ -21,25 +21,7 @@ raise_sig(struct term* at_term, struct linebuffer* lbuf, int sig)
     lbuf->sflags |= LSTATE_SIGRAISE;
 }
 
-static inline int
-lcntl_invoke_slaves(struct term* tdev, struct linebuffer* lbuf, char c)
-{
-    int allow_more = 0;
-    struct term_lcntl *lcntl, *n;
-    llist_for_each(lcntl, n, &tdev->lcntl_stack, lcntls)
-    {
-        allow_more = lcntl->process_and_put(tdev, lbuf, c);
-        if (!allow_more) {
-            break;
-        }
-
-        line_flip(lbuf);
-    }
-
-    return allow_more;
-}
-
-static inline int optimize("ipa-cp-clone")
+static inline int must_inline optimize("-fipa-cp-clone")
 lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
 {
     struct rbuffer* raw = lbuf->current;
@@ -51,6 +33,9 @@ lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
     int allow_more = 1, latest_eol = cooked->ptr;
     char c;
     bool should_flush = false;
+
+    int (*lcntl_slave_put)(struct term*, struct linebuffer*, char) =
+        tdev->lcntl->process_and_put;
 
 #define EOL tdev->cc[_VEOL]
 #define EOF tdev->cc[_VEOF]
@@ -126,6 +111,8 @@ lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
             raise_sig(tdev, lbuf, SIGSTOP);
         } else if (c == ERASE) {
             rbuffer_erase(cooked);
+        } else if (c == KILL) {
+            // TODO shrink the rbuffer
         } else {
             goto keep;
         }
@@ -145,17 +132,18 @@ lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
         }
 
     put_char:
-        allow_more = rbuffer_put(cooked, c);
-    }
-
-    if (out || (_lf & _IEXTEN)) {
-        line_flip(lbuf);
-        lcntl_invoke_slaves(tdev, lbuf, c);
+        if (!out && (_lf & _IEXTEN) && lcntl_slave_put) {
+            allow_more = lcntl_slave_put(tdev, lbuf, c);
+        } else {
+            allow_more = rbuffer_put(cooked, c);
+        }
     }
 
     if (should_flush && !(_lf & _NOFLSH)) {
         term_flush(tdev);
     }
+
+    line_flip(lbuf);
 
     return i;
 }

@@ -32,7 +32,7 @@ CFLAGS += -include flags.h
 
 %.S.o: %.S
 	$(call status_,AS,$<)
-	@$(CC) $(kinc_opts) -c $< -o $@
+	@$(CC) $(CFLAGS) $(kinc_opts) -c $< -o $@
 
 %.c.o: %.c
 	$(call status_,CC,$<)

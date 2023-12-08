@@ -11,8 +11,8 @@ struct term;
 
 struct linebuffer
 {
-    struct rbuffer *next;
-    struct rbuffer *current;
+    struct rbuffer* next;
+    struct rbuffer* current;
     short sflags;
     short sz_hlf;
 };
@@ -27,16 +27,15 @@ typedef struct rbuffer** lbuf_ref_t;
 
 struct term_lcntl
 {
-    struct llist_header lcntls;
     struct term* term;
-    size_t (*process_and_put)(struct term*, struct linebuffer*, char);
+    int (*process_and_put)(struct term*, struct linebuffer*, char);
 };
 
 struct term
 {
     struct device* dev;
     struct device* chdev;
-    struct llist_header lcntl_stack;
+    struct term_lcntl* lcntl;
     struct linebuffer line_out;
     struct linebuffer line_in;
     pid_t fggrp;
@@ -70,7 +69,8 @@ struct term_lcntl*
 term_get_lcntl(u32_t lcntl_index);
 
 static inline void
-line_flip(struct linebuffer* lbf) {
+line_flip(struct linebuffer* lbf)
+{
     struct rbuffer* tmp = lbf->current;
     lbf->current = lbf->next;
     lbf->next = tmp;

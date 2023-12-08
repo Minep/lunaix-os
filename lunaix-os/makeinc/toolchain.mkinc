@@ -1,10 +1,13 @@
-CC := i686-elf-gcc
-AS := i686-elf-as
-AR := i686-elf-ar
+CC := $(CX_PREFIX)gcc
+CC := $(CX_PREFIX)gcc
+AS := $(CX_PREFIX)as
+AR := $(CX_PREFIX)ar
 PY := python3
 
+STRIP_OSDEP_CC := -ffreestanding -fno-pie
+STRIP_OSDEP_LD := -nostdlib -nolibc -z noexecstack -no-pie -Wl,--build-id=none
 
-ARCH_OPT := -D__ARCH_IA32
+ARCH_OPT := -m32 -D__ARCH_IA32
 O := -O2
 W := -Wall -Wextra -Werror -Wno-unknown-pragmas \
 		-Wno-unused-function \
@@ -23,15 +26,15 @@ OFLAGS := -fno-gcse\
 		  -fno-inline-small-functions \
 		  -fno-indirect-inlining
 
-CFLAGS := -std=gnu99 -ffreestanding -MMD $(OFLAGS) $(W) $(ARCH_OPT)
+CFLAGS := $(ARCH_OPT) -std=gnu99 -MMD $(OFLAGS) $(W)
 
 ifeq ($(BUILD_MODE),debug)
 	O = -Og
 	CFLAGS += -g
 endif
 
-CFLAGS += $(O)
+CFLAGS += $(O) $(STRIP_OSDEP_CC)
 
-LDFLAGS := -ffreestanding $(O) -nostdlib -lgcc
+LDFLAGS := $(ARCH_OPT) $(O) $(STRIP_OSDEP_LD)
 
 MKFLAGS := --no-print-directory

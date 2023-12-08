@@ -1,9 +1,6 @@
 #ifndef __LUNAIX_ACPI_ACPI_H
 #define __LUNAIX_ACPI_ACPI_H
 
-#include <stddef.h>
-#include <stdint.h>
-
 #include "fadt.h"
 #include "madt.h"
 #include "mcfg.h"

@@ -1,31 +1,29 @@
 #ifndef __LUNAIX_STRING_H
 #define __LUNAIX_STRING_H
 
-#include <stddef.h>
-
 int
-memcmp(const void* dest, const void* src, size_t size);
+memcmp(const void* dest, const void* src, unsigned long size);
 
 void*
-memcpy(void* dest, const void* src, size_t size);
+memcpy(void* dest, const void* src, unsigned long size);
 
 void*
-memmove(void* dest, const void* src, size_t size);
+memmove(void* dest, const void* src, unsigned long size);
 
 void*
-memset(void* dest, int val, size_t size);
+memset(void* dest, int val, unsigned long size);
 
-size_t
+unsigned long
 strlen(const char* str);
 
 char*
 strcpy(char* dest, const char* src);
 
-size_t
-strnlen(const char* str, size_t max_len);
+unsigned long
+strnlen(const char* str, unsigned long max_len);
 
 char*
-strncpy(char* dest, const char* src, size_t n);
+strncpy(char* dest, const char* src, unsigned long n);
 
 const char*
 strchr(const char* str, int character);

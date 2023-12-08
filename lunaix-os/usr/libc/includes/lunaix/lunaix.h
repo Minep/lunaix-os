@@ -2,6 +2,7 @@
 #define __LUNAIX_SYS_LUNAIX_H
 
 #include <lunaix/types.h>
+#include <stddef.h>
 
 void
 yield();
