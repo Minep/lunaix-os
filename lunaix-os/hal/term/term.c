@@ -145,7 +145,7 @@ tdev_do_read(struct device* dev, void* buf, size_t offset, size_t len)
     return rdsz;
 }
 
-static cc_t default_cc[_NCCS] = {4, '\n', 8, 3, 1, 24, 22, 0, 0, 1, 1};
+static cc_t default_cc[_NCCS] = {4, '\n', 0x7f, 3, 1, 24, 22, 0, 0, 1, 1};
 
 struct term*
 term_create(struct device* chardev, char* suffix)
@@ -175,8 +175,9 @@ term_create(struct device* chardev, char* suffix)
         device_register(terminal->dev, &termdev, "tty%d", termdev.variant++);
     }
 
-    terminal->lflags = _ICANON | _IEXTEN | _ISIG | _ECHO;
-    terminal->iflags = _ICRNL;
+    terminal->lflags = _ICANON | _IEXTEN | _ISIG | _ECHO | _ECHOE | _ECHONL;
+    terminal->iflags = _ICRNL | _IGNBRK;
+    terminal->oflags = _ONLCR | _OPOST;
     memcpy(terminal->cc, default_cc, _NCCS * sizeof(cc_t));
 
     return terminal;

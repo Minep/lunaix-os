@@ -32,7 +32,6 @@ lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
         _lf = tdev->lflags;
     int allow_more = 1, latest_eol = cooked->ptr;
     char c;
-    bool should_flush = false;
 
     int (*lcntl_slave_put)(struct term*, struct linebuffer*, char) =
         tdev->lcntl->process_and_put;
@@ -57,19 +56,19 @@ lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
         if (c == '\r' && ((_if & _ICRNL) || (_of & _OCRNL))) {
             c = '\n';
         } else if (c == '\n') {
-            if ((_if & _INLCR) || (_of & (_ONLRET | _ONLCR))) {
+            if ((_if & _INLCR) || (_of & (_ONLRET))) {
                 c = '\r';
             }
         }
 
         if (c == '\0') {
+            if ((_if & _IGNBRK)) {
+                continue;
+            }
+
             if ((_if & _BRKINT)) {
                 raise_sig(tdev, lbuf, SIGINT);
                 break;
-            }
-
-            if ((_if & _IGNBRK)) {
-                continue;
             }
         }
 
@@ -86,18 +85,16 @@ lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
             if (!out && (_lf & _ECHONL)) {
                 rbuffer_put(output, c);
             }
-            should_flush = true;
         }
 
         if (out) {
-            goto put_char;
+            goto do_out;
         }
 
         // For input procesing
 
         if (c == '\n' || c == EOL) {
             lbuf->sflags |= LSTATE_EOL;
-            goto keep;
         } else if (c == EOF) {
             lbuf->sflags |= LSTATE_EOF;
             rbuffer_clear(raw);
@@ -117,18 +114,28 @@ lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
             goto keep;
         }
 
+        if ((_lf & _ECHOE) && c == ERASE) {
+            rbuffer_put(output, '\x8'); 
+            rbuffer_put(output, ' '); 
+            rbuffer_put(output, '\x8'); 
+        }
+        if ((_lf & _ECHOK) && c == KILL) {
+            rbuffer_put(output, c);
+            rbuffer_put(output, '\n');
+        }
+
         continue;
 
     keep:
         if ((_lf & _ECHO)) {
             rbuffer_put(output, c);
         }
-        if ((_lf & _ECHOE) && c == ERASE) {
-            rbuffer_erase(output);
-        }
-        if ((_lf & _ECHOK) && c == KILL) {
-            rbuffer_put(output, c);
-            rbuffer_put(output, '\n');
+
+        goto put_char;
+
+    do_out:
+        if (c == '\n' && (_of & _ONLCR)) {
+            rbuffer_put(cooked, '\r');
         }
 
     put_char:
@@ -139,7 +146,7 @@ lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
         }
     }
 
-    if (should_flush && !(_lf & _NOFLSH)) {
+    if (!rbuffer_empty(output) && !(_lf & _NOFLSH)) {
         term_flush(tdev);
     }
 
@@ -157,5 +164,5 @@ lcntl_transform_inseq(struct term* tdev)
 int
 lcntl_transform_outseq(struct term* tdev)
 {
-    return lcntl_transform_seq(tdev, &tdev->line_in, true);
+    return lcntl_transform_seq(tdev, &tdev->line_out, true);
 }

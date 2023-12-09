@@ -66,7 +66,7 @@ uart_general_irq_handler(int iv, struct llist_header* ports)
     llist_for_each(pos, n, ports, local_ports)
     {
         int is = uart_intr_identify(pos);
-        if (iv == pos->iv && (is == UART_DATA_OK || is == UART_CHR_TIMEOUT)) {
+        if (iv == pos->iv && (is == UART_CHR_TIMEOUT)) {
             goto done;
         }
     }
@@ -91,5 +91,7 @@ done:
     }
 
     serial_accept_buffer(pos->sdev, tmpbuf, i);
+    serial_accept_one(pos->sdev, 0);
+    
     serial_end_recv(pos->sdev);
 }

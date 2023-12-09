@@ -49,6 +49,8 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     /* Setup kernel memory layout and services */
     kmem_init(bhctx);
 
+    boot_parse_cmdline(bhctx);
+
     /* Prepare stack trace environment */
     trace_modksyms_init(bhctx);
 

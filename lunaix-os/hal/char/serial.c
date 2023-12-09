@@ -209,6 +209,8 @@ serial_create(struct devclass* class, char* if_ident)
     struct device* dev = device_allocseq(NULL, sdev);
     dev->ops.read = __serial_read;
     dev->ops.read_page = __serial_read_page;
+    dev->ops.read_async = __serial_read_async;
+    dev->ops.write_async = __serial_write_async;
     dev->ops.write = __serial_write;
     dev->ops.write_page = __serial_write_page;
     dev->ops.exec_cmd = __serial_exec_command;

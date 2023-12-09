@@ -61,7 +61,6 @@ term_read_noncano(struct term* tdev)
 {
     struct device* chdev = tdev->chdev;
     return do_read_raw(tdev);
-    ;
 }
 
 static int
@@ -95,7 +94,7 @@ int
 term_flush(struct term* tdev)
 {
     if ((tdev->oflags & _OPOST)) {
-        lcntl_transform_inseq(tdev);
+        lcntl_transform_outseq(tdev);
     }
 
     struct linebuffer* line_out = &tdev->line_out;

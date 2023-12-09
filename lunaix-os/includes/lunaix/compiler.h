@@ -21,6 +21,9 @@
 #define stringify(v) #v
 #define stringify__(v) stringify(v)
 
+#define compact __attribute__((packed))
+#define align(v) __attribute__((aligned (v)))
+
 inline static void noret
 spin()
 {
