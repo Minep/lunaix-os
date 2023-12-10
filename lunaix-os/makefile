@@ -74,7 +74,6 @@ instable: CFLAGS := -g -std=gnu99 -ffreestanding $(O) $(W) $(ARCH_OPT) -D__LUNAI
 instable: all
 
 all-debug: bootable-debug
-	@echo "Dumping the disassembled kernel code to $(kbuild_dir)/kdump.txt"
 
 clean:
 	@rm -rf $(kbuild_dir) || exit 1
@@ -90,7 +89,7 @@ debug-qemu: all-debug
 	@i686-elf-objcopy --only-keep-debug $(kbin) $(kbuild_dir)/kernel.dbg
 	@qemu-system-i386 $(call get_qemu_options,$(kimg))
 	@sleep 1
-	@QMPORT=$(QEMU_MON_PORT) gdb -s $(kbuild_dir)/kernel.dbg -ex "target remote localhost:1234"
+	@QMPORT=$(QEMU_MON_PORT) gdb $(kbin) -ex "target remote localhost:1234"
 
 debug-qemu-vscode: all-debug
 	@i686-elf-objcopy --only-keep-debug $(kbin) $(kbuild_dir)/kernel.dbg

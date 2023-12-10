@@ -85,34 +85,76 @@
         .variant = (devvar)                                                    \
     }
 
-#define DEV_STRUCT_MAGIC 0x5645444c
+#define DEV_STRUCT_MAGIC_MASK 0x56454440U
+#define DEV_STRUCT 0xc
+#define DEV_CAT 0xd
+#define DEV_ALIAS 0xf
+
+#define DEV_STRUCT_MAGIC (DEV_STRUCT_MAGIC_MASK | DEV_STRUCT)
+#define DEV_CAT_MAGIC (DEV_STRUCT_MAGIC_MASK | DEV_CAT)
+#define DEV_ALIAS_MAGIC (DEV_STRUCT_MAGIC_MASK | DEV_ALIAS)
 
 #define DEV_MSKIF 0x00000003
 
 #define DEV_IFVOL 0x0 // volumetric (block) device
 #define DEV_IFSEQ 0x1 // sequential (character) device
-#define DEV_IFCAT 0x2 // a device category (as device groupping)
 #define DEV_IFSYS 0x3 // a system device
+
+struct device_meta
+{
+    u32_t magic;
+    struct llist_header siblings;
+    struct llist_header children;
+    struct device_meta* parent;
+    struct hstr name;
+    
+    u32_t dev_uid;
+    
+    char name_val[DEVICE_NAME_SIZE];
+};
+
+#define DEVICE_METADATA                             \
+    union {                                         \
+        struct device_meta meta;                    \
+        struct {                                    \
+            u32_t magic;                            \
+            struct llist_header siblings;           \
+            struct llist_header children;           \
+            struct device_meta* parent;             \
+            struct hstr name;                       \
+                                                    \
+            u32_t dev_uid;                          \
+                                                    \
+            char name_val[DEVICE_NAME_SIZE];        \
+        };                                          \
+    }                                              
+
+#define dev_meta(dev) (&(dev)->meta)
+#define to_dev(dev) (container_of(dev,struct device, meta))
+#define to_catdev(dev) (container_of(dev,struct device_cat, meta))
+#define to_aliasdev(dev) (container_of(dev,struct device_alias, meta))
+
+struct device_alias {
+    DEVICE_METADATA;
+    struct device_meta* alias;
+};
+
+struct device_cat {
+    DEVICE_METADATA;
+};
 
 struct device
 {
     /* -- device structing -- */
 
-    u32_t magic;
-    struct llist_header siblings;
-    struct llist_header children;
-    struct device* parent;
+    DEVICE_METADATA;
 
     /* -- device state -- */
 
     mutex_t lock;
 
-    struct hstr name;
-    struct devident ident;
-
-    u32_t dev_uid;
     int dev_type;
-    char name_val[DEVICE_NAME_SIZE];
+    struct devident ident;
     void* underlay;
 
     /* -- polling -- */
@@ -168,6 +210,30 @@ struct device_def
     int (*free)(struct device_def*, void* instance);
 };
 
+static inline bool must_inline
+valid_device_ref(void* maybe_dev) {
+    if (!maybe_dev) 
+        return false;
+        
+    unsigned int magic = ((struct device_meta*)maybe_dev)->magic;
+    return (magic ^ DEV_STRUCT_MAGIC_MASK) <= 0xfU;
+}
+
+static inline bool must_inline
+valid_device_subtype_ref(void* maybe_dev, unsigned int subtype) {
+    if (!maybe_dev) 
+        return false;
+    
+    unsigned int magic = ((struct device_meta*)maybe_dev)->magic;
+    return (magic ^ DEV_STRUCT_MAGIC_MASK) == subtype;
+}
+
+struct device*
+resolve_device(void* maybe_dev);
+
+struct device_meta*
+resolve_device_meta(void* maybe_dev);
+
 #define mark_device_doing_write(dev_ptr) (dev_ptr)->poll_evflags &= ~_POLLOUT
 #define mark_device_done_write(dev_ptr) (dev_ptr)->poll_evflags |= _POLLOUT
 
@@ -187,61 +253,64 @@ void
 device_scan_drivers();
 
 void
-device_setname_vargs(struct device* dev, char* fmt, va_list args);
+device_setname_vargs(struct device_meta* dev, char* fmt, va_list args);
 
 void
-device_setname(struct device* dev, char* fmt, ...);
+device_setname(struct device_meta* dev, char* fmt, ...);
 
 void
-device_register(struct device* dev, struct devclass* class, char* fmt, ...);
+device_register_generic(struct device_meta* dev, struct devclass* class, char* fmt, ...);
+
+#define register_device(dev, class, fmt, ...) \
+            device_register_generic(dev_meta(dev), class, fmt, ## __VA_ARGS__)
 
 void
 device_create(struct device* dev,
-              struct device* parent,
+              struct device_meta* parent,
               u32_t type,
               void* underlay);
 
 struct device*
-device_alloc(struct device* parent, u32_t type, void* underlay);
+device_alloc(struct device_meta* parent, u32_t type, void* underlay);
 
-static inline struct device*
-device_allocsys(struct device* parent, void* underlay)
+static inline struct device* must_inline
+device_allocsys(struct device_meta* parent, void* underlay)
 {
     return device_alloc(parent, DEV_IFSYS, underlay);
 }
 
-static inline struct device*
-device_allocseq(struct device* parent, void* underlay)
+static inline struct device* must_inline
+device_allocseq(struct device_meta* parent, void* underlay)
 {
     return device_alloc(parent, DEV_IFSEQ, underlay);
 }
 
-static inline struct device*
-device_allocvol(struct device* parent, void* underlay)
+static inline struct device* must_inline
+device_allocvol(struct device_meta* parent, void* underlay)
 {
     return device_alloc(parent, DEV_IFVOL, underlay);
 }
 
-struct device*
-device_addcat(struct device* parent, char* name_fmt, ...);
+struct device_alias*
+device_addalias(struct device_meta* parent, struct device_meta* aliased, char* name_fmt, ...);
+
+struct device_cat*
+device_addcat(struct device_meta* parent, char* name_fmt, ...);
 
 void
-device_remove(struct device* dev);
+device_remove(struct device_meta* dev);
 
-struct device*
+struct device_meta*
 device_getbyid(struct llist_header* devlist, u32_t id);
 
-struct device*
-device_getbyhname(struct device* root_dev, struct hstr* name);
+struct device_meta*
+device_getbyhname(struct device_meta* root_dev, struct hstr* name);
 
-struct device*
-device_getbyname(struct device* root_dev, const char* name, size_t len);
+struct device_meta*
+device_getbyname(struct device_meta* root_dev, const char* name, size_t len);
 
-struct device*
-device_getbyoffset(struct device* root_dev, int pos);
-
-struct device*
-device_cast(void* obj);
+struct device_meta*
+device_getbyoffset(struct device_meta* root_dev, int pos);
 
 struct hbucket*
 device_definitions_byif(int if_type);
@@ -258,7 +327,7 @@ device_scan_drivers();
 /*------ Load hooks ------*/
 
 void
-device_onbooot_load();
+device_onboot_load();
 
 void
 device_postboot_load();

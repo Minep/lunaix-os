@@ -121,7 +121,7 @@ signal_send(pid_t pid, int signum)
         return -1;
     }
 
-send_grp:
+send_grp: ;
     struct proc_info *pos, *n;
     llist_for_each(pos, n, &proc->grp_member, grp_member)
     {

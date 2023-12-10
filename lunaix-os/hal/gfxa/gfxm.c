@@ -10,7 +10,7 @@
 DEFINE_LLIST(gfxa_flat);
 DECLARE_HASHTABLE(gfxa_idset, 8);
 
-struct device* gfxa_devcat = NULL;
+struct device_cat* gfxa_devcat = NULL;
 static int id = 0;
 
 static struct devclass gfxa_class = DEVCLASS(DEV_BUILTIN, DEVFN_DISP, DEV_GFXA);
@@ -92,7 +92,7 @@ gfxm_alloc_adapter(void* hw_obj)
     }
 
     struct gfxa* gfxa = valloc(sizeof(struct gfxa));
-    struct device* gfxa_dev = device_allocsys(gfxa_devcat, gfxa);
+    struct device* gfxa_dev = device_allocsys(dev_meta(gfxa_devcat), gfxa);
 
     *gfxa = (struct gfxa){ .dev = gfxa_dev, .hw_obj = hw_obj };
 
@@ -109,7 +109,7 @@ gfxm_register(struct gfxa* gfxa)
     llist_append(&gfxa_flat, &gfxa->gfxas);
     hashtable_hash_in(gfxa_idset, &gfxa->gfxas_id, gfxa->id);
 
-    device_register(gfxa->dev, &gfxa_class, "gfxa%d", gfxa->id);
+    register_device(gfxa->dev, &gfxa_class, "gfxa%d", gfxa->id);
 }
 
 struct gfxa*

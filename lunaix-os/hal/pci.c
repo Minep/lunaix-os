@@ -22,7 +22,7 @@ LOG_MODULE("PCI")
 static DEFINE_LLIST(pci_devices);
 static DECLARE_HASHTABLE(pci_devcache, 8);
 
-static struct device* pcidev_cat;
+static struct device_cat* pcidev_cat;
 static struct device_def pci_def;
 
 void
@@ -58,13 +58,13 @@ pci_create_device(pciaddr_t loc, ptr_t pci_base, int devinfo)
     device->cspace_base = pci_base;
     device->intr_info = intr;
 
-    device_create(&device->dev, pcidev_cat, DEV_IFSYS, NULL);
+    device_create(&device->dev, dev_meta(pcidev_cat), DEV_IFSYS, NULL);
 
     pci_probe_msi_info(device);
     pci_probe_bar_info(device);
 
     llist_append(&pci_devices, &device->dev_chain);
-    device_register(&device->dev, &pci_def.class, "%x", loc);
+    register_device(&device->dev, &pci_def.class, "%x", loc);
     pci_def.class.variant++;
 
     return device;

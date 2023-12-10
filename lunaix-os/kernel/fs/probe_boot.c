@@ -10,24 +10,30 @@ LOG_MODULE("PROBE")
 struct device*
 probe_boot_medium()
 {
-    struct device* block_cat = device_getbyname(NULL, "block", 5);
+    struct device_meta* block_cat = device_getbyname(NULL, "block", 5);
     if (!block_cat) {
         return NULL;
     }
 
     struct iso_vol_primary* volp = valloc(ISO9660_BLKSZ);
 
-    struct device *pos, *n;
+    struct device* dev = NULL;
+    struct device_meta *pos, *n;
     llist_for_each(pos, n, &block_cat->children, siblings)
     {
+        dev = resolve_device(pos);
+        if (!dev) {
+            continue;
+        }
+
         int errno =
-          pos->ops.read(pos, (void*)volp, ISO9660_READ_OFF, ISO9660_BLKSZ);
+          dev->ops.read(dev, (void*)volp, ISO9660_READ_OFF, ISO9660_BLKSZ);
         if (errno < 0) {
             kprintf(KINFO "failed %xh:%xh, /dev/%s",
-                    pos->ident.fn_grp,
-                    pos->ident.unique,
-                    pos->name.value);
-            pos = NULL;
+                    dev->ident.fn_grp,
+                    dev->ident.unique,
+                    dev->name.value);
+            dev = NULL;
             goto done;
         }
 
@@ -37,9 +43,9 @@ probe_boot_medium()
 
         if (*(u32_t*)volp->sys_id == LUNAIX_ID) {
             kprintf(KINFO "%xh:%xh, /dev/%s, %s",
-                    pos->ident.fn_grp,
-                    pos->ident.unique,
-                    pos->name.value,
+                    dev->ident.fn_grp,
+                    dev->ident.unique,
+                    dev->name.value,
                     (char*)volp->vol_id);
             break;
         }
@@ -47,5 +53,5 @@ probe_boot_medium()
 
 done:
     vfree(volp);
-    return pos;
+    return dev;
 }

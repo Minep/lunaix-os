@@ -1,22 +1,13 @@
-#include <lunaix/block.h>
 #include <lunaix/boot_generic.h>
 #include <lunaix/exec.h>
 #include <lunaix/foptions.h>
 #include <lunaix/fs.h>
 #include <lunaix/fs/probe_boot.h>
 #include <lunaix/fs/twifs.h>
-#include <lunaix/lxconsole.h>
-#include <lunaix/mm/cake.h>
-#include <lunaix/mm/pmm.h>
-#include <lunaix/mm/valloc.h>
-#include <lunaix/mm/vmm.h>
-#include <lunaix/peripheral/serial.h>
 #include <lunaix/spike.h>
-#include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
 #include <lunaix/types.h>
-
-#include <sdbg/protocol.h>
+#include <lunaix/owloysius.h>
 
 #include <klibc/string.h>
 
@@ -82,9 +73,7 @@ __proc0()
     init_proc_user_space(__current);
 
     if (!mount_bootmedium() || !exec_initd()) {
-        while (1) {
-            asm("hlt");
-        }
+        FATAL("failed to initd");
         // should not reach
     }
 }
@@ -93,13 +82,10 @@ void
 init_platform()
 {
     device_postboot_load();
+    invoke_init_function(call_on_postboot);
 
     twifs_register_plugins();
 
     // FIXME Re-design needed!!
     // sdbg_init();
-
-    // console
-    console_start_flushing();
-    console_flush();
 }

@@ -91,7 +91,7 @@ hwrtc_register(struct devclass* class, struct hwrtc* rtc)
     }
 
     class->variant = rtc->id;
-    device_register(rtc->rtc_dev, class, "rtc%d", rtc->id);
+    register_device(rtc->rtc_dev, class, "rtc%d", rtc->id);
 }
 
 static void

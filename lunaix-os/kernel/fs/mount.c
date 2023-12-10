@@ -33,7 +33,7 @@ vfs_create_mount(struct v_mount* parent, struct v_dnode* mnt_point)
         llist_append(&parent->submnts, &mnt->sibmnts);
         mutex_unlock(&mnt->parent->lock);
     }
-
+    
     atomic_fetch_add(&mnt_point->ref_count, 1);
 
     return mnt;
@@ -64,7 +64,7 @@ __vfs_do_unmount(struct v_mount* mnt)
     mnt_chillax(mnt->parent);
 
     vfs_sb_free(sb);
-    vfs_d_free(mnt->mnt_point);
+    atomic_fetch_sub(&mnt->mnt_point->ref_count, 1);
     vfree(mnt);
 
     return errno;

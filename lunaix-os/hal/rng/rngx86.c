@@ -35,7 +35,7 @@ pdev_randdev_init(struct device_def* devdef)
     devrand->ops.read = __rand_rd;
     devrand->ops.read_page = __rand_rd_pg;
 
-    device_register(devrand, &devdef->class, "rand");
+    register_device(devrand, &devdef->class, "rand");
 
     return 0;
 }

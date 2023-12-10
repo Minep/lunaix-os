@@ -61,6 +61,7 @@ mb_parse_cmdline(struct boot_handoff* bhctx, void* buffer, char* cmdline)
 
     mb_memcpy(buffer, (u8_t*)cmdline, slen);
     bhctx->kexec.len = slen;
+    bhctx->kexec.cmdline = buffer;
 
     return slen;
 }

@@ -13,9 +13,13 @@
 #include <lunaix/fs.h>
 #include <lunaix/mm/valloc.h>
 
+#include <lunaix/fs/twimap.h>
+#include <lunaix/fs/twifs.h>
+
 #define HASH_BUCKET_BITS 4
 #define HASH_BUCKET_NUM (1 << HASH_BUCKET_BITS)
 
+DEFINE_LLIST(fs_flatlist);
 DECLARE_HASHTABLE(fs_registry, HASH_BUCKET_NUM);
 
 void
@@ -31,6 +35,7 @@ fsm_register(struct filesystem* fs)
 {
     hstr_rehash(&fs->fs_name, HSTR_FULL_HASH);
     hashtable_hash_in(fs_registry, &fs->fs_list, fs->fs_name.hash);
+    llist_append(&fs_flatlist, &fs->fs_flat);
 }
 
 struct filesystem*
@@ -60,3 +65,21 @@ fsm_new_fs(char* name, size_t name_len)
     fs->fs_name = HHSTR(name, name_len, 0);
     return fs;
 }
+
+static void
+read_fslist(struct twimap *mapping)
+{
+    struct filesystem *pos, *n;
+    llist_for_each(pos, n, &fs_flatlist, fs_flat)
+    {
+        twimap_printf(mapping, "%s %d\n", pos->fs_name.value, pos->types);
+    }
+}
+
+static void
+fstab_twifs_plugin()
+{
+    struct twimap* map = twifs_mapping(NULL, NULL, "fstab");
+    map->read = read_fslist;
+}
+EXPORT_TWIFS_PLUGIN(fstab, fstab_twifs_plugin);

@@ -224,7 +224,7 @@ serial_create(struct devclass* class, char* if_ident)
     rbuffer_init(&sdev->rxbuf, valloc(RXBUF_SIZE), RXBUF_SIZE);
     llist_append(&serial_devs, &sdev->sdev_list);
 
-    device_register(dev, class, "port%s%d", if_ident, class->variant);
+    register_device(dev, class, "port%s%d", if_ident, class->variant);
 
     sdev->at_term = term_create(dev, if_ident);
 

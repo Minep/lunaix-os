@@ -89,6 +89,7 @@
 #define DEV_BUILTIN 0
 #define DEV_BUILTIN_NULL 0
 #define DEV_BUILTIN_ZERO 1
+#define DEV_BUILTIN_KMSG 2
 
 #define DEV_VTERM 1
 #define DEV_RNG 2

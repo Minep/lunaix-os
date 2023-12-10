@@ -37,7 +37,7 @@ __do_poll(struct poll_info* pinfo, int pld)
     struct device* dev;
     int evt = 0;
 
-    if ((dev = device_cast(poller->file_ref->inode->data))) {
+    if ((dev = resolve_device(poller->file_ref->inode->data))) {
         dev->ops.poll(dev);
     } else {
         // TODO handle generic file
@@ -111,7 +111,7 @@ __do_poll_all(struct poll_info* pinfo)
     return 0;
 }
 
-#define fd2dev(fd) device_cast((fd)->file->inode->data)
+#define fd2dev(fd) resolve_device((fd)->file->inode->data)
 
 static int
 __alloc_pld()

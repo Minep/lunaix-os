@@ -34,6 +34,10 @@ extract_next_option(struct extractor* ctx)
     s->len = 0;
     s->pos = i;
 
+    if (!ctx->cmdline[i]) {
+        return false;
+    }
+
     while((c = ctx->cmdline[i++])) {
         if (c == ' ') {
             while ((c = ctx->cmdline[i++]) && c == ' ');
@@ -50,21 +54,17 @@ extract_next_option(struct extractor* ctx)
                 state = PARSE_VAL;
                 s = &ctx->val;
                 s->len = 0;
-                s->pos = i + 1;
+                s->pos = i;
                 continue;
             }
         }
 
-        while ((c = ctx->cmdline[i++]) && c != ' ') {
-            s->len++;
-        }
-
-        i--;
+        s->len++;
     }
 
-    ctx->pos = i;
+    ctx->pos = i - 1;
 
-    return !!c;
+    return true;
 }
 
 #define MAX_KEYSIZE 16

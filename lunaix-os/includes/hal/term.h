@@ -53,6 +53,8 @@ struct term
     speed_t iospeed;
 };
 
+extern struct device* sysconsole;
+
 struct term*
 term_create(struct device* chardev, char* suffix);
 
