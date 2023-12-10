@@ -126,6 +126,26 @@ SECTIONS {
 
         PROVIDE(__lga_fs_end = .);
 
+        /* ---- */
+
+        . = ALIGN(8);
+
+        PROVIDE(__lga_lunainit_call_on_boot_start = .);
+        
+        KEEP(*(.lga.lunainit.c_boot));
+
+        PROVIDE(__lga_lunainit_call_on_boot_end = .);
+
+        /* ---- */
+
+        . = ALIGN(8);
+
+        PROVIDE(__lga_lunainit_call_on_postboot_start = .);
+        
+        KEEP(*(.lga.lunainit.c_postboot));
+
+        PROVIDE(__lga_lunainit_call_on_postboot_end = .);
+
     }
 
     .bss BLOCK(4K) : AT ( ADDR(.bss) - 0xC0000000 ) {

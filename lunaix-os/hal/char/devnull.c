@@ -38,7 +38,7 @@ pdev_nulldev_init(struct device_def* def)
     devnull->ops.read_page = __null_rd_pg;
     devnull->ops.read = __null_rd;
 
-    device_register(devnull, &def->class, "null");
+    register_device(devnull, &def->class, "null");
 
     return 0;
 }

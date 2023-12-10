@@ -18,6 +18,8 @@ static struct term_lcntl* line_controls[] = {[ANSI_LCNTL] =
 
 static struct devclass termdev = DEVCLASS(DEVIF_NON, DEVFN_TTY, DEV_VTERM);
 
+struct device* sysconsole = NULL;
+
 static int
 term_exec_cmd(struct device* dev, u32_t req, va_list args)
 {
@@ -47,7 +49,7 @@ term_exec_cmd(struct device* dev, u32_t req, va_list args)
                 goto done;
             }
 
-            struct device* cdev = device_cast(vfd->file->inode->data);
+            struct device* cdev = resolve_device(vfd->file->inode->data);
             if (!cdev) {
                 err = ENOTDEV;
                 goto done;
@@ -121,7 +123,10 @@ tdev_do_write(struct device* dev, void* buf, size_t offset, size_t len)
             term_flush(tdev);
         }
     }
-
+    
+    if (!rbuffer_empty(deref(current))) {
+        term_flush(tdev);
+    }
     return 0;
 }
 
@@ -145,7 +150,16 @@ tdev_do_read(struct device* dev, void* buf, size_t offset, size_t len)
     return rdsz;
 }
 
-static cc_t default_cc[_NCCS] = {4, '\n', 8, 3, 1, 24, 22, 0, 0, 1, 1};
+static cc_t default_cc[_NCCS] = {4, '\n', 0x7f, 3, 1, 24, 22, 0, 0, 1, 1};
+
+static void 
+load_default_setting(struct term* tdev) 
+{
+    tdev->lflags = _ICANON | _IEXTEN | _ISIG | _ECHO | _ECHOE | _ECHONL;
+    tdev->iflags = _ICRNL | _IGNBRK;
+    tdev->oflags = _ONLCR | _OPOST;
+    memcpy(tdev->cc, default_cc, _NCCS * sizeof(cc_t));
+}
 
 struct term*
 term_create(struct device* chardev, char* suffix)
@@ -170,14 +184,12 @@ term_create(struct device* chardev, char* suffix)
 
     if (chardev) {
         int cdev_var = DEV_VAR_FROM(chardev->ident.unique);
-        device_register(terminal->dev, &termdev, "tty%s%d", suffix, cdev_var);
+        register_device(terminal->dev, &termdev, "tty%s%d", suffix, cdev_var);
     } else {
-        device_register(terminal->dev, &termdev, "tty%d", termdev.variant++);
+        register_device(terminal->dev, &termdev, "tty%d", termdev.variant++);
     }
 
-    terminal->lflags = _ICANON | _IEXTEN | _ISIG | _ECHO;
-    terminal->iflags = _ICRNL;
-    memcpy(terminal->cc, default_cc, _NCCS * sizeof(cc_t));
+    load_default_setting(terminal);
 
     return terminal;
 }

@@ -41,8 +41,8 @@ struct boot_handoff
         ptr_t ksections;
         size_t size;
 
-        char** argv;
-        size_t argc;
+        char* cmdline;
+        size_t len;
     } kexec;
 
     struct
@@ -60,6 +60,9 @@ struct boot_handoff
 #ifndef __BOOT_CODE__
 void
 boot_begin(struct boot_handoff*);
+
+void
+boot_parse_cmdline(struct boot_handoff*);
 
 void
 boot_end(struct boot_handoff*);

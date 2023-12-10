@@ -18,7 +18,7 @@ static volatile u32_t devid = 0;
 struct devclass default_devclass = {};
 
 void
-device_setname_vargs(struct device* dev, char* fmt, va_list args)
+device_setname_vargs(struct device_meta* dev, char* fmt, va_list args)
 {
     size_t strlen = ksnprintfv(dev->name_val, fmt, DEVICE_NAME_SIZE, args);
 
@@ -28,52 +28,61 @@ device_setname_vargs(struct device* dev, char* fmt, va_list args)
 }
 
 void
-device_register(struct device* dev, struct devclass* class, char* fmt, ...)
+device_register_generic(struct device_meta* devm, struct devclass* class, char* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
 
     if (fmt) {
-        device_setname_vargs(dev, fmt, args);
+        device_setname_vargs(devm, fmt, args);
     }
 
-    if (class) {
+    if (class && valid_device_subtype_ref(devm, DEV_STRUCT)) {
+        struct device* dev = to_dev(devm);
         dev->ident = (struct devident){ .fn_grp = class->fn_grp,
                                         .unique = DEV_UNIQUE(class->device,
                                                              class->variant) };
     }
 
-    dev->dev_uid = devid++;
+    devm->dev_uid = devid++;
 
-    struct device* parent = dev->parent;
+    struct device_meta* parent = devm->parent;
     if (parent) {
-        assert((parent->dev_type & DEV_MSKIF) == DEV_IFCAT);
-        llist_append(&parent->children, &dev->siblings);
+        assert(valid_device_subtype_ref(parent, DEV_CAT));
+        llist_append(&parent->children, &devm->siblings);
     } else {
-        llist_append(&root_list, &dev->siblings);
+        llist_append(&root_list, &devm->siblings);
     }
 
     va_end(args);
 }
 
+static void
+device_init_meta(struct device_meta* dmeta, struct device_meta* parent, unsigned int subtype) 
+{
+    dmeta->magic = DEV_STRUCT_MAGIC_MASK | subtype;
+    dmeta->parent = parent;
+
+    llist_init_head(&dmeta->children);
+}
+
 void
 device_create(struct device* dev,
-              struct device* parent,
+              struct device_meta* parent,
               u32_t type,
               void* underlay)
 {
     dev->magic = DEV_STRUCT_MAGIC;
     dev->underlay = underlay;
     dev->dev_type = type;
-    dev->parent = parent;
 
-    llist_init_head(&dev->children);
+    device_init_meta(dev_meta(dev), parent, DEV_STRUCT);
     mutex_init(&dev->lock);
     iopoll_init_evt_q(&dev->pollers);
 }
 
 struct device*
-device_alloc(struct device* parent, u32_t type, void* underlay)
+device_alloc(struct device_meta* parent, u32_t type, void* underlay)
 {
     struct device* dev = vzalloc(sizeof(struct device));
 
@@ -86,8 +95,38 @@ device_alloc(struct device* parent, u32_t type, void* underlay)
     return dev;
 }
 
+struct device_alias*
+device_alloc_alias(struct device_meta* parent, struct device_meta* aliased)
+{
+    struct device_alias* dev = vzalloc(sizeof(struct device_alias));
+
+    if (!dev) {
+        return NULL;
+    }
+
+    device_init_meta(dev_meta(dev), parent, DEV_ALIAS);
+    dev->alias = aliased;
+
+    return dev;
+}
+
+struct device_cat*
+device_alloc_cat(struct device_meta* parent)
+{
+    struct device_cat* dev = vzalloc(sizeof(struct device_cat));
+
+    if (!dev) {
+        return NULL;
+    }
+
+    device_init_meta(dev_meta(dev), parent, DEV_CAT);
+
+    return dev;
+}
+
+
 void
-device_setname(struct device* dev, char* fmt, ...)
+device_setname(struct device_meta* dev, char* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -97,26 +136,41 @@ device_setname(struct device* dev, char* fmt, ...)
     va_end(args);
 }
 
-struct device*
-device_addcat(struct device* parent, char* name_fmt, ...)
+struct device_cat*
+device_addcat(struct device_meta* parent, char* name_fmt, ...)
 {
     va_list args;
     va_start(args, name_fmt);
 
-    struct device* dev = device_alloc(parent, DEV_IFCAT, NULL);
+    struct device_cat* dev = device_alloc_cat(parent);
 
-    device_setname_vargs(dev, name_fmt, args);
-    device_register(dev, NULL, NULL);
+    device_setname_vargs(dev_meta(dev), name_fmt, args);
+    device_register_generic(dev_meta(dev), NULL, NULL);
 
     va_end(args);
     return dev;
 }
 
-struct device*
+struct device_alias*
+device_addalias(struct device_meta* parent, struct device_meta* aliased, char* name_fmt, ...)
+{
+    va_list args;
+    va_start(args, name_fmt);
+
+    struct device_alias* dev = device_alloc_alias(parent, aliased);
+
+    device_setname_vargs(dev_meta(dev), name_fmt, args);
+    device_register_generic(dev_meta(dev), NULL, NULL);
+
+    va_end(args);
+    return dev;
+}
+
+struct device_meta*
 device_getbyid(struct llist_header* devlist, u32_t id)
 {
     devlist = devlist ? devlist : &root_list;
-    struct device *pos, *n;
+    struct device_meta *pos, *n;
     llist_for_each(pos, n, devlist, siblings)
     {
         if (pos->dev_uid == id) {
@@ -127,11 +181,11 @@ device_getbyid(struct llist_header* devlist, u32_t id)
     return NULL;
 }
 
-struct device*
-device_getbyhname(struct device* root_dev, struct hstr* name)
+struct device_meta*
+device_getbyhname(struct device_meta* root_dev, struct hstr* name)
 {
     struct llist_header* devlist = root_dev ? &root_dev->children : &root_list;
-    struct device *pos, *n;
+    struct device_meta *pos, *n;
     llist_for_each(pos, n, devlist, siblings)
     {
         if (HSTR_EQ(&pos->name, name)) {
@@ -142,8 +196,8 @@ device_getbyhname(struct device* root_dev, struct hstr* name)
     return NULL;
 }
 
-struct device*
-device_getbyname(struct device* root_dev, const char* name, size_t len)
+struct device_meta*
+device_getbyname(struct device_meta* root_dev, const char* name, size_t len)
 {
     struct hstr hname = HSTR(name, len);
     hstr_rehash(&hname, HSTR_FULL_HASH);
@@ -152,17 +206,17 @@ device_getbyname(struct device* root_dev, const char* name, size_t len)
 }
 
 void
-device_remove(struct device* dev)
+device_remove(struct device_meta* dev)
 {
     llist_delete(&dev->siblings);
     vfree(dev);
 }
 
-struct device*
-device_getbyoffset(struct device* root_dev, int offset)
+struct device_meta*
+device_getbyoffset(struct device_meta* root_dev, int offset)
 {
     struct llist_header* devlist = root_dev ? &root_dev->children : &root_list;
-    struct device *pos, *n;
+    struct device_meta *pos, *n;
     int off = 0;
     llist_for_each(pos, n, devlist, siblings)
     {
@@ -190,15 +244,44 @@ device_populate_info(struct device* dev, struct dev_info* devinfo)
     devinfo->dev_name.buf[buflen - 1] = 0;
 }
 
-struct device*
-device_cast(void* obj)
-{
-    struct device* dev = (struct device*)obj;
-    if (dev && dev->magic == DEV_STRUCT_MAGIC) {
-        return dev;
+struct device_meta*
+resolve_device_meta(void* maybe_dev) {
+    if (!valid_device_ref(maybe_dev)) {
+        return NULL;
     }
 
-    return NULL;
+    struct device_meta* dm = (struct device_meta*)maybe_dev;
+    unsigned int subtype = dm->magic ^ DEV_STRUCT_MAGIC_MASK;
+    
+    switch (subtype)
+    {
+        case DEV_STRUCT:
+        case DEV_CAT:
+            return dm;
+        
+        case DEV_ALIAS: {
+            struct device_meta* aliased_dm = dm;
+            
+            while(valid_device_subtype_ref(aliased_dm, DEV_ALIAS)) {
+                aliased_dm = to_aliasdev(aliased_dm)->alias;
+            }
+
+            return aliased_dm;
+        }
+        default:
+            return NULL;
+    }
+}
+
+struct device*
+resolve_device(void* maybe_dev) {
+    struct device_meta* dm = resolve_device_meta(maybe_dev);
+    
+    if (!valid_device_subtype_ref(dm, DEV_STRUCT)) {
+        return NULL;
+    }
+
+    return to_dev(dm);
 }
 
 void
@@ -217,7 +300,7 @@ __DEFINE_LXSYSCALL3(int, ioctl, int, fd, int, req, va_list, args)
     }
 
     struct device* dev = (struct device*)fd_s->file->inode->data;
-    if (dev->magic != DEV_STRUCT_MAGIC) {
+    if (valid_device_subtype_ref(dev, DEV_STRUCT)) {
         errno &= ENODEV;
         goto done;
     }

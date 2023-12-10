@@ -60,28 +60,10 @@ mb_parse_cmdline(struct boot_handoff* bhctx, void* buffer, char* cmdline)
     }
 
     mb_memcpy(buffer, (u8_t*)cmdline, slen);
+    bhctx->kexec.len = slen;
+    bhctx->kexec.cmdline = buffer;
 
-    cmdline = (char*)buffer;
-    buffer = &cmdline[slen];
-
-    char c, prev = SPACE;
-    int i = 0, argc = 0;
-    ptr_t argptr = (ptr_t)cmdline;
-
-    while ((c = cmdline[i])) {
-        if (c == SPACE && prev != SPACE) {
-            ((ptr_t*)buffer)[argc++] = argptr;
-        } else if (c != SPACE && prev == SPACE) {
-            argptr = (ptr_t)&cmdline[i];
-        }
-        prev = c;
-        i++;
-    }
-
-    bhctx->kexec.argv = (char**)buffer;
-    bhctx->kexec.argc = argc;
-
-    return slen + argc * sizeof(ptr_t);
+    return slen;
 }
 
 size_t boot_text
@@ -165,6 +147,8 @@ mb_parse(struct multiboot_info* mb)
 {
     struct boot_handoff* bhctx = (struct boot_handoff*)bhctx_buffer;
     ptr_t bhctx_ex = (ptr_t)&bhctx[1];
+    
+    *bhctx = (struct boot_handoff){ };
 
     /* Parse memory map */
     if ((mb->flags & MULTIBOOT_INFO_MEM_MAP)) {

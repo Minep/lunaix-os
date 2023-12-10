@@ -1,3 +1,4 @@
+#include <lunaix/types.h>
 #include <lunaix/block.h>
 #include <lunaix/boot_generic.h>
 #include <lunaix/device.h>
@@ -16,7 +17,7 @@
 #include <lunaix/spike.h>
 #include <lunaix/trace.h>
 #include <lunaix/tty/tty.h>
-#include <lunaix/types.h>
+#include <lunaix/owloysius.h>
 
 #include <hal/acpi/acpi.h>
 #include <hal/intc.h>
@@ -49,6 +50,8 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     /* Setup kernel memory layout and services */
     kmem_init(bhctx);
 
+    boot_parse_cmdline(bhctx);
+
     /* Prepare stack trace environment */
     trace_modksyms_init(bhctx);
 
@@ -79,14 +82,16 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     block_init();
     sched_init();
 
-    device_onbooot_load();
+    device_onboot_load();
 
     /* the bare metal are now happy, let's get software over with */
 
-    int errno = 0;
-    if ((errno = vfs_mount_root("ramfs", NULL))) {
-        panickf("Fail to mount root. (errno=%d)", errno);
-    }
+    must_success(vfs_mount_root("ramfs", NULL));
+    must_success(vfs_mount("/dev", "devfs", NULL, 0));
+    
+    invoke_init_function(call_on_boot);
+
+    must_success(vfs_unmount("/dev"));
 
     /* Finish up bootstrapping sequence, we are ready to spawn the root process
      * and start geting into uspace

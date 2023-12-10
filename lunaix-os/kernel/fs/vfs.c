@@ -1235,14 +1235,19 @@ void
 vfs_ref_dnode(struct v_dnode* dnode)
 {
     atomic_fetch_add(&dnode->ref_count, 1);
-    mnt_mkbusy(dnode->mnt);
+    
+    if (dnode->mnt) {
+        mnt_mkbusy(dnode->mnt);
+    }
 }
 
 void
 vfs_unref_dnode(struct v_dnode* dnode)
 {
     atomic_fetch_sub(&dnode->ref_count, 1);
-    mnt_chillax(dnode->mnt);
+    if (dnode->mnt) {
+        mnt_chillax(dnode->mnt);
+    }
 }
 
 int
@@ -1448,7 +1453,7 @@ __DEFINE_LXSYSCALL2(int, fstat, int, fd, struct file_stat*, stat)
                                .st_blksize = vino->sb->blksize};
 
     if (VFS_DEVFILE(vino->itype)) {
-        struct device* rdev = (struct device*)vino->data;
+        struct device* rdev = resolve_device(vino->data);
         if (!rdev || rdev->magic != DEV_STRUCT_MAGIC) {
             errno = EINVAL;
             goto done;

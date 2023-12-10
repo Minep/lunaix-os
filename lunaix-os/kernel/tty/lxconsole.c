@@ -353,7 +353,7 @@ lxconsole_spawn_ttydev(struct device_def* devdef)
     waitq_init(&lx_reader);
     input_add_listener(__lxconsole_listener);
 
-    device_register(tty_dev, &devdef->class, "tty");
+    register_device(tty_dev, &devdef->class, "vcon");
 
     return 0;
 }
@@ -363,4 +363,5 @@ static struct device_def lxconsole_def = {
     .class = DEVCLASSV(DEVIF_NON, DEVFN_TTY, DEV_BUILTIN, 12),
     .init = lxconsole_spawn_ttydev
 };
+// FIXME
 EXPORT_DEVICE(lxconsole, &lxconsole_def, load_onboot);

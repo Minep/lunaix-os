@@ -62,5 +62,5 @@ hwtimer_init(u32_t hertz, void* tick_callback)
 
     timerdev->ops.exec_cmd = __hwtimer_ioctl;
 
-    device_register(timerdev, &hwt_ctx->class, hwt_ctx->name);
+    register_device(timerdev, &hwt_ctx->class, hwt_ctx->name);
 }

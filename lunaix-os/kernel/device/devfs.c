@@ -13,9 +13,9 @@ devfs_read(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 {
     assert(inode->data);
 
-    struct device* dev = (struct device*)inode->data;
+    struct device* dev = resolve_device(inode->data);
 
-    if (!dev->ops.read) {
+    if (!dev || !dev->ops.read) {
         return ENOTSUP;
     }
 
@@ -27,9 +27,9 @@ devfs_write(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 {
     assert(inode->data);
 
-    struct device* dev = (struct device*)inode->data;
+    struct device* dev = resolve_device(inode->data);
 
-    if (!dev->ops.write) {
+    if (!dev || !dev->ops.write) {
         return ENOTSUP;
     }
 
@@ -41,9 +41,9 @@ devfs_read_page(struct v_inode* inode, void* buffer, size_t fpos)
 {
     assert(inode->data);
 
-    struct device* dev = (struct device*)inode->data;
+    struct device* dev = resolve_device(inode->data);
 
-    if (!dev->ops.read_page) {
+    if (!dev || !dev->ops.read_page) {
         return ENOTSUP;
     }
 
@@ -55,9 +55,9 @@ devfs_write_page(struct v_inode* inode, void* buffer, size_t fpos)
 {
     assert(inode->data);
 
-    struct device* dev = (struct device*)inode->data;
+    struct device* dev = resolve_device(inode->data);
 
-    if (!dev->ops.read_page) {
+    if (!dev || !dev->ops.read_page) {
         return ENOTSUP;
     }
 
@@ -65,13 +65,18 @@ devfs_write_page(struct v_inode* inode, void* buffer, size_t fpos)
 }
 
 int
-devfs_get_itype(struct device* dev)
+devfs_get_itype(struct device_meta* dm)
 {
     int itype = VFS_IFFILE;
+
+    if (valid_device_subtype_ref(dm, DEV_CAT)) {
+        return VFS_IFDIR;
+    }
+
+    struct device* dev = resolve_device(dm);
     int dev_if = dev->dev_type & DEV_MSKIF;
-    if (dev_if == DEV_IFCAT) {
-        itype = VFS_IFDIR;
-    } else if (dev_if == DEV_IFVOL) {
+    
+    if (dev_if == DEV_IFVOL) {
         itype |= VFS_IFVOLDEV;
     } else if (dev_if == DEV_IFSEQ) {
         itype |= VFS_IFSEQDEV;
@@ -82,19 +87,16 @@ devfs_get_itype(struct device* dev)
 }
 
 int
-devfs_get_dtype(struct device* dev)
+devfs_get_dtype(struct device_meta* dev)
 {
-    switch (dev->dev_type & DEV_MSKIF) {
-        case DEV_IFCAT:
-            return DT_DIR;
-
-        default:
-            return DT_FILE;
+    if (valid_device_subtype_ref(dev, DEV_CAT)) {
+        return DT_DIR;
     }
+    return DT_FILE;
 }
 
 int
-devfs_mknod(struct v_dnode* dnode, struct device* dev)
+devfs_mknod(struct v_dnode* dnode, struct device_meta* dev)
 {
     assert(dev);
 
@@ -118,22 +120,40 @@ devfs_mknod(struct v_dnode* dnode, struct device* dev)
 int
 devfs_dirlookup(struct v_inode* this, struct v_dnode* dnode)
 {
-    struct device* dev =
-      device_getbyhname((struct device*)this->data, &dnode->name);
+    void* data = this->data;
+    struct device_meta* rootdev = resolve_device_meta(data);
+
+    if (data && !rootdev) {
+        return ENOTDIR;
+    }
+
+    struct device_meta* dev =
+      device_getbyhname(rootdev, &dnode->name);
+    
     if (!dev) {
         return ENOENT;
     }
+
     return devfs_mknod(dnode, dev);
 }
 
 int
 devfs_readdir(struct v_file* file, struct dir_context* dctx)
 {
-    struct device* dev =
-      device_getbyoffset((struct device*)(file->inode->data), dctx->index);
+    void* data = file->inode->data;
+    struct device_meta* rootdev = resolve_device_meta(data);
+
+    if (data && !rootdev) {
+        return ENOTDIR;
+    }
+
+    struct device_meta* dev =
+      device_getbyoffset(rootdev, dctx->index);
+    
     if (!dev) {
         return 0;
     }
+
     dctx->read_complete_callback(
       dctx, dev->name.value, dev->name.len, devfs_get_dtype(dev));
     return 1;

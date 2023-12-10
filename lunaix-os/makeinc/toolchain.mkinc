@@ -24,7 +24,8 @@ OFLAGS := -fno-gcse\
 		  -fno-optimize-strlen\
 		  -fno-inline-functions-called-once \
 		  -fno-inline-small-functions \
-		  -fno-indirect-inlining
+		  -fno-indirect-inlining\
+		  -fno-omit-frame-pointer
 
 CFLAGS := $(ARCH_OPT) -std=gnu99 -MMD $(OFLAGS) $(W)
 

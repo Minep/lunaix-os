@@ -68,14 +68,24 @@
 
 #ifndef __LUNAIXOS_NASSERT__
 #define assert(cond)                                                           \
-    if (!(cond)) {                                                             \
-        __assert_fail(#cond, __FILE__, __LINE__);                              \
-    }
+    do {                                                                       \
+        if (!(cond)) {                                                         \
+            __assert_fail(#cond, __FILE__, __LINE__);                          \
+        }                                                                      \
+    } while(0)
 
 #define assert_msg(cond, msg)                                                  \
-    if (!(cond)) {                                                             \
-        __assert_fail(msg, __FILE__, __LINE__);                                \
-    }
+    do {                                                                       \
+        if (!(cond)) {                                                         \
+            __assert_fail(msg, __FILE__, __LINE__);                            \
+        }                                                                      \
+    } while(0)
+
+#define must_success(statement)                                                \
+    do {                                                                       \
+        int err = (statement);                                                 \
+        if (err) panickf(#statement "failed with errcode=%d", err);           \
+    } while(0)
 
 #define fail(msg) __assert_fail(msg, __FILE__, __LINE__);
 

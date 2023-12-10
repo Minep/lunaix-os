@@ -98,6 +98,7 @@ extern struct v_dnode* vfs_sysroot;
 
 struct filesystem
 {
+    struct llist_header fs_flat;
     struct hlist_node fs_list;
     struct hstr fs_name;
     u32_t types;

@@ -10,6 +10,7 @@ struct kp_entry
     int lvl;
     time_t time;
     char* content;
+    size_t len;
 };
 #define KP_ENT_SIZE sizeof(struct kp_entry)
 

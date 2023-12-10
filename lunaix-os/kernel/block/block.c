@@ -26,7 +26,7 @@ LOG_MODULE("BLOCK")
 static struct cake_pile* lbd_pile;
 static struct block_dev** dev_registry;
 static struct twifs_node* blk_sysroot;
-static struct device* blk_parent_dev;
+static struct device_cat* blk_parent_dev;
 
 int free_slot = 0;
 
@@ -299,7 +299,7 @@ __block_register(struct block_dev* bdev)
         return 0;
     }
 
-    struct device* dev = device_allocvol(blk_parent_dev, bdev);
+    struct device* dev = device_allocvol(dev_meta(blk_parent_dev), bdev);
     dev->ops.write = __block_write;
     dev->ops.write_page = __block_write_page;
     dev->ops.read = __block_read;
@@ -307,7 +307,7 @@ __block_register(struct block_dev* bdev)
 
     bdev->dev = dev;
 
-    device_register(dev, bdev->class, "sd%c", 'a' + free_slot);
+    register_device(dev, bdev->class, "sd%c", 'a' + free_slot);
     dev_registry[free_slot++] = bdev;
 
     strcpy(bdev->bdev_id, dev->name_val);
@@ -342,7 +342,7 @@ blk_mount_part(struct block_dev* bdev,
 
     llist_append(&bdev->parts, &pbdev->parts);
 
-    device_register(dev, pbdev->class, "%sp%d", bdev->bdev_id, index + 1);
+    register_device(dev, pbdev->class, "%sp%d", bdev->bdev_id, index + 1);
 
     return pbdev;
 }

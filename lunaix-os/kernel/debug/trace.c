@@ -104,6 +104,10 @@ trace_walkback(struct trace_record* tb_buffer,
         i++;
     }
 
+    if (!valid_fp((ptr_t)frame)) {
+        frame = NULL;
+    }
+
     if (last_fp) {
         *last_fp = (ptr_t)frame;
     }

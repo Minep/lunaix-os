@@ -51,6 +51,7 @@ kprec_put(struct kp_records* recs, int lvl, char* content, size_t len)
     ent->lvl = lvl;
     ent->content = _content;
     ent->time = clock_systime();
+    ent->len = len;
 
     return ent;
 }

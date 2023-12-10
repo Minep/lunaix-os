@@ -9,7 +9,7 @@
 
 static DEFINE_LLIST(listener_chain);
 
-static struct device* input_devcat = NULL;
+static struct device_cat* input_devcat = NULL;
 
 void
 input_init()
@@ -80,10 +80,10 @@ input_add_device(struct devclass* class, char* name_fmt, ...)
     va_list args;
     va_start(args, name_fmt);
 
-    struct device* dev = device_allocseq(input_devcat, idev);
+    struct device* dev = device_allocseq(dev_meta(input_devcat), idev);
 
-    device_setname_vargs(dev, name_fmt, args);
-    device_register(dev, class, NULL);
+    device_setname_vargs(dev_meta(dev), name_fmt, args);
+    register_device(dev, class, NULL);
 
     idev->dev_if = dev;
     dev->ops.read = __input_dev_read;

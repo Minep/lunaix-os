@@ -10,7 +10,7 @@ static DECLARE_HASHTABLE(dev_registry, 32);
 static DECLARE_HASHTABLE(dev_byif, 8);
 static DEFINE_LLIST(dev_registry_flat);
 
-static struct device* adhoc_devcat;
+static struct device_cat* adhoc_devcat;
 
 static inline u32_t
 hash_dev(u32_t fngrp, u32_t dev)
@@ -97,7 +97,7 @@ device_definitions_byif(int if_type)
 #define device_load_on_stage(stage) __device_load_on_stage(stage)
 
 void
-device_onbooot_load()
+device_onboot_load()
 {
     device_load_on_stage(load_onboot);
 }
@@ -136,7 +136,7 @@ __devdb_twifs_lsdb(struct twimap* mapping)
     ksnprintf(flags, 64, "if=%x,fn=%x", DEV_IF(meta), DEV_FN(meta));
 
     twimap_printf(mapping,
-                  "%xh:%d \"%s\" %s\n",
+                  "%08xh:%04d \"%s\" %s\n",
                   def->class.fn_grp,
                   def->class.device,
                   def->name,

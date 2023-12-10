@@ -24,7 +24,7 @@ pdev_zerodev_init(struct device_def* def)
     devzero->ops.read_page = __zero_rd_pg;
     devzero->ops.read = __zero_rd;
 
-    device_register(devzero, &def->class, "zero");
+    register_device(devzero, &def->class, "zero");
 
     return 0;
 }

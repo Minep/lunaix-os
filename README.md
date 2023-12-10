@@ -157,6 +157,7 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 + `vmrs [pid]` 列举进程`<pid>`的内存区域图（Memory Regions），如果`<pid>`未指定，则默认为正在运行的进程（smp=1）。
 + `proc [pid]` 打印进程`<pid>`的进程控制块状态，如果`<pid>`未指定，则默认为正在运行的进程（smp=1）。
 + `proc_table` 列举所有非终止的进程以及他们的状态。
++ `syslog` 打印到目前为止的系统日志。
 
 该插件可以通过运行以下命令来进行安装：
 

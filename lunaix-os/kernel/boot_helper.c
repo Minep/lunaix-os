@@ -4,6 +4,7 @@
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
+#include <lunaix/kcmd.h>
 #include <sys/mm/mempart.h>
 
 /**
@@ -88,4 +89,13 @@ boot_cleanup()
         vmm_del_mapping(VMS_SELF, (ptr_t)i);
         pmm_free_page(KERNEL_PID, (ptr_t)i);
     }
+}
+
+void
+boot_parse_cmdline(struct boot_handoff* bhctx) {
+    if (!bhctx->kexec.len) {
+        return;
+    }
+
+    kcmd_parse_cmdline(bhctx->kexec.cmdline);
 }
