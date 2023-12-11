@@ -25,6 +25,11 @@
 #define UART_rIE_ELSI (1 << 2)
 #define UART_rIE_EDSSI (1 << 3)
 
+#define UART_rLC_STOPB (1 << 2)
+#define UART_rLC_PAREN (1 << 3)
+#define UART_rLC_PAREVN (1 << 4)
+#define UART_rLC_SETBRK (1 << 6)
+
 #define UART_rLS_THRE (1 << 5)
 #define UART_rLS_DR 1
 #define UART_rLS_BI (1 << 4)
@@ -65,6 +70,7 @@ struct uart16550
         u8_t rie;
         u8_t rfc;
         u8_t rmc;
+        u8_t rlc;
     } cntl_save;
 
     u32_t (*read_reg)(struct uart16550* uart, ptr_t regoff);
@@ -90,7 +96,13 @@ uart_clrie(struct uart16550* uart)
 static inline void
 uart_setie(struct uart16550* uart)
 {
-    uart->write_reg(uart, UART_rIE, uart->cntl_save.rie | 1);
+    uart->write_reg(uart, UART_rIE, uart->cntl_save.rie);
+}
+
+static inline void
+uart_setlc(struct uart16550* uart)
+{
+    uart->write_reg(uart, UART_rLC, uart->cntl_save.rlc);
 }
 
 struct uart16550*

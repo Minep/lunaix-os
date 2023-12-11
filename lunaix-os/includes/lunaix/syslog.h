@@ -29,6 +29,7 @@
     }
 
 #define DEBUG(fmt, ...) kprintf(KDEBUG fmt, ##__VA_ARGS__)
+#define INFO(fmt, ...) kprintf(KINFO fmt, ##__VA_ARGS__)
 #define WARN(fmt, ...) kprintf(KWARN fmt, ##__VA_ARGS__)
 #define ERROR(fmt, ...) kprintf(KERROR fmt, ##__VA_ARGS__)
 #define FATAL(fmt, ...)                                                        \

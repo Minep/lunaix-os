@@ -108,6 +108,24 @@ make CX_PREFIX=i686-linux-gnu- all
 
 **※：由于在`-O2`模式下，GCC会进行CSE优化，这导致LunaixOS会出现一些非常奇怪、离谱的bug，从而影响到基本运行。具体原因有待调查。**
 
+### 4.4 设置内核启动参数
+
+在 make 的时候通过`CMDLINE`变量可以设置内核启动参数列表。该列表可以包含多个参数，通过一个或多个空格来分割。每个参数可以为键值对 `<key>=<val>` 或者是开关标志位 `<flag>`。目前 Lunaix 支持以下参数：
+
++ `console=<dev>` 设置系统终端的输入输出设备（tty设备）。其中 `<dev>` 是设备文件路径 （注意，这里的设备文件路径是针对Lunaix，而非Linux）。关于LunaixOS设备文件系统的介绍可参考 Lunaix Wiki（WIP）
+
+如果`CMDLINE`未指定，则将会载入默认参数：
+
+```
+console=/dev/ttyFB0
+```
+
+其中，`/dev/ttyFB0` 指向基于VGA文本模式的tty设备，也就是平时启动QEMU时看到的黑色窗口。
+
+当然，读者也可以使用 `/dev/ttyS0` 来作为默认tty设备，来验证 Lunaix 的灵活性与兼容性。该路径指向第一个串口设备。可以通过telnet协议在`12345`端口上进行访问——端口号可以自行修改QEMU启动参数（位于：`makeinc/qemu.mkinc`）来变更。
+
+**注意：** 根据操作系统和键盘布局的不同，telnet客户端对一些关键键位的映射（如退格，回车）可能有所差别（如某些版本的Linux会将退格键映射为`0x7f`，也就是ASCII的`<DEL>`字符，而非我们熟知`0x08`）。如果读者想要通过串口方式把玩Lunaix，请修改`usr/init/init.c`里面的终端初始化代码，将`VERASE`设置为正确的映射（修改方式可以参考 POSIX termios 的使用方式。由于Lunaix的终端接口的实现是完全兼容POSIX的，读者可以直接去查阅Linux自带的帮助`man termios`，无需作任何的转换）
+
 ## 5. 运行，分支以及 Issue
 
 ### 5.1 虚拟磁盘（非必须）

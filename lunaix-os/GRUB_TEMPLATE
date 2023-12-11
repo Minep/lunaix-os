@@ -2,6 +2,6 @@ default=0
 timeout=0
 
 menuentry "$_OS_NAME" {
-	multiboot /boot/kernel.bin console=/dev/vcon
+	multiboot /boot/kernel.bin $KCMD
 	module --nounzip /boot/modksyms modksyms
 }

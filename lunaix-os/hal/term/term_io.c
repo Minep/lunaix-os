@@ -33,7 +33,7 @@ do_read_raw(struct term* tdev)
         max_lb_sz -= sz;
 
         // TODO pass a flags to read to indicate it is non blocking ops
-        sz += chdev->ops.read_async(chdev, inbuffer, sz, max_lb_sz);
+        sz += chdev->ops.read_async(chdev, &inbuffer[sz], 0, max_lb_sz);
     }
 
     rbuffer_puts(line_in->next, inbuffer, sz);
@@ -99,14 +99,14 @@ term_flush(struct term* tdev)
 
     struct linebuffer* line_out = &tdev->line_out;
     size_t xmit_len = line_out->current->len;
-    void* xmit_buf = line_out->next->buffer;
+    char* xmit_buf = line_out->next->buffer;
 
     rbuffer_gets(line_out->current, xmit_buf, xmit_len);
 
     off_t off = 0;
     int ret = 0;
     while (xmit_len && ret >= 0) {
-        ret = tdev->chdev->ops.write(tdev->chdev, xmit_buf, off, xmit_len);
+        ret = tdev->chdev->ops.write(tdev->chdev, &xmit_buf[off], 0, xmit_len);
         xmit_len -= ret;
         off += ret;
     }

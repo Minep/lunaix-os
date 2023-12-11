@@ -80,15 +80,15 @@ lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
             }
         }
 
-        if (c == '\n') {
-            latest_eol = cooked->ptr + 1;
-            if (!out && (_lf & _ECHONL)) {
-                rbuffer_put(output, c);
-            }
-        }
-
         if (out) {
             goto do_out;
+        }
+
+        if (c == '\n') {
+            latest_eol = cooked->ptr + 1;
+            if ((_lf & _ECHONL)) {
+                rbuffer_put(output, c);
+            }
         }
 
         // For input procesing
@@ -107,7 +107,8 @@ lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
         } else if (c == SUSP) {
             raise_sig(tdev, lbuf, SIGSTOP);
         } else if (c == ERASE) {
-            rbuffer_erase(cooked);
+            if (!rbuffer_erase(cooked))
+                continue;
         } else if (c == KILL) {
             // TODO shrink the rbuffer
         } else {
@@ -146,7 +147,7 @@ lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
         }
     }
 
-    if (!rbuffer_empty(output) && !(_lf & _NOFLSH)) {
+    if (!out && !rbuffer_empty(output) && !(_lf & _NOFLSH)) {
         term_flush(tdev);
     }
 

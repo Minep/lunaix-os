@@ -2,6 +2,7 @@
 #include <lunaix/status.h>
 
 #include <usr/lunaix/serial.h>
+#include <usr/lunaix/term.h>
 
 #include "16550.h"
 
@@ -41,6 +42,22 @@ uart_general_tx(struct serial_dev* sdev, u8_t* data, size_t len)
     return RXTX_DONE;
 }
 
+static void
+uart_set_control_mode(struct uart16550* uart, tcflag_t cflags)
+{
+    uart->cntl_save.rie &= ~(UART_rIE_ERBFI | UART_rIE_EDSSI);
+    uart->cntl_save.rie |= (!(cflags & _CLOCAL)) * UART_rIE_EDSSI;
+    uart->cntl_save.rie |= (!!(cflags & _CREAD)) * UART_rIE_ERBFI;
+    uart_setie(uart);
+
+    uart->cntl_save.rlc &= ~(UART_rLC_STOPB | UART_rLC_PAREN | UART_rLC_PAREVN | 0b11);
+    uart->cntl_save.rlc |= (!!(cflags & _CSTOPB)) * UART_rLC_STOPB;
+    uart->cntl_save.rlc |= (!!(cflags & _CPARENB)) * UART_rLC_PAREN;
+    uart->cntl_save.rlc |= (!(cflags & _CPARODD)) * UART_rLC_PAREVN;
+    uart->cntl_save.rlc |= (cflags & _CSZ_MASK) >> 2;
+    uart_setlc(uart);
+}
+
 int
 uart_general_exec_cmd(struct serial_dev* sdev, u32_t req, va_list args)
 {
@@ -51,6 +68,12 @@ uart_general_exec_cmd(struct serial_dev* sdev, u32_t req, va_list args)
             break;
         case SERIO_RXDA:
             uart_clrie(uart);
+            break;
+        case SERIO_SETBRDIV:
+            // TODO
+            break;
+        case SERIO_SETCNTRLMODE:
+            uart_set_control_mode(uart, va_arg(args, tcflag_t));
             break;
         default:
             return ENOTSUP;
@@ -92,6 +115,6 @@ done:
 
     serial_accept_buffer(pos->sdev, tmpbuf, i);
     serial_accept_one(pos->sdev, 0);
-    
+
     serial_end_recv(pos->sdev);
 }

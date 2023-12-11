@@ -63,7 +63,7 @@ rbuffer_puts(struct rbuffer* rb, char* buf, size_t len)
 int
 rbuffer_gets(struct rbuffer* rb, char* buf, size_t len)
 {
-    if (!len)
+    if (!len || !rb->len)
         return 0;
 
     size_t nlen = MIN(len, rb->len);

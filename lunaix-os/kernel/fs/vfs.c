@@ -708,7 +708,7 @@ __DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
     file->inode->atime = clock_unixtime();
 
     if ((file->inode->itype & VFS_IFSEQDEV) || (fd_s->flags & FO_DIRECT)) {
-        errno = file->ops->read(file->inode, buf, count, file->f_pos);
+    errno = file->ops->read(file->inode, buf, count, file->f_pos);
     } else {
         errno = pcache_read(file->inode, buf, count, file->f_pos);
     }
@@ -860,7 +860,7 @@ vfs_readlink(struct v_dnode* dnode, char* buf, size_t size)
 int
 vfs_get_dtype(int itype)
 {
-    if ((itype & VFS_IFSYMLINK)) {
+    if ((itype & VFS_IFSYMLINK) == VFS_IFSYMLINK) {
         return DT_SYMLINK;
     } else if (!(itype & VFS_IFFILE)) {
         return DT_DIR;
@@ -1000,6 +1000,11 @@ __DEFINE_LXSYSCALL1(int, mkdir, const char*, path)
     struct hstr name = HHSTR(name_value, 0, 0);
 
     if ((errno = vfs_walk_proc(path, &parent, &name, VFS_WALK_PARENT))) {
+        goto done;
+    }
+
+    if (!(errno = vfs_walk(parent, name_value, &dir, NULL, 0))) {
+        errno = EEXIST;
         goto done;
     }
 

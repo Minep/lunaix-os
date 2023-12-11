@@ -100,6 +100,28 @@
 #define DEV_IFSEQ 0x1 // sequential (character) device
 #define DEV_IFSYS 0x3 // a system device
 
+struct capability_meta
+{
+    struct llist_header caps;
+    unsigned int cap_type;
+};
+
+#define CAPABILITY_META                     \
+    union {                                 \
+        struct capability_meta cap_meta;    \
+        struct {                            \
+            struct llist_header caps;       \
+            unsigned int cap_type;          \
+        };                                  \
+    }
+
+#define get_capability(cap, cap_type)       \
+    container_of((cap), cap_type, cap_meta)
+#define cap_meta(cap) (&(cap)->cap_meta)
+
+typedef struct llist_header capability_list_t;
+
+
 struct device_meta
 {
     u32_t magic;
@@ -148,6 +170,8 @@ struct device
     /* -- device structing -- */
 
     DEVICE_METADATA;
+
+    capability_list_t capabilities;
 
     /* -- device state -- */
 
@@ -324,6 +348,22 @@ device_populate_info(struct device* dev, struct dev_info* devinfo);
 void
 device_scan_drivers();
 
+/*------ Capability ------*/
+
+struct capability_meta*
+alloc_capability(int cap, unsigned int size);
+
+#define new_capability(cap_type, cap_impl)\
+    ((cap_impl*)alloc_capability((cap_type), sizeof(cap_impl)))
+
+#define new_capability_marker(cap_type)\
+    (alloc_capability((cap_type), sizeof(struct capability_meta)))
+
+void
+device_grant_capability(struct device* dev, struct capability_meta* cap);
+
+struct capability_meta*
+device_get_capability(struct device* dev, unsigned int cap_type);
 /*------ Load hooks ------*/
 
 void

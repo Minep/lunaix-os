@@ -23,6 +23,8 @@
 #include <lunaix/tty/console.h>
 #include <lunaix/tty/tty.h>
 
+#include <hal/term.h>
+
 static struct console lx_console;
 
 int
@@ -38,16 +40,8 @@ void
 console_flush();
 
 static waitq_t lx_reader;
-static volatile char ttychr;
 
 static volatile pid_t fg_pgid = 0;
-
-static inline void
-print_control_code(const char cntrl)
-{
-    console_write_char('^');
-    console_write_char(cntrl + 64);
-}
 
 int
 __lxconsole_listener(struct input_device* dev)
@@ -55,7 +49,7 @@ __lxconsole_listener(struct input_device* dev)
     u32_t key = dev->current_pkt.sys_code;
     u32_t type = dev->current_pkt.pkt_type;
     kbd_kstate_t state = key >> 16;
-    ttychr = key & 0xff;
+    u8_t ttychr = key & 0xff;
     key = key & 0xffff;
 
     if (type == PKT_RELEASE) {
@@ -68,18 +62,6 @@ __lxconsole_listener(struct input_device* dev)
             goto done;
         }
         ttychr = cntrl - 'a' + 1;
-        switch (ttychr) {
-            case TCINTR:
-                signal_send(-fg_pgid, _SIGINT);
-                print_control_code(ttychr);
-                break;
-            case TCSTOP:
-                signal_send(-fg_pgid, _SIGSTOP);
-                print_control_code(ttychr);
-                break;
-            default:
-                break;
-        }
     } else if (key == KEY_PG_UP) {
         console_view_up();
         goto done;
@@ -92,6 +74,7 @@ __lxconsole_listener(struct input_device* dev)
         goto done;
     }
 
+    fifo_putone(&lx_console.input, ttychr);
     pwake_all(&lx_reader);
 
 done:
@@ -161,40 +144,11 @@ __tty_read(struct device* dev, void* buf, size_t offset, size_t len)
     struct console* console = (struct console*)dev->underlay;
 
     size_t count = fifo_read(&console->input, buf, len);
-    if (count > 0 && ((char*)buf)[count - 1] == '\n') {
+    if (count > 0) {
         return count;
     }
 
-    while (count < len) {
-        pwait(&lx_reader);
-
-        if (ttychr < 0x1B) {
-            // ASCII control codes
-            switch (ttychr) {
-                case TCINTR:
-                    fifo_clear(&console->input);
-                    return 0;
-                case TCBS:
-                    if (fifo_backone(&console->input)) {
-                        console_write_char(ttychr);
-                    }
-                    continue;
-                case TCLF:
-                case TCCR:
-                    goto proceed;
-                default:
-                    break;
-            }
-            print_control_code(ttychr);
-            continue;
-        }
-
-    proceed:
-        console_write_char(ttychr);
-        if (!fifo_putone(&console->input, ttychr) || ttychr == '\n') {
-            break;
-        }
-    }
+    pwait(&lx_reader);
 
     return count + fifo_read(&console->input, buf + count, len - count);
 }
@@ -355,12 +309,14 @@ lxconsole_spawn_ttydev(struct device_def* devdef)
 
     register_device(tty_dev, &devdef->class, "vcon");
 
+    term_create(tty_dev, "FB");
+
     return 0;
 }
 
 static struct device_def lxconsole_def = {
     .name = "Lunaix Virtual Console",
-    .class = DEVCLASSV(DEVIF_NON, DEVFN_TTY, DEV_BUILTIN, 12),
+    .class = DEVCLASS(DEVIF_NON, DEVFN_TTY, DEV_BUILTIN),
     .init = lxconsole_spawn_ttydev
 };
 // FIXME
