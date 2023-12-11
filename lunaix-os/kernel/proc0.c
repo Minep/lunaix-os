@@ -82,7 +82,7 @@ void
 init_platform()
 {
     device_postboot_load();
-    invoke_init_function(call_on_postboot);
+    invoke_init_function(on_postboot);
 
     twifs_register_plugins();
 

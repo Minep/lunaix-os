@@ -15,14 +15,15 @@
         }                                                                      \
     } while (0)
 
-#define check(statement)                                      \
-    do {                                                                       \
+#define check(statement)                                                       \
+    ({                                                                         \
         int err = 0;                                                           \
-        if ((err = (statement))) {                            \
-            syslog(2, #statement " failed: %d", err);   \
-            return err;                                                        \
+        if ((err = (statement)) < 0) {                                         \
+            syslog(2, #statement " failed: %d", err);                          \
+            _exit(1);                                                          \
         }                                                                      \
-    } while (0)
+        err;                                                                   \
+    })
 
 int
 init_termios(int fd) {
@@ -34,7 +35,7 @@ init_termios(int fd) {
     term.c_iflag = ICRNL | IGNBRK;
     term.c_oflag = ONLCR | OPOST;
     term.c_cflag = CREAD | CLOCAL | CS8 | CPARENB;
-    term.c_cc[VERASE] = 0x08;
+    term.c_cc[VERASE] = 0x7f;
 
     check(tcsetattr(fd, 0, &term));
 
@@ -44,7 +45,6 @@ init_termios(int fd) {
 int
 main(int argc, const char** argv)
 {
-    int err = 0;
 
     mkdir("/dev");
     mkdir("/sys");
@@ -54,24 +54,16 @@ main(int argc, const char** argv)
     must_mount(NULL, "/sys", "twifs", MNT_RO);
     must_mount(NULL, "/task", "taskfs", MNT_RO);
 
-    if ((err = open("/dev/tty", 0)) < 0) {
-        syslog(2, "fail to open tty (%d)\n", errno);
-        return err;
-    }
+    int fd = check(open("/dev/tty", 0));
 
-    check(init_termios(err));
+    check(init_termios(fd));
 
-    if ((err = dup(err)) < 0) {
-        syslog(2, "fail to setup tty i/o (%d)\n", errno);
-        return err;
-    }
+    check(dup(fd));
 
-    if ((err = symlink("/usr", "/mnt/lunaix-os/usr"))) {
-        syslog(2, "symlink /usr:/mnt/lunaix-os/usr (%d)\n", errno);
-        return err;
-    }
+    check(symlink("/usr", "/mnt/lunaix-os/usr"));
 
     pid_t pid;
+    int err = 0;
     if (!(pid = fork())) {
         err = execve("/usr/bin/sh", NULL, NULL);
         printf("fail to execute (%d)\n", errno);

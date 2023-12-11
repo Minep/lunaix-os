@@ -136,7 +136,7 @@ tdev_do_write(struct device* dev, void* buf, off_t fpos, size_t len)
     if (!rbuffer_empty(deref(current))) {
         term_flush(tdev);
     }
-    return 0;
+    return wrsz;
 }
 
 static int
@@ -170,6 +170,14 @@ load_default_setting(struct term* tdev)
     memcpy(tdev->cc, default_cc, _NCCS * sizeof(cc_t));
 }
 
+static void
+alloc_term_buffer(struct term* terminal, size_t sz_hlf) 
+{
+    line_alloc(&terminal->line_in, sz_hlf);
+    line_alloc(&terminal->line_out, sz_hlf);
+    terminal->scratch_pad = valloc(sz_hlf);
+}
+
 struct term*
 term_create(struct device* chardev, char* suffix)
 {
@@ -189,8 +197,7 @@ term_create(struct device* chardev, char* suffix)
     // TODO choice of lcntl can be flexible
     terminal->lcntl = line_controls[ANSI_LCNTL];
 
-    line_alloc(&terminal->line_in, 1024);
-    line_alloc(&terminal->line_out, 1024);
+    alloc_term_buffer(terminal, 1024);
 
     if (chardev) {
         int cdev_var = DEV_VAR_FROM(chardev->ident.unique);

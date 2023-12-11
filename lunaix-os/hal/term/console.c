@@ -4,6 +4,7 @@
 #include <lunaix/kcmd.h>
 #include <lunaix/fs.h>
 #include <lunaix/syslog.h>
+#include <lunaix/kprintf.h>
 
 #include <hal/term.h>
 
@@ -41,5 +42,7 @@ setup_default_tty()
     INFO("system console: %s", console_dev);
 
     sysconsole = dev;
+
+    kprintf_dump_logs();
 }
-lunaix_initfn(setup_default_tty, call_on_boot);
+owloysius_fetch_init(setup_default_tty, on_boot);

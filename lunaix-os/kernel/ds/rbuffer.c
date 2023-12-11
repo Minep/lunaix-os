@@ -32,7 +32,7 @@ rbuffer_put(struct rbuffer* rb, char c)
     rb->ptr = (rb->ptr + 1) % rb->maxsz;
     rb->len = MIN(rb->len + 1, rb->maxsz);
 
-    return 1;
+    return rb->len < rb->maxsz;
 }
 
 int
@@ -41,21 +41,21 @@ rbuffer_puts(struct rbuffer* rb, char* buf, size_t len)
     if (!len)
         return 0;
 
-    size_t ptr = (rb->ptr + len) % rb->maxsz;
     size_t nlen = MIN(len, rb->maxsz);
-    size_t ptr_start = (ptr - nlen) % rb->maxsz;
+    size_t ptr = (rb->ptr + nlen) % rb->maxsz;
+    size_t ptr_start = rb->ptr;
 
     buf = &buf[nlen];
     if (ptr_start >= ptr) {
         size_t llen = rb->maxsz - ptr_start;
         memcpy(&rb->buffer[ptr_start], &buf[-nlen], llen);
-        memcpy(&rb->buffer[0], &buf[-nlen + llen], ptr + 1);
+        memcpy(&rb->buffer[0], &buf[-nlen + llen], ptr);
     } else {
         memcpy(&rb->buffer[ptr_start], &buf[-nlen], nlen);
     }
 
     rb->ptr = ptr;
-    rb->len = nlen;
+    rb->len = MIN(rb->len + nlen, rb->maxsz);
 
     return nlen;
 }
@@ -74,7 +74,7 @@ rbuffer_gets(struct rbuffer* rb, char* buf, size_t len)
     if (ptr_start >= ptr_end) {
         size_t llen = rb->maxsz - ptr_start;
         memcpy(&buf[-nlen], &rb->buffer[ptr_start], llen);
-        memcpy(&buf[-nlen + llen], &rb->buffer[0], ptr_end + 1);
+        memcpy(&buf[-nlen + llen], &rb->buffer[0], ptr_end);
     } else {
         memcpy(&buf[-nlen], &rb->buffer[ptr_start], nlen);
     }

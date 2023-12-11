@@ -44,6 +44,13 @@ lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
 #define QUIT tdev->cc[_VQUIT]
 #define SUSP tdev->cc[_VSUSP]
 
+#define putc_safe(rb, chr)                  \
+    ({                                      \
+        if (!rbuffer_put_nof(rb, chr)) {    \
+            break;                          \
+        }                                   \
+    })
+
     if (!out) {
         // Keep all cc's (except VMIN & VTIME) up to L2 cache.
         for (size_t i = 0; i < _VMIN; i++) {
@@ -51,7 +58,7 @@ lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
         }
     }
 
-    while (rbuffer_get(raw, &c) && allow_more) {
+    while (allow_more && rbuffer_get(raw, &c)) {
 
         if (c == '\r' && ((_if & _ICRNL) || (_of & _OCRNL))) {
             c = '\n';
@@ -136,14 +143,14 @@ lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
 
     do_out:
         if (c == '\n' && (_of & _ONLCR)) {
-            rbuffer_put(cooked, '\r');
+            putc_safe(cooked, '\r');
         }
 
     put_char:
         if (!out && (_lf & _IEXTEN) && lcntl_slave_put) {
             allow_more = lcntl_slave_put(tdev, lbuf, c);
         } else {
-            allow_more = rbuffer_put(cooked, c);
+            allow_more = rbuffer_put_nof(cooked, c);
         }
     }
 

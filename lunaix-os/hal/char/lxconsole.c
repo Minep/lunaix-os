@@ -14,16 +14,25 @@
 #include <lunaix/input.h>
 #include <lunaix/ioctl.h>
 #include <lunaix/keyboard.h>
-#include <lunaix/lxconsole.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/sched.h>
 #include <lunaix/signal.h>
-#include <lunaix/tty/console.h>
 #include <lunaix/tty/tty.h>
+#include <lunaix/ds/fifo.h>
+#include <lunaix/owloysius.h>
 
 #include <hal/term.h>
+
+struct console
+{
+    struct lx_timer* flush_timer;
+    struct fifo_buf output;
+    struct fifo_buf input;
+    size_t wnd_start;
+    size_t lines;
+};
 
 static struct console lx_console;
 
@@ -38,6 +47,12 @@ console_write(struct console* console, u8_t* data, size_t size);
 
 void
 console_flush();
+
+void
+console_view_up();
+
+void
+console_view_down();
 
 static waitq_t lx_reader;
 
@@ -82,42 +97,6 @@ done:
 }
 
 int
-__tty_exec_cmd(struct device* dev, u32_t req, va_list args)
-{
-    switch (req) {
-        case TIOCGPGRP:
-            return fg_pgid;
-        case TIOCSPGRP:
-            fg_pgid = va_arg(args, pid_t);
-            break;
-        case TIOCCLSBUF:
-            fifo_clear(&lx_console.output);
-            fifo_clear(&lx_console.input);
-            lx_console.wnd_start = 0;
-            lx_console.lines = 0;
-            lx_console.output.flags |= FIFO_DIRTY;
-            break;
-        case TIOCFLUSH:
-            lx_console.output.flags |= FIFO_DIRTY;
-            console_flush();
-            break;
-        default:
-            return EINVAL;
-    }
-    return 0;
-}
-
-void
-lxconsole_init()
-{
-    memset(&lx_console, 0, sizeof(lx_console));
-    fifo_init(&lx_console.output, valloc(8192), 8192, 0);
-    fifo_init(&lx_console.input, valloc(4096), 4096, 0);
-
-    lx_console.flush_timer = NULL;
-}
-
-int
 __tty_write_pg(struct device* dev, void* buf, size_t offset)
 {
     return __tty_write(dev, buf, offset, PG_SIZE);
@@ -151,12 +130,6 @@ __tty_read(struct device* dev, void* buf, size_t offset, size_t len)
     pwait(&lx_reader);
 
     return count + fifo_read(&console->input, buf + count, len - count);
-}
-
-void
-console_schedule_flush()
-{
-    // TODO make the flush on-demand rather than periodic
 }
 
 size_t
@@ -286,13 +259,17 @@ console_write_char(char str)
     console_write(&lx_console, (u8_t*)&str, 1);
 }
 
-void
-console_start_flushing()
+
+static void
+lxconsole_init()
 {
-    struct lx_timer* timer =
-      timer_run_ms(20, console_flush, NULL, TIMER_MODE_PERIODIC);
-    lx_console.flush_timer = timer;
+    memset(&lx_console, 0, sizeof(lx_console));
+    fifo_init(&lx_console.output, valloc(8192), 8192, 0);
+    fifo_init(&lx_console.input, valloc(4096), 4096, 0);
+
+    lx_console.flush_timer = NULL;
 }
+owloysius_fetch_init(lxconsole_init, on_earlyboot)
 
 static int
 lxconsole_spawn_ttydev(struct device_def* devdef)
@@ -302,7 +279,6 @@ lxconsole_spawn_ttydev(struct device_def* devdef)
     tty_dev->ops.write_page = __tty_write_pg;
     tty_dev->ops.read = __tty_read;
     tty_dev->ops.read_page = __tty_read_pg;
-    tty_dev->ops.exec_cmd = __tty_exec_cmd;
 
     waitq_init(&lx_reader);
     input_add_listener(__lxconsole_listener);

@@ -27,7 +27,7 @@ OFLAGS := -fno-gcse\
 		  -fno-indirect-inlining\
 		  -fno-omit-frame-pointer
 
-CFLAGS := $(ARCH_OPT) -std=gnu99 -MMD $(OFLAGS) $(W)
+CFLAGS := $(ARCH_OPT) -std=gnu99 $(OFLAGS) $(W)
 
 ifeq ($(BUILD_MODE),debug)
 	O = -Og

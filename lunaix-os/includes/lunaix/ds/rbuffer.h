@@ -20,6 +20,22 @@ rbuffer_init(struct rbuffer* rb, char* buf, size_t maxsz)
 struct rbuffer*
 rbuffer_create(char* buf, size_t maxsz);
 
+int
+rbuffer_erase(struct rbuffer* rb);
+
+int
+rbuffer_put(struct rbuffer* rb, char c);
+
+int
+rbuffer_puts(struct rbuffer* rb, char* c, size_t len);
+
+int
+rbuffer_gets(struct rbuffer* rb, char* buf, size_t len);
+
+int
+rbuffer_get(struct rbuffer* rb, char* c);
+
+
 static inline void
 rbuffer_clear(struct rbuffer* rb)
 {
@@ -38,19 +54,14 @@ rbuffer_full(struct rbuffer* rb)
     return rb->len == rb->maxsz;
 }
 
-int
-rbuffer_erase(struct rbuffer* rb);
+static inline int 
+rbuffer_put_nof(struct rbuffer* rb, char c)
+{
+    if (rbuffer_full(rb)) {
+        return 0;
+    }
 
-int
-rbuffer_put(struct rbuffer* rb, char c);
-
-int
-rbuffer_puts(struct rbuffer* rb, char* c, size_t len);
-
-int
-rbuffer_gets(struct rbuffer* rb, char* buf, size_t len);
-
-int
-rbuffer_get(struct rbuffer* rb, char* c);
+    return rbuffer_put(rb, c);
+}
 
 #endif /* __LUNAIX_RBUFFER_H */

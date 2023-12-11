@@ -61,6 +61,7 @@ struct term
     struct term_lcntl* lcntl;
     struct linebuffer line_out;
     struct linebuffer line_in;
+    char* scratch_pad;
     pid_t fggrp;
 
     struct termport_capability* tp_cap;

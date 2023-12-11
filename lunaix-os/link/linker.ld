@@ -130,21 +130,31 @@ SECTIONS {
 
         . = ALIGN(8);
 
-        PROVIDE(__lga_lunainit_call_on_boot_start = .);
+        PROVIDE(__lga_lunainit_on_earlyboot_start = .);
         
-        KEEP(*(.lga.lunainit.c_boot));
+        KEEP(*(.lga.lunainit.c_earlyboot));
 
-        PROVIDE(__lga_lunainit_call_on_boot_end = .);
+        PROVIDE(__lga_lunainit_on_earlyboot_end = .);
 
         /* ---- */
 
         . = ALIGN(8);
 
-        PROVIDE(__lga_lunainit_call_on_postboot_start = .);
+        PROVIDE(__lga_lunainit_on_boot_start = .);
+        
+        KEEP(*(.lga.lunainit.c_boot));
+
+        PROVIDE(__lga_lunainit_on_boot_end = .);
+
+        /* ---- */
+
+        . = ALIGN(8);
+
+        PROVIDE(__lga_lunainit_on_postboot_start = .);
         
         KEEP(*(.lga.lunainit.c_postboot));
 
-        PROVIDE(__lga_lunainit_call_on_postboot_end = .);
+        PROVIDE(__lga_lunainit_on_postboot_end = .);
 
     }
 

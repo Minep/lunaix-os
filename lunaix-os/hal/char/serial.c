@@ -1,6 +1,7 @@
 #include <lunaix/device.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
+#include <lunaix/owloysius.h>
 #include <lunaix/status.h>
 
 #include <sys/mm/mempart.h>
@@ -19,6 +20,8 @@
 
 static DEFINE_LLIST(serial_devs);
 static int serial_idx = 0;
+
+static struct device_cat* serial_cat;
 
 #define serial_device(dev) ((struct serial_dev*)(dev)->underlay)
 
@@ -239,7 +242,7 @@ struct serial_dev*
 serial_create(struct devclass* class, char* if_ident)
 {
     struct serial_dev* sdev = valloc(sizeof(struct serial_dev));
-    struct device* dev = device_allocseq(NULL, sdev);
+    struct device* dev = device_allocseq(dev_meta(serial_cat), sdev);
     dev->ops.read = __serial_read;
     dev->ops.read_page = __serial_read_page;
     dev->ops.read_async = __serial_read_async;
@@ -264,7 +267,7 @@ serial_create(struct devclass* class, char* if_ident)
     
     device_grant_capability(dev, cap_meta(tp_cap));
 
-    register_device(dev, class, "serial%d", class->variant);
+    register_device(dev, class, "s%d", class->variant);
 
     term_create(dev, if_ident);
 
@@ -285,3 +288,12 @@ serial_get_avilable()
 
     return NULL;
 }
+
+static void
+init_serial_dev()
+{
+    serial_cat = device_addcat(NULL, "serial");
+
+    assert(serial_cat);
+}
+owloysius_fetch_init(init_serial_dev, on_earlyboot)

@@ -1,6 +1,5 @@
 #include <klibc/string.h>
 #include <lunaix/spike.h>
-#include <lunaix/tty/console.h>
 #include <lunaix/tty/tty.h>
 #include <stdint.h>
 
@@ -61,62 +60,34 @@ tty_flush_buffer(struct fifo_buf* buf)
     tty_clear();
 
     char chr;
-    int state = 0;
-    int g[2] = { 0, 0 };
-    vga_attribute current_theme = tty_theme_color;
     while (fifo_readone_async(buf, (u8_t*)&chr)) {
-        if (state == 0 && chr == '\033') {
-            state = 1;
-        } else if (state == 1 && chr == '[') {
-            state = 2;
-        } else if (state > 1) {
-            if ('0' <= chr && chr <= '9') {
-                g[state - 2] = (chr - '0') + g[state - 2] * 10;
-            } else if (chr == ';' && state == 2) {
-                state = 3;
-            } else {
-                if (g[0] == 39 && g[1] == 49) {
-                    current_theme = tty_theme_color;
-                } else {
-                    current_theme = (g[1] << 4 | g[0]) << 8;
-                }
-                g[0] = 0;
-                g[1] = 0;
-                state = 0;
-            }
-        } else {
-            state = 0;
-            switch (chr) {
-                case '\t':
-                    x += 4;
-                    break;
-                case '\n':
-                    y++;
-                    // fall through
-                case '\r':
-                    x = 0;
-                    break;
-                // case '\x08':
-                //     *(tty_vga_buffer + x + y * TTY_WIDTH) =
-                //       (current_theme | 0x20);
-                //     break;
-                default:
-                    *(tty_vga_buffer + x + y * TTY_WIDTH) =
-                      (current_theme | chr);
-                    (x)++;
-                    break;
-            }
-
-            if (x >= TTY_WIDTH) {
-                x = 0;
-                y++;
-            }
-            if (y >= TTY_HEIGHT) {
-                y--;
+        switch (chr) {
+            case '\t':
+                x += 4;
                 break;
-            }
+            case '\n':
+                y++;
+                // fall through
+            case '\r':
+                x = 0;
+                break;
+            default:
+                *(tty_vga_buffer + x + y * TTY_WIDTH) =
+                    (tty_theme_color | chr);
+                (x)++;
+                break;
+        }
+
+        if (x >= TTY_WIDTH) {
+            x = 0;
+            y++;
+        }
+        if (y >= TTY_HEIGHT) {
+            y--;
+            break;
         }
     }
+
     tty_set_cursor(x, y);
 }
 
