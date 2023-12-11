@@ -14,6 +14,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 
 如果有意研读LunaixOS的内核代码和其中的设计，以下资料可能会对此有用。
 
++ [最新的LunaixOS源代码分析教程](docs/tutorial/0-教程介绍和环境搭建.md)
 + [内核虚拟内存的详细布局](docs/img/lunaix-os-mem.png)
 + [LunaixOS启动流程概览](docs/img/boot_sequence.jpeg)
 + LunaixOS总体架构概览（WIP）
@@ -175,7 +176,6 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 + `vmrs [pid]` 列举进程`<pid>`的内存区域图（Memory Regions），如果`<pid>`未指定，则默认为正在运行的进程（smp=1）。
 + `proc [pid]` 打印进程`<pid>`的进程控制块状态，如果`<pid>`未指定，则默认为正在运行的进程（smp=1）。
 + `proc_table` 列举所有非终止的进程以及他们的状态。
-+ `syslog` 打印到目前为止的系统日志。
 
 该插件可以通过运行以下命令来进行安装：
 
