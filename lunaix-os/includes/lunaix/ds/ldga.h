@@ -12,15 +12,16 @@
 #define __LUNAIX_LDGA_H
 
 #include <lunaix/types.h>
+#include <lunaix/compiler.h>
 
 #define ldga_el_id(ga_name, el_name) __lga_##ga_name##_##el_name
 #define ldga_section(ga_name) __attribute__((section(".lga." ga_name)))
 
 #define export_ldga_el(ga_name, el_name, type, val)                            \
-    type ldga_section(#ga_name) ldga_el_id(ga_name, el_name) = (type)(val)
+    type ldga_section(#ga_name) must_emit ldga_el_id(ga_name, el_name) = (type)(val)
 
 #define export_ldga_el_sfx(ga_name, el_name, type, val, suffix)                \
-    type ldga_section(#ga_name "." #suffix) ldga_el_id(ga_name, el_name) =     \
+    type ldga_section(#ga_name "." #suffix) must_emit ldga_el_id(ga_name, el_name) =     \
       (type)(val)
 
 #define export_ldga_el_idx(ga_name, i, type, val)                              \

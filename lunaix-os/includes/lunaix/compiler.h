@@ -10,6 +10,7 @@
 #define optimize(opt) __attribute__((optimize(opt)))
 #define must_inline __attribute__((always_inline))
 #define must_emit __attribute__((used))
+#define unreachable __builtin_unreachable()
 
 #define clz(bits) __builtin_clz(bits)
 #define sadd_overflow(a, b, of) __builtin_sadd_overflow(a, b, of)
@@ -34,7 +35,7 @@ spin()
     volatile int __infloop = 1;
     while (__infloop)
         ;
-    __builtin_unreachable();
+    unreachable;
 }
 
 #endif /* __LUNAIX_COMPILER_H */

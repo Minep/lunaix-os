@@ -3,11 +3,11 @@
 
 #include <lunaix/ds/ldga.h>
 
-#define call_on_earlyboot c_earlyboot
-#define call_on_boot c_boot
-#define call_on_postboot c_postboot
+#define on_earlyboot c_earlyboot
+#define on_boot c_boot
+#define on_postboot c_postboot
 
-#define lunaix_initfn(func, call_stage)                                     \
+#define owloysius_fetch_init(func, call_stage)                                     \
     export_ldga_el(lunainit, func, ptr_t, func);                            \
     export_ldga_el_sfx(lunainit, func##_##call_stage, ptr_t, func, call_stage);
 

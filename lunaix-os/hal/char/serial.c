@@ -1,11 +1,13 @@
 #include <lunaix/device.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
+#include <lunaix/owloysius.h>
 #include <lunaix/status.h>
 
 #include <sys/mm/mempart.h>
 
 #include <hal/serial.h>
+#include <hal/term.h>
 
 #define lock_sdev(sdev) device_lock((sdev)->dev)
 #define unlock_sdev(sdev) device_unlock((sdev)->dev)
@@ -18,6 +20,8 @@
 
 static DEFINE_LLIST(serial_devs);
 static int serial_idx = 0;
+
+static struct device_cat* serial_cat;
 
 #define serial_device(dev) ((struct serial_dev*)(dev)->underlay)
 
@@ -143,41 +147,41 @@ serial_writebuf_nowait(struct serial_dev* sdev, u8_t* buf, size_t len)
 }
 
 static int
-__serial_read(struct device* dev, void* buf, size_t offset, size_t len)
+__serial_read(struct device* dev, void* buf, off_t fpos, size_t len)
 {
-    return serial_readbuf(serial_device(dev), &((u8_t*)buf)[offset], len);
+    return serial_readbuf(serial_device(dev), (u8_t*)buf, len);
 }
 
 static int
-__serial_read_async(struct device* dev, void* buf, size_t offset, size_t len)
+__serial_read_async(struct device* dev, void* buf, off_t fpos, size_t len)
 {
     return serial_readbuf_nowait(
-        serial_device(dev), &((u8_t*)buf)[offset], len);
+        serial_device(dev), (u8_t*)buf, len);
 }
 
 static int
-__serial_read_page(struct device* dev, void* buf, size_t offset)
+__serial_read_page(struct device* dev, void* buf, off_t fpos)
 {
-    return serial_readbuf(serial_device(dev), &((u8_t*)buf)[offset], MEM_PAGE);
+    return serial_readbuf(serial_device(dev), (u8_t*)buf, MEM_PAGE);
 }
 
 static int
-__serial_write(struct device* dev, void* buf, size_t offset, size_t len)
+__serial_write(struct device* dev, void* buf, off_t fpos, size_t len)
 {
-    return serial_writebuf(serial_device(dev), &((u8_t*)buf)[offset], len);
+    return serial_writebuf(serial_device(dev), (u8_t*)buf, len);
 }
 
 static int
-__serial_write_async(struct device* dev, void* buf, size_t offset, size_t len)
+__serial_write_async(struct device* dev, void* buf, off_t fpos, size_t len)
 {
     return serial_writebuf_nowait(
-        serial_device(dev), &((u8_t*)buf)[offset], len);
+        serial_device(dev), (u8_t*)buf, len);
 }
 
 static int
-__serial_write_page(struct device* dev, void* buf, size_t offset)
+__serial_write_page(struct device* dev, void* buf, off_t fpos)
 {
-    return serial_writebuf(serial_device(dev), &((u8_t*)buf)[offset], MEM_PAGE);
+    return serial_writebuf(serial_device(dev), (u8_t*)buf, MEM_PAGE);
 }
 
 static int
@@ -200,13 +204,45 @@ __serial_poll_event(struct device* dev)
     return sdev->dev->poll_evflags;
 }
 
+static void sdev_execmd(struct serial_dev* sdev, u32_t req, ...)
+{
+    va_list args;
+    va_start(args, req);
+
+    sdev->exec_cmd(sdev, req, args);
+
+    va_end(args);
+}
+
+static void
+__serial_set_speed(struct device* dev, speed_t speed)
+{
+    struct serial_dev* sdev = serial_device(dev);
+    lock_sdev(sdev);
+
+    sdev_execmd(sdev, SERIO_SETBRDIV, speed);
+
+    unlock_sdev(sdev);
+}
+
+static void
+__serial_set_cntrl_mode(struct device* dev, tcflag_t cflag)
+{
+    struct serial_dev* sdev = serial_device(dev);
+    lock_sdev(sdev);
+
+    sdev_execmd(sdev, SERIO_SETCNTRLMODE, cflag);
+
+    unlock_sdev(sdev);
+}
+
 #define RXBUF_SIZE 512
 
 struct serial_dev*
 serial_create(struct devclass* class, char* if_ident)
 {
     struct serial_dev* sdev = valloc(sizeof(struct serial_dev));
-    struct device* dev = device_allocseq(NULL, sdev);
+    struct device* dev = device_allocseq(dev_meta(serial_cat), sdev);
     dev->ops.read = __serial_read;
     dev->ops.read_page = __serial_read_page;
     dev->ops.read_async = __serial_read_async;
@@ -215,18 +251,25 @@ serial_create(struct devclass* class, char* if_ident)
     dev->ops.write_page = __serial_write_page;
     dev->ops.exec_cmd = __serial_exec_command;
     dev->ops.poll = __serial_poll_event;
-
+    
     sdev->dev = dev;
     dev->underlay = sdev;
+
+    struct termport_capability* tp_cap = 
+        new_capability(TERMPORT_CAP, struct termport_capability);
+    tp_cap->set_speed = __serial_set_speed;
+    tp_cap->set_cntrl_mode = __serial_set_cntrl_mode;
 
     waitq_init(&sdev->wq_rxdone);
     waitq_init(&sdev->wq_txdone);
     rbuffer_init(&sdev->rxbuf, valloc(RXBUF_SIZE), RXBUF_SIZE);
     llist_append(&serial_devs, &sdev->sdev_list);
+    
+    device_grant_capability(dev, cap_meta(tp_cap));
 
-    register_device(dev, class, "port%s%d", if_ident, class->variant);
+    register_device(dev, class, "s%d", class->variant);
 
-    sdev->at_term = term_create(dev, if_ident);
+    term_create(dev, if_ident);
 
     class->variant++;
     return sdev;
@@ -245,3 +288,12 @@ serial_get_avilable()
 
     return NULL;
 }
+
+static void
+init_serial_dev()
+{
+    serial_cat = device_addcat(NULL, "serial");
+
+    assert(serial_cat);
+}
+owloysius_fetch_init(init_serial_dev, on_earlyboot)

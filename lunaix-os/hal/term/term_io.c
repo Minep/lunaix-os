@@ -33,7 +33,7 @@ do_read_raw(struct term* tdev)
         max_lb_sz -= sz;
 
         // TODO pass a flags to read to indicate it is non blocking ops
-        sz += chdev->ops.read_async(chdev, inbuffer, sz, max_lb_sz);
+        sz += chdev->ops.read_async(chdev, &inbuffer[sz], 0, max_lb_sz);
     }
 
     rbuffer_puts(line_in->next, inbuffer, sz);
@@ -93,26 +93,35 @@ term_read(struct term* tdev)
 int
 term_flush(struct term* tdev)
 {
-    if ((tdev->oflags & _OPOST)) {
-        lcntl_transform_outseq(tdev);
-    }
-
     struct linebuffer* line_out = &tdev->line_out;
-    size_t xmit_len = line_out->current->len;
-    void* xmit_buf = line_out->next->buffer;
+    char* xmit_buf = tdev->scratch_pad;
+    lbuf_ref_t current_ref = ref_current(line_out);
 
-    rbuffer_gets(line_out->current, xmit_buf, xmit_len);
+    int count = 0;
 
-    off_t off = 0;
-    int ret = 0;
-    while (xmit_len && ret >= 0) {
-        ret = tdev->chdev->ops.write(tdev->chdev, xmit_buf, off, xmit_len);
-        xmit_len -= ret;
-        off += ret;
+    while (!rbuffer_empty(deref(current_ref))) {
+        if ((tdev->oflags & _OPOST)) {
+            lcntl_transform_outseq(tdev);
+        }
+
+        size_t xmit_len = line_out->current->len;
+
+        rbuffer_gets(line_out->current, xmit_buf, xmit_len);
+
+        off_t off = 0;
+        int ret = 0;
+        while (xmit_len && ret >= 0) {
+            ret = tdev->chdev->ops.write(tdev->chdev, &xmit_buf[off], 0, xmit_len);
+            xmit_len -= ret;
+            off += ret;
+            count += ret;
+        }
+
+        // put back the left over if transmittion went south
+        rbuffer_puts(line_out->current, xmit_buf, xmit_len);
+
+        line_flip(line_out);
     }
 
-    // put back the left over if transmittion went south
-    rbuffer_puts(line_out->current, xmit_buf, xmit_len);
-
-    return off;
+    return count;
 }

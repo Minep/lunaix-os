@@ -11,12 +11,24 @@ int
 main(int argc, const char* argv[])
 {
     int fd = 0;
-    unsigned int size = 0;
+    int size = 0;
+    struct file_stat stat;
     for (int i = 1; i < argc; i++) {
         fd = open(argv[i], FO_RDONLY);
+                
         if (fd < 0) {
             printf("open failed: %s (error: %d)", argv[i], fd);
             continue;
+        }
+
+        if (fstat(fd, &stat) < 0) {
+            printf("fail to get stat %d\n", errno);
+            return 1;
+        }
+
+        if (!(stat.mode & F_MFILE)) {
+            printf("%s is a directory", argv[i]);
+            return 1;
         }
 
         do {

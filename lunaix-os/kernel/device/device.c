@@ -77,6 +77,7 @@ device_create(struct device* dev,
     dev->dev_type = type;
 
     device_init_meta(dev_meta(dev), parent, DEV_STRUCT);
+    llist_init_head(&dev->capabilities);
     mutex_init(&dev->lock);
     iopoll_init_evt_q(&dev->pollers);
 }
@@ -299,9 +300,9 @@ __DEFINE_LXSYSCALL3(int, ioctl, int, fd, int, req, va_list, args)
         goto done;
     }
 
-    struct device* dev = (struct device*)fd_s->file->inode->data;
-    if (valid_device_subtype_ref(dev, DEV_STRUCT)) {
-        errno &= ENODEV;
+    struct device* dev = resolve_device(fd_s->file->inode->data);
+    if (!valid_device_subtype_ref(dev, DEV_STRUCT)) {
+        errno = ENODEV;
         goto done;
     }
 
@@ -312,11 +313,11 @@ __DEFINE_LXSYSCALL3(int, ioctl, int, fd, int, req, va_list, args)
     }
 
     if (!dev->ops.exec_cmd) {
-        errno &= ENOTSUP;
+        errno = ENOTSUP;
         goto done;
     }
 
-    errno &= dev->ops.exec_cmd(dev, req, args);
+    errno = dev->ops.exec_cmd(dev, req, args);
 
 done:
     return DO_STATUS_OR_RETURN(errno);

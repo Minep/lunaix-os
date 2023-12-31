@@ -31,6 +31,29 @@ struct term_lcntl
     int (*process_and_put)(struct term*, struct linebuffer*, char);
 };
 
+/**
+ * @brief Communication port capability that a device is supported natively, 
+ *          or able to emulate low level serial transmission behaviour specify 
+ *          by POSIX1-2008, section 11.
+ * 
+ */
+#define TERMPORT_CAP 0x4d524554U
+
+/**
+ * @brief A termios capability that a device provide interfaces which is 
+ *          compliant to POSIX1-2008
+ * 
+ */
+#define TERMIOS_CAP 0x534f4954U
+
+struct termport_capability
+{
+    CAPABILITY_META;
+
+    void (*set_speed)(struct device*, speed_t);
+    void (*set_cntrl_mode)(struct device*, tcflag_t);
+};
+
 struct term
 {
     struct device* dev;
@@ -38,17 +61,16 @@ struct term
     struct term_lcntl* lcntl;
     struct linebuffer line_out;
     struct linebuffer line_in;
+    char* scratch_pad;
     pid_t fggrp;
 
-    struct
-    {
-        int (*set_speed)(struct device*, speed_t);
-    } chdev_ops;
+    struct termport_capability* tp_cap;
 
     /* -- POSIX.1-2008 compliant fields -- */
     tcflag_t iflags;
     tcflag_t oflags;
     tcflag_t lflags;
+    tcflag_t cflags;
     cc_t cc[_NCCS];
     speed_t iospeed;
 };

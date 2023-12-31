@@ -9,4 +9,7 @@
 #define SERIO_TXEN IOREQ(3, 0)
 #define SERIO_TXDA IOREQ(4, 0)
 
+#define SERIO_SETBRDIV IOREQ(5, 0)
+#define SERIO_SETCNTRLMODE IOREQ(6, 0)
+
 #endif /* __LUNAIX_USERIAL_H */

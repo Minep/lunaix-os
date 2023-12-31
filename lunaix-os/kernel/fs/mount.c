@@ -63,6 +63,8 @@ __vfs_do_unmount(struct v_mount* mnt)
 
     mnt_chillax(mnt->parent);
 
+    mnt->mnt_point->mnt = mnt->parent;
+
     vfs_sb_free(sb);
     atomic_fetch_sub(&mnt->mnt_point->ref_count, 1);
     vfree(mnt);
@@ -245,6 +247,11 @@ __DEFINE_LXSYSCALL4(int,
     }
 
     if (mnt->ref_count > 1) {
+        errno = EBUSY;
+        goto done;
+    }
+
+    if (mnt->mnt->mnt_point == mnt) {
         errno = EBUSY;
         goto done;
     }

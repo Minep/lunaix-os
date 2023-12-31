@@ -5,7 +5,6 @@
 #include <lunaix/foptions.h>
 #include <lunaix/fs/twifs.h>
 #include <lunaix/input.h>
-#include <lunaix/lxconsole.h>
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/mmio.h>
 #include <lunaix/mm/page.h>
@@ -57,10 +56,11 @@ kernel_bootstrap(struct boot_handoff* bhctx)
 
     device_scan_drivers();
 
-    // crt
+    invoke_init_function(on_earlyboot);
+
+    // FIXME this goes to hal/gfxa
     tty_init(ioremap(0xB8000, PG_SIZE));
     tty_set_theme(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
-    lxconsole_init();
 
     device_sysconf_load();
 
@@ -89,7 +89,7 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     must_success(vfs_mount_root("ramfs", NULL));
     must_success(vfs_mount("/dev", "devfs", NULL, 0));
     
-    invoke_init_function(call_on_boot);
+    invoke_init_function(on_boot);
 
     must_success(vfs_unmount("/dev"));
 

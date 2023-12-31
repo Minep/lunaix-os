@@ -1,7 +1,6 @@
 #include <sys/interrupts.h>
 
 #include <lunaix/isrm.h>
-#include <lunaix/lxconsole.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/spike.h>
@@ -32,7 +31,6 @@ intr_routine_divide_zero(const isr_param* param)
 {
     __print_panic_msg("div zero", param);
 
-    console_flush();
     spin();
 }
 
@@ -41,7 +39,6 @@ intr_routine_general_protection(const isr_param* param)
 {
     __print_panic_msg("general protection", param);
 
-    console_flush();
     spin();
 }
 
@@ -50,7 +47,6 @@ intr_routine_sys_panic(const isr_param* param)
 {
     __print_panic_msg((char*)(param->registers.edi), param);
 
-    console_flush();
     spin();
 }
 
@@ -59,7 +55,6 @@ intr_routine_fallback(const isr_param* param)
 {
     __print_panic_msg("unknown interrupt", param);
 
-    console_flush();
     spin();
 }
 
@@ -83,7 +78,6 @@ intr_routine_apic_error(const isr_param* param)
 
     __print_panic_msg(buf, param);
 
-    console_flush();
     spin();
 }
 

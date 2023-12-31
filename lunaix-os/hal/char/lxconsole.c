@@ -14,14 +14,25 @@
 #include <lunaix/input.h>
 #include <lunaix/ioctl.h>
 #include <lunaix/keyboard.h>
-#include <lunaix/lxconsole.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/sched.h>
 #include <lunaix/signal.h>
-#include <lunaix/tty/console.h>
 #include <lunaix/tty/tty.h>
+#include <lunaix/ds/fifo.h>
+#include <lunaix/owloysius.h>
+
+#include <hal/term.h>
+
+struct console
+{
+    struct lx_timer* flush_timer;
+    struct fifo_buf output;
+    struct fifo_buf input;
+    size_t wnd_start;
+    size_t lines;
+};
 
 static struct console lx_console;
 
@@ -37,17 +48,15 @@ console_write(struct console* console, u8_t* data, size_t size);
 void
 console_flush();
 
+void
+console_view_up();
+
+void
+console_view_down();
+
 static waitq_t lx_reader;
-static volatile char ttychr;
 
 static volatile pid_t fg_pgid = 0;
-
-static inline void
-print_control_code(const char cntrl)
-{
-    console_write_char('^');
-    console_write_char(cntrl + 64);
-}
 
 int
 __lxconsole_listener(struct input_device* dev)
@@ -55,7 +64,7 @@ __lxconsole_listener(struct input_device* dev)
     u32_t key = dev->current_pkt.sys_code;
     u32_t type = dev->current_pkt.pkt_type;
     kbd_kstate_t state = key >> 16;
-    ttychr = key & 0xff;
+    u8_t ttychr = key & 0xff;
     key = key & 0xffff;
 
     if (type == PKT_RELEASE) {
@@ -68,18 +77,6 @@ __lxconsole_listener(struct input_device* dev)
             goto done;
         }
         ttychr = cntrl - 'a' + 1;
-        switch (ttychr) {
-            case TCINTR:
-                signal_send(-fg_pgid, _SIGINT);
-                print_control_code(ttychr);
-                break;
-            case TCSTOP:
-                signal_send(-fg_pgid, _SIGSTOP);
-                print_control_code(ttychr);
-                break;
-            default:
-                break;
-        }
     } else if (key == KEY_PG_UP) {
         console_view_up();
         goto done;
@@ -92,46 +89,11 @@ __lxconsole_listener(struct input_device* dev)
         goto done;
     }
 
+    fifo_putone(&lx_console.input, ttychr);
     pwake_all(&lx_reader);
 
 done:
     return INPUT_EVT_NEXT;
-}
-
-int
-__tty_exec_cmd(struct device* dev, u32_t req, va_list args)
-{
-    switch (req) {
-        case TIOCGPGRP:
-            return fg_pgid;
-        case TIOCSPGRP:
-            fg_pgid = va_arg(args, pid_t);
-            break;
-        case TIOCCLSBUF:
-            fifo_clear(&lx_console.output);
-            fifo_clear(&lx_console.input);
-            lx_console.wnd_start = 0;
-            lx_console.lines = 0;
-            lx_console.output.flags |= FIFO_DIRTY;
-            break;
-        case TIOCFLUSH:
-            lx_console.output.flags |= FIFO_DIRTY;
-            console_flush();
-            break;
-        default:
-            return EINVAL;
-    }
-    return 0;
-}
-
-void
-lxconsole_init()
-{
-    memset(&lx_console, 0, sizeof(lx_console));
-    fifo_init(&lx_console.output, valloc(8192), 8192, 0);
-    fifo_init(&lx_console.input, valloc(4096), 4096, 0);
-
-    lx_console.flush_timer = NULL;
 }
 
 int
@@ -161,48 +123,13 @@ __tty_read(struct device* dev, void* buf, size_t offset, size_t len)
     struct console* console = (struct console*)dev->underlay;
 
     size_t count = fifo_read(&console->input, buf, len);
-    if (count > 0 && ((char*)buf)[count - 1] == '\n') {
+    if (count > 0) {
         return count;
     }
 
-    while (count < len) {
-        pwait(&lx_reader);
-
-        if (ttychr < 0x1B) {
-            // ASCII control codes
-            switch (ttychr) {
-                case TCINTR:
-                    fifo_clear(&console->input);
-                    return 0;
-                case TCBS:
-                    if (fifo_backone(&console->input)) {
-                        console_write_char(ttychr);
-                    }
-                    continue;
-                case TCLF:
-                case TCCR:
-                    goto proceed;
-                default:
-                    break;
-            }
-            print_control_code(ttychr);
-            continue;
-        }
-
-    proceed:
-        console_write_char(ttychr);
-        if (!fifo_putone(&console->input, ttychr) || ttychr == '\n') {
-            break;
-        }
-    }
+    pwait(&lx_reader);
 
     return count + fifo_read(&console->input, buf + count, len - count);
-}
-
-void
-console_schedule_flush()
-{
-    // TODO make the flush on-demand rather than periodic
 }
 
 size_t
@@ -332,13 +259,17 @@ console_write_char(char str)
     console_write(&lx_console, (u8_t*)&str, 1);
 }
 
-void
-console_start_flushing()
+
+static void
+lxconsole_init()
 {
-    struct lx_timer* timer =
-      timer_run_ms(20, console_flush, NULL, TIMER_MODE_PERIODIC);
-    lx_console.flush_timer = timer;
+    memset(&lx_console, 0, sizeof(lx_console));
+    fifo_init(&lx_console.output, valloc(8192), 8192, 0);
+    fifo_init(&lx_console.input, valloc(4096), 4096, 0);
+
+    lx_console.flush_timer = NULL;
 }
+owloysius_fetch_init(lxconsole_init, on_earlyboot)
 
 static int
 lxconsole_spawn_ttydev(struct device_def* devdef)
@@ -348,19 +279,20 @@ lxconsole_spawn_ttydev(struct device_def* devdef)
     tty_dev->ops.write_page = __tty_write_pg;
     tty_dev->ops.read = __tty_read;
     tty_dev->ops.read_page = __tty_read_pg;
-    tty_dev->ops.exec_cmd = __tty_exec_cmd;
 
     waitq_init(&lx_reader);
     input_add_listener(__lxconsole_listener);
 
     register_device(tty_dev, &devdef->class, "vcon");
 
+    term_create(tty_dev, "FB");
+
     return 0;
 }
 
 static struct device_def lxconsole_def = {
     .name = "Lunaix Virtual Console",
-    .class = DEVCLASSV(DEVIF_NON, DEVFN_TTY, DEV_BUILTIN, 12),
+    .class = DEVCLASS(DEVIF_NON, DEVFN_TTY, DEV_BUILTIN),
     .init = lxconsole_spawn_ttydev
 };
 // FIXME

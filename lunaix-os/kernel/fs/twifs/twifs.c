@@ -208,7 +208,7 @@ twifs_file_node_vargs(struct twifs_node* parent, const char* fmt, va_list args)
     char buf[VFS_NAME_MAXLEN];
     size_t len = ksnprintfv(buf, fmt, VFS_NAME_MAXLEN, args);
 
-    return __twifs_new_node(parent ? parent : fs_root, buf, len, VFS_IFSEQDEV);
+    return __twifs_new_node(parent ? parent : fs_root, buf, len, F_FILE);
 }
 
 struct twifs_node*

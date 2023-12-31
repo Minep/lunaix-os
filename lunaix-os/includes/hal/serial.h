@@ -7,7 +7,7 @@
 #include <lunaix/ds/waitq.h>
 #include <lunaix/ds/rbuffer.h>
 
-#include <hal/term.h>
+#include <usr/lunaix/serial.h>
 
 #define SERIAL_RW_RX 0x0
 #define SERIAL_RW_TX 0x1
@@ -28,7 +28,6 @@ struct serial_dev
     struct device* dev;
     struct waitq wq_rxdone;
     struct waitq wq_txdone;
-    struct term* at_term;
     void* backend;
 
     struct rbuffer rxbuf;

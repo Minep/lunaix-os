@@ -143,7 +143,7 @@ sh_loop()
 
     while (1) {
         getcwd(pwd, 512);
-        printf("[\033[2m%s\033[39;49m]$ ", pwd);
+        printf("[%s]$ ", pwd);
         int sz = read(stdin, buf, 511);
 
         if (sz < 0) {

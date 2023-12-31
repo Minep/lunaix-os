@@ -76,27 +76,36 @@ term_exec_cmd(struct device* dev, u32_t req, va_list args)
             break;
         }
         case TDEV_TCGETATTR: {
-            struct _termios* tios = va_arg(args, struct _termios*);
-            *tios = (struct _termios){.c_oflag = term->oflags,
+            struct termios* tios = va_arg(args, struct termios*);
+            *tios = (struct termios){.c_oflag = term->oflags,
                                       .c_iflag = term->iflags,
-                                      .c_lflag = term->lflags};
+                                      .c_lflag = term->lflags,
+                                      .c_cflag = term->cflags};
             memcpy(tios->c_cc, term->cc, _NCCS * sizeof(cc_t));
             tios->c_baud = term->iospeed;
         } break;
         case TDEV_TCSETATTR: {
-            struct _termios* tios = va_arg(args, struct _termios*);
+            struct termios* tios = va_arg(args, struct termios*);
             term->iflags = tios->c_iflag;
             term->oflags = tios->c_oflag;
             term->lflags = tios->c_lflag;
             memcpy(term->cc, tios->c_cc, _NCCS * sizeof(cc_t));
 
+            tcflag_t old_cf = term->cflags;
+            term->cflags = tios->c_cflag;
+
+            if (!term->tp_cap) {
+                goto done;
+            }
+
             if (tios->c_baud != term->iospeed) {
                 term->iospeed = tios->c_baud;
-                if (!term->chdev_ops.set_speed) {
-                    goto done;
-                }
 
-                term->chdev_ops.set_speed(term->chdev, tios->c_baud);
+                term->tp_cap->set_speed(term->chdev, tios->c_baud);
+            }
+
+            if (old_cf != tios->c_cflag) {
+                term->tp_cap->set_cntrl_mode(term->chdev, tios->c_cflag);
             }
         } break;
         default:
@@ -110,14 +119,14 @@ done:
 }
 
 static int
-tdev_do_write(struct device* dev, void* buf, size_t offset, size_t len)
+tdev_do_write(struct device* dev, void* buf, off_t fpos, size_t len)
 {
     struct term* tdev = termdev(dev);
     lbuf_ref_t current = ref_current(&tdev->line_out);
     size_t wrsz = 0;
     while (wrsz < len) {
         wrsz += rbuffer_puts(
-            deref(current), &((char*)buf)[offset + wrsz], len - wrsz);
+            deref(current), &((char*)buf)[wrsz], len - wrsz);
 
         if (rbuffer_full(deref(current))) {
             term_flush(tdev);
@@ -127,11 +136,11 @@ tdev_do_write(struct device* dev, void* buf, size_t offset, size_t len)
     if (!rbuffer_empty(deref(current))) {
         term_flush(tdev);
     }
-    return 0;
+    return wrsz;
 }
 
 static int
-tdev_do_read(struct device* dev, void* buf, size_t offset, size_t len)
+tdev_do_read(struct device* dev, void* buf, off_t fpos, size_t len)
 {
     struct term* tdev = termdev(dev);
     lbuf_ref_t current = ref_current(&tdev->line_in);
@@ -144,7 +153,7 @@ tdev_do_read(struct device* dev, void* buf, size_t offset, size_t len)
         }
 
         rdsz += rbuffer_gets(
-            deref(current), &((char*)buf)[offset + rdsz], len - rdsz);
+            deref(current), &((char*)buf)[rdsz], len - rdsz);
     }
 
     return rdsz;
@@ -161,6 +170,14 @@ load_default_setting(struct term* tdev)
     memcpy(tdev->cc, default_cc, _NCCS * sizeof(cc_t));
 }
 
+static void
+alloc_term_buffer(struct term* terminal, size_t sz_hlf) 
+{
+    line_alloc(&terminal->line_in, sz_hlf);
+    line_alloc(&terminal->line_out, sz_hlf);
+    terminal->scratch_pad = valloc(sz_hlf);
+}
+
 struct term*
 term_create(struct device* chardev, char* suffix)
 {
@@ -175,12 +192,12 @@ term_create(struct device* chardev, char* suffix)
 
     terminal->dev->ops.read = tdev_do_read;
     terminal->dev->ops.write = tdev_do_write;
+    terminal->dev->ops.exec_cmd = term_exec_cmd;
 
     // TODO choice of lcntl can be flexible
     terminal->lcntl = line_controls[ANSI_LCNTL];
 
-    line_alloc(&terminal->line_in, 1024);
-    line_alloc(&terminal->line_out, 1024);
+    alloc_term_buffer(terminal, 1024);
 
     if (chardev) {
         int cdev_var = DEV_VAR_FROM(chardev->ident.unique);
@@ -188,6 +205,14 @@ term_create(struct device* chardev, char* suffix)
     } else {
         register_device(terminal->dev, &termdev, "tty%d", termdev.variant++);
     }
+
+    struct capability_meta* termport_cap = device_get_capability(chardev, TERMPORT_CAP);
+    if (termport_cap) {
+        terminal->tp_cap = get_capability(termport_cap, struct termport_capability);
+    }
+
+    struct capability_meta* term_cap = new_capability_marker(TERMIOS_CAP);
+    device_grant_capability(terminal->dev, term_cap);
 
     load_default_setting(terminal);
 

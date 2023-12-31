@@ -4,6 +4,7 @@
 #include <lunaix/kcmd.h>
 #include <lunaix/fs.h>
 #include <lunaix/syslog.h>
+#include <lunaix/kprintf.h>
 
 #include <hal/term.h>
 
@@ -34,8 +35,14 @@ setup_default_tty()
 
     assert(device_addalias(NULL, dev_meta(dev), "tty"));
     
-    // TODO implement capability list
-    // for now, we just assume the parameter always pointed to valid device
+    if (!device_get_capability(dev, TERMIOS_CAP)) {
+        FATAL("not a terminal device: %s", console_dev);
+    }
+
+    INFO("system console: %s", console_dev);
+
     sysconsole = dev;
+
+    kprintf_dump_logs();
 }
-lunaix_initfn(setup_default_tty, call_on_boot);
+owloysius_fetch_init(setup_default_tty, on_boot);

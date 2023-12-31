@@ -22,12 +22,12 @@ __ansi_actcontrol(struct term* termdev, struct linebuffer* lbuf, char chr)
         default:
             if ((int)chr < 32) {
                 rbuffer_put(cooked, '^');
-                chr += 64;
+                return rbuffer_put(cooked, chr += 64);
             }
             break;
     }
 
-    return rbuffer_put(cooked, chr);
+    return rbuffer_put_nof(cooked, chr);
 }
 
 struct term_lcntl ansi_line_controller = {.process_and_put = __ansi_actcontrol};

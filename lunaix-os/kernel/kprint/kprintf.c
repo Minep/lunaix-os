@@ -87,7 +87,8 @@ kprintf_mapping_init()
 EXPORT_TWIFS_PLUGIN(kprintf, kprintf_mapping_init);
 
 
-static void kprintf_init() {
+void 
+kprintf_dump_logs() {
     if (unlikely(!sysconsole)) {
         return;
     }
@@ -98,7 +99,6 @@ static void kprintf_init() {
         sysconsole->ops.write(sysconsole, pos->content, 0, pos->len);
     }
 }
-lunaix_initfn(kprintf_init, call_on_postboot);
 
 __DEFINE_LXSYSCALL3(void, syslog, int, level, const char*, fmt, va_list, args)
 {

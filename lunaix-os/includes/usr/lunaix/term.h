@@ -67,6 +67,18 @@
 #define _B19200 19200
 #define _B38400 38400
 
+#define _CLOCAL 1
+#define _CREAD (1 << 1)
+#define _CSZ_MASK (0b11 << 2)
+#define _CS5 (0b00 << 2)
+#define _CS6 (0b01 << 2)
+#define _CS7 (0b10 << 2)
+#define _CS8 (0b11 << 2)
+#define _CSTOPB (1 << 4)
+#define _CHUPCL (1 << 5)
+#define _CPARENB (1 << 6)
+#define _CPARODD (1 << 7)
+
 #define _TCSANOW 1
 #define _TCSADRAIN 2
 #define _TCSAFLUSH 3
@@ -82,7 +94,7 @@ typedef int tcflag_t;
 typedef char cc_t;
 typedef unsigned int speed_t;
 
-struct _termios
+struct termios
 {
     tcflag_t c_iflag;
     tcflag_t c_oflag;

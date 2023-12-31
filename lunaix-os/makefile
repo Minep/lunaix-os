@@ -10,6 +10,8 @@ export ARCH
 
 DEPS := $(CC) $(LD) $(AR) xorriso grub-mkrescue
 
+CMDLINE ?= console=/dev/ttyFB0
+
 kbuild_dir := build
 kbin_dir := $(kbuild_dir)/bin
 os_img_dir := $(kbuild_dir)/img
@@ -45,9 +47,11 @@ kernel:
 	@$(MAKE) $(MKFLAGS) -I $(mkinc_dir) -f kernel.mk all
 
 .PHONY: image
+export KCMD=$(CMDLINE)
+export _OS_NAME=$(OS_NAME)
 image: usr/build kernel
 	$(call status,TASK,$(notdir $@))
-	@./config-grub.sh ${OS_NAME} $(os_img_dir)/boot/grub/grub.cfg
+	@./config-grub.sh $(os_img_dir)/boot/grub/grub.cfg
 	@cp -r usr/build/* $(os_img_dir)/usr
 	@cp -r $(kbin_dir)/* $(os_img_dir)/boot
 	@grub-mkrescue -o $(kimg) $(os_img_dir) -- -volid "$(OS_ID) $(OS_VER)" -system_id "$(OS_NAME)"
@@ -92,7 +96,6 @@ debug-qemu: all-debug
 	@QMPORT=$(QEMU_MON_PORT) gdb $(kbin) -ex "target remote localhost:1234"
 
 debug-qemu-vscode: all-debug
-	@i686-elf-objcopy --only-keep-debug $(kbin) $(kbuild_dir)/kernel.dbg
 	@qemu-system-i386 $(call get_qemu_options,$(kimg))
 	@sleep 0.5
 	@telnet 127.0.0.1 $(QEMU_MON_PORT)

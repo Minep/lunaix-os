@@ -29,6 +29,7 @@
     }
 
 #define DEBUG(fmt, ...) kprintf(KDEBUG fmt, ##__VA_ARGS__)
+#define INFO(fmt, ...) kprintf(KINFO fmt, ##__VA_ARGS__)
 #define WARN(fmt, ...) kprintf(KWARN fmt, ##__VA_ARGS__)
 #define ERROR(fmt, ...) kprintf(KERROR fmt, ##__VA_ARGS__)
 #define FATAL(fmt, ...)                                                        \
@@ -39,23 +40,4 @@
 
 void
 kprintf_m(const char* component, const char* fmt, va_list args);
-
-// TODO need more thought on it
-
-// struct klog_chunk
-// {
-//     void* log_entry;
-//     size_t max_len;
-//     size_t len;
-// };
-
-// struct klog_chunk*
-// kprintf_lcstart_m(const char* component, size_t size);
-
-// void
-// kprintf_lcappend_m(struct klog_chunk*, const char* fmt, va_list args);
-
-// void
-// kprintf_lcdone_m(struct klog_chunk*);
-
 #endif /* __LUNAIX_SYSLOG_H */
