@@ -3,7 +3,7 @@
 首先clone仓库，回滚到下面的commit。如果想编译这个版本的代码建议还是使用自行编译gcc编译器。
 
 ```sh
-git reset --hard e0ee3d449aacd33a84cb1f58961e55f9f06acb46
+git checkout e0ee3d449aacd33a84cb1f58961e55f9f06acb46
 ```
 
 读者还需要准备有makefile的基础
