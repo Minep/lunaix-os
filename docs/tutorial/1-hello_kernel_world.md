@@ -6,7 +6,7 @@
 git checkout e0ee3d449aacd33a84cb1f58961e55f9f06acb46
 ```
 
-读者还需要准备有makefile的基础
+除此之外读者还需要准备有makefile的基础。
 
 ## 项目结构
 
@@ -308,9 +308,62 @@ start_就是链接文件里面提到的ENTRY，引导程序会引导到这个指
 
 伪指令.global声明_start为全局符号。
 
-如果其他文件里面要jump到这个_start，链接时会从全局符号里面看是否存在这个符号，如果存在，则使用全局符号的地址。总之，如果要在其他文件使用这个文件的函数，需要申明成全局的。_
+下面先介绍一下符号。
 
-`.type start_, @function`申明为函数。
+先准备好两个文件：`a.c`、`a2.c`。
+
+`a.c`
+
+```c
+#include <stdio.h>
+int main()
+{
+    printf("address:%lx\n", &func);
+    return 0;
+}
+```
+
+`a2.c`
+
+```c
+#include <stdio.h>
+extern void func();
+int main()
+{
+    printf("address:%lx\n", &func);
+    return 0;
+}
+```
+
+分别把a.c和a2.c编译成object文件，会发现前者无法通过编译，后者可以。
+
+```sh
+$ gcc -m32 -c a.c -o a.o
+a.c: In function ‘main’:
+a.c:5:28: error: ‘func’ undeclared (first use in this function)
+    5 |     printf("address:%lx", &func);
+      |                            ^~~~
+a.c:5:28: note: each undeclared identifier is reported only once for each function it appears in
+```
+
+```sh
+$ gcc -m32 -c a2.c -o a2.o
+a2.c: In function ‘main’:
+a2.c:5:23: warning: format ‘%lx’ expects argument of type ‘long unsigned int’, but argument 2 has type ‘void (*)()’ [-Wformat=]
+    5 |     printf("address:%lx\n", &func);
+      |                     ~~^     ~~~~~
+      |                       |     |
+      |                       |     void (*)()
+      |                       long unsigned int
+```
+
+这就涉及到符号的概念。这里的函数是一个符号，在符号未声明时，是无法通过编译的。`extern void func();`就是用来对符号声明。使用extern就是让编译器放心，符号在其他对象文件存在。假如其他文件也没有符号，链接器就会报错了。这个时候需要检查符号是否存在。
+
+声明为全局符号相当于成为符号供应方，这样其他符号需求方才能成功链接。
+
+如果其他文件里面要jump到这个_start，链接时会从全局符号里面看是否存在这个符号，如果存在，则使用全局符号的地址。总之，如果要在其他文件使用这个文件的函数，需要声明成全局的。_
+
+`.type start_, @function`声明为函数。
 
 里面简单的初始化了esp栈顶，调用了\_kernel_init和_kernel_main。
 
@@ -318,7 +371,7 @@ start_就是链接文件里面提到的ENTRY，引导程序会引导到这个指
 
 最后就是一个死循环，防止退出。
 
-之后来看看.multiboot节
+之后来看看.multiboot节[1]
 
 ```assembly
 .section .multiboot
@@ -329,11 +382,11 @@ start_就是链接文件里面提到的ENTRY，引导程序会引导到这个指
 
 第一个.long表示在节的第一个32bits中，存储MB_MAGIC（0x1BADB002）。第三个用于配置一些选项（0x3表示在页面边界加载模块和提供内存地图）。第三个用于校验。
 
-其他类推，可以打开二进制编辑器来验证。这个节的作用就是为了满足约定。为了让GRUB 能够识别镜像文件，我们需要硬编码。最好像链接脚本那样把.multiboot放到第一个位置。
+其他类推，可以打开二进制编辑器来验证。这个节的作用就是为了满足约定。为了让GRUB 能够识别镜像文件，我们需要硬编码。最好像链接脚本那样把.multiboot放到第一个位置[2]。
 
 ### kernel/tty/tty.c
 
-根据视频中提到的文档定义宽度和长度，表示每行80个字符，总共25行（VGA文本模式）。buffer指向的是一个固定的地址，也是文档定义的。操作这个地址才能在屏幕上打印出字符。最后是两个表示当前位置的全局变量。
+根据视频中提到的文档定义宽度和长度，表示每行80个字符，总共25行（VGA文本模式）。buffer指向的是一个固定的地址[3]，也是文档定义的。操作这个地址才能在屏幕上打印出字符。最后是两个表示当前位置的全局变量。
 
 ```c
 #define TTY_WIDTH 80
@@ -394,4 +447,8 @@ void tty_put_char(char chr) {
 
 ## 参考
 
-https://wiki.osdev.org/User:Zesterer/Bare_Bones#kernel.c
+[1]https://wiki.osdev.org/Multiboot#Header_Format
+
+[2]https://wiki.osdev.org/User:Zesterer/Bare_Bones#kernel.c
+
+[3]https://en.wikipedia.org/wiki/VGA_text_mode#cite_note-cyrix-14:~:text=The%20VGA%20text%20buffer%20is%20located%20at%20physical%20memory%20address%200xB8000.
