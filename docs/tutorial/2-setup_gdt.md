@@ -44,7 +44,9 @@ _init_gdt() {
     _set_gdt_entry(1, 0, 0xfffff, SEG_R0_CODE);
 ```
 
-第0号entry默认为空，第1号的base为0、limit为0xfffff。这种分段模式叫做平坦模式，它可以映射到32位的所有内存。flags为`SEG_R0_CODE`（权限为ring0的代码段）。
+第0号entry默认为空，第1号的base为0、limit为0xfffff。这种分段模式叫做平坦模式。一个指令需要访问一个数据，地址设为x。需要先通过ds得到一个段描述符（base为0、limit为0xfffff）。因为标志位G为1，所以要在limit的20位的后面补充`fff`得到真实的地址范围上限，即x取值范围是`0x0`-`0xffffffff`。再通过0+x得到最后的地址。可以发现这个范围会映射到32位的所有内存地址。
+
+flags为`SEG_R0_CODE`（权限为ring0的代码段）。
 
 ```c
 #define SEG_R0_CODE         SD_TYPE(SEG_CODE_EXRD) | SD_CODE_DATA(1) | SD_DPL(0) | \
