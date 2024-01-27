@@ -79,7 +79,7 @@ exec_load(struct exec_container* container, struct v_file* executable)
         goto done;
     }
 
-    struct proc_mm* pvms = &container->proc->mm;
+    struct proc_mm* pvms = vmspace(container->proc);
 
     if (pvms->heap) {
         mem_unmap_region(container->vms_mnt, pvms->heap);
@@ -89,7 +89,7 @@ exec_load(struct exec_container* container, struct v_file* executable)
     if (!argv_extra[1]) {
         // If loading a statically linked file, then heap remapping we can do,
         // otherwise delayed.
-        create_heap(&container->proc->mm, PG_ALIGN(container->exe.end));
+        create_heap(vmspace(container->proc), PG_ALIGN(container->exe.end));
     }
 
     if (container->vms_mnt == VMS_SELF) {

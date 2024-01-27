@@ -191,7 +191,7 @@ mem_sync_pages(ptr_t mnt,
 
     invalidate:
         *mapping.pte &= ~PG_PRESENT;
-        pmm_free_page(KERNEL_PID, mapping.pa);
+        pmm_free_page(mapping.pa);
         cpu_flush_page((ptr_t)mapping.pte);
     }
 }
@@ -231,7 +231,7 @@ mem_unmap_region(ptr_t mnt, struct mm_region* region)
     for (size_t i = region->start; i <= region->end; i += PG_SIZE) {
         ptr_t pa = vmm_del_mapping(mnt, i);
         if (pa) {
-            pmm_free_page(__current->pid, pa);
+            pmm_free_page(pa);
         }
     }
     llist_delete(&region->head);
@@ -303,7 +303,7 @@ __unmap_overlapped_cases(ptr_t mnt,
     for (size_t i = 0; i < umps_len; i += PG_SIZE) {
         ptr_t pa = vmm_del_mapping(mnt, vmr->start + i);
         if (pa) {
-            pmm_free_page(vmr->proc_vms->pid, pa);
+            pmm_free_page(pa);
         }
     }
 
@@ -394,7 +394,7 @@ __DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
                                 .offset = offset,
                                 .type = REGION_TYPE_GENERAL,
                                 .proct = proct,
-                                .pvms = (struct proc_mm*)&__current->mm,
+                                .pvms = vmspace(__current),
                                 .vms_mnt = VMS_SELF };
 
     errno = mem_map(&result, NULL, addr_ptr, file, &param);
@@ -407,7 +407,7 @@ done:
 __DEFINE_LXSYSCALL2(int, munmap, void*, addr, size_t, length)
 {
     return mem_unmap(
-      VMS_SELF, (vm_regions_t*)&__current->mm.regions, (ptr_t)addr, length);
+      VMS_SELF, vmregions(__current), (ptr_t)addr, length);
 }
 
 __DEFINE_LXSYSCALL3(int, msync, void*, addr, size_t, length, int, flags)
@@ -417,7 +417,7 @@ __DEFINE_LXSYSCALL3(int, msync, void*, addr, size_t, length, int, flags)
     }
 
     int status = mem_msync(VMS_SELF,
-                           (vm_regions_t*)&__current->mm.regions,
+                           vmregions(__current),
                            (ptr_t)addr,
                            length,
                            flags);

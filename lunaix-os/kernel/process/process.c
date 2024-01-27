@@ -34,14 +34,14 @@ __del_pagetable(pid_t pid, ptr_t mount_point)
             x86_pte_t pte = ppt->entry[j];
             // free the 4KB data page
             if ((pte & PG_PRESENT)) {
-                pmm_free_page(pid, PG_ENTRY_ADDR(pte));
+                pmm_free_page(PG_ENTRY_ADDR(pte));
             }
         }
         // free the L2 page table
-        pmm_free_page(pid, PG_ENTRY_ADDR(ptde));
+        pmm_free_page(PG_ENTRY_ADDR(ptde));
     }
     // free the L1 directory
-    pmm_free_page(pid, PG_ENTRY_ADDR(pptd->entry[PG_MAX_ENTRIES - 1]));
+    pmm_free_page(PG_ENTRY_ADDR(pptd->entry[PG_MAX_ENTRIES - 1]));
 }
 
 __DEFINE_LXSYSCALL(pid_t, getpid)
@@ -98,8 +98,9 @@ init_proc_user_space(struct proc_info* pcb)
     /*---  分配用户栈  ---*/
 
     struct mm_region* mapped;
+    struct proc_mm* mm = vmspace(pcb);
     struct mmap_param param = { .vms_mnt = VMS_MOUNT_1,
-                                .pvms = &pcb->mm,
+                                .pvms = mm,
                                 .mlen = USR_STACK_SIZE,
                                 .proct = PROT_READ | PROT_WRITE,
                                 .flags = MAP_ANON | MAP_PRIVATE | MAP_FIXED,
@@ -111,7 +112,7 @@ init_proc_user_space(struct proc_info* pcb)
     }
 
     mapped->region_copied = __stack_copied;
-    mm_index((void**)&pcb->mm.stack, mapped);
+    mm_index((void**)&mm->stack, mapped);
 
     // TODO other uspace initialization stuff
 

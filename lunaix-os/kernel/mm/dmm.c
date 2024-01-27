@@ -36,7 +36,7 @@ create_heap(struct proc_mm* pvms, ptr_t addr)
 
 __DEFINE_LXSYSCALL1(void*, sbrk, ssize_t, incr)
 {
-    struct proc_mm* pvms = (struct proc_mm*)&__current->mm;
+    struct proc_mm* pvms = vmspace(__current);
     struct mm_region* heap = pvms->heap;
 
     assert(heap);
@@ -49,7 +49,7 @@ __DEFINE_LXSYSCALL1(void*, sbrk, ssize_t, incr)
 
 __DEFINE_LXSYSCALL1(int, brk, void*, addr)
 {
-    struct proc_mm* pvms = (struct proc_mm*)&__current->mm;
+    struct proc_mm* pvms = vmspace(__current);
     struct mm_region* heap = pvms->heap;
 
     if (!heap) {

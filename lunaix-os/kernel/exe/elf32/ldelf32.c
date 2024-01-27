@@ -31,7 +31,7 @@ elf32_smap(struct load_context* ldctx,
     uintptr_t va = phdre->p_va + base_va;
     struct exec_container* container = ldctx->container;
     struct mmap_param param = { .vms_mnt = container->vms_mnt,
-                                .pvms = &container->proc->mm,
+                                .pvms = vmspace(container->proc),
                                 .proct = proct,
                                 .offset = PG_ALIGN(phdre->p_offset),
                                 .mlen = ROUNDUP(phdre->p_memsz, PG_SIZE),

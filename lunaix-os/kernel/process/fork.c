@@ -17,7 +17,7 @@ LOG_MODULE("FORK")
 static ptr_t
 __dup_pagetable(pid_t pid, ptr_t mount_point)
 {
-    ptr_t ptd_pp = pmm_alloc_page(pid, PP_FGPERSIST);
+    ptr_t ptd_pp = pmm_alloc_page(PP_FGPERSIST);
     vmm_set_mapping(VMS_SELF, PG_MOUNT_1, ptd_pp, PG_PREM_RW, VMAP_NULL);
 
     x86_page_table* ptd = (x86_page_table*)PG_MOUNT_1;
@@ -36,7 +36,7 @@ __dup_pagetable(pid_t pid, ptr_t mount_point)
         }
 
         // 复制L2页表
-        ptr_t pt_pp = pmm_alloc_page(pid, PP_FGPERSIST);
+        ptr_t pt_pp = pmm_alloc_page(PP_FGPERSIST);
         vmm_set_mapping(VMS_SELF, PG_MOUNT_2, pt_pp, PG_PREM_RW, VMAP_NULL);
 
         x86_page_table* ppt = (x86_page_table*)(mount_point | (i << 12));
@@ -44,7 +44,7 @@ __dup_pagetable(pid_t pid, ptr_t mount_point)
 
         for (size_t j = 0; j < PG_MAX_ENTRIES; j++) {
             x86_pte_t pte = ppt->entry[j];
-            pmm_ref_page(pid, PG_ENTRY_ADDR(pte));
+            pmm_ref_page(PG_ENTRY_ADDR(pte));
             pt->entry[j] = pte;
         }
 
@@ -85,8 +85,8 @@ __mark_region(ptr_t start_vpn, ptr_t end_vpn, int attr)
     }
 }
 
-static void
-__copy_fdtable(struct proc_info* pcb)
+static inline void
+__dup_fdtable(struct proc_info* pcb)
 {
     for (size_t i = 0; i < VFS_MAX_FD; i++) {
         struct v_fd* fd = __current->fdtable->fds[i];
@@ -108,8 +108,8 @@ dup_proc()
         vfs_ref_dnode(pcb->cwd);
     }
 
-    __copy_fdtable(pcb);
-    region_copy_mm(&__current->mm, &pcb->mm);
+    __dup_fdtable(pcb);
+    procvm_dup(pcb);
     signal_dup_context(pcb->sigctx);
 
     /*
@@ -123,7 +123,7 @@ dup_proc()
     // 根据 mm_region 进一步配置页表
 
     struct mm_region *pos, *n;
-    llist_for_each(pos, n, &pcb->mm.regions, head)
+    llist_for_each(pos, n, &pcb->mm->regions, head)
     {
         // 如果写共享，则不作处理。
         if ((pos->attr & REGION_WSHARED)) {
@@ -168,8 +168,8 @@ copy_kernel_stack(struct proc_info* proc, ptr_t usedMnt)
         cpu_flush_page((ptr_t)ppte);
 
         x86_pte_t p = *ppte;
-        ptr_t ppa = vmm_dup_page(pid, PG_ENTRY_ADDR(p));
-        pmm_free_page(pid, PG_ENTRY_ADDR(p));
+        ptr_t ppa = vmm_dup_page(PG_ENTRY_ADDR(p));
+        pmm_free_page(PG_ENTRY_ADDR(p));
         *ppte = (p & 0xfff) | ppa;
     }
 

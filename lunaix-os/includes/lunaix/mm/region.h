@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_REGION_H
 #define __LUNAIX_REGION_H
 
-#include <lunaix/mm/mm.h>
+#include <lunaix/mm/procvm.h>
 
 struct mm_region*
 region_create(ptr_t start, ptr_t end, u32_t attr);

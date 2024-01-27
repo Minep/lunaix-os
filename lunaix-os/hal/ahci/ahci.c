@@ -130,13 +130,13 @@ ahci_driver_init(struct ahci_driver_param* param)
 
         if (!clbp) {
             // 每页最多4个命令队列
-            clb_pa = pmm_alloc_page(KERNEL_PID, PP_FGLOCKED);
+            clb_pa = pmm_alloc_page(PP_FGLOCKED);
             clb_pg_addr = (ptr_t)ioremap(clb_pa, 0x1000);
             memset((void*)clb_pg_addr, 0, 0x1000);
         }
         if (!fisp) {
             // 每页最多16个FIS
-            fis_pa = pmm_alloc_page(KERNEL_PID, PP_FGLOCKED);
+            fis_pa = pmm_alloc_page(PP_FGLOCKED);
             fis_pg_addr = (ptr_t)ioremap(fis_pa, 0x1000);
             memset((void*)fis_pg_addr, 0, 0x1000);
         }

@@ -90,7 +90,7 @@ vmm_lookupat(ptr_t mnt, ptr_t va, v_mapping* mapping);
  *
  */
 ptr_t
-vmm_dup_page(pid_t pid, ptr_t pa);
+vmm_dup_page(ptr_t pa);
 
 ptr_t
 vmm_dup_vmspace(pid_t pid);

@@ -11,6 +11,7 @@
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
+#include <lunaix/mm/procvm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/signal.h>
@@ -68,7 +69,7 @@ sched_init_dummy()
     dummy_proc.state = PS_READY;
     dummy_proc.parent = &dummy_proc;
     dummy_proc.pid = KERNEL_PID;
-    llist_init_head(&dummy_proc.mm.regions);
+    llist_init_head(vmregions(&dummy_proc));
 
     __current = &dummy_proc;
 }
@@ -324,14 +325,14 @@ alloc_process()
 
     proc->state = PS_CREATED;
     proc->pid = i;
-    proc->mm.pid = i;
     proc->created = clock_systime();
     proc->pgid = proc->pid;
 
     proc->sigctx = vzalloc(sizeof(struct sigctx));
     proc->fdtable = vzalloc(sizeof(struct v_fdtable));
 
-    llist_init_head(&proc->mm.regions);
+    proc->mm = procvm_create(proc);
+    
     llist_init_head(&proc->tasks);
     llist_init_head(&proc->children);
     llist_init_head(&proc->grp_member);
@@ -409,13 +410,7 @@ destroy_process(pid_t pid)
 
     vmm_mount_pd(VMS_MOUNT_1, proc->page_table);
 
-    struct mm_region *pos, *n;
-    llist_for_each(pos, n, &proc->mm.regions, head)
-    {
-        mem_sync_pages(VMS_MOUNT_1, pos, pos->start, pos->end - pos->start, 0);
-        region_release(pos);
-    }
-
+    procvm_cleanup(VMS_MOUNT_1, proc);
     __del_pagetable(pid, VMS_MOUNT_1);
 
     vmm_unmount_pd(VMS_MOUNT_1);

@@ -140,7 +140,7 @@ spawn_proc0()
 
     // 为内核创建一个专属栈空间。
     for (size_t i = 0; i < KERNEL_STACK_SIZE; i += PG_SIZE) {
-        ptr_t pa = pmm_alloc_page(KERNEL_PID, 0);
+        ptr_t pa = pmm_alloc_page(0);
         vmm_set_mapping(VMS_SELF, KERNEL_STACK + i, pa, PG_PREM_RW, VMAP_NULL);
     }
 
@@ -163,7 +163,7 @@ kmem_init(struct boot_handoff* bhctx)
     extern u8_t __kexec_end;
     // 将内核占据的页，包括前1MB，hhk_init 设为已占用
     size_t pg_count = ((ptr_t)&__kexec_end - KERNEL_EXEC) >> PG_SIZE_BITS;
-    pmm_mark_chunk_occupied(KERNEL_PID, 0, pg_count, PP_FGLOCKED);
+    pmm_mark_chunk_occupied(0, pg_count, PP_FGLOCKED);
 
     // reserve higher half
     for (size_t i = L1_INDEX(KERNEL_EXEC); i < 1023; i++) {

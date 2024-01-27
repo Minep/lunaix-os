@@ -79,6 +79,8 @@ struct proc_info
 
     /* ---- critical section end ---- */
 
+    struct thread_info* th_active;
+
     struct llist_header tasks;
     struct llist_header siblings;
     struct llist_header children;
@@ -102,20 +104,34 @@ struct proc_info
         time_t alarm_time;
     } sleep;
 
-    struct proc_mm mm;
+    struct proc_mm* mm;
     struct sigctx* sigctx;
     struct v_fdtable* fdtable;
     struct v_dnode* cwd;
 
     struct iopoll pollctx;
 };
+
 extern volatile struct proc_info* __current;
+#define current_thread (__current->th_active)
 
 #define check_kcontext() (__current->pid == KERNEL_PID)
 
 #define resume_process(proc) (proc)->state = PS_READY
 #define pause_process(proc) (proc)->state = PS_PAUSED
 #define block_process(proc) (proc)->state = PS_BLOCKED
+
+static inline struct proc_mm* 
+vmspace(struct proc_info* proc) 
+{
+    return proc->mm;
+}
+
+static inline vm_regions_t* 
+vmregions(struct proc_info* proc) 
+{
+    return &proc->mm->regions;
+}
 
 static inline void
 block_current()

@@ -19,7 +19,7 @@ x86_page_table*
 vmm_init_pd()
 {
     x86_page_table* dir =
-      (x86_page_table*)pmm_alloc_page(KERNEL_PID, PP_FGPERSIST);
+      (x86_page_table*)pmm_alloc_page(PP_FGPERSIST);
     for (size_t i = 0; i < PG_MAX_ENTRIES; i++) {
         dir->entry[i] = PTE_NULL;
     }
@@ -46,7 +46,7 @@ vmm_set_mapping(ptr_t mnt, ptr_t va, ptr_t pa, pt_attr attr, int options)
     x86_pte_t* l1pte = &l1pt->entry[l1_inx];
     if (!*l1pte) {
         x86_page_table* new_l1pt_pa =
-          (x86_page_table*)pmm_alloc_page(KERNEL_PID, PP_FGPERSIST);
+          (x86_page_table*)pmm_alloc_page(PP_FGPERSIST);
 
         // 物理内存已满！
         if (!new_l1pt_pa) {
@@ -204,9 +204,9 @@ vmm_unmount_pd(ptr_t mnt)
 }
 
 ptr_t
-vmm_dup_page(pid_t pid, ptr_t pa)
+vmm_dup_page(ptr_t pa)
 {
-    ptr_t new_ppg = pmm_alloc_page(pid, 0);
+    ptr_t new_ppg = pmm_alloc_page(0);
     vmm_set_mapping(VMS_SELF, PG_MOUNT_3, new_ppg, PG_PREM_RW, VMAP_NULL);
     vmm_set_mapping(VMS_SELF, PG_MOUNT_4, pa, PG_PREM_RW, VMAP_NULL);
 

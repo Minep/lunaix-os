@@ -48,7 +48,7 @@ intr_routine_page_fault(const isr_param* param)
 
     // XXX do kernel trigger pfault?
 
-    vm_regions_t* vmr = (vm_regions_t*)&__current->mm.regions;
+    vm_regions_t* vmr = vmregions(__current);
     struct mm_region* hit_region = region_get(vmr, ptr);
 
     if (!hit_region) {
@@ -70,9 +70,9 @@ intr_routine_page_fault(const isr_param* param)
             // normal page fault, do COW
             cpu_flush_page((ptr_t)pte);
 
-            ptr_t pa = (ptr_t)vmm_dup_page(__current->pid, PG_ENTRY_ADDR(*pte));
+            ptr_t pa = (ptr_t)vmm_dup_page(PG_ENTRY_ADDR(*pte));
 
-            pmm_free_page(__current->pid, *pte & ~0xFFF);
+            pmm_free_page(*pte & ~0xFFF);
             *pte = (*pte & 0xFFF & ~PG_DIRTY) | pa | PG_WRITE;
 
             goto resolved;
@@ -87,7 +87,7 @@ intr_routine_page_fault(const isr_param* param)
         if (!PG_IS_PRESENT(*pte)) {
             cpu_flush_page((ptr_t)pte);
 
-            ptr_t pa = pmm_alloc_page(__current->pid, 0);
+            ptr_t pa = pmm_alloc_page(0);
             if (!pa) {
                 goto oom;
             }
@@ -108,7 +108,7 @@ intr_routine_page_fault(const isr_param* param)
 
         u32_t mseg_off = (ptr - hit_region->start);
         u32_t mfile_off = mseg_off + hit_region->foff;
-        ptr_t pa = pmm_alloc_page(__current->pid, 0);
+        ptr_t pa = pmm_alloc_page(0);
 
         if (!pa) {
             goto oom;
@@ -150,6 +150,7 @@ segv_term:
     trace_printstack_isr(param);
 
     if (kernel_context(param)) {
+        ERROR("[page fault on kernel]");
         // halt kernel if segv comes from kernel space
         spin();
     }
