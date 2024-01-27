@@ -10,10 +10,16 @@
 #include <lunaix/signal.h>
 #include <lunaix/timer.h>
 #include <lunaix/types.h>
+#include <lunaix/spike.h>
 #include <stdint.h>
 #include <sys/interrupts.h>
 
-// 虽然内核不是进程，但为了区分，这里使用Pid=-1来指代内核。这主要是方便物理页所有权检查。
+/*
+    Although kernel is not a process, it is rather useful given that 
+    we might introduce concept of "kernel thread" in the future thus we can 
+    integrate some periodical, non-crucial kernel task into scheduling 
+    subsystem. (E.g., Linux's khugepaged)
+*/
 #define KERNEL_PID -1
 
 /*
@@ -46,23 +52,6 @@
 #define proc_hanged(proc) (((proc)->state) & PS_BLOCKED)
 #define proc_runnable(proc) (((proc)->state) & PS_PAUSED)
 
-struct sigact
-{
-    struct sigact* prev;
-    sigset_t sa_mask;
-    void* sa_actor;
-    void* sa_handler;
-    pid_t sender;
-};
-
-struct sighail
-{
-    sigset_t sig_pending;
-    sigset_t sig_mask;
-    struct sigact* inprogress;
-    struct sigact signals[_SIG_NUM];
-};
-
 struct proc_sig
 {
     int sig_num;
@@ -81,11 +70,12 @@ struct proc_info
 
     /* ---- critical section start ---- */
 
-    pid_t pid;
-    struct proc_info* parent;
-    isr_param* intr_ctx;
-    ptr_t ustack_top;
-    ptr_t page_table;
+    struct
+    {
+        isr_param* intr_ctx;
+        ptr_t ustack_top;
+        ptr_t page_table;
+    };
 
     /* ---- critical section end ---- */
 
@@ -95,6 +85,16 @@ struct proc_info
     struct llist_header grp_member;
     waitq_t waitqueue;
 
+    struct {
+        struct proc_info* parent;
+        pid_t pid;
+        pid_t pgid;
+        time_t created;
+        u8_t state;
+        int32_t exit_code;
+        int32_t k_status;
+    };
+
     struct
     {
         struct llist_header sleepers;
@@ -103,19 +103,15 @@ struct proc_info
     } sleep;
 
     struct proc_mm mm;
-    time_t created;
-    u8_t state;
-    int32_t exit_code;
-    int32_t k_status;
-    struct sighail sigctx;
+    struct sigctx* sigctx;
     struct v_fdtable* fdtable;
     struct v_dnode* cwd;
-    pid_t pgid;
 
     struct iopoll pollctx;
 };
-
 extern volatile struct proc_info* __current;
+
+#define check_kcontext() (__current->pid == KERNEL_PID)
 
 #define resume_process(proc) (proc)->state = PS_READY
 #define pause_process(proc) (proc)->state = PS_PAUSED
@@ -196,12 +192,6 @@ orphaned_proc(pid_t pid);
 struct proc_info*
 get_process(pid_t pid);
 
-void
-proc_setsignal(struct proc_info* proc, int signum);
-
-void
-proc_clear_signal(struct proc_info* proc);
-
 // enable interrupt upon transfer
 #define TRANSFER_IE 1
 
@@ -215,5 +205,40 @@ proc_clear_signal(struct proc_info* proc);
  */
 void
 proc_init_transfer(struct proc_info* proc, ptr_t stop, ptr_t target, int flags);
+
+#define pending_sigs(proc) ((proc)->sigctx->sig_pending)
+#define raise_signal(proc, sig) sigset_add(pending_sigs(proc), sig)
+#define sigact_of(proc, sig) ((proc)->sigctx->signals[(sig)])
+#define set_sigact(proc, sig, sigact) ((proc)->sigctx->signals[(sig)] = (sigact))
+
+static inline struct sigact*
+active_signal(struct proc_info* proc) {
+    struct sigctx* sigctx = (proc)->sigctx;
+    return sigctx->signals[sigctx->sig_active];
+} 
+
+static inline void 
+sigactive_push(struct proc_info* proc, int active_sig) {
+    struct sigctx* sigctx = proc->sigctx;
+    int prev_active = sigctx->sig_active;
+
+    assert(sigctx->signals[active_sig]);
+
+    sigctx->sig_order[active_sig] = prev_active;
+    sigctx->sig_active = active_sig;
+}
+
+static inline void 
+sigactive_pop(struct proc_info* proc) {
+    struct sigctx* sigctx = proc->sigctx;
+    int active_sig = sigctx->sig_active;
+
+    sigctx->sig_active = sigctx->sig_order[active_sig];
+    sigctx->sig_order[active_sig] = active_sig;
+}
+
+void
+proc_setsignal(struct proc_info* proc, signum_t signum);
+
 
 #endif /* __LUNAIX_PROCESS_H */

@@ -227,7 +227,7 @@ __DEFINE_LXSYSCALL3(int,
 
     // these become meaningless once execved!
     __current->ustack_top = 0;
-    proc_clear_signal(__current);
+    signal_reset_context(__current->sigctx);
 
 done:
     // set return value

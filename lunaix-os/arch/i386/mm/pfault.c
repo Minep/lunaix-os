@@ -147,9 +147,14 @@ segv_term:
           param->execp->eip,
           param->execp->err_code);
 
-    sigset_add(__current->sigctx.sig_pending, _SIGSEGV);
-
     trace_printstack_isr(param);
+
+    if (kernel_context(param)) {
+        // halt kernel if segv comes from kernel space
+        spin();
+    }
+
+    raise_signal(__current, _SIGSEGV);
 
     schedule();
     // should not reach

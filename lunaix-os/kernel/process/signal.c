@@ -5,6 +5,7 @@
 #include <lunaix/status.h>
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
+#include <lunaix/mm/valloc.h>
 
 #include <klibc/string.h>
 
@@ -14,7 +15,7 @@ LOG_MODULE("SIG")
 
 extern struct scheduler sched_ctx; /* kernel/sched.c */
 
-#define UNMASKABLE (sigset(SIGKILL) | sigset(SIGTERM))
+#define UNMASKABLE (sigset(SIGKILL) | sigset(SIGTERM) | sigset(SIGILL))
 #define TERMSIG (sigset(SIGSEGV) | sigset(SIGINT) | UNMASKABLE)
 #define CORE (sigset(SIGSEGV))
 #define within_kstack(addr)                                                    \
@@ -30,27 +31,30 @@ signal_terminate(int errcode)
 void*
 signal_dispatch()
 {
-    if (!__current->sigctx.sig_pending) {
+    if (check_kcontext()) {
+        // signal is undefined under 'kernel process'
+        return 0;
+    }
+
+    if (!pending_sigs(__current)) {
         // 没有待处理信号
         return 0;
     }
 
-    struct sighail* psig = &__current->sigctx;
-    struct sigact* prev_working = psig->inprogress;
+    struct sigctx* psig = __current->sigctx;
+    struct sigact* prev_working = active_signal(__current);
     sigset_t mask = psig->sig_mask | (prev_working ? prev_working->sa_mask : 0);
 
     int sig_selected = 31 - clz(psig->sig_pending & ~mask);
-
     sigset_clear(psig->sig_pending, sig_selected);
 
-    struct sigact* action = &psig->signals[sig_selected];
-
-    if (sig_selected == 0) {
+    if (!sig_selected) {
         // SIG0 is reserved
         return 0;
     }
 
-    if (!action->sa_actor) {
+    struct sigact* action = psig->signals[sig_selected];
+    if (!action || !action->sa_actor) {
         if (sigset_test(TERMSIG, sig_selected)) {
             signal_terminate(sig_selected);
             schedule();
@@ -60,7 +64,6 @@ signal_dispatch()
     }
 
     ptr_t ustack = __current->ustack_top;
-
     if ((int)(ustack - USR_STACK) < (int)sizeof(struct proc_sig)) {
         // 用户栈没有空间存放信号上下文
         return 0;
@@ -75,29 +78,32 @@ signal_dispatch()
 
     sigframe->saved_ictx = __current->intr_ctx;
 
-    action->prev = prev_working;
-    psig->inprogress = action;
+    sigactive_push(__current, sig_selected);
 
     return sigframe;
 }
 
-void
-proc_clear_signal(struct proc_info* proc)
+static inline void must_inline
+__set_signal(struct proc_info* proc, signum_t signum) 
 {
-    memset(&proc->sigctx, 0, sizeof(proc->sigctx));
+    raise_signal(proc, signum);
+    
+    struct sigact* sig = sigact_of(proc, signum);
+    if (sig) {
+        sig->sender = __current->pid;
+    }
 }
 
 void
-proc_setsignal(struct proc_info* proc, int signum)
+proc_setsignal(struct proc_info* proc, signum_t signum)
 {
-    sigset_add(proc->sigctx.sig_pending, signum);
-    proc->sigctx.signals[signum].sender = __current->pid;
+    __set_signal(proc, signum);
 }
 
 int
-signal_send(pid_t pid, int signum)
+signal_send(pid_t pid, signum_t signum)
 {
-    if (signum < 0 || signum >= _SIG_NUM) {
+    if (signum >= _SIG_NUM) {
         __current->k_status = EINVAL;
         return -1;
     }
@@ -125,9 +131,7 @@ send_grp: ;
     struct proc_info *pos, *n;
     llist_for_each(pos, n, &proc->grp_member, grp_member)
     {
-        struct sighail* sh = &pos->sigctx;
-        sigset_add(sh->sig_pending, signum);
-        sh->signals[signum].sender = sender_pid;
+        __set_signal(pos, signum);
     }
 
 send_single:
@@ -136,24 +140,67 @@ send_single:
         return -1;
     }
 
-    sigset_add(proc->sigctx.sig_pending, signum);
-    proc->sigctx.signals[signum].sender = sender_pid;
+    __set_signal(proc, signum);
 
     return 0;
 }
 
+void
+signal_dup_context(struct sigctx* dest_ctx) 
+{
+    struct sigctx* old_ctx = __current->sigctx;
+
+    memcpy(dest_ctx, old_ctx, sizeof(struct sigctx));
+
+    for (int i = 0; i < _SIG_NUM; i++) {
+        struct sigact* oldact = old_ctx->signals[i];
+        if (!oldact) {
+            continue;
+        }
+        
+        struct sigact* newact = valloc(sizeof(struct sigact));
+        memcpy(newact, oldact, sizeof(struct sigact));
+
+        dest_ctx->signals[i] = newact;
+    }
+}
+
+static inline void must_inline
+signal_free_sigacts(struct sigctx* sigctx) {
+    for (int i = 0; i < _SIG_NUM; i++) {
+        struct sigact* act = sigctx->signals[i];
+        if (act) {
+            vfree(act);
+        }
+    }
+} 
+
+void
+signal_reset_context(struct sigctx* sigctx) {
+    signal_free_sigacts(sigctx);
+    memset(sigctx, 0, sizeof(struct sigctx));
+}
+
+void
+signal_free_context(struct sigctx* sigctx) {
+    signal_free_sigacts(sigctx);
+    vfree(sigctx);
+}
+
 __DEFINE_LXSYSCALL1(int, sigreturn, struct proc_sig, *sig_ctx)
 {
-    __current->intr_ctx = sig_ctx->saved_ictx;
+    struct sigctx* sigctx = __current->sigctx;
+    struct sigact* active = active_signal(__current);
 
-    struct sigact* current = __current->sigctx.inprogress;
-    if (current) {
-        __current->sigctx.inprogress = current->prev;
-        current->prev = NULL;
-    } else {
-        __current->sigctx.inprogress = NULL;
+    /* We choose signal#0 as our base case, that is sig#0 means no signal.
+        Therefore, it is an ill situation to return from such sigctx.
+    */
+    if (!active) {
+        signal_terminate(SIGSEGV);
+        schedule();
     }
 
+    __current->intr_ctx = sig_ctx->saved_ictx;
     if (proc_terminated(__current)) {
         __current->exit_code |= PEXITSIG;
     } else if (sigset_test(CORE, sig_ctx->sig_num)) {
@@ -172,6 +219,8 @@ __DEFINE_LXSYSCALL1(int, sigreturn, struct proc_sig, *sig_ctx)
         signal_terminate(SIGSEGV);
     }
 
+    sigactive_pop(__current);
+
     schedule();
 
     // never reach!
@@ -181,7 +230,7 @@ __DEFINE_LXSYSCALL1(int, sigreturn, struct proc_sig, *sig_ctx)
 __DEFINE_LXSYSCALL3(
     int, sigprocmask, int, how, const sigset_t, *set, sigset_t, *oldset)
 {
-    struct sighail* sh = &__current->sigctx;
+    struct sigctx* sh = __current->sigctx;
     *oldset = sh->sig_mask;
 
     if (how == _SIG_BLOCK) {
@@ -208,7 +257,17 @@ __DEFINE_LXSYSCALL2(int, sys_sigaction, int, signum, struct sigaction*, action)
         return -1;
     }
 
-    struct sigact* sa = &__current->sigctx.signals[signum];
+    struct sigctx* sigctx = __current->sigctx;
+    if (signum == sigctx->sig_active) {
+        return -1;
+    }
+
+    struct sigact* sa = sigact_of(__current, signum);
+
+    if (!sa) {
+        sa = vzalloc(sizeof(struct sigact));
+        set_sigact(__current, signum, sa);
+    }
 
     sa->sa_actor = (void*)action->sa_sigaction;
     sa->sa_handler = (void*)action->sa_handler;
@@ -233,18 +292,18 @@ __DEFINE_LXSYSCALL2(int, kill, pid_t, pid, int, signum)
 
 __DEFINE_LXSYSCALL1(int, sigpending, sigset_t, *sigset)
 {
-    *sigset = __current->sigctx.sig_pending;
+    *sigset = pending_sigs(__current);
     return 0;
 }
 
 __DEFINE_LXSYSCALL1(int, sigsuspend, sigset_t, *mask)
 {
-    sigset_t tmp = __current->sigctx.sig_mask;
-    __current->sigctx.sig_mask = (*mask) & ~UNMASKABLE;
+    sigset_t tmp = __current->sigctx->sig_mask;
+    __current->sigctx->sig_mask = (*mask) & ~UNMASKABLE;
 
     pause_current();
     sched_yieldk();
 
-    __current->sigctx.sig_mask = tmp;
+    __current->sigctx->sig_mask = tmp;
     return -1;
 }

@@ -72,14 +72,18 @@
         movw %ax, %es
 
         movl __current, %ebx
+        movl iuesp(%esp), %eax
 
         # Save x87 context to user stack, rather than kernel's memory.
         # XXX what will happen if we triggered a page fault during fxsave?
-        # FIXME can we remove this overhead?
-        movl iuesp(%esp), %eax
-        andl $stack_alignment, %eax 
-        subl $512, %eax
-        fxsave (%eax)
+        # FIXME I think we should defer this to scheduler, and pratice lazy save/load
+        #       Doing this will also make it safe from nested interrupt due to potential 
+        #       page fault when saving
+        # FIXME Also, generalise it to any FPU context, without constraining it to x87.
+
+        #andl $stack_alignment, %eax 
+        #subl $512, %eax
+        #fxsave (%eax)
 
         # 保存用户栈顶指针。因为我们允许同级中断的产生，所以需要该手段跟踪用户栈的地址。
         movl %eax, proc_ustack_top(%ebx)     # 存入__current->ustack_top
@@ -115,7 +119,7 @@
         movl proc_ustack_top(%eax), %eax
         test %eax, %eax
         jz 1f
-        fxrstor (%eax)
+        # fxrstor (%eax)
 
 1:
         popl %eax   # discard isr_param::depth

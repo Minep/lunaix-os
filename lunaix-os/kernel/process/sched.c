@@ -25,8 +25,6 @@ volatile struct proc_info* __current;
 
 static struct proc_info dummy_proc;
 
-struct proc_info dummy;
-
 struct scheduler sched_ctx;
 
 struct cake_pile* proc_pile;
@@ -62,7 +60,7 @@ sched_init_dummy()
 
     ptr_t stktop = (ptr_t)dummy_stack + DUMMY_STACK_SIZE;
 
-    dummy_proc = (struct proc_info){};
+    memset(&dummy_proc, 0, sizeof(dummy_proc));
 
     proc_init_transfer(&dummy_proc, stktop, (ptr_t)my_dummy, TRANSFER_IE);
 
@@ -70,6 +68,7 @@ sched_init_dummy()
     dummy_proc.state = PS_READY;
     dummy_proc.parent = &dummy_proc;
     dummy_proc.pid = KERNEL_PID;
+    llist_init_head(&dummy_proc.mm.regions);
 
     __current = &dummy_proc;
 }
@@ -90,7 +89,8 @@ can_schedule(struct proc_info* proc)
         return 0;
     }
 
-    struct sighail* sh = &proc->sigctx;
+    struct sigctx* sh = proc->sigctx;
+    assert(sh);
 
     if ((proc->state & PS_PAUSED)) {
         return !!(sh->sig_pending & ~1);
@@ -297,16 +297,24 @@ done:
     return destroy_process(proc->pid);
 }
 
+static inline pid_t
+get_free_pid() {
+    pid_t i = 0;
+    
+    for (; i < sched_ctx.ptable_len && sched_ctx._procs[i]; i++)
+        ;
+    
+    if (unlikely(i == MAX_PROCESS)) {
+        panick("Panic in Ponyville shimmer!");
+    }
+
+    return i;
+}
+
 struct proc_info*
 alloc_process()
 {
-    pid_t i = 0;
-    for (; i < sched_ctx.ptable_len && sched_ctx._procs[i]; i++)
-        ;
-
-    if (i == MAX_PROCESS) {
-        panick("Panic in Ponyville shimmer!");
-    }
+    pid_t i = get_free_pid();
 
     if (i == sched_ctx.ptable_len) {
         sched_ctx.ptable_len++;
@@ -319,6 +327,8 @@ alloc_process()
     proc->mm.pid = i;
     proc->created = clock_systime();
     proc->pgid = proc->pid;
+
+    proc->sigctx = vzalloc(sizeof(struct sigctx));
     proc->fdtable = vzalloc(sizeof(struct v_fdtable));
 
     llist_init_head(&proc->mm.regions);
@@ -370,7 +380,7 @@ destroy_process(pid_t pid)
     }
 
     struct proc_info* proc = sched_ctx._procs[index];
-    sched_ctx._procs[index] = 0;
+    sched_ctx._procs[index] = NULL;
 
     llist_delete(&proc->siblings);
     llist_delete(&proc->grp_member);
@@ -394,6 +404,8 @@ destroy_process(pid_t pid)
     }
 
     vfree(proc->fdtable);
+
+    signal_free_context(proc->sigctx);
 
     vmm_mount_pd(VMS_MOUNT_1, proc->page_table);
 

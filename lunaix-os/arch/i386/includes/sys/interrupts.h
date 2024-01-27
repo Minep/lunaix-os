@@ -7,7 +7,7 @@
 #include <sys/cpu.h>
 
 #define saved_fp(isrm) ((isrm)->registers.ebp)
-#define uspace_context(isrm) (((isrm)->execp->cs) == 0x8)
+#define kernel_context(isrm) (!(((isrm)->execp->cs) & 0b11))
 
 struct exec_param;
 

@@ -173,7 +173,7 @@ trace_printstack_isr(const isr_param* isrm)
 
     while (p) {
         if (!prev_fromusr) {
-            if (uspace_context(p)) {
+            if (!kernel_context(p)) {
                 trace_printswctx(p, "s/u");
             } else {
                 trace_printswctx(p, "s/s");
@@ -185,7 +185,7 @@ trace_printstack_isr(const isr_param* isrm)
         fp = saved_fp(p);
         trace_printstack_of(fp);
 
-        prev_fromusr = uspace_context(p);
+        prev_fromusr = !kernel_context(p);
 
         p = p->execp->saved_prev_ctx;
     }

@@ -3,11 +3,12 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
-
 #include <lunaix/syscall.h>
 #include <lunaix/syscall_utils.h>
 
 #include <sys/mm/mempart.h>
+
+#include <usr/lunaix/mann_flags.h>
 
 // any size beyond this is bullshit
 #define BS_SIZE (KERNEL_EXEC - USR_MMAP)
