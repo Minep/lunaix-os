@@ -56,6 +56,7 @@
         pushl %eax
 
         movl __current, %eax
+        movl (%eax), %eax
         movl proc_intr_ctx(%eax), %eax
         incl %eax
         pushl %eax          # nested intr: current depth
@@ -72,6 +73,7 @@
         movw %ax, %es
 
         movl __current, %ebx
+        movl (%ebx), %ebx
         movl iuesp(%esp), %eax
 
         # Save x87 context to user stack, rather than kernel's memory.
@@ -86,7 +88,7 @@
         #fxsave (%eax)
 
         # 保存用户栈顶指针。因为我们允许同级中断的产生，所以需要该手段跟踪用户栈的地址。
-        movl %eax, proc_ustack_top(%ebx)     # 存入__current->ustack_top
+        movl %eax, thread_ustack_top(%ebx)     # 存入__current->ustack_top
 
     /* kernel space same-level switch */
     1:
@@ -116,7 +118,8 @@
         jz 1f 
 
         movl __current, %eax
-        movl proc_ustack_top(%eax), %eax
+        movl (%eax), %eax
+        movl thread_ustack_top(%eax), %eax
         test %eax, %eax
         jz 1f
         # fxrstor (%eax)
@@ -140,9 +143,10 @@
 
         movl %eax, tmp_store
         movl __current, %eax
+        movl (%eax), %eax
 
         # nested intr: restore saved context
-        popl proc_intr_ctx(%eax)
+        popl thread_intr_ctx(%eax)
 
         addl $8, %esp
 
@@ -164,26 +168,21 @@
 
         iret
 
-    .type switch_to, @function
-    .global switch_to
-    switch_to:
-        # 约定
-        # arg1: 目标进程PCB地址 (next
+    .type do_switch, @function
+    .global do_switch
+    do_switch:
+        # Assumption: __current already hold the target process
 
-        movl %eax, %ebx               # next
-        movl __current, %eax    
-        movl proc_page_table(%eax), %ecx     # __current->pagetable
-        movl proc_page_table(%ebx), %eax     # next->pagetable
-        
-        cmpl %ecx, %eax         # if(next->pagtable != __current->pagetable) {
+        call proc_vmroot
+
+        xorl %cr3, %eax         # avoid setting cr3 if just local thread switch.
         jz 1f
-        movl %eax, %cr3         #   cpu_lcr3(next->pagetable)
-                                # }
-    1:
-        movl %ebx, __current    # __current = next
 
-        # 我们已经处在了新的地址空间，为了避免影响其先前的栈布局
-        # 需要使用一个临时的栈空间
+        movl %eax, %cr3         
+
+    1:
+        # the address space could be changed. A temporary stack
+        # is required to prevent corrupt existing stack
         movl $tmp_stack, %esp
 
         call signal_dispatch    # kernel/signal.c
@@ -199,13 +198,14 @@
             由于这中间没有进行地址空间的交换，所以第二次跳转使用的是同一个内核栈，而之前默认tss.esp0的值是永远指向最顶部
             这样一来就有可能会覆盖更早的上下文信息（比如嵌套的信号捕获函数）
         */
-        movl proc_intr_ctx(%ebx), %ecx      # __current->intr_ctx
+        movl __current, %ebx
+        movl thread_intr_ctx(%ebx), %ecx      # __current->intr_ctx
         movl %ecx, (tss_esp0_off + _tss)
 
         jmp handle_signal
 
     1:
-        movl proc_intr_ctx(%ebx), %eax
+        movl thread_intr_ctx(%ebx), %eax
         jmp soft_iret
 
     .type handle_signal, @function 

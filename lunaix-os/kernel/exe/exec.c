@@ -222,12 +222,13 @@ __DEFINE_LXSYSCALL3(int,
 
     // we will jump to new entry point (_u_start) upon syscall's
     // return so execve 'will not return' from the perspective of it's invoker
-    eret_target(__current) = container.exe.entry;
-    eret_stack(__current) = container.stack_top;
+    eret_target(current_thread) = container.exe.entry;
+    eret_stack(current_thread) = container.stack_top;
 
     // these become meaningless once execved!
-    __current->ustack_top = 0;
-    signal_reset_context(__current->sigctx);
+    current_thread->ustack_top = 0;
+    signal_reset_context(&current_thread->sigctx);
+    signal_reset_register(__current->sigreg);
 
 done:
     // set return value

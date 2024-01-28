@@ -45,6 +45,8 @@ typedef struct llist_header vm_regions_t;
 
 struct proc_mm
 {
+    // virtual memory root (i.e. root page table)
+    ptr_t vmroot;
     vm_regions_t regions;
     struct mm_region* heap;
     struct mm_region* stack;

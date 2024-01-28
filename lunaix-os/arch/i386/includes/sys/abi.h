@@ -6,14 +6,14 @@
 #define stack_alignment 0xfffffff0
 
 #ifndef __ASM__
-#define store_retval(retval) __current->intr_ctx->registers.eax = (retval)
+#define store_retval(retval) current_thread->intr_ctx->registers.eax = (retval)
 
-#define store_retval_to(proc, retval) (proc)->intr_ctx->registers.eax = (retval)
+#define store_retval_to(th, retval) (th)->intr_ctx->registers.eax = (retval)
 
-#define eret_target(proc) (proc)->intr_ctx->execp->eip
-#define eret_stack(proc) (proc)->intr_ctx->execp->esp
-#define intr_ivec(proc) (proc)->intr_ctx->execp->vector
-#define intr_ierr(proc) (proc)->intr_ctx->execp->err_code
+#define eret_target(th) (th)->intr_ctx->execp->eip
+#define eret_stack(th) (th)->intr_ctx->execp->esp
+#define intr_ivec(th) (th)->intr_ctx->execp->vector
+#define intr_ierr(th) (th)->intr_ctx->execp->err_code
 
 #define j_usr(sp, pc)                                                          \
     asm volatile("movw %0, %%ax\n"                                             \
@@ -31,7 +31,11 @@
                  "r"(pc)                                                       \
                  : "eax", "memory");
 
-#define switch_context(process) asm volatile("jmp switch_to\n" ::"a"(process));
+
+static void inline must_inline
+switch_context() {
+    asm volatile("jmp do_switch\n");
+}
 
 #define push_arg1(stack_ptr, arg) *((typeof((arg))*)(stack_ptr)--) = arg
 #define push_arg2(stack_ptr, arg1, arg2)                                       \

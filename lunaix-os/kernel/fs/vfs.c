@@ -1337,7 +1337,7 @@ __DEFINE_LXSYSCALL2(char*, getcwd, char*, buf, size_t, size)
     ret_ptr = buf;
 
 done:
-    __current->k_status = errno;
+    syscall_result(errno);
     return ret_ptr;
 }
 

@@ -152,7 +152,7 @@ __append_pollers(int* ds, int npoller)
 static void
 __wait_until_event()
 {
-    block_current();
+    block_current_thread();
     sched_yieldk();
 }
 
@@ -201,6 +201,7 @@ iopoll_remove(pid_t pid, struct iopoll* ctx, int pld)
         return ENOENT;
     }
 
+    // FIXME vfs locking model need to rethink in the presence of threads
     vfs_pclose(poller->file_ref, pid);
     vfree(poller);
     ctx->pollers[pld] = NULL;

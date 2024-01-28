@@ -132,11 +132,13 @@ spawn_proc0()
 
     /* Ok... 首先fork进我们的零号进程，而后由那里，我们fork进init进程。 */
 
+    // FIXME adapt to thread
     // 把当前虚拟地址空间（内核）复制一份。
-    proc0->page_table = vmm_dup_vmspace(proc0->pid);
+    // proc0->page_table = vmm_dup_vmspace(proc0->pid);
 
+    // FIXME adapt to thread
     // 直接切换到新的拷贝，进行配置。
-    cpu_chvmspace(proc0->page_table);
+    // cpu_chvmspace(proc0->page_table);
 
     // 为内核创建一个专属栈空间。
     for (size_t i = 0; i < KERNEL_STACK_SIZE; i += PG_SIZE) {
@@ -149,9 +151,9 @@ spawn_proc0()
     // 向调度器注册进程。
     commit_process(proc0);
 
-    // 由于时钟中断与APIC未就绪，我们需要手动进行第一次调度。这里也会同时隐式地恢复我们的eflags.IF位
-    proc0->state = PS_RUNNING;
-    switch_context(proc0);
+    // FIXME adapt to thread
+    // proc0->state = PS_RUNNING;
+    // switch_context(proc0);
 
     /* Should not return */
     assert_msg(0, "Unexpected Return");

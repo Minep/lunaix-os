@@ -67,11 +67,9 @@ exuss:
 
 /* struct layout: critical section of struct proc_info */
     .struct 0
-proc_intr_ctx:
-    .struct proc_intr_ctx + regsize
-proc_ustack_top:
-    .struct proc_ustack_top + regsize
-proc_page_table:
+thread_intr_ctx:
+    .struct thread_intr_ctx + regsize
+thread_ustack_top:
 
 /* struct layout: proc_sig */
     .struct 0

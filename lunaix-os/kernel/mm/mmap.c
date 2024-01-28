@@ -400,7 +400,7 @@ __DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
     errno = mem_map(&result, NULL, addr_ptr, file, &param);
 
 done:
-    __current->k_status = errno;
+    syscall_result(errno);
     return result;
 }
 

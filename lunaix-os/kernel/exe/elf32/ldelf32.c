@@ -48,7 +48,7 @@ elf32_smap(struct load_context* ldctx,
         ldctx->mem_sz += phdre->p_memsz;
     } else {
         // we probably fucked up our process
-        terminate_proc(-1);
+        terminate_current(-1);
     }
 
     return status;

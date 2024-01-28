@@ -155,7 +155,7 @@ segv_term:
         spin();
     }
 
-    raise_signal(__current, _SIGSEGV);
+    thread_setsignal(current_thread, _SIGSEGV);
 
     schedule();
     // should not reach

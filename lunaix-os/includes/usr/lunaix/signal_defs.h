@@ -5,10 +5,10 @@
 #define SIGCHLD 2
 #define SIGCLD SIGCHLD
 
-#define SIGSTOP 3
-#define SIGCONT 4
+#define SIGINT 3
+#define SIGSTOP 4
+#define SIGCONT 5
 
-#define SIGINT 5
 #define SIGSEGV 6
 #define SIGKILL 7
 #define SIGTERM 8
