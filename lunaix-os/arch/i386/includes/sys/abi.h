@@ -6,6 +6,7 @@
 #define stack_alignment 0xfffffff0
 
 #ifndef __ASM__
+#define align_stack(ptr) ((ptr) & stack_alignment)
 #define store_retval(retval) current_thread->intr_ctx->registers.eax = (retval)
 
 #define store_retval_to(th, retval) (th)->intr_ctx->registers.eax = (retval)
@@ -32,7 +33,7 @@
                  : "eax", "memory");
 
 
-static void inline must_inline
+static void inline must_inline noret
 switch_context() {
     asm volatile("jmp do_switch\n");
 }

@@ -1,9 +1,6 @@
 #ifndef __LUNAIX_MM_H
 #define __LUNAIX_MM_H
 
-#include <lunaix/ds/llist.h>
-#include <lunaix/ds/mutex.h>
-#include <lunaix/fs.h>
 #include <lunaix/types.h>
 
 #include <usr/lunaix/mann_flags.h>
@@ -37,6 +34,7 @@
 #define REGION_EXEC PROT_EXEC
 #define REGION_ANON MAP_ANON
 #define REGION_RW REGION_READ | REGION_WRITE
+#define REGION_KERNEL (1 << 31)
 
 #define REGION_TYPE_CODE (1 << 16)
 #define REGION_TYPE_GENERAL (2 << 16)

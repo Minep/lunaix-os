@@ -1,5 +1,4 @@
 #include <sys/abi.h>
-#include <sys/interrupts.h>
 #include <sys/mm/mempart.h>
 
 #include <hal/intc.h>
@@ -19,22 +18,18 @@
 #include <lunaix/status.h>
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
+#include <lunaix/pcontext.h>
 
 #include <klibc/string.h>
 
 volatile struct proc_info* __current;
 volatile struct thread* current_thread;
 
-static struct proc_info dummy_proc;
-
 struct scheduler sched_ctx;
 
 struct cake_pile *proc_pile ,*thread_pile;
 
 LOG_MODULE("SCHED")
-
-void
-sched_init_dummy();
 
 void
 sched_init()
@@ -48,38 +43,6 @@ sched_init()
         .procs = vzalloc(PROC_TABLE_SIZE), .ptable_len = 0, .procs_index = 0};
     
     llist_init_head(&sched_ctx.sleepers);
-
-    // TODO initialize dummy_proc
-    sched_init_dummy();
-}
-
-#define DUMMY_STACK_SIZE 2048
-
-void
-sched_init_dummy()
-{
-    // This surely need to be simplified or encapsulated!
-    // It is a living nightmare!
-
-    // FIXME to accommodate thread
-
-    extern void my_dummy();
-    static char dummy_stack[DUMMY_STACK_SIZE] __attribute__((aligned(16)));
-
-    ptr_t stktop = (ptr_t)dummy_stack + DUMMY_STACK_SIZE;
-
-    memset(&dummy_proc, 0, sizeof(dummy_proc));
-
-    proc_init_transfer(&dummy_proc, stktop, (ptr_t)my_dummy, TRANSFER_IE);
-
-    // FIXME
-    // dummy_proc.page_table = cpu_ldvmspace();
-    dummy_proc.state = PS_READY;
-    dummy_proc.parent = &dummy_proc;
-    dummy_proc.pid = KERNEL_PID;
-    llist_init_head(vmregions(&dummy_proc));
-
-    __current = &dummy_proc;
 }
 
 void
@@ -99,6 +62,11 @@ can_schedule(struct thread* thread)
 {
     if (!thread) {
         return 0;
+    }
+
+    if (unlikely(kernel_process(thread->process))) {
+        // a kernel process is always runnable
+        return thread->state == PS_READY;
     }
 
     struct proc_info* proc = thread->process;
@@ -148,8 +116,7 @@ check_sleepers()
 
         if (atime && now >= atime) {
             pos->sleep.alarm_time = 0;
-            // FIXME set signal to thread
-            proc_setsignal(pos, _SIGALRM);
+            thread_setsignal(pos, _SIGALRM);
         }
 
         if (!wtime && !atime) {
@@ -340,6 +307,7 @@ alloc_thread(struct proc_info* process) {
 
     th->process = process;
     th->tid = process->thread_count++;
+    th->state = PS_CREATED;
     
     llist_init_head(&th->sleep.sleepers);
     llist_init_head(&th->sched_sibs);
@@ -395,6 +363,8 @@ commit_thread(struct thread* thread) {
     } else {
         sched_ctx.threads = &thread->sched_sibs;
     }
+
+    thread->state = PS_READY;
 }
 
 void
@@ -405,7 +375,11 @@ commit_process(struct proc_info* process)
 
     // every process is the child of first process (pid=1)
     if (!process->parent) {
-        process->parent = sched_ctx.procs[1];
+        if (likely(!kernel_process(process))) {
+            process->parent = sched_ctx.procs[1];
+        } else {
+            process->parent = process;
+        }
     } else {
         assert(!proc_terminated(process->parent));
     }
@@ -430,17 +404,11 @@ destory_thread(struct thread* thread)
     cake_release(thread_pile, thread);
 }
 
-pid_t
-destroy_process(pid_t pid)
+void 
+delete_process(struct proc_info* proc)
 {
-    int index = pid;
-    if (index <= 0 || index > sched_ctx.ptable_len) {
-        syscall_result(EINVAL);
-        return -1;
-    }
-
-    struct proc_info* proc = sched_ctx.procs[index];
-    sched_ctx.procs[index] = NULL;
+    pid_t pid = proc->pid;
+    sched_ctx.procs[pid] = NULL;
 
     struct thread *pos, *n;
     llist_for_each(pos, n, &__current->threads, proc_sibs) {
@@ -477,6 +445,19 @@ destroy_process(pid_t pid)
     vmm_unmount_pd(VMS_MOUNT_1);
 
     cake_release(proc_pile, proc);
+}
+
+pid_t
+destroy_process(pid_t pid)
+{
+    int index = pid;
+    if (index <= 0 || index > sched_ctx.ptable_len) {
+        syscall_result(EINVAL);
+        return -1;
+    }
+
+    struct proc_info* proc = sched_ctx.procs[index];
+    delete_process(proc);
 
     return pid;
 }

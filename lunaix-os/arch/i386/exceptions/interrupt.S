@@ -55,8 +55,7 @@
         pushl %ebx
         pushl %eax
 
-        movl __current, %eax
-        movl (%eax), %eax
+        movl current_thread, %eax
         movl proc_intr_ctx(%eax), %eax
         incl %eax
         pushl %eax          # nested intr: current depth
@@ -72,8 +71,7 @@
         movw %ax, %ds
         movw %ax, %es
 
-        movl __current, %ebx
-        movl (%ebx), %ebx
+        movl current_thread, %ebx
         movl iuesp(%esp), %eax
 
         # Save x87 context to user stack, rather than kernel's memory.
@@ -117,8 +115,7 @@
         andl $3, %eax
         jz 1f 
 
-        movl __current, %eax
-        movl (%eax), %eax
+        movl current_thread, %eax
         movl thread_ustack_top(%eax), %eax
         test %eax, %eax
         jz 1f
@@ -142,8 +139,7 @@
         movl 16(%esp), %esp
 
         movl %eax, tmp_store
-        movl __current, %eax
-        movl (%eax), %eax
+        movl current_thread, %eax
 
         # nested intr: restore saved context
         popl thread_intr_ctx(%eax)
@@ -175,10 +171,11 @@
 
         call proc_vmroot
 
+        movl %eax, %ebx
         xorl %cr3, %eax         # avoid setting cr3 if just local thread switch.
         jz 1f
 
-        movl %eax, %cr3         
+        movl %ebx, %cr3         
 
     1:
         # the address space could be changed. A temporary stack
@@ -198,7 +195,7 @@
             由于这中间没有进行地址空间的交换，所以第二次跳转使用的是同一个内核栈，而之前默认tss.esp0的值是永远指向最顶部
             这样一来就有可能会覆盖更早的上下文信息（比如嵌套的信号捕获函数）
         */
-        movl __current, %ebx
+        movl current_thread, %ebx
         movl thread_intr_ctx(%ebx), %ecx      # __current->intr_ctx
         movl %ecx, (tss_esp0_off + _tss)
 

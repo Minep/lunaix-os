@@ -11,16 +11,9 @@
 #include <lunaix/timer.h>
 #include <lunaix/types.h>
 #include <lunaix/spike.h>
+#include <lunaix/pcontext.h>
 #include <stdint.h>
-#include <sys/interrupts.h>
 
-/*
-    Although kernel is not a process, it is rather useful given that 
-    we might introduce concept of "kernel thread" in the future thus we can 
-    integrate some periodical, non-crucial kernel task into scheduling 
-    subsystem. (E.g., Linux's khugepaged)
-*/
-#define KERNEL_PID -1
 
 /*
     |C|Sp|Bk|De|Tn|Pu|Rn|
@@ -92,6 +85,11 @@ struct thread
         ptr_t exit_val;
     };
 
+    struct {
+        ptr_t kstack;   // process local kernel stack
+        ptr_t ustack;   // process local user stack (undefined for kernel thread)
+    };
+
     struct haybed sleep;
 
     struct proc_info* process;
@@ -141,7 +139,11 @@ struct proc_info
 extern volatile struct proc_info* __current;
 extern volatile struct thread* current_thread;
 
-#define check_kcontext() (__current->pid == KERNEL_PID)
+/**
+ * @brief Check if current process belong to kernel itself
+ * (pid=0)
+ */
+#define kernel_process(proc) (!(proc)->pid)
 
 #define resume_thread(th) (th)->state = PS_READY
 #define pause_thread(th) (th)->state = PS_PAUSED
@@ -195,6 +197,33 @@ static inline int syscall_result(int retval) {
 }
 
 /**
+ * @brief Spawn a process with arbitary entry point. 
+ *        The inherit priviledge level is deduced automatically
+ *        from the given entry point
+ * 
+ * @param created returned created main thread
+ * @param entry entry point
+ * @param with_ustack whether to pre-allocate a user stack with it
+ * @return int 
+ */
+int
+spawn_process(struct thread** created, ptr_t entry, bool with_ustack);
+
+/**
+ * @brief Spawn a process that housing a given executable image as well as 
+ *        program argument and environment setting
+ * 
+ * @param created returned created main thread
+ * @param path file system path to executable
+ * @param argv arguments passed to executable
+ * @param envp environment variables passed to executable
+ * @return int 
+ */
+int
+spawn_process_usr(struct thread** created, char* path, 
+                    const char** argv, const char** envp);
+
+/**
  * @brief 分配并初始化一个进程控制块
  *
  * @return struct proc_info*
@@ -220,6 +249,9 @@ commit_process(struct proc_info* process);
 
 pid_t
 destroy_process(pid_t pid);
+
+void 
+delete_process(struct proc_info* proc);
 
 /**
  * @brief 复制当前进程（LunaixOS的类 fork (unix) 实现）
@@ -251,20 +283,6 @@ orphaned_proc(pid_t pid);
 struct proc_info*
 get_process(pid_t pid);
 
-// enable interrupt upon transfer
-#define TRANSFER_IE 1
-
-/**
- * @brief Setup process initial context, used to initiate first switch
- *
- * @param proc
- * @param stop
- * @param target
- * @param flags
- */
-void
-proc_init_transfer(struct proc_info* proc, ptr_t stop, ptr_t target, int flags);
-
 /* 
     ========= Thread =========
 */
@@ -283,6 +301,12 @@ terminate_thread(struct thread* thread, ptr_t val);
 
 void
 terminate_current_thread(ptr_t val);
+
+struct thread*
+spawn_thread(struct proc_info* proc, ptr_t vm_mnt, bool with_ustack);
+
+void
+start_thread(struct thread* th, ptr_t vm_mnt, ptr_t entry);
 
 /* 
     ========= Signal =========

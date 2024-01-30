@@ -19,7 +19,7 @@ extern struct scheduler sched_ctx; /* kernel/sched.c */
 #define TERMSIG (sigset(SIGSEGV) | sigset(SIGINT) | UNMASKABLE)
 #define CORE (sigset(SIGSEGV))
 #define within_kstack(addr)                                                    \
-    (KERNEL_STACK <= (addr) && (addr) <= KERNEL_STACK_END)
+    (KSTACK_AREA <= (addr) && (addr) <= KSTACK_AREA_END)
 
 static inline void
 signal_terminate(int caused_by)
@@ -31,7 +31,7 @@ signal_terminate(int caused_by)
 void*
 signal_dispatch()
 {
-    if (check_kcontext()) {
+    if (kernel_process(__current)) {
         // signal is undefined under 'kernel process'
         return 0;
     }
@@ -112,19 +112,29 @@ __set_signal_all_threads(struct proc_info* proc, signum_t signum)
 void
 thread_setsignal(struct thread* thread, signum_t signum)
 {
+    if (unlikely(kernel_process(thread->process))) {
+        return;
+    }
+
     __set_signal(thread, signum);
 }
 
 void
 proc_setsignal(struct proc_info* proc, signum_t signum)
 {
+    if (unlikely(kernel_process(proc))) {
+        return;
+    }
+
     // FIXME handle signal delivery at process level.
     switch (signum)
     {
     case SIGKILL:
         signal_terminate(signum);
         break;
-    
+    case SIGCONT:
+    case SIGSTOP:
+        __set_signal_all_threads(proc, signum);
     default:
         break;
     }

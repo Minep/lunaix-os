@@ -11,16 +11,24 @@ struct mmap_param
     struct proc_mm* pvms; // process vm
     off_t offset;         // mapped file offset
     size_t mlen;          // mapped memory length
-    size_t flen;          // mapped file length
     u32_t proct;          // protections
     u32_t flags;          // other options
     u32_t type;           // region type
+    ptr_t range_start;
+    ptr_t range_end;
 };
 
 int
 mem_adjust_inplace(vm_regions_t* regions,
                    struct mm_region* region,
                    ptr_t newend);
+
+int 
+mmap_user(void** addr_out,
+        struct mm_region** created,
+        ptr_t addr,
+        struct v_file* file,
+        struct mmap_param* param);
 
 int
 mem_map(void** addr_out,

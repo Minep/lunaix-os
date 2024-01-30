@@ -17,22 +17,19 @@
 #include <lunaix/trace.h>
 #include <lunaix/tty/tty.h>
 #include <lunaix/owloysius.h>
+#include <lunaix/pcontext.h>
 
 #include <hal/acpi/acpi.h>
 #include <hal/intc.h>
 
 #include <sys/abi.h>
-#include <sys/interrupts.h>
 #include <sys/mm/mempart.h>
 
 #include <klibc/strfmt.h>
 #include <klibc/string.h>
 
-extern void
-__proc0(); /* proc0.c */
-
 void
-spawn_proc0();
+spawn_lunad();
 
 void
 kmem_init(struct boot_handoff* bhctx);
@@ -98,64 +95,27 @@ kernel_bootstrap(struct boot_handoff* bhctx)
      */
     boot_end(bhctx);
 
-    spawn_proc0();
+    spawn_lunad();
 }
 
+extern void
+lunad_main();
+
 /**
- * @brief 创建并运行proc0进程
+ * @brief 创建并运行Lunaix守护进程
  *
  */
 void
-spawn_proc0()
+spawn_lunad()
 {
-    struct proc_info* proc0 = alloc_process();
+    int has_error;
+    struct thread* kthread;
+    
+    has_error = spawn_process(&kthread, lunad_main, false);
+    assert_msg(!has_error, "failed to spawn lunad");
 
-    /**
-     * @brief
-     * 注意：这里和视频中说的不一样，属于我之后的一点微调。
-     * 在视频中，spawn_proc0是在_kernel_post_init的末尾才调用的。并且是直接跳转到_proc0
-     *
-     * 但是我后来发现，上述的方法会产生竞态条件。这是因为spawn_proc0被调用的时候，时钟中断已经开启，
-     * 而中断的产生会打乱栈的布局，从而使得下面的上下文设置代码产生未定义行为（Undefined
-     * Behaviour）。 为了保险起见，有两种办法：
-     *      1. 在创建proc0进程前关闭中断
-     *      2. 将_kernel_post_init搬进proc0进程
-     * （_kernel_post_init已经更名为init_platform）
-     *
-     * 目前的解决方案是2
-     */
-
-    proc0->parent = proc0;
-
-    // 方案1：必须在读取eflags之后禁用。否则当进程被调度时，中断依然是关闭的！
-    // cpu_disable_interrupt();
-
-    /* Ok... 首先fork进我们的零号进程，而后由那里，我们fork进init进程。 */
-
-    // FIXME adapt to thread
-    // 把当前虚拟地址空间（内核）复制一份。
-    // proc0->page_table = vmm_dup_vmspace(proc0->pid);
-
-    // FIXME adapt to thread
-    // 直接切换到新的拷贝，进行配置。
-    // cpu_chvmspace(proc0->page_table);
-
-    // 为内核创建一个专属栈空间。
-    for (size_t i = 0; i < KERNEL_STACK_SIZE; i += PG_SIZE) {
-        ptr_t pa = pmm_alloc_page(0);
-        vmm_set_mapping(VMS_SELF, KERNEL_STACK + i, pa, PG_PREM_RW, VMAP_NULL);
-    }
-
-    proc_init_transfer(proc0, KERNEL_STACK_END, (ptr_t)__proc0, 0);
-
-    // 向调度器注册进程。
-    commit_process(proc0);
-
-    // FIXME adapt to thread
-    // proc0->state = PS_RUNNING;
-    // switch_context(proc0);
-
-    /* Should not return */
+    run(kthread);
+    
     assert_msg(0, "Unexpected Return");
 }
 

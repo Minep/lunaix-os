@@ -24,7 +24,7 @@ create_heap(struct proc_mm* pvms, ptr_t addr)
                                     .mlen = PG_SIZE };
     int status = 0;
     struct mm_region* heap;
-    if ((status = mem_map(NULL, &heap, addr, NULL, &map_param))) {
+    if ((status = mmap_user(NULL, &heap, addr, NULL, &map_param))) {
         return status;
     }
 

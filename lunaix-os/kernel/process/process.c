@@ -1,6 +1,7 @@
 #include <klibc/string.h>
 #include <lunaix/clock.h>
 #include <lunaix/mm/mmap.h>
+#include <lunaix/mm/vmm.h>
 #include <lunaix/mm/region.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/process.h>
@@ -8,9 +9,11 @@
 #include <lunaix/status.h>
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
+#include <lunaix/exec.h>
+#include <lunaix/fs.h>
 
 #include <sys/abi.h>
-#include <sys/mm/mempart.h>
+#include <sys/mm/mm_defs.h>
 
 LOG_MODULE("PROC")
 
@@ -54,40 +57,73 @@ __DEFINE_LXSYSCALL2(int, setpgid, pid_t, pid, pid_t, pgid)
     return 0;
 }
 
-static void
-__stack_copied(struct mm_region* region)
+int
+spawn_process(struct thread** created, ptr_t entry, bool with_ustack) 
 {
-    mm_index((void**)&region->proc_vms->stack, region);
-}
+    struct proc_info* kproc = alloc_process();
 
-void
-init_proc_user_space(struct proc_info* pcb)
-{
-    vmm_mount_pd(VMS_MOUNT_1, vmroot(pcb));
+    vmm_mount_pd(VMS_MOUNT_1, vmroot(kproc));
+    
+    struct thread* kthread = spawn_thread(kproc, VMS_MOUNT_1, with_ustack);
 
-    /*---  分配用户栈  ---*/
-
-    struct mm_region* mapped;
-    struct proc_mm* mm = vmspace(pcb);
-    struct mmap_param param = { .vms_mnt = VMS_MOUNT_1,
-                                .pvms = mm,
-                                .mlen = USR_STACK_SIZE,
-                                .proct = PROT_READ | PROT_WRITE,
-                                .flags = MAP_ANON | MAP_PRIVATE | MAP_FIXED,
-                                .type = REGION_TYPE_STACK };
-
-    int status = 0;
-    if ((status = mem_map(NULL, &mapped, USR_STACK, NULL, &param))) {
-        kprintf(KFATAL "fail to alloc user stack: %d", status);
+    if (!kthread) {
+        vmm_unmount_pd(VMS_MOUNT_1);
+        delete_process(kproc);
+        return -1;
     }
 
-    mapped->region_copied = __stack_copied;
-    mm_index((void**)&mm->stack, mapped);
-
-    // TODO other uspace initialization stuff
+    commit_process(kproc);
+    start_thread(kproc, VMS_MOUNT_1, entry);
 
     vmm_unmount_pd(VMS_MOUNT_1);
+
+    if (created) {
+        *created = kthread;
+    }
+
+    return 0;
 }
+
+int
+spawn_process_usr(struct thread** created, char* path, 
+                    const char** argv, const char** envp)
+{
+    // FIXME remote injection of user stack not yet implemented
+
+    struct proc_info* proc = alloc_process();
+    
+    assert(!kernel_process(proc));
+
+    vmm_mount_pd(VMS_MOUNT_1, vmroot(proc));
+
+    struct thread* main_thread;
+    if (!(main_thread = spawn_thread(proc, VMS_MOUNT_1, true))) {
+        goto fail;
+    }
+
+    int errno;
+    struct exec_container container;
+    exec_init_container(&container, main_thread, VMS_MOUNT_1, argv, envp);
+    if ((errno = exec_load_byname(&container, path))) {
+        goto fail;
+    }
+
+    commit_process(proc);
+    start_thread(main_thread, VMS_MOUNT_1, container.exe.entry);
+
+    if (created) {
+        *created = main_thread;
+    }
+
+    vmm_unmount_pd(VMS_MOUNT_1);
+    return 0;
+
+fail:
+    vmm_unmount_pd(VMS_MOUNT_1);
+    delete_process(proc);
+    return errno;
+}
+
 
 ptr_t proc_vmroot() {
     return __current->mm->vmroot;

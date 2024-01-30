@@ -1,7 +1,18 @@
 #ifndef __LUNAIX_REGION_H
 #define __LUNAIX_REGION_H
 
+#include <lunaix/mm/mm.h>
 #include <lunaix/mm/procvm.h>
+
+static int inline
+stack_region(struct mm_region* region) {
+    return region->attr & REGION_TYPE_STACK;
+}
+
+static int inline
+region_contains(struct mm_region* region, ptr_t ptr) {
+    return region->start <= ptr && ptr < region->end;
+}
 
 struct mm_region*
 region_create(ptr_t start, ptr_t end, u32_t attr);

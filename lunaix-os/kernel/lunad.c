@@ -51,8 +51,17 @@ fail:
     return 0;
 }
 
+static void
+lunad_do_usr() {
+    // No, these are not preemptive
+    cpu_disable_interrupt();
+    if (!mount_bootmedium() || !exec_initd()) {
+        fail("failed to initd");
+    }
+}
+
 /**
- * @brief LunaixOS的零号进程，该进程永远为可执行。
+ * @brief LunaixOS的内核进程，该进程永远为可执行。
  *
  * 这主要是为了保证调度器在没有进程可调度时依然有事可做。
  *
@@ -60,7 +69,7 @@ fail:
  *
  */
 void
-__proc0()
+lunad_main()
 {
     /*
      * We must defer boot code/data cleaning to here, after we successfully
@@ -69,12 +78,25 @@ __proc0()
     boot_cleanup();
 
     init_platform();
+    
+    // spawn our init process. (use `spawn_process_usr` when ready)
+    spawn_process(NULL, lunad_do_usr, true);
 
-    init_proc_user_space(__current);
+    /*
+        NOTE Kernel preemption after this point.
 
-    if (!mount_bootmedium() || !exec_initd()) {
-        FATAL("failed to initd");
-        // should not reach
+        More specifically, it is not a real kernel preemption (as in preemption
+        happened at any point of kernel, except those marked explicitly).
+        In Lunaix, things are designed in an non-preemptive fashion, we implement 
+        kernel preemption the other way around: only selected kernel functions which,
+        of course, with great care of preemptive assumption, will goes into kernel 
+        thread (which is preemptive!)
+    */
+
+    cpu_enable_interrupt();
+    while (1)
+    {
+        cpu_wait();
     }
 }
 

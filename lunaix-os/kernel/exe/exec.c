@@ -16,18 +16,19 @@
 #include <klibc/string.h>
 
 void
-exec_container(struct exec_container* param,
-               struct proc_info* proc,
+exec_init_container(struct exec_container* param,
+               struct thread* thread,
                ptr_t vms,
                const char** argv,
                const char** envp)
 {
-    *param = (struct exec_container){ .proc = proc,
+    *param = (struct exec_container){ .proc = thread->process,
                                       .vms_mnt = vms,
                                       .exe = { .container = param },
                                       .argv_pp = { 0, 0 },
                                       .argv = argv,
-                                      .envp = envp };
+                                      .envp = envp,
+                                      .stack_top = thread->ustack };
 }
 
 size_t
@@ -95,7 +96,7 @@ exec_load(struct exec_container* container, struct v_file* executable)
     if (container->vms_mnt == VMS_SELF) {
         // we are loading executable into current addr space
 
-        ptr_t ustack = USR_STACK_END;
+        ptr_t ustack = container->stack_top;
         size_t argv_len = 0, envp_len = 0;
         ptr_t argv_ptr = 0, envp_ptr = 0;
 
@@ -172,6 +173,12 @@ exec_load_byname(struct exec_container* container, const char* filename)
 
     errno = exec_load(container, file);
 
+    // It shouldn't matter which pid we passed. As the only reader is 
+    //  in current context and we must finish read at this point,
+    //  therefore the dead-lock condition will not exist and the pid
+    //  for arbitration has no use.
+    vfs_pclose(file, container->proc->pid);
+
 done:
     return errno;
 }
@@ -182,8 +189,7 @@ exec_kexecve(const char* filename, const char* argv[], const char* envp[])
     int errno = 0;
     struct exec_container container;
 
-    exec_container(
-      &container, (struct proc_info*)__current, VMS_SELF, argv, envp);
+    exec_init_container(&container, current_thread, VMS_SELF, argv, envp);
 
     errno = exec_load_byname(&container, filename);
 
@@ -213,8 +219,8 @@ __DEFINE_LXSYSCALL3(int,
     int errno = 0;
     struct exec_container container;
 
-    exec_container(
-      &container, (struct proc_info*)__current, VMS_SELF, argv, envp);
+    exec_init_container(
+      &container, current_thread, VMS_SELF, argv, envp);
 
     if ((errno = exec_load_byname(&container, filename))) {
         goto done;

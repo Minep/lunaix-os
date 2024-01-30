@@ -4,6 +4,7 @@
 #include "vectors.h"
 
 #ifndef __ASM__
+#include <lunaix/compiler.h>
 #include <sys/cpu.h>
 
 #define saved_fp(isrm) ((isrm)->registers.ebp)
@@ -24,9 +25,9 @@ struct regcontext
     u32_t es;
     u32_t fs;
     u32_t gs;
-} __attribute__((packed));
+} compact;
 
-typedef struct
+struct pcontext
 {
     unsigned int depth;
     struct regcontext registers;
@@ -35,11 +36,11 @@ typedef struct
         u32_t esp;
         volatile struct exec_param* execp;
     };
-} __attribute__((packed)) isr_param;
+} compact;
 
 struct exec_param
 {
-    isr_param* saved_prev_ctx;
+    struct pcontext* saved_prev_ctx;
     u32_t vector;
     u32_t err_code;
     u32_t eip;
@@ -47,12 +48,7 @@ struct exec_param
     u32_t eflags;
     u32_t esp;
     u32_t ss;
-} __attribute__((packed));
-
-#define ISR_PARAM_SIZE sizeof(isr_param)
-
-void
-exception_init();
+} compact;
 
 #endif
 

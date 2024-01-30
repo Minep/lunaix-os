@@ -12,7 +12,7 @@
 #define __LUNAIX_ISRM_H
 
 #include <lunaix/types.h>
-#include <sys/interrupts.h>
+#include <lunaix/pcontext.h>
 
 typedef void (*isr_cb)(const isr_param*);
 

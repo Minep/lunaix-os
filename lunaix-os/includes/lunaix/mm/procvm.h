@@ -49,18 +49,38 @@ struct proc_mm
     ptr_t vmroot;
     vm_regions_t regions;
     struct mm_region* heap;
-    struct mm_region* stack;
     struct proc_info* proc;
 };
 
+/**
+ * @brief Create a process virtual memory space descriptor
+ * 
+ * @param proc 
+ * @return struct proc_mm* 
+ */
 struct proc_mm*
 procvm_create(struct proc_info* proc);
 
+/**
+ * @brief Initialize the vm of `proc` to duplication of current process
+ * 
+ * @param proc 
+ * @return struct proc_mm* 
+ */
 void
 procvm_dup(struct proc_info* proc);
 
 void
 procvm_cleanup(ptr_t vm_mnt, struct proc_info* proc);
 
+
+/**
+ * @brief Initialize the vm of `proc` as a clean slate which contains
+ * nothing but shared global mapping of kernel image.
+ * 
+ * @param proc 
+ */
+void
+procvm_init_clean(struct proc_info* proc);
 
 #endif /* __LUNAIX_PROCVM_H */

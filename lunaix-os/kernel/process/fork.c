@@ -2,6 +2,7 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/mm/pmm.h>
+#include <lunaix/mm/mmap.h>
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
 #include <lunaix/status.h>
@@ -10,7 +11,7 @@
 #include <lunaix/signal.h>
 
 #include <sys/abi.h>
-#include <sys/mm/mempart.h>
+#include <sys/mm/mm_defs.h>
 
 LOG_MODULE("FORK")
 
@@ -50,30 +51,19 @@ __dup_fdtable(struct proc_info* pcb)
 
 
 static void
-__dup_kernel_stack(struct proc_info* proc, ptr_t usedMnt)
+__dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
 {
-    // copy the entire kernel page table
-    pid_t pid = proc->pid;
-    ptr_t pt_copy = __dup_pagetable(pid, usedMnt);
+    ptr_t kstack_pn = PN(current_thread->kstack);
 
     // copy the kernel stack
-    for (size_t i = KERNEL_STACK >> 12; i <= KERNEL_STACK_END >> 12; i++) {
-        volatile x86_pte_t* ppte = &PTE_MOUNTED(usedMnt, i);
-
-        /*
-            This is a fucking nightmare, the TLB caching keep the rewrite to PTE
-           from updating. Even the Nightmare Moon the Evil is far less nasty
-           than this. It took me hours of debugging to figure this out.
-
-            In the name of Celestia our glorious goddess, I will fucking HATE
-           the TLB for the rest of my LIFE!
-        */
-        cpu_flush_page((ptr_t)ppte);
-
-        x86_pte_t p = *ppte;
+    for (size_t i = 0; i <= PN(KSTACK_SIZE); i++) {
+        volatile x86_pte_t* orig_ppte = &PTE_MOUNTED(VMS_SELF, i + kstack_pn);
+        x86_pte_t p = *orig_ppte;
         ptr_t ppa = vmm_dup_page(PG_ENTRY_ADDR(p));
         pmm_free_page(PG_ENTRY_ADDR(p));
-        *ppte = (p & 0xfff) | ppa;
+        
+        ptr_t kstack = (i + kstack_pn) * PG_SIZE;
+        vmm_set_mapping(vm_mnt, kstack, ppa, p & 0xfff, 0);
     }
 }
 
@@ -83,6 +73,8 @@ dup_active_thread(struct proc_info* duped_pcb)
     struct thread* th = alloc_thread(duped_pcb);
 
     th->intr_ctx = current_thread->intr_ctx;
+    th->kstack = current_thread->kstack;
+    th->ustack = current_thread->ustack;
 
     signal_dup_active_context(&th->sigctx);
 
@@ -113,12 +105,21 @@ dup_proc()
 
     vmm_mount_pd(VMS_MOUNT_1, vmroot(pcb));
 
+    __dup_kernel_stack(main_thread, VMS_MOUNT_1);
+
     // 根据 mm_region 进一步配置页表
+    ptr_t copied_kstack = main_thread->ustack;
     struct mm_region *pos, *n;
     llist_for_each(pos, n, &pcb->mm->regions, head)
     {
         // 如果写共享，则不作处理。
         if ((pos->attr & REGION_WSHARED)) {
+            continue;
+        }
+
+        // remove stack of other threads.
+        if (stack_region(pos) && !region_contains(pos, copied_kstack)) {
+            mem_unmap_region(VMS_MOUNT_1, pos);
             continue;
         }
 

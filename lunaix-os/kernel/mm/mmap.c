@@ -58,6 +58,19 @@ mem_adjust_inplace(vm_regions_t* regions,
     return 0;
 }
 
+int 
+mmap_user(void** addr_out,
+        struct mm_region** created,
+        ptr_t addr,
+        struct v_file* file,
+        struct mmap_param* param) 
+{
+    param->range_end = KERNEL_EXEC;
+    param->range_start = USR_EXEC;
+
+    return mem_map(addr_out, created, addr, file, param);
+}
+
 int
 mem_map(void** addr_out,
         struct mm_region** created,
@@ -104,7 +117,7 @@ mem_map(void** addr_out,
     return ENOMEM;
 
 found:
-    if (found_loc >= KERNEL_EXEC || found_loc < USR_EXEC) {
+    if (found_loc >= param->range_end || found_loc < param->range_start) {
         return ENOMEM;
     }
 
@@ -119,12 +132,16 @@ found:
 
     region_add(vm_regions, region);
 
-    u32_t attr = PG_ALLOW_USER;
-    if ((param->proct & REGION_WRITE)) {
+    int proct = param->proct;
+    int attr = PG_ALLOW_USER;
+    if ((proct & REGION_WRITE)) {
         attr |= PG_WRITE;
     }
+    if ((proct & REGION_KERNEL)) {
+        attr &= ~PG_ALLOW_USER;
+    }
 
-    for (u32_t i = 0; i < param->mlen; i += PG_SIZE) {
+    for (int i = 0; i < param->mlen; i += PG_SIZE) {
         vmm_set_mapping(param->vms_mnt, found_loc + i, 0, attr, 0);
     }
 
@@ -225,6 +242,10 @@ mem_msync(ptr_t mnt,
 void
 mem_unmap_region(ptr_t mnt, struct mm_region* region)
 {
+    if (!region) {
+        return;
+    }
+    
     size_t len = ROUNDUP(region->end - region->start, PG_SIZE);
     mem_sync_pages(mnt, region, region->start, len, 0);
 
@@ -234,6 +255,7 @@ mem_unmap_region(ptr_t mnt, struct mm_region* region)
             pmm_free_page(pa);
         }
     }
+    
     llist_delete(&region->head);
     region_release(region);
 }
@@ -390,14 +412,13 @@ __DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
 
     struct mmap_param param = { .flags = options,
                                 .mlen = ROUNDUP(length, PG_SIZE),
-                                .flen = length,
                                 .offset = offset,
                                 .type = REGION_TYPE_GENERAL,
                                 .proct = proct,
                                 .pvms = vmspace(__current),
                                 .vms_mnt = VMS_SELF };
 
-    errno = mem_map(&result, NULL, addr_ptr, file, &param);
+    errno = mmap_user(&result, NULL, addr_ptr, file, &param);
 
 done:
     syscall_result(errno);

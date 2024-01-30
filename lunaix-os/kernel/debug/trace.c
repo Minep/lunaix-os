@@ -78,7 +78,7 @@ ksym_getstr(struct ksym_entry* sym)
 }
 
 static inline bool valid_fp(ptr_t ptr) {
-    return KERNEL_STACK < ptr && ptr < KERNEL_EXEC_END;
+    return KSTACK_AREA < ptr && ptr < KSTACK_AREA_END;
 }
 
 int

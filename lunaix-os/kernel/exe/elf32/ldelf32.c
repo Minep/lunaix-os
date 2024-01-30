@@ -35,12 +35,11 @@ elf32_smap(struct load_context* ldctx,
                                 .proct = proct,
                                 .offset = PG_ALIGN(phdre->p_offset),
                                 .mlen = ROUNDUP(phdre->p_memsz, PG_SIZE),
-                                .flen = phdre->p_filesz,
                                 .flags = MAP_FIXED | MAP_PRIVATE,
                                 .type = REGION_TYPE_CODE };
 
     struct mm_region* seg_reg;
-    int status = mem_map(NULL, &seg_reg, PG_ALIGN(va), elfile, &param);
+    int status = mmap_user(NULL, &seg_reg, PG_ALIGN(va), elfile, &param);
 
     if (!status) {
         size_t next_addr = phdre->p_memsz + va;

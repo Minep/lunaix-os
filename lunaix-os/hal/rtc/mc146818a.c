@@ -13,12 +13,12 @@
 #include <lunaix/isrm.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/status.h>
+#include <lunaix/pcontext.h>
 
 #include <hal/rtc/mc146818a.h>
 
 #include <klibc/string.h>
 
-#include <sys/interrupts.h>
 #include <sys/port_io.h>
 
 #define RTC_INDEX_PORT 0x70

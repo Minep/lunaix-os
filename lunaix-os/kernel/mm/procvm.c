@@ -16,7 +16,6 @@ procvm_create(struct proc_info* proc) {
     assert(mm);
 
     mm->heap = 0;
-    mm->stack = 0;
     mm->proc = proc;
 
     llist_init_head(&mm->regions);
@@ -25,7 +24,7 @@ procvm_create(struct proc_info* proc) {
 
 
 static ptr_t
-__dup_vmspace(ptr_t mount_point)
+__dup_vmspace(ptr_t mount_point, bool only_kernel)
 {
     ptr_t ptd_pp = pmm_alloc_page(PP_FGPERSIST);
     vmm_set_mapping(VMS_SELF, PG_MOUNT_1, ptd_pp, PG_PREM_RW, VMAP_NULL);
@@ -34,8 +33,14 @@ __dup_vmspace(ptr_t mount_point)
     x86_page_table* pptd = (x86_page_table*)(mount_point | (0x3FF << 12));
 
     size_t kspace_l1inx = L1_INDEX(KERNEL_EXEC);
+    size_t i = 1;   // skip first 4MiB, to avoid bring other thread's stack
 
-    for (size_t i = 0; i < PG_MAX_ENTRIES - 1; i++) {
+    if (only_kernel) {
+        i = kspace_l1inx;
+        memset(ptd, 0, PG_SIZE);
+    }
+
+    for (; i < PG_MAX_ENTRIES - 1; i++) {
 
         x86_pte_t ptde = pptd->entry[i];
         // 空或者是未在内存中的L1页表项直接照搬过去。
@@ -72,10 +77,16 @@ procvm_dup(struct proc_info* proc) {
    struct proc_mm* mm_current = vmspace(__current);
    
    mm->heap = mm_current->heap;
-   mm->stack = mm_current->stack;
-   mm->vmroot = __dup_vmspace(VMS_SELF);
+   mm->vmroot = __dup_vmspace(VMS_SELF, false);
    
    region_copy_mm(mm_current, mm);
+}
+
+void
+procvm_init_clean(struct proc_info* proc)
+{
+    struct proc_mm* mm = vmspace(proc);
+    mm->vmroot = __dup_vmspace(VMS_SELF, true);
 }
 
 
