@@ -111,12 +111,12 @@ spawn_lunad()
     int has_error;
     struct thread* kthread;
     
-    has_error = spawn_process(&kthread, lunad_main, false);
+    has_error = spawn_process(&kthread, (ptr_t)lunad_main, false);
     assert_msg(!has_error, "failed to spawn lunad");
 
     run(kthread);
     
-    assert_msg(0, "Unexpected Return");
+    fail("Unexpected Return");
 }
 
 void

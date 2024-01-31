@@ -110,12 +110,15 @@ vmm_unmount_pd(ptr_t mnt);
 
 static inline ptr_t 
 vmm_mount_pg(ptr_t mnt, ptr_t pa) {
+    assert(pa);
     vmm_set_mapping(VMS_SELF, mnt, pa, PG_PREM_RW, 0);
+    return mnt;
 }
 
 static inline ptr_t 
 vmm_unmount_pg(ptr_t mnt) {
     vmm_del_mapping(VMS_SELF, mnt);
+    return mnt;
 }
 
 void*

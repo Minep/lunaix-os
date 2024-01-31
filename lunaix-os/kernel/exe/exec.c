@@ -5,6 +5,7 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
+#include <lunaix/sched.h>
 #include <lunaix/spike.h>
 #include <lunaix/status.h>
 #include <lunaix/syscall.h>

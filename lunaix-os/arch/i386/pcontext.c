@@ -10,17 +10,21 @@ volatile struct x86_tss _tss = { .link = 0,
                                  .esp0 = 0,
                                  .ss0 = KDATA_SEG };
 
-int
+bool
 inject_transfer_context(ptr_t vm_mnt, struct transfer_context* tctx)
 {
     v_mapping mapping;
     if (!vmm_lookupat(vm_mnt, tctx->inject, &mapping)) {
-        return 0;
+        return false;
     }
 
     vmm_mount_pg(PG_MOUNT_4, mapping.pa);
-    memcpy(PG_MOUNT_4, &tctx->transfer, sizeof(tctx->transfer));
+
+    ptr_t mount_inject = PG_MOUNT_4 + PG_OFFSET(tctx->inject);
+    memcpy((void*)mount_inject, &tctx->transfer, sizeof(tctx->transfer));
+    
     vmm_unmount_pg(PG_MOUNT_4);
+    return true;
 }
 
 void
@@ -38,7 +42,7 @@ thread_setup_trasnfer(struct transfer_context* tctx,
                                 .fs = KDATA_SEG,
                                 .gs = KDATA_SEG 
                             },
-                            .execp = tctx->inject + offset
+                            .execp = (struct exec_param*)(tctx->inject + offset)
                         };
     
     int code_seg = KCODE_SEG, data_seg = KDATA_SEG;

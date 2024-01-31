@@ -62,9 +62,11 @@ spawn_process(struct thread** created, ptr_t entry, bool with_ustack)
 {
     struct proc_info* kproc = alloc_process();
 
+    procvm_init_clean(kproc);
+
     vmm_mount_pd(VMS_MOUNT_1, vmroot(kproc));
     
-    struct thread* kthread = spawn_thread(kproc, VMS_MOUNT_1, with_ustack);
+    struct thread* kthread = create_thread(kproc, VMS_MOUNT_1, with_ustack);
 
     if (!kthread) {
         vmm_unmount_pd(VMS_MOUNT_1);
@@ -73,7 +75,7 @@ spawn_process(struct thread** created, ptr_t entry, bool with_ustack)
     }
 
     commit_process(kproc);
-    start_thread(kproc, VMS_MOUNT_1, entry);
+    start_thread(kthread, VMS_MOUNT_1, entry);
 
     vmm_unmount_pd(VMS_MOUNT_1);
 
@@ -94,14 +96,17 @@ spawn_process_usr(struct thread** created, char* path,
     
     assert(!kernel_process(proc));
 
+    procvm_init_clean(proc);
+
     vmm_mount_pd(VMS_MOUNT_1, vmroot(proc));
 
+    int errno = 0;
     struct thread* main_thread;
-    if (!(main_thread = spawn_thread(proc, VMS_MOUNT_1, true))) {
+    if (!(main_thread = create_thread(proc, VMS_MOUNT_1, true))) {
+        errno = ENOMEM;
         goto fail;
     }
 
-    int errno;
     struct exec_container container;
     exec_init_container(&container, main_thread, VMS_MOUNT_1, argv, envp);
     if ((errno = exec_load_byname(&container, path))) {

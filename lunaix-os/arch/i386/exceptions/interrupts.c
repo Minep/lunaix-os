@@ -17,10 +17,11 @@ LOG_MODULE("INTR")
 void
 intr_handler(isr_param* param)
 {
-    param->execp->saved_prev_ctx = __current->intr_ctx;
-    __current->intr_ctx = param;
+    isr_param* intrctx = current_thread->intr_ctx;
+    param->execp->saved_prev_ctx = intrctx;
+    current_thread->intr_ctx = param;
 
-    volatile struct exec_param* execp = __current->intr_ctx->execp;
+    volatile struct exec_param* execp = param->execp;
 
     if (execp->vector <= 255) {
         isr_cb subscriber = isrm_get(execp->vector);

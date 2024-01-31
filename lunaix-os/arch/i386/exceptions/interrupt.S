@@ -56,7 +56,7 @@
         pushl %eax
 
         movl current_thread, %eax
-        movl proc_intr_ctx(%eax), %eax
+        movl thread_intr_ctx(%eax), %eax
         incl %eax
         pushl %eax          # nested intr: current depth
 
@@ -172,7 +172,8 @@
         call proc_vmroot
 
         movl %eax, %ebx
-        xorl %cr3, %eax         # avoid setting cr3 if just local thread switch.
+        movl %cr3, %eax
+        xorl %ebx, %eax         # avoid setting cr3 if just local thread switch.
         jz 1f
 
         movl %ebx, %cr3         
@@ -184,6 +185,7 @@
 
         call signal_dispatch    # kernel/signal.c
 
+        movl current_thread, %ebx
         test %eax, %eax         # do we have signal to handle?
         jz 1f
 
@@ -195,7 +197,6 @@
             由于这中间没有进行地址空间的交换，所以第二次跳转使用的是同一个内核栈，而之前默认tss.esp0的值是永远指向最顶部
             这样一来就有可能会覆盖更早的上下文信息（比如嵌套的信号捕获函数）
         */
-        movl current_thread, %ebx
         movl thread_intr_ctx(%ebx), %ecx      # __current->intr_ctx
         movl %ecx, (tss_esp0_off + _tss)
 

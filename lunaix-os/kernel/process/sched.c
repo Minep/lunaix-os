@@ -55,6 +55,7 @@ run(struct thread* thread)
     set_current_executing(thread);
 
     switch_context();
+    fail("unexpected return from switching");
 }
 
 int
@@ -129,9 +130,7 @@ check_sleepers()
 void
 schedule()
 {
-    if (!sched_ctx.ptable_len || !sched_ctx.ttable_len) {
-        return;
-    }
+    assert(sched_ctx.ptable_len && sched_ctx.ttable_len);
 
     // 上下文切换相当的敏感！我们不希望任何的中断打乱栈的顺序……
     cpu_disable_interrupt();
@@ -155,8 +154,9 @@ schedule()
         }
 
         if (to_check == current) {
-            // TODO schedule dummy thread
-            goto done;
+            // FIXME do something less leathal here
+            fail("Ran out of threads!")
+            goto done;  
         }
 
     } while (1);
@@ -166,6 +166,8 @@ schedule()
 done:
     intc_notify_eos(0);
     run(to_check);
+
+    fail("unexpected return from scheduler");
 }
 
 void
@@ -306,7 +308,12 @@ alloc_thread(struct proc_info* process) {
     struct thread* th = cake_grab(thread_pile);
 
     th->process = process;
-    th->tid = process->thread_count++;
+    th->created = clock_systime();
+
+    // FIXME we need a better tid allocation method!
+    th->tid = th->created - process->created;
+    th->tid += ((ptr_t)th) & 0xff;
+
     th->state = PS_CREATED;
     
     llist_init_head(&th->sleep.sleepers);
@@ -359,11 +366,12 @@ commit_thread(struct thread* thread) {
     llist_append(&process->threads, &thread->proc_sibs);
     
     if (sched_ctx.threads) {
-        llist_append(&sched_ctx.threads, &thread->sched_sibs);
+        llist_append(sched_ctx.threads, &thread->sched_sibs);
     } else {
         sched_ctx.threads = &thread->sched_sibs;
     }
 
+    sched_ctx.ttable_len++;
     thread->state = PS_READY;
 }
 
@@ -400,6 +408,7 @@ destory_thread(struct thread* thread)
     llist_delete(&thread->sleep.sleepers);
 
     proc->thread_count--;
+    sched_ctx.ttable_len--;
 
     cake_release(thread_pile, thread);
 }
@@ -420,7 +429,7 @@ delete_process(struct proc_info* proc)
     llist_delete(&proc->grp_member);
     llist_delete(&proc->tasks);
 
-    iopoll_free(pid, &proc->pollctx);
+    iopoll_free(proc);
 
     taskfs_invalidate(pid);
 

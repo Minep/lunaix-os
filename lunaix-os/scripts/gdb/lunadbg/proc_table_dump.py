@@ -1,5 +1,5 @@
 import gdb
-from .utils import pid_argument
+from .utils import pid_argument, llist_foreach
 
 class ProcessHelper:
     PS_READY   = 0
@@ -25,6 +25,18 @@ class ProcessHelper:
         
     def process_at(pid):
         return gdb.parse_and_eval(pid_argument(pid))
+    
+    def get_sig_bitmap(sigbmp):
+        if sigbmp == 0:
+            return '<None>'
+        v = []
+        i = 0
+        while sigbmp != 0:
+            if sigbmp & 1 != 0:
+                v.append(str(i))
+            sigbmp = sigbmp >> 1
+            i+=1
+        return ",".join(v)
 
     @staticmethod    
     def pp_process(proc: gdb.Value):
@@ -34,14 +46,34 @@ class ProcessHelper:
             print(" root process")
         else:
             print("  ppid:", proc["parent"]["pid"])
-        print("  page table:", proc["page_table"])
 
         print("  state:", ProcessHelper.get_state(proc))
         print("  created: +%dms"%(proc["created"]))
-        print("  saved context:")
-        print("     %s"%(proc["intr_ctx"].dereference()
-                         .format_string(max_depth=3, format='x')
-                         .replace('\n', '\n     ')))
+
+        print("   Threads:")
+
+        thread = gdb.lookup_type("struct thread").pointer()
+        active_th = proc["th_active"]
+        llist_foreach(proc["threads"].address, thread, 'proc_sibs', lambda a,b: ProcessHelper.print_thread_cb(a,b, active_th))
+
+    def print_thread_cb(index, val: gdb.Value, active: gdb.Value):
+        addr1 = int(val.cast(gdb.lookup_type("void").pointer()))
+        addr2 = int(active.cast(gdb.lookup_type("void").pointer()))
+        isActive = addr1 == addr2
+        print("      [Thread #%d] %s"%(index, "(active)" if isActive else ""))
+        ProcessHelper.pp_thread(val, 3)
+
+    @staticmethod
+    def pp_thread(thread: gdb.Value, indent):
+        pref = "   " * indent
+        print(pref, "tid:", thread["tid"])
+        print(pref, "state:", ProcessHelper.get_state(thread))
+        print(pref, "created: +%dms"%(thread["created"]))
+        print(pref, "kstack_top:", thread["kstack"])
+        print(pref, "ustack_top:", thread["ustack"])
+        print(pref, "sig_masked:", ProcessHelper.get_sig_bitmap(thread["sigctx"]["sig_mask"]))
+        print(pref, "sig_pending:", ProcessHelper.get_sig_bitmap(thread["sigctx"]["sig_pending"]))
+        
 
 
 class ProcessDump(gdb.Command):

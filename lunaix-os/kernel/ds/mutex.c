@@ -1,5 +1,6 @@
 #include <lunaix/ds/mutex.h>
 #include <lunaix/process.h>
+#include <lunaix/sched.h>
 
 void
 mutex_lock(mutex_t* mutex)

@@ -141,7 +141,7 @@ found:
         attr &= ~PG_ALLOW_USER;
     }
 
-    for (int i = 0; i < param->mlen; i += PG_SIZE) {
+    for (size_t i = 0; i < param->mlen; i += PG_SIZE) {
         vmm_set_mapping(param->vms_mnt, found_loc + i, 0, attr, 0);
     }
 

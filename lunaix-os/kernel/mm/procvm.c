@@ -3,6 +3,7 @@
 #include <lunaix/mm/region.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
+#include <lunaix/mm/mmap.h>
 #include <lunaix/process.h>
 
 #include <sys/mm/mempart.h>

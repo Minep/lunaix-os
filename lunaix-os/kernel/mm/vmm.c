@@ -132,7 +132,7 @@ vmm_lookupat(ptr_t mnt, ptr_t va, v_mapping* mapping)
         x86_pte_t* l2pte =
           &((x86_page_table*)(mnt | (l1_index << 12)))->entry[l2_index];
 
-        if (l2pte) {
+        if (l2pte && PG_IS_PRESENT(*l2pte)) {
             mapping->flags = PG_ENTRY_FLAGS(*l2pte);
             mapping->pa = PG_ENTRY_ADDR(*l2pte);
             mapping->pn = mapping->pa >> PG_SIZE_BITS;
@@ -188,6 +188,8 @@ vmm_v2pat(ptr_t mnt, ptr_t va)
 ptr_t
 vmm_mount_pd(ptr_t mnt, ptr_t pde)
 {
+    assert(pde);
+
     x86_page_table* l1pt = (x86_page_table*)L1_BASE_VADDR;
     l1pt->entry[(mnt >> 22)] = NEW_L1_ENTRY(T_SELF_REF_PERM, pde);
     cpu_flush_page(mnt);

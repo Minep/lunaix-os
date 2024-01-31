@@ -29,7 +29,7 @@ schedule();
 void
 sched_yieldk();
 
-void
+void noret
 run(struct thread* thread);
 
 #endif /* __LUNAIX_SCHEDULER_H */

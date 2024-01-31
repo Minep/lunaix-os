@@ -33,9 +33,10 @@
                  : "eax", "memory");
 
 
-static void inline must_inline noret
+static inline void must_inline noret
 switch_context() {
     asm volatile("jmp do_switch\n");
+    unreachable;
 }
 
 #define push_arg1(stack_ptr, arg) *((typeof((arg))*)(stack_ptr)--) = arg

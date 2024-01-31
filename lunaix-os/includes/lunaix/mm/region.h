@@ -4,12 +4,12 @@
 #include <lunaix/mm/mm.h>
 #include <lunaix/mm/procvm.h>
 
-static int inline
+static inline int
 stack_region(struct mm_region* region) {
     return region->attr & REGION_TYPE_STACK;
 }
 
-static int inline
+static inline int
 region_contains(struct mm_region* region, ptr_t ptr) {
     return region->start <= ptr && ptr < region->end;
 }

@@ -18,7 +18,7 @@ struct transfer_context
     } compact transfer;
 };
 
-int
+bool
 inject_transfer_context(ptr_t vm_mnt, struct transfer_context* tctx);
 
 void
@@ -26,7 +26,7 @@ thread_setup_trasnfer(struct transfer_context* tctx,
                       ptr_t kstack_tp, ptr_t ustack_pt, 
                       ptr_t entry, bool to_user);
 
-static void inline
+static inline void
 thread_create_user_transfer(struct transfer_context* tctx, 
                             ptr_t kstack_tp, ptr_t ustack_pt, 
                             ptr_t entry) 
@@ -34,7 +34,7 @@ thread_create_user_transfer(struct transfer_context* tctx,
     thread_setup_trasnfer(tctx, kstack_tp, ustack_pt, entry, true);
 }
 
-static void inline
+static inline void
 thread_create_kernel_transfer(struct transfer_context* tctx, 
                             ptr_t kstack_tp,  ptr_t entry) 
 {

@@ -1,5 +1,6 @@
 #include <lunaix/ds/waitq.h>
 #include <lunaix/process.h>
+#include <lunaix/sched.h>
 #include <lunaix/spike.h>
 
 void
@@ -42,14 +43,14 @@ pwake_all(waitq_t* queue)
         return;
     }
 
-    struct thread* proc;
+    struct thread* thread;
     waitq_t *pos, *n;
     llist_for_each(pos, n, &queue->waiters, waiters)
     {
-        proc = container_of(pos, struct thread, waitqueue);
+        thread = container_of(pos, struct thread, waitqueue);
 
-        assert(proc->state == PS_BLOCKED);
-        proc->state = PS_READY;
+        assert(thread->state == PS_BLOCKED);
+        thread->state = PS_READY;
         llist_delete(&pos->waiters);
     }
 }

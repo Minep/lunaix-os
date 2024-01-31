@@ -30,26 +30,26 @@ __alloc_user_thread_stack(struct proc_info* proc, struct mm_region** stack_regio
 
     if (errno) {
         WARN("failed to create user thread stack: %d", errno);
-        return NULL;
+        return 0;
     }
 
-    return th_stack_top + USR_STACK_SIZE - 1;
+    return align_stack(th_stack_top + USR_STACK_SIZE - 1);
 }
 
 static ptr_t
 __alloc_kernel_thread_stack(struct proc_info* proc, ptr_t vm_mnt)
 {
     v_mapping mapping;
-    ptr_t kstack = KSTACK_AREA;
-    while (kstack < KSTACK_AREA_END) {
+    ptr_t kstack = PG_ALIGN(KSTACK_AREA_END - KSTACK_SIZE);
+    while (kstack >= KSTACK_AREA) {
         if (!vmm_lookupat(vm_mnt, kstack, &mapping)) {
             break;
         }
 
-        kstack += KSTACK_SIZE;
+        kstack -= KSTACK_SIZE;
     }
 
-    if (kstack >= KSTACK_AREA_END) {
+    if (kstack < KSTACK_AREA) {
         return 0;
     }
 
@@ -63,11 +63,11 @@ __alloc_kernel_thread_stack(struct proc_info* proc, ptr_t vm_mnt)
         vmm_set_mapping(vm_mnt, kstack + i, pa + i, PG_PREM_RW, 0);
     }
 
-    return kstack + KSTACK_SIZE - 1;
+    return align_stack(kstack + KSTACK_SIZE - 1);
 }
 
 struct thread*
-spawn_thread(struct proc_info* proc, ptr_t vm_mnt, bool with_ustack)
+create_thread(struct proc_info* proc, ptr_t vm_mnt, bool with_ustack)
 {
     ptr_t ustack = 0;
     struct mm_region* ustack_region = NULL;

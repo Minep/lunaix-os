@@ -43,4 +43,4 @@ class MemoryRegionDump(gdb.Command):
         
         print("VMRS (pid: %d)"%(pid))
 
-        llist_foreach(val, region_t, lambda a,b: self.region_callback(a,b))
+        llist_foreach(val, region_t, "head", lambda a,b: self.region_callback(a,b))

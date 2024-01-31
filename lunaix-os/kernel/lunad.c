@@ -53,8 +53,12 @@ fail:
 
 static void
 lunad_do_usr() {
+    // FIXME segfault on 0x0 when trasfer to user 
+    //       (possibly the j_usr at the end of exec_initd)
+
     // No, these are not preemptive
     cpu_disable_interrupt();
+    
     if (!mount_bootmedium() || !exec_initd()) {
         fail("failed to initd");
     }
@@ -77,10 +81,7 @@ lunad_main()
      */
     boot_cleanup();
 
-    init_platform();
-    
-    // spawn our init process. (use `spawn_process_usr` when ready)
-    spawn_process(NULL, lunad_do_usr, true);
+    spawn_kthread((ptr_t)init_platform);
 
     /*
         NOTE Kernel preemption after this point.
@@ -110,4 +111,7 @@ init_platform()
 
     // FIXME Re-design needed!!
     // sdbg_init();
+
+    // spawn our init process. (use `spawn_process_usr` when ready)
+    spawn_kthread((ptr_t)lunad_do_usr);
 }

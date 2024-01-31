@@ -173,7 +173,7 @@ send_grp: ;
     struct proc_info *pos, *n;
     llist_for_each(pos, n, &proc->grp_member, grp_member)
     {
-        __set_signal(pos, signum);
+        proc_setsignal(pos, signum);
     }
 
 send_single:
@@ -182,7 +182,7 @@ send_single:
         return -1;
     }
 
-    __set_signal(proc, signum);
+    proc_setsignal(proc, signum);
 
     return 0;
 }
@@ -211,7 +211,7 @@ signal_dup_registers(struct sigregister* dest_reg)
     }
 }
 
-void must_inline
+void
 signal_reset_context(struct sigctx* sigctx) {
     memset(sigctx, 0, sizeof(struct sigctx));
 }

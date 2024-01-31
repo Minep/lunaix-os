@@ -146,15 +146,16 @@ trace_printstack()
 }
 
 static void
-trace_printswctx(const isr_param* p, char* direction)
+trace_printswctx(const isr_param* p, bool from_usr, bool to_usr)
 {
 
     struct ksym_entry* sym = trace_sym_lookup(p->execp->eip);
 
-    DEBUG(">> (sw:%s) iv:%d, errno:%p <<",
-          direction,
+    DEBUG("^^^^^ --- %s", to_usr ? "user" : "kernel");
+    DEBUG("  interrupted on #%d, ecode=%p",
           p->execp->vector,
           p->execp->err_code);
+    DEBUG("vvvvv --- %s", from_usr ? "user" : "kernel");
 
     ptr_t sym_pc = sym ? sym->pc : p->execp->eip;
     trace_print_code_entry(sym_pc, p->execp->eip, ksym_getstr(sym));
@@ -174,12 +175,12 @@ trace_printstack_isr(const isr_param* isrm)
     while (p) {
         if (!prev_fromusr) {
             if (!kernel_context(p)) {
-                trace_printswctx(p, "s/u");
+                trace_printswctx(p, false, true);
             } else {
-                trace_printswctx(p, "s/s");
+                trace_printswctx(p, false, false);
             }
         } else {
-            trace_printswctx(p, "u/s");
+            trace_printswctx(p, true, false);
         }
 
         fp = saved_fp(p);

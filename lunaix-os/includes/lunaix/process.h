@@ -6,6 +6,7 @@
 #include <lunaix/fs.h>
 #include <lunaix/iopoll.h>
 #include <lunaix/mm/mm.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/mm/region.h>
 #include <lunaix/signal.h>
 #include <lunaix/timer.h>
@@ -80,6 +81,7 @@ struct thread
 
     struct {
         tid_t tid;
+        time_t created;
         int state;
         int syscall_ret;
         ptr_t exit_val;
@@ -120,10 +122,6 @@ struct proc_info
         pid_t pgid;
         time_t created;
 
-        /*
-            After thread is introduced, a process can only have three states: 
-                ready, terminated, destoried
-        */
         int state;
         int exit_code;
     };
@@ -177,19 +175,19 @@ vmregions(struct proc_info* proc)
 static inline void
 block_current_thread()
 {
-    block_thread(__current);
+    block_thread(current_thread);
 }
 
 static inline void
 pause_current_thread()
 {
-    pause_thread(__current);
+    pause_thread(current_thread);
 }
 
 static inline void
 resume_current_thread()
 {
-    resume_process(__current);
+    resume_thread(current_thread);
 }
 
 static inline int syscall_result(int retval) {
@@ -302,11 +300,22 @@ terminate_thread(struct thread* thread, ptr_t val);
 void
 terminate_current_thread(ptr_t val);
 
+
 struct thread*
-spawn_thread(struct proc_info* proc, ptr_t vm_mnt, bool with_ustack);
+create_thread(struct proc_info* proc, ptr_t vm_mnt, bool with_ustack);
 
 void
 start_thread(struct thread* th, ptr_t vm_mnt, ptr_t entry);
+
+static inline void
+spawn_kthread(ptr_t entry) {
+    assert(kernel_process(__current));
+
+    struct thread* th = create_thread(__current, VMS_SELF, false);
+    
+    assert(th);
+    start_thread(th, VMS_SELF, entry);
+}
 
 /* 
     ========= Signal =========
