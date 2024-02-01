@@ -36,6 +36,7 @@ __dup_vmspace(ptr_t mount_point, bool only_kernel)
     size_t kspace_l1inx = L1_INDEX(KERNEL_EXEC);
     size_t i = 1;   // skip first 4MiB, to avoid bring other thread's stack
 
+    ptd->entry[0] = 0;
     if (only_kernel) {
         i = kspace_l1inx;
         memset(ptd, 0, PG_SIZE);

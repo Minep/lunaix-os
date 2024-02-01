@@ -11,7 +11,7 @@ mutex_lock(mutex_t* mutex)
     }
 
     while (atomic_load(&mutex->lk)) {
-        sched_yieldk();
+        sched_pass();
     }
 
     atomic_fetch_add(&mutex->lk, 1);

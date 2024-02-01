@@ -51,7 +51,7 @@ int
 signal_send(pid_t pid, signum_t signum);
 
 void
-signal_dup_active_context(struct sigctx* dest_ctx);
+signal_dup_context(struct sigctx* dest_ctx);
 
 void
 signal_dup_registers(struct sigregister* dest_reg);

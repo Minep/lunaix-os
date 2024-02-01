@@ -132,7 +132,7 @@ vmm_lookupat(ptr_t mnt, ptr_t va, v_mapping* mapping)
         x86_pte_t* l2pte =
           &((x86_page_table*)(mnt | (l1_index << 12)))->entry[l2_index];
 
-        if (l2pte && PG_IS_PRESENT(*l2pte)) {
+        if (l2pte) {
             mapping->flags = PG_ENTRY_FLAGS(*l2pte);
             mapping->pa = PG_ENTRY_ADDR(*l2pte);
             mapping->pn = mapping->pa >> PG_SIZE_BITS;

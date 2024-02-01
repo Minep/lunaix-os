@@ -47,7 +47,7 @@
 
 #define proc_terminated(proc) (((proc)->state) & PS_GrDT)
 #define proc_hanged(proc) (((proc)->state) & PS_BLOCKED)
-#define proc_runnable(proc) (((proc)->state) & ~PS_Rn)
+#define proc_runnable(proc) (!(proc)->state || !(((proc)->state) & ~PS_Rn))
 
 struct proc_sig
 {
@@ -88,8 +88,8 @@ struct thread
     };
 
     struct {
-        ptr_t kstack;   // process local kernel stack
-        ptr_t ustack;   // process local user stack (undefined for kernel thread)
+        ptr_t kstack;               // process local kernel stack
+        struct mm_region* ustack;   // process local user stack (NULL for kernel thread)
     };
 
     struct haybed sleep;
@@ -292,14 +292,13 @@ struct thread*
 alloc_thread(struct proc_info* process);
 
 void
-destory_thread(struct thread* thread);
+destory_thread(ptr_t vm_mnt, struct thread* thread);
 
 void
 terminate_thread(struct thread* thread, ptr_t val);
 
 void
 terminate_current_thread(ptr_t val);
-
 
 struct thread*
 create_thread(struct proc_info* proc, ptr_t vm_mnt, bool with_ustack);
@@ -316,6 +315,12 @@ spawn_kthread(ptr_t entry) {
     assert(th);
     start_thread(th, VMS_SELF, entry);
 }
+
+void 
+exit_thread();
+
+void
+thread_release_mem(struct thread* thread, ptr_t vm_mnt);
 
 /* 
     ========= Signal =========

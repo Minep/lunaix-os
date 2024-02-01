@@ -146,6 +146,7 @@ schedule()
     
     struct thread* current = current_thread;
     struct thread* to_check = current;
+    
     do {
         to_check = list_next(to_check, struct thread, sched_sibs);
 
@@ -171,7 +172,7 @@ done:
 }
 
 void
-sched_yieldk()
+sched_pass()
 {
     cpu_enable_interrupt();
     cpu_trap_sched();
@@ -279,7 +280,7 @@ repeat:
         return 0;
     }
     // 放弃当前的运行机会
-    sched_yieldk();
+    sched_pass();
     goto repeat;
 
 done:
@@ -334,6 +335,9 @@ alloc_process()
     }
 
     struct proc_info* proc = cake_grab(proc_pile);
+    if (!proc) {
+        return NULL;
+    }
 
     proc->state = PS_CREATED;
     proc->pid = i;
@@ -399,13 +403,15 @@ commit_process(struct proc_info* process)
 }
 
 void
-destory_thread(struct thread* thread) 
+destory_thread(ptr_t vm_mnt, struct thread* thread) 
 {
     struct proc_info* proc = thread->process;
 
     llist_delete(&thread->sched_sibs);
     llist_delete(&thread->proc_sibs);
     llist_delete(&thread->sleep.sleepers);
+
+    thread_release_mem(thread, vm_mnt);
 
     proc->thread_count--;
     sched_ctx.ttable_len--;
@@ -418,12 +424,6 @@ delete_process(struct proc_info* proc)
 {
     pid_t pid = proc->pid;
     sched_ctx.procs[pid] = NULL;
-
-    struct thread *pos, *n;
-    llist_for_each(pos, n, &__current->threads, proc_sibs) {
-        assert(pos->state == PS_TERMNAT);
-        destory_thread(pos);
-    }
 
     llist_delete(&proc->siblings);
     llist_delete(&proc->grp_member);
@@ -450,7 +450,15 @@ delete_process(struct proc_info* proc)
     signal_free_registers(proc->sigreg);
 
     vmm_mount_pd(VMS_MOUNT_1, vmroot(proc));
+    
+    struct thread *pos, *n;
+    llist_for_each(pos, n, &proc->threads, proc_sibs) {
+        // terminate and destory all thread unconditionally
+        destory_thread(VMS_MOUNT_1, pos);
+    }
+
     procvm_cleanup(VMS_MOUNT_1, proc);
+
     vmm_unmount_pd(VMS_MOUNT_1);
 
     cake_release(proc_pile, proc);

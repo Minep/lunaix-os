@@ -166,27 +166,27 @@ trace_printstack_isr(const isr_param* isrm)
 {
     isr_param* p = isrm;
     ptr_t fp = cpu_get_fp();
-    int prev_fromusr = 0;
+    int prev_usrctx = 0;
 
     DEBUG("stack trace (pid=%d)\n", __current->pid);
 
     trace_printstack_of(fp);
 
     while (p) {
-        if (!prev_fromusr) {
+        if (!prev_usrctx) {
             if (!kernel_context(p)) {
-                trace_printswctx(p, false, true);
+                trace_printswctx(p, true, false);
             } else {
                 trace_printswctx(p, false, false);
             }
         } else {
-            trace_printswctx(p, true, false);
+            trace_printswctx(p, false, true);
         }
 
         fp = saved_fp(p);
         trace_printstack_of(fp);
 
-        prev_fromusr = !kernel_context(p);
+        prev_usrctx = !kernel_context(p);
 
         p = p->execp->saved_prev_ctx;
     }

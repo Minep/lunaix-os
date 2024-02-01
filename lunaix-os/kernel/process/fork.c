@@ -56,27 +56,30 @@ __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
     ptr_t kstack_pn = PN(current_thread->kstack);
 
     // copy the kernel stack
-    for (size_t i = 0; i <= PN(KSTACK_SIZE); i++) {
-        volatile x86_pte_t* orig_ppte = &PTE_MOUNTED(VMS_SELF, i + kstack_pn);
+    for (size_t i = 0; i < PN(KSTACK_SIZE); i++) {
+        volatile x86_pte_t* orig_ppte = &PTE_MOUNTED(VMS_SELF, kstack_pn);
         x86_pte_t p = *orig_ppte;
         ptr_t ppa = vmm_dup_page(PG_ENTRY_ADDR(p));
         pmm_free_page(PG_ENTRY_ADDR(p));
         
-        ptr_t kstack = (i + kstack_pn) * PG_SIZE;
+        ptr_t kstack = kstack_pn * PG_SIZE;
         vmm_set_mapping(vm_mnt, kstack, ppa, p & 0xfff, 0);
+        kstack_pn--;
     }
 }
 
-struct thread*
-dup_active_thread(struct proc_info* duped_pcb) 
+static struct thread*
+dup_active_thread(ptr_t vm_mnt, struct proc_info* duped_pcb) 
 {
     struct thread* th = alloc_thread(duped_pcb);
+    if (!th) {
+        return NULL;
+    }
 
     th->intr_ctx = current_thread->intr_ctx;
     th->kstack = current_thread->kstack;
-    th->ustack = current_thread->ustack;
 
-    signal_dup_active_context(&th->sigctx);
+    signal_dup_context(&th->sigctx);
 
     /*
      *  store the return value for forked process.
@@ -84,6 +87,32 @@ dup_active_thread(struct proc_info* duped_pcb)
      */
     store_retval_to(th, 0);
 
+    __dup_kernel_stack(th, vm_mnt);
+
+    if (!current_thread->ustack) {
+        goto done;
+    }
+
+    struct mm_region* old_stack = current_thread->ustack;
+    struct mm_region *pos, *n;
+    llist_for_each(pos, n, vmregions(duped_pcb), head)
+    {
+        // remove stack of other threads.
+        if (!stack_region(pos)) {
+            continue;
+        }
+
+        if (!same_region(pos, old_stack)) {
+            mem_unmap_region(vm_mnt, pos);
+        }
+        else {
+            th->ustack = pos;
+        }
+    }
+
+    assert(th->ustack);
+
+done:
     return th;
 }
 
@@ -91,7 +120,10 @@ pid_t
 dup_proc()
 {
     struct proc_info* pcb = alloc_process();
-    struct thread* main_thread = dup_active_thread(pcb);
+    if (!pcb) {
+        syscall_result(ENOMEM);
+        return -1;
+    }
     
     pcb->parent = __current;
 
@@ -105,21 +137,20 @@ dup_proc()
 
     vmm_mount_pd(VMS_MOUNT_1, vmroot(pcb));
 
-    __dup_kernel_stack(main_thread, VMS_MOUNT_1);
+    struct thread* main_thread = dup_active_thread(VMS_MOUNT_1, pcb);
+    if (!main_thread) {
+        syscall_result(ENOMEM);
+        vmm_unmount_pd(VMS_MOUNT_1);
+        delete_process(pcb);
+        return -1;
+    }
 
     // 根据 mm_region 进一步配置页表
-    ptr_t copied_kstack = main_thread->ustack;
     struct mm_region *pos, *n;
     llist_for_each(pos, n, &pcb->mm->regions, head)
     {
         // 如果写共享，则不作处理。
         if ((pos->attr & REGION_WSHARED)) {
-            continue;
-        }
-
-        // remove stack of other threads.
-        if (stack_region(pos) && !region_contains(pos, copied_kstack)) {
-            mem_unmap_region(VMS_MOUNT_1, pos);
             continue;
         }
 

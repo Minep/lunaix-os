@@ -8,6 +8,7 @@
 #include <lunaix/syslog.h>
 #include <lunaix/types.h>
 #include <lunaix/owloysius.h>
+#include <lunaix/sched.h>
 
 #include <klibc/string.h>
 
@@ -97,7 +98,7 @@ lunad_main()
     cpu_enable_interrupt();
     while (1)
     {
-        cpu_wait();
+        sched_pass();
     }
 }
 
@@ -111,7 +112,8 @@ init_platform()
 
     // FIXME Re-design needed!!
     // sdbg_init();
+    
+    spawn_process(NULL, (ptr_t)lunad_do_usr, true);
 
-    // spawn our init process. (use `spawn_process_usr` when ready)
-    spawn_kthread((ptr_t)lunad_do_usr);
+    exit_thread();
 }

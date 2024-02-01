@@ -27,7 +27,7 @@ void noret
 schedule();
 
 void
-sched_yieldk();
+sched_pass();
 
 void noret
 run(struct thread* thread);

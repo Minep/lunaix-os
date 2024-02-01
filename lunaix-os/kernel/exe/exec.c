@@ -12,7 +12,7 @@
 #include <lunaix/syscall_utils.h>
 
 #include <sys/abi.h>
-#include <sys/mm/mempart.h>
+#include <sys/mm/mm_defs.h>
 
 #include <klibc/string.h>
 
@@ -23,13 +23,15 @@ exec_init_container(struct exec_container* param,
                const char** argv,
                const char** envp)
 {
+    assert(thread->ustack);
+    ptr_t ustack_top = align_stack(thread->ustack->end - 1);
     *param = (struct exec_container){ .proc = thread->process,
                                       .vms_mnt = vms,
                                       .exe = { .container = param },
                                       .argv_pp = { 0, 0 },
                                       .argv = argv,
                                       .envp = envp,
-                                      .stack_top = thread->ustack };
+                                      .stack_top = ustack_top };
 }
 
 size_t
@@ -81,7 +83,8 @@ exec_load(struct exec_container* container, struct v_file* executable)
         goto done;
     }
 
-    struct proc_mm* pvms = vmspace(container->proc);
+    struct proc_info* proc = container->proc;
+    struct proc_mm* pvms = vmspace(proc);
 
     if (pvms->heap) {
         mem_unmap_region(container->vms_mnt, pvms->heap);
@@ -91,7 +94,7 @@ exec_load(struct exec_container* container, struct v_file* executable)
     if (!argv_extra[1]) {
         // If loading a statically linked file, then heap remapping we can do,
         // otherwise delayed.
-        create_heap(vmspace(container->proc), PG_ALIGN(container->exe.end));
+        create_heap(vmspace(proc), PG_ALIGN(container->exe.end));
     }
 
     if (container->vms_mnt == VMS_SELF) {

@@ -12,6 +12,26 @@ elf32_read(struct v_file* elf, void* data, size_t off, size_t len)
     return pcache_read(elf->inode, data, len, off);
 }
 
+static int
+elf32_do_open(struct elf32* elf, struct v_file* elf_file)
+{
+    int status = 0;
+    elf->pheaders = NULL;
+    elf->elf_file = elf_file;
+
+    if ((status = elf32_read_ehdr(elf)) < 0) {
+        elf32_close(elf);
+        return status;
+    }
+
+    if ((status = elf32_read_phdr(elf)) < 0) {
+        elf32_close(elf);
+        return status;
+    }
+
+    return 0;
+}
+
 int
 elf32_open(struct elf32* elf, const char* path)
 {
@@ -27,27 +47,15 @@ elf32_open(struct elf32* elf, const char* path)
         return error;
     }
 
-    return elf32_openat(elf, elffile);
+    return elf32_do_open(elf, elffile);
 }
 
 int
-elf32_openat(struct elf32* elf, const void* elf_vfile)
+elf32_openat(struct elf32* elf, void* elf_vfile)
 {
-    int status = 0;
-    elf->pheaders = NULL;
-    elf->elf_file = elf_vfile;
-
-    if ((status = elf32_read_ehdr(elf)) < 0) {
-        elf32_close(elf);
-        return status;
-    }
-
-    if ((status = elf32_read_phdr(elf)) < 0) {
-        elf32_close(elf);
-        return status;
-    }
-
-    return 0;
+    // so the ref count kept in sync
+    vfs_ref_file(elf_vfile);
+    return elf32_do_open(elf, elf_vfile);
 }
 
 int

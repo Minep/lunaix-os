@@ -188,7 +188,7 @@ send_single:
 }
 
 void
-signal_dup_active_context(struct sigctx* dest_ctx) 
+signal_dup_context(struct sigctx* dest_ctx) 
 {
     struct sigctx* old_ctx = &current_thread->sigctx;
     memcpy(dest_ctx, old_ctx, sizeof(struct sigctx));
@@ -325,7 +325,7 @@ __DEFINE_LXSYSCALL2(int, sys_sigaction, int, signum, struct sigaction*, action)
 __DEFINE_LXSYSCALL(int, pause)
 {
     pause_current_thread();
-    sched_yieldk();
+    sched_pass();
 
     syscall_result(EINTR);
     return -1;
@@ -349,7 +349,7 @@ __DEFINE_LXSYSCALL1(int, sigsuspend, sigset_t, *mask)
     sigctx->sig_mask = (*mask) & ~UNMASKABLE;
 
     pause_current_thread();
-    sched_yieldk();
+    sched_pass();
 
     sigctx->sig_mask = tmp;
     return -1;

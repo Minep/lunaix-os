@@ -153,7 +153,7 @@ static void
 __wait_until_event()
 {
     block_current_thread();
-    sched_yieldk();
+    sched_pass();
 }
 
 void

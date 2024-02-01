@@ -10,8 +10,10 @@ stack_region(struct mm_region* region) {
 }
 
 static inline int
-region_contains(struct mm_region* region, ptr_t ptr) {
-    return region->start <= ptr && ptr < region->end;
+same_region(struct mm_region* a, struct mm_region* b) {
+    return a->start == b->start \
+            && a->end == b->end \
+            && a->attr == b->attr;
 }
 
 struct mm_region*

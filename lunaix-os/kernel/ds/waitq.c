@@ -16,7 +16,7 @@ pwait(waitq_t* queue)
     llist_append(&queue->waiters, &current_wq->waiters);
 
     block_current_thread();
-    sched_yieldk();
+    sched_pass();
 
     cpu_enable_interrupt();
 }
