@@ -22,8 +22,8 @@ class ProcInfo(KernelStruct):
     def print_simple(self, pp : MyPrettyPrinter, *args):
         pp.print_field(self._kstruct, 'pid')
         pp.print_field(self._kstruct, 'pgid')
-        pp.print_field(self._kstruct, 'parent', fmt="(pid=%d)", type_convert=lambda v: v["pid"])
-        pp.print_field(self._kstruct, 'cwd', type_convert=lambda v: get_dnode_path(v))
+        pp.print_field(self._kstruct, 'parent', fmt="(pid=%d)", cast=lambda v: v["pid"])
+        pp.print_field(self._kstruct, 'cwd', cast=lambda v: get_dnode_path(v))
         pp.print_field(self._kstruct, 'created', '+%dms')
         pp.print_field(self._kstruct, 'exit_code')
         pp.print_field(self._kstruct, 'thread_count')
@@ -36,8 +36,8 @@ class ProcInfo(KernelStruct):
         cmd = self._kstruct['cmd']
         cmd = cmd.string() if cmd != 0 else ''
         state = ProcInfo.get_state(self._kstruct["state"])
-
-        pp.print(f"[pid={pid}, ppid={ppid}, cmd='{cmd}'] ({state})")
+        
+        pp.print(f"pid={pid}, ppid={ppid}, cmd='{cmd}', {state}")
 
 
     PS_READY   = 0

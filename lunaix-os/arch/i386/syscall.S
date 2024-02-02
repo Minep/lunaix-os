@@ -69,15 +69,17 @@
             .long 0
         .endr
 
-.global syscall_hndlr
 
 .section .text
+    .type syscall_hndlr, @function
+    .global syscall_hndlr
     syscall_hndlr:
         pushl %ebp
-        movl 8(%esp), %ebp          // isr_param*
+        movl %esp, %ebp
+        movl 8(%esp), %ebx          // isr_param*
 
-        addl $4, %ebp
-        movl (%ebp), %eax          /* eax: call code as well as the return value from syscall */
+        addl $4, %ebx
+        movl (%ebx), %eax          /* eax: call code as well as the return value from syscall */
         cmpl $__SYSCALL_MAX, %eax
         jae 2f
 
@@ -87,21 +89,26 @@
         jne 1f
     2:    
         neg   %eax
+        movl %ebp, %esp
         popl  %ebp
         ret
+
     1:
-        pushl 24(%ebp)      /* esi - #5 arg */
-        pushl 16(%ebp)      /* edi - #4 arg */
-        pushl 12(%ebp)      /* edx - #3 arg */
-        pushl 8(%ebp)       /* ecx - #2 arg */
-        pushl 4(%ebp)       /* ebx - #1 arg */
+        pushl %ebx
+        pushl 24(%ebx)      /* esi - #5 arg */
+        pushl 16(%ebx)      /* edi - #4 arg */
+        pushl 12(%ebx)      /* edx - #3 arg */
+        pushl 8(%ebx)       /* ecx - #2 arg */
+        pushl 4(%ebx)       /* ebx - #1 arg */
         
         call *(%eax)
 
-        movl %eax, (%ebp)    /* save the return value */
-
         addl $20, %esp      /* remove the parameters from stack */
-
+        
+        popl %ebx
+        movl %eax, (%ebx)    /* save the return value */
+        
+        movl %ebp, %esp
         popl %ebp
         
         ret

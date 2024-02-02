@@ -70,13 +70,12 @@ can_schedule(struct thread* thread)
         return thread->state == PS_READY;
     }
 
-    struct proc_info* proc = thread->process;
     struct sigctx* sh = &thread->sigctx;
 
-    if ((proc->state & PS_PAUSED)) {
+    if ((thread->state & PS_PAUSED)) {
         return !!(sh->sig_pending & ~1);
     }
-    if ((proc->state & PS_BLOCKED)) {
+    if ((thread->state & PS_BLOCKED)) {
         return sigset_test(sh->sig_pending, _SIGINT);
     }
 
@@ -84,15 +83,15 @@ can_schedule(struct thread* thread)
         // If one thread is experiencing SIGSTOP, then we know
         // all other threads are also SIGSTOP (as per POSIX-2008.1)
         // In which case, the entire process is stopped.
-        proc->state = PS_STOPPED;
+        thread->state = PS_STOPPED;
         return 0;
     }
     if (sigset_test(sh->sig_pending, _SIGCONT)) {
-        proc->state = PS_READY;
+        thread->state = PS_READY;
     }
 
     return (thread->state == PS_READY) \
-            && proc_runnable(proc);
+            && proc_runnable(thread->process);
 }
 
 void
@@ -191,7 +190,6 @@ __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
         return (bed->wakeup_time - systime);
     }
 
-    struct proc_info* root_proc = sched_ctx.procs[0];
     bed->wakeup_time = systime + seconds;
 
     if (llist_empty(&bed->sleepers)) {

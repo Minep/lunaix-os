@@ -118,7 +118,11 @@ trace_walkback(struct trace_record* tb_buffer,
 static inline void
 trace_print_code_entry(ptr_t sym_pc, ptr_t inst_pc, char* sym)
 {
-    DEBUG("%p+%p: %s", sym_pc, inst_pc - sym_pc, sym);
+    if (sym_pc) {
+        DEBUG("%p+%p: %s", sym_pc, inst_pc - sym_pc, sym);
+    } else {
+        DEBUG("%p+%p: %s", inst_pc, sym_pc, sym);
+    }
 }
 
 void

@@ -60,9 +60,9 @@ class MyPrettyPrinter:
         self.print(fmt%args, indent=indent)
         return self
 
-    def print_field(self, obj, field, fmt=None, val=None, type_convert=TypeConverter.Identity):
+    def print_field(self, obj, field, fmt=None, val=None, cast=TypeConverter.Identity):
         val = obj[field] if val is None else val
-        val = type_convert(val)
+        val = cast(val)
 
         if fmt is None:
             self.printf("%s: %s", field, val)
