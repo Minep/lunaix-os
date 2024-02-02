@@ -1,12 +1,19 @@
 import gdb
 from .utils import pid_argument, llist_foreach
 
-class MemoryRegionDump(gdb.Command):
-    """Dump virtual memory regions associated with a process"""
-    def __init__(self) -> None:
-        super().__init__("vmrs", gdb.COMMAND_USER)
+def parse_type(attr):
+    """
+        #define REGION_TYPE_CODE (1 << 16)
+        #define REGION_TYPE_GENERAL (2 << 16)
+        #define REGION_TYPE_HEAP (3 << 16)
+        #define REGION_TYPE_STACK (4 << 16)
+        #define REGION_TYPE_VARS (5 << 16)
+    """
+    attr = (attr >> 16) & 0xf
+    return ["exec", ]
 
-    def region_callback(self, idx, region):
+class RegionDumpHelper:
+    def __region_callback(self, idx, region, ident):
         print(f"VMR #{idx}:")
         print( "  0x%x...0x%x [0x%x]"%(
             region['start'], region['end'], 
@@ -28,7 +35,16 @@ class MemoryRegionDump(gdb.Command):
         else:
             print( "  file mapped:")
             print( "     dnode: %s @0x%x"%(file["dnode"]["name"]["value"].string(), file))
-            print( "     frange: 0x%x+0x%x"%(region["foff"], region["flen"]))
+            print( "     range: 0x%x+0x%x"%(region["foff"], region["flen"]))
+
+class MemoryRegionDump(gdb.Command):
+    """Dump virtual memory regions associated with a process"""
+    def __init__(self) -> None:
+        super().__init__("vmrs", gdb.COMMAND_USER)
+
+    
+
+    
 
     def invoke(self, argument: str, from_tty: bool) -> None:
         argument = pid_argument(argument)
@@ -37,8 +53,6 @@ class MemoryRegionDump(gdb.Command):
 
         argument = f"&{argument}->mm.regions"
         val = gdb.parse_and_eval(argument)
-        head = val
-
         region_t = gdb.lookup_type("struct mm_region").pointer()
         
         print("VMRS (pid: %d)"%(pid))

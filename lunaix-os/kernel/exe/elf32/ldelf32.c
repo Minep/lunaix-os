@@ -76,8 +76,8 @@ load_executable(struct load_context* context, const struct v_file* exefile)
         goto done;
     }
 
-    ldpath = valloc(512);
-    errno = elf32_find_loader(&elf, ldpath, 512);
+    ldpath = valloc(256);
+    errno = elf32_find_loader(&elf, ldpath, 256);
     uintptr_t load_base = 0;
 
     if (errno < 0) {
@@ -130,6 +130,8 @@ done_close_elf32:
     elf32_close(&elf);
 
 done:
-    vfree_safe(ldpath);
+    if (!container->argv_pp[1]) {
+        vfree_safe(ldpath);
+    }
     return errno;
 }

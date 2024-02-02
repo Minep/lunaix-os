@@ -46,7 +46,7 @@ args_ptr_size(const char** paramv)
     return (sz + 1) * sizeof(ptr_t);
 }
 
-ptr_t
+static ptr_t
 copy_to_ustack(ptr_t stack_top, ptr_t* paramv)
 {
     ptr_t ptr;
@@ -63,6 +63,32 @@ copy_to_ustack(ptr_t stack_top, ptr_t* paramv)
     }
 
     return stack_top;
+}
+
+static void
+save_process_cmd(struct proc_info* proc, ptr_t* argv)
+{
+    ptr_t ptr, *_argv = argv;
+    size_t total_sz = 0;
+    while ((ptr = *_argv)) {
+        total_sz += strlen((const char*)ptr) + 1;
+        _argv++;
+    }
+
+    if (proc->cmd) {
+        vfree(proc->cmd);
+    }
+
+    char* cmd_ = (char*)valloc(total_sz);
+    proc->cmd = cmd_;
+    proc->cmd_len = total_sz;
+
+    while ((ptr = *argv)) {
+        cmd_ = strcpy(cmd_, (const char*)ptr);
+        cmd_[-1] = ' ';
+        argv++;
+    }
+    cmd_[-1] = '\0';
 }
 
 // externed from mm/dmm.c
@@ -113,20 +139,23 @@ exec_load(struct exec_container* container, struct v_file* executable)
             ustack = copy_to_ustack(ustack, (ptr_t*)ustack);
         }
 
-        if (argv) {
+        if (argv) {            
             argv_len = args_ptr_size(argv);
             ustack -= argv_len;
 
             memcpy((void*)ustack, (const void**)argv, argv_len);
-            for (size_t i = 0; i < 2 && argv_extra[i]; i++) {
-                ustack -= sizeof(ptr_t);
-                *((ptr_t*)ustack) = (ptr_t)argv_extra[i];
-                argv_len += sizeof(ptr_t);
-            }
-
-            argv_ptr = ustack;
-            ustack = copy_to_ustack(ustack, (ptr_t*)ustack);
         }
+
+        for (size_t i = 0; i < 2 && argv_extra[i]; i++) {
+            ustack -= sizeof(ptr_t);
+            *((ptr_t*)ustack) = (ptr_t)argv_extra[i];
+            argv_len += sizeof(ptr_t);
+        }
+
+        argv_ptr = ustack;
+        ustack = copy_to_ustack(ustack, (ptr_t*)ustack);
+
+        save_process_cmd(proc, (ptr_t*)argv_ptr);
 
         // four args (arg{c|v}, env{c|p}) for main
         struct uexec_param* exec_param = &((struct uexec_param*)ustack)[-1];

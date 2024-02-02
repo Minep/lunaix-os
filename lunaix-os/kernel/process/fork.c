@@ -13,6 +13,8 @@
 #include <sys/abi.h>
 #include <sys/mm/mm_defs.h>
 
+#include <klibc/string.h>
+
 LOG_MODULE("FORK")
 
 static void
@@ -126,6 +128,13 @@ dup_proc()
     }
     
     pcb->parent = __current;
+
+    // FIXME need a more elagent refactoring
+    if (__current->cmd) {
+        pcb->cmd_len = __current->cmd_len;
+        pcb->cmd = valloc(pcb->cmd_len);
+        memcpy(pcb->cmd, __current->cmd, pcb->cmd_len);
+    }
 
     if (__current->cwd) {
         pcb->cwd = __current->cwd;

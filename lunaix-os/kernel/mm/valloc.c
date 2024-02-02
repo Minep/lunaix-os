@@ -54,7 +54,7 @@ __valloc(unsigned int size,
     i -= boffset;
 
     if (i >= len)
-        return NULL;
+        i = 0;
 
     return cake_grab(segregate_list[i]);
 }

@@ -1,3 +1,9 @@
-from .commands import load_commands
+from .region_dump import MemoryRegionDump
+from .proc_table_dump import ProcessDump, SchedulerDump
+from .syslog import SysLogDump
 
-load_commands()
+MemoryRegionDump()
+SchedulerDump()
+ProcessDump()
+SysLogDump()
+

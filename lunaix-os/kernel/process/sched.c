@@ -376,6 +376,7 @@ commit_thread(struct thread* thread) {
     }
 
     sched_ctx.ttable_len++;
+    process->thread_count++;
     thread->state = PS_READY;
 }
 
@@ -396,8 +397,13 @@ commit_process(struct proc_info* process)
         assert(!proc_terminated(process->parent));
     }
 
+    if (sched_ctx.proc_list) {
+        llist_append(sched_ctx.proc_list, &process->tasks);
+    } else {
+        sched_ctx.proc_list = &process->tasks;
+    }
+
     llist_append(&process->parent->children, &process->siblings);
-    llist_append(&sched_ctx.procs[0]->tasks, &process->tasks);
 
     process->state = PS_READY;
 }
@@ -423,6 +429,9 @@ void
 delete_process(struct proc_info* proc)
 {
     pid_t pid = proc->pid;
+
+    assert(pid);    // long live the pid0 !!
+
     sched_ctx.procs[pid] = NULL;
 
     llist_delete(&proc->siblings);
@@ -435,6 +444,10 @@ delete_process(struct proc_info* proc)
 
     if (proc->cwd) {
         vfs_unref_dnode(proc->cwd);
+    }
+
+    if (proc->cmd) {
+        vfree(proc->cmd);
     }
 
     for (size_t i = 0; i < VFS_MAX_FD; i++) {

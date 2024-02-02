@@ -11,6 +11,8 @@
 
 #include <sys/mm/mempart.h>
 
+// FIXME issues with signal
+
 LOG_MODULE("SIG")
 
 extern struct scheduler sched_ctx; /* kernel/sched.c */

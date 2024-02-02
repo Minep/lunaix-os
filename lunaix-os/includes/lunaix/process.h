@@ -109,7 +109,6 @@ struct proc_info
     struct llist_header threads;
     int thread_count;
 
-    // FIXME This is not needed
     struct llist_header tasks;
 
     struct llist_header siblings;
@@ -130,6 +129,10 @@ struct proc_info
     struct sigregister* sigreg;
     struct v_fdtable* fdtable;
     struct v_dnode* cwd;
+    struct {
+        char* cmd;
+        size_t cmd_len;
+    };
 
     struct iopoll pollctx;
 };

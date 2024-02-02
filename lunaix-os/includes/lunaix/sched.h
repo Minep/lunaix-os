@@ -13,6 +13,7 @@ struct scheduler
 {
     struct proc_info** procs;
     struct llist_header* threads;
+    struct llist_header* proc_list;
     struct llist_header sleepers;
 
     int procs_index;
