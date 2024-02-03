@@ -445,10 +445,13 @@ class TemplateExpander:
                 
                 self.mapping[src] = dest.strip()
 
-    def render(self):
+    def render(self, selected = []):
         for k, v in self.mapping.items():
             src: Path = self.tbase_path.joinpath(k)
             dest: Path = self.pbase_path.joinpath(v)
+            if (k not in selected):
+                continue
+
             if not src.is_file():
                 continue
 
@@ -468,6 +471,7 @@ import pprint
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("selects", nargs="*")
     parser.add_argument("--arch", default='i386')
     parser.add_argument("-twd", "--template_dir", default=str(Path.cwd()))
     parser.add_argument("-pwd", "--project_dir", default=str(Path.cwd()))
@@ -476,7 +480,7 @@ def main():
 
     expander = TemplateExpander(Path(args.template_dir), Path(args.project_dir), args.arch)
     
-    expander.render()
+    expander.render(args.selects)
     # pprint.pprint(expander.data)
 
 if __name__ == "__main__":

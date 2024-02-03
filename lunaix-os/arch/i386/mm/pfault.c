@@ -14,18 +14,7 @@
 
 LOG_MODULE("pf")
 
-static u32_t
-get_ptattr(struct mm_region* vmr)
-{
-    u32_t vmr_attr = vmr->attr;
-    u32_t ptattr = PG_PRESENT | PG_ALLOW_USER;
 
-    if ((vmr_attr & PROT_WRITE)) {
-        ptattr |= PG_WRITE;
-    }
-
-    return ptattr & 0xfff;
-}
 
 #define COW_MASK (REGION_RSHARED | REGION_READ | REGION_WRITE)
 
@@ -92,7 +81,7 @@ intr_routine_page_fault(const isr_param* param)
                 goto oom;
             }
 
-            *pte = pa | get_ptattr(hit_region);
+            *pte = pa | region_ptattr(hit_region);
             memset((void*)PG_ALIGN(ptr), 0, PG_SIZE);
             goto resolved;
         }
@@ -115,7 +104,7 @@ intr_routine_page_fault(const isr_param* param)
         }
 
         cpu_flush_page((ptr_t)pte);
-        *pte = pa | get_ptattr(hit_region);
+        *pte = pa | region_ptattr(hit_region);
 
         memset((void*)ptr, 0, PG_SIZE);
 

@@ -2,6 +2,7 @@
 #define __LUNAIX_REGION_H
 
 #include <lunaix/mm/mm.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/mm/procvm.h>
 
 static inline int
@@ -15,6 +16,17 @@ same_region(struct mm_region* a, struct mm_region* b) {
             && a->end == b->end \
             && a->attr == b->attr;
 }
+
+static inline bool
+region_contains(struct mm_region* mm, ptr_t va) {
+    return mm->start <= va && va < mm->end;
+}
+
+static inline size_t
+region_size(struct mm_region* mm) {
+    return mm->end - mm->start;
+}
+
 
 struct mm_region*
 region_create(ptr_t start, ptr_t end, u32_t attr);
@@ -39,5 +51,18 @@ region_copy_mm(struct proc_mm* src, struct proc_mm* dest);
 
 struct mm_region*
 region_dup(struct mm_region* origin);
+
+static u32_t
+region_ptattr(struct mm_region* vmr)
+{
+    u32_t vmr_attr = vmr->attr;
+    u32_t ptattr = PG_PRESENT | PG_ALLOW_USER;
+
+    if ((vmr_attr & PROT_WRITE)) {
+        ptattr |= PG_WRITE;
+    }
+
+    return ptattr & 0xfff;
+}
 
 #endif /* __LUNAIX_REGION_H */

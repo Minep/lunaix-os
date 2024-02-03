@@ -133,3 +133,67 @@ procvm_cleanup(ptr_t vm_mnt, struct proc_info* proc) {
 
     __delete_vmspace(vm_mnt);
 }
+
+ptr_t
+procvm_enter_remote(struct remote_vmctx* rvmctx, struct proc_mm* mm, 
+                    ptr_t vm_mnt, ptr_t remote_base, size_t size)
+{
+    ptr_t size_pn = PN(size + MEM_PAGE);
+    assert(size_pn < REMOTEVM_MAX_PAGES);
+
+    struct mm_region* region = region_get(&mm->regions, remote_base);
+    assert(region && region_contains(region, remote_base + size));
+
+    rvmctx->vms_mnt = vm_mnt;
+    rvmctx->page_cnt = size_pn;
+
+    remote_base = PG_ALIGN(remote_base);
+    rvmctx->remote = remote_base;
+    rvmctx->local_mnt = PG_MOUNT_4_END + 1;
+
+    v_mapping m;
+    unsigned int pattr = region_ptattr(region);
+    ptr_t raddr = remote_base, lmnt = rvmctx->local_mnt;
+    for (size_t i = 0; i < size_pn; i++, lmnt += MEM_PAGE, raddr += MEM_PAGE)
+    {
+        if (vmm_lookupat(vm_mnt, raddr, &m) && PG_IS_PRESENT(m.flags)) {
+            vmm_set_mapping(VMS_SELF, lmnt, m.pa, PG_PREM_RW, 0);
+            continue;
+        }
+
+        ptr_t pa = pmm_alloc_page(0);
+        vmm_set_mapping(VMS_SELF, lmnt, pa, PG_PREM_RW, 0);
+        vmm_set_mapping(vm_mnt, raddr, pa, pattr, 0);
+    }
+
+    return vm_mnt;
+    
+}
+
+int
+procvm_copy_remote_transaction(struct remote_vmctx* rvmctx, 
+                   ptr_t remote_dest, void* local_src, size_t sz)
+{
+    if (remote_dest < rvmctx->remote) {
+        return -1;
+    }
+
+    ptr_t offset = remote_dest - rvmctx->remote;
+    if (PN(offset + sz) >= rvmctx->page_cnt) {
+        return -1;
+    }
+
+    memcpy((void*)(rvmctx->local_mnt + offset), local_src, sz);
+
+    return sz;
+}
+
+void
+procvm_exit_remote_transaction(struct remote_vmctx* rvmctx)
+{
+    ptr_t lmnt = rvmctx->local_mnt;
+    for (size_t i = 0; i < rvmctx->page_cnt; i++, lmnt += MEM_PAGE)
+    {
+        vmm_del_mapping(VMS_SELF, lmnt);
+    }
+}

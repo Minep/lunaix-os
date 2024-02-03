@@ -9,6 +9,7 @@
 #include <lunaix/types.h>
 #include <lunaix/owloysius.h>
 #include <lunaix/sched.h>
+#include <lunaix/kpreempt.h>
 
 #include <klibc/string.h>
 
@@ -54,9 +55,6 @@ fail:
 
 static void
 lunad_do_usr() {
-    // FIXME segfault on 0x0 when trasfer to user 
-    //       (possibly the j_usr at the end of exec_initd)
-
     // No, these are not preemptive
     cpu_disable_interrupt();
     
@@ -73,7 +71,7 @@ lunad_do_usr() {
  * 同时，该进程也负责fork出我们的init进程。
  *
  */
-void
+void _preemptible
 lunad_main()
 {
     /*
@@ -98,6 +96,7 @@ lunad_main()
     cpu_enable_interrupt();
     while (1)
     {
+        cleanup_detached_threads();
         sched_pass();
     }
 }
@@ -115,5 +114,5 @@ init_platform()
     
     spawn_process(NULL, (ptr_t)lunad_do_usr, true);
 
-    exit_thread();
+    exit_thread(NULL);
 }

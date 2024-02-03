@@ -18,8 +18,15 @@
 LOG_MODULE("FORK")
 
 static void
-__mark_region(ptr_t start_vpn, ptr_t end_vpn, int attr)
+region_maybe_cow(struct mm_region* region)
 {
+    int attr = region->attr;
+    if ((attr & REGION_WSHARED)) {
+        return;
+    }
+
+    ptr_t start_vpn = PN(region->start);
+    ptr_t end_vpn = PN(region->end);
     for (size_t i = start_vpn; i <= end_vpn; i++) {
         x86_pte_t* curproc = &PTE_MOUNTED(VMS_SELF, i);
         x86_pte_t* newproc = &PTE_MOUNTED(VMS_MOUNT_1, i);
@@ -69,6 +76,19 @@ __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
         kstack_pn--;
     }
 }
+
+/*
+    Duplicate the current active thread to the forked process's
+    main thread.
+
+    This is not the same as "fork a thread within the same 
+    process". In fact, it is impossible to do such "thread forking"
+    as the new forked thread's kernel and user stack must not
+    coincide with the original thread (because the same vm space)
+    thus all reference to the stack space are staled which could 
+    lead to undefined behaviour.
+
+*/
 
 static struct thread*
 dup_active_thread(ptr_t vm_mnt, struct proc_info* duped_pcb) 
@@ -158,14 +178,7 @@ dup_proc()
     struct mm_region *pos, *n;
     llist_for_each(pos, n, &pcb->mm->regions, head)
     {
-        // 如果写共享，则不作处理。
-        if ((pos->attr & REGION_WSHARED)) {
-            continue;
-        }
-
-        ptr_t start_vpn = pos->start >> 12;
-        ptr_t end_vpn = pos->end >> 12;
-        __mark_region(start_vpn, end_vpn, pos->attr);
+        region_maybe_cow(pos);
     }
 
     vmm_unmount_pd(VMS_MOUNT_1);
@@ -175,7 +188,6 @@ dup_proc()
 
     return pcb->pid;
 }
-
 
 __DEFINE_LXSYSCALL(pid_t, fork)
 {

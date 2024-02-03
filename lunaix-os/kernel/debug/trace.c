@@ -5,7 +5,7 @@
 #include <lunaix/syslog.h>
 #include <lunaix/trace.h>
 
-#include <sys/cpu.h>
+#include <sys/abi.h>
 #include <sys/mm/mempart.h>
 
 #include <klibc/string.h>
@@ -92,7 +92,7 @@ trace_walkback(struct trace_record* tb_buffer,
     int i = 0;
 
     while (valid_fp((ptr_t)frame) && i < limit) {
-        ptr_t pc = *(frame + 1);
+        ptr_t pc = abi_get_retaddrat((ptr_t)frame);
 
         current = trace_sym_lookup(pc);
         tb_buffer[i] =
@@ -146,7 +146,7 @@ trace_printstack_of(ptr_t fp)
 void
 trace_printstack()
 {
-    trace_printstack_of(cpu_get_fp());
+    trace_printstack_of(abi_get_callframe());
 }
 
 static void
@@ -169,7 +169,7 @@ void
 trace_printstack_isr(const isr_param* isrm)
 {
     isr_param* p = isrm;
-    ptr_t fp = cpu_get_fp();
+    ptr_t fp = abi_get_callframe();
     int prev_usrctx = 0;
 
     DEBUG("stack trace (pid=%d)\n", __current->pid);

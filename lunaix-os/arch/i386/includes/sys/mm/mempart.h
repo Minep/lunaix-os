@@ -18,11 +18,11 @@
 #define USR_EXEC_END 0x203fffffUL
 
 #define USR_MMAP 0x20400000UL
-#define USR_MMAP_SIZE 0x9f800000UL
-#define USR_MMAP_END 0xbfbfffffUL
+#define USR_MMAP_SIZE 0x9fbc0000UL
+#define USR_MMAP_END 0xbffbffffUL
 
-#define USR_STACK 0xbfc00000UL
-#define USR_STACK_SIZE 0x400000UL
+#define USR_STACK 0xbffc0000UL
+#define USR_STACK_SIZE 0x40000UL
 #define USR_STACK_END 0xbffffff0UL
 
 #define KERNEL_EXEC 0xc0000000UL

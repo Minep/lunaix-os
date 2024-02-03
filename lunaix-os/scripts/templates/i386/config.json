@@ -68,7 +68,7 @@
             },
             {
                 "name": "usr_stack",
-                "size": "1@4M",
+                "size": "64@page",
                 "stk_align": 16
             },
             {

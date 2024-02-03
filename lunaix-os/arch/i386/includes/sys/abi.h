@@ -58,5 +58,26 @@ switch_context() {
         *((typeof((arg3))*)(stack_ptr)--) = arg3;                              \
         *((typeof((arg4))*)(stack_ptr)--) = arg4;                              \
     }
+
+
+static inline ptr_t
+abi_get_callframe()
+{
+    ptr_t val;
+    asm("movl %%ebp, %0" : "=r"(val)::);
+    return val;
+}
+
+static inline ptr_t
+abi_get_retaddr()
+{
+    return *((ptr_t*)abi_get_callframe() + 1);
+}
+
+static inline ptr_t
+abi_get_retaddrat(ptr_t fp)
+{
+    return *((ptr_t*)fp + 1);
+}
 #endif
 #endif /* __LUNAIX_ABI_H */

@@ -8,6 +8,8 @@
 #include <lunaix/mm/pmm.h>
 #include <lunaix/syslog.h>
 
+#include <usr/lunaix/threads.h>
+
 #include <sys/abi.h>
 #include <sys/mm/mm_defs.h>
 
@@ -34,7 +36,16 @@ __alloc_user_thread_stack(struct proc_info* proc, struct mm_region** stack_regio
         return 0;
     }
 
-    return align_stack(th_stack_top + USR_STACK_SIZE - 1);
+    // Pre-allocate a page contains stack top, to avoid immediate trap to kernel
+    //  upon thread execution
+    ptr_t pa = pmm_alloc_page(0);
+    ptr_t stack_top = align_stack(th_stack_top + USR_STACK_SIZE - 1);
+    if (likely(pa)) {
+        vmm_set_mapping(vm_mnt, PG_ALIGN(stack_top), 
+                        pa, region_ptattr(*stack_region), 0);
+    }
+
+    return stack_top;
 }
 
 static ptr_t
@@ -128,7 +139,107 @@ start_thread(struct thread* th, ptr_t vm_mnt, ptr_t entry)
 }
 
 void 
-exit_thread() {
-    terminate_current_thread(0);
+exit_thread(void* val) {
+    terminate_current_thread((ptr_t)val);
     schedule();
+}
+
+struct thread*
+thread_find(struct proc_info* proc, tid_t tid)
+{
+    struct thread *pos, *n;
+    llist_for_each(pos, n, &proc->threads, proc_sibs) {
+        if (pos->tid == tid) {
+            return pos;
+        }
+    }
+
+    return NULL;
+}
+
+__DEFINE_LXSYSCALL4(int, th_create, tid_t*, tid, struct uthread_info*, thinfo, 
+                                    void*, entry, void*, param)
+{
+    struct thread* th = create_thread(__current, VMS_SELF, true);
+    if (!th) {
+        return EAGAIN;
+    }
+
+    start_thread(th, VMS_SELF, (ptr_t)entry);
+
+    ptr_t ustack_top = align_stack(th->ustack->end - 1);
+    *((void**)ustack_top) = param;
+
+    thinfo->th_stack_sz = region_size(th->ustack);
+    thinfo->th_stack_top = (void*)ustack_top;
+
+    return 0;
+}
+
+__DEFINE_LXSYSCALL(tid_t, th_self)
+{
+    return current_thread->tid;
+}
+
+__DEFINE_LXSYSCALL1(void, th_exit, void*, val)
+{
+    exit_thread(val);
+}
+
+__DEFINE_LXSYSCALL2(int, th_join, tid_t, tid, void**, val_ptr)
+{
+    struct thread* th = thread_find(__current, tid);
+    if (!th) {
+        return EINVAL;
+    }
+
+    if (th == current_thread) {
+        return EDEADLK;
+    }
+
+    while (!proc_terminated(th)) {
+        sched_pass();
+    }
+
+    if (val_ptr) {
+        *val_ptr = (void*)th->exit_val;
+    }
+
+    destory_thread(VMS_SELF, th);
+
+    return 0;
+}
+
+__DEFINE_LXSYSCALL1(int, th_detach, tid_t, tid)
+{
+    // can not detach the only thread
+    if (__current->thread_count == 1) {
+        return EINVAL;
+    }
+
+    struct thread* th = thread_find(__current, tid);
+    if (!th) {
+        return EINVAL;
+    }
+
+    detach_thread(th);
+    return 0;
+}
+
+__DEFINE_LXSYSCALL2(int, th_kill, tid_t, tid, int, signum)
+{
+    struct thread* target = thread_find(__current, tid);
+    if (!target) {
+        return EINVAL;
+    }
+
+    if (signum > _SIG_NUM) {
+        return EINVAL;
+    }
+
+    if (signum) {
+        thread_setsignal(target, signum);
+    }
+    
+    return 0;
 }

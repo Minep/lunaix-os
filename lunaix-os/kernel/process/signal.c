@@ -67,7 +67,8 @@ signal_dispatch()
     }
 
     ptr_t ustack = current_thread->ustack_top;
-    if ((int)(ustack - USR_STACK) < (int)sizeof(struct proc_sig)) {
+    ptr_t ustack_start = current_thread->ustack->start;
+    if ((int)(ustack - ustack_start) < (int)sizeof(struct proc_sig)) {
         // 用户栈没有空间存放信号上下文
         return 0;
     }
@@ -235,6 +236,26 @@ signal_free_registers(struct sigregister* sigreg) {
     vfree(sigreg);
 }
 
+static bool
+signal_set_sigmask(struct thread* thread, int how, sigset_t* oldset, sigset_t* set)
+{
+    struct sigctx* sh = &current_thread->sigctx;
+    *oldset = sh->sig_mask;
+
+    if (how == _SIG_BLOCK) {
+        sigset_union(sh->sig_mask, *set);
+    } else if (how == _SIG_UNBLOCK) {
+        sigset_intersect(sh->sig_mask, ~(*set));
+    } else if (how == _SIG_SETMASK) {
+        sh->sig_mask = *set;
+    } else {
+        return false;
+    }
+
+    sigset_intersect(sh->sig_mask, ~UNMASKABLE);
+    return true;
+}
+
 __DEFINE_LXSYSCALL1(int, sigreturn, struct proc_sig, *sig_ctx)
 {
     struct sigctx* sigctx = &current_thread->sigctx;
@@ -278,21 +299,25 @@ __DEFINE_LXSYSCALL1(int, sigreturn, struct proc_sig, *sig_ctx)
 __DEFINE_LXSYSCALL3(
     int, sigprocmask, int, how, const sigset_t, *set, sigset_t, *oldset)
 {
-    struct sigctx* sh = &current_thread->sigctx;
-    *oldset = sh->sig_mask;
-
-    if (how == _SIG_BLOCK) {
-        sigset_union(sh->sig_mask, *set);
-    } else if (how == _SIG_UNBLOCK) {
-        sigset_intersect(sh->sig_mask, ~(*set));
-    } else if (how == _SIG_SETMASK) {
-        sh->sig_mask = *set;
-    } else {
+    // TODO maybe it is a good opportunity to introduce a process-wide 
+    //      signal mask?
+    
+    if (signal_set_sigmask(current_thread, how, oldset, set)) {
         return 0;
     }
 
-    sigset_intersect(sh->sig_mask, ~UNMASKABLE);
-    return 1;
+    syscall_result(EINVAL);
+    return -1;
+}
+
+__DEFINE_LXSYSCALL3(
+    int, th_sigmask, int, how, const sigset_t, *set, sigset_t, *oldset)
+{
+    if (signal_set_sigmask(current_thread, how, oldset, set)) {
+        return 0;
+    }
+
+    return EINVAL;
 }
 
 __DEFINE_LXSYSCALL2(int, sys_sigaction, int, signum, struct sigaction*, action)

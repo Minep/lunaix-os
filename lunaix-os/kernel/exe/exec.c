@@ -169,20 +169,11 @@ exec_load(struct exec_container* container, struct v_file* executable)
                                 .envp = (char**)envp_ptr };
     } else {
         /*
-            TODO need to find a way to inject argv and envp remotely
-                 this is for the support of kernel level implementation of
-                 posix_spawn
-
-            IDEA
-                1. Allocate a orphaned physical page (i.e., do not belong to any
-                VMA)
-                2. Mounted to a temporary mount point in current VMA, (i.e.,
-                PG_MOUNT_*)
-                3. Do setup there.
-                4. Unmount then mounted to the foreign VMA as the first stack
-                page.
+            TODO Inject to remote user stack with our procvm_remote toolsets
+                 Need a better way to factorise the argv/envp length calculating
         */
         fail("not implemented");
+
     }
 
 done:

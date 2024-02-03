@@ -49,6 +49,12 @@
 #define proc_hanged(proc) (((proc)->state) & PS_BLOCKED)
 #define proc_runnable(proc) (!(proc)->state || !(((proc)->state) & ~PS_Rn))
 
+
+#define TH_DETACHED 0b0001
+
+#define thread_detached(th) ((th)->flags & TH_DETACHED)
+#define detach_thread(th) ((th)->flags |= TH_DETACHED)
+
 struct proc_sig
 {
     int sig_num;
@@ -85,6 +91,7 @@ struct thread
         int state;
         int syscall_ret;
         ptr_t exit_val;
+        int flags;
     };
 
     struct {
@@ -320,7 +327,7 @@ spawn_kthread(ptr_t entry) {
 }
 
 void 
-exit_thread();
+exit_thread(void* val);
 
 void
 thread_release_mem(struct thread* thread, ptr_t vm_mnt);

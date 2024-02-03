@@ -34,6 +34,15 @@ struct mm_region
     void (*destruct_region)(struct mm_region*);
 };
 
+struct remote_vmctx
+{
+    ptr_t vms_mnt;
+    ptr_t local_mnt;
+    ptr_t remote;
+    size_t page_cnt;
+};
+
+
 static inline void
 mm_index(void** index, struct mm_region* target)
 {
@@ -82,5 +91,23 @@ procvm_cleanup(ptr_t vm_mnt, struct proc_info* proc);
  */
 void
 procvm_init_clean(struct proc_info* proc);
+
+
+/*
+    remote virtual memory manipulation
+*/
+
+#define REMOTEVM_MAX_PAGES 128
+
+ptr_t
+procvm_enter_remote_transaction(struct remote_vmctx* rvmctx, struct proc_mm* mm,
+                    ptr_t vm_mnt, ptr_t remote_base, size_t size);
+
+int
+procvm_copy_remote(struct remote_vmctx* rvmctx, 
+                   ptr_t remote_dest, void* local_src, size_t sz);
+
+void
+procvm_exit_remote_transaction(struct remote_vmctx* rvmctx);
 
 #endif /* __LUNAIX_PROCVM_H */

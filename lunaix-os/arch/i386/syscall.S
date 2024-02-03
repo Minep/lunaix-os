@@ -64,6 +64,13 @@
         .long __lxsys_execve
         .long __lxsys_fstat         /* 55 */
         .long __lxsys_pollctl
+        .long __lxsys_th_create
+        .long __lxsys_th_self
+        .long __lxsys_th_exit
+        .long __lxsys_th_join       /* 60 */
+        .long __lxsys_th_kill
+        .long __lxsys_th_detach
+        .long __lxsys_th_sigmask
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
             .long 0

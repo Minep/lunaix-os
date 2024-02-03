@@ -19,6 +19,7 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
 #include <lunaix/pcontext.h>
+#include <lunaix/kpreempt.h>
 
 #include <klibc/string.h>
 
@@ -56,6 +57,41 @@ run(struct thread* thread)
 
     switch_context();
     fail("unexpected return from switching");
+}
+
+/*
+    Currently, we do not allow self-destorying thread, doing
+    so will eliminate current kernel stack which is disaster.
+    A compromise solution is to perform a regular scan and 
+    clean-up on these thread, in the preemptible kernel thread.
+*/
+
+void _preemptible
+cleanup_detached_threads() {
+    ensure_preempt_caller();
+
+    // XXX may be a lock on sched_context will ben the most appropriate?
+    cpu_disable_interrupt();
+
+    int i = 0;
+    struct thread *pos, *n;
+    llist_for_each(pos, n, sched_ctx.threads, sched_sibs) {
+        if (likely(!proc_terminated(pos) || !thread_detached(pos))) {
+            continue;
+        }
+
+        vmm_mount_pd(VMS_MOUNT_1, vmroot(pos->process));
+        destory_thread(VMS_MOUNT_1, pos);
+        vmm_unmount_pd(VMS_MOUNT_1);
+        
+        i++;
+    }
+
+    if (i) {
+        INFO("cleaned %d terminated detached thread(s)", i);
+    }
+
+    cpu_enable_interrupt();
 }
 
 int

@@ -33,4 +33,7 @@ sched_pass();
 void noret
 run(struct thread* thread);
 
+void
+cleanup_detached_threads();
+
 #endif /* __LUNAIX_SCHEDULER_H */
