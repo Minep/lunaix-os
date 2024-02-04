@@ -206,6 +206,8 @@ found:
         llist_append(&pile->partial, &pos->cakes);
     }
 
+    *((unsigned int*)area) = DEADCAKE_MARK;
+
     return 1;
 }
 

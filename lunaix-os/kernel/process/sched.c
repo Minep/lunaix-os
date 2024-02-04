@@ -445,6 +445,8 @@ commit_process(struct proc_info* process)
 void
 destory_thread(ptr_t vm_mnt, struct thread* thread) 
 {
+    cake_ensure_valid(thread);
+    
     struct proc_info* proc = thread->process;
 
     llist_delete(&thread->sched_sibs);

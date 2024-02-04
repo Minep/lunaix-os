@@ -5,6 +5,10 @@
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/procvm.h>
 
+#define prev_region(vmr) list_prev(vmr, struct mm_region, head)
+#define next_region(vmr) list_next(vmr, struct mm_region, head)
+#define get_region(vmr_el) list_entry(vmr_el, struct mm_region, head)
+
 static inline int
 stack_region(struct mm_region* region) {
     return region->attr & REGION_TYPE_STACK;

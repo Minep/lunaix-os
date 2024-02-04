@@ -72,10 +72,10 @@ main(int argc, const char** argv)
     waitpid(pid, &err, 0);
 
     if (WEXITSTATUS(err)) {
-        printf("shell exit abnormally (%d)", err);
+        printf("shell exit abnormally (%d)\n", err);
     }
 
-    printf("init exiting");
+    printf("init exiting\n");
 
     return err;
 }

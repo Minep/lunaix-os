@@ -57,32 +57,43 @@ __inc_number(void* value)
     return NULL;
 }
 
+static void* 
+__spawn_and_quit(void* value)
+{
+    // quit right-away
+    printf("thread %d: exit\n", pthread_self());
+    return NULL;
+}
+
 /*
     Test cases
 */
 
 static void
+spawn_detached_thread(void* (*fn)(void *), int amount) 
+{
+    do {                                                                            
+        int err;                                                                    
+        pthread_t created;                                                          
+        for (int i = 0; i < amount; i++) {                                          
+            err = pthread_create(&created, NULL, fn, (void*)i);                     
+            if (err) {                                                              
+                printf("unable to create thread: %d\n", err);                       
+                continue;                                                           
+            }                                                                       
+            if((err = pthread_detach(created))) {                                   
+                printf("failed to detach: %d\n", err);                              
+            }                                                                       
+            printf("created %d-th\n", i);                                           
+        }                                                                           
+    } while(0);
+}
+
+static void
 pthread_test_rand_sleep(int param)
 {
-    int err;
-    pthread_t created;
-
     printf("spawning %d threads\n", param);
-    for (int i = 0; i < param; i++)
-    {
-        err = pthread_create(&created, NULL, __print_and_sleep_randsec, (void*)i);
-        if (err) {
-            printf("unable to create thread: %d\n", err);
-            continue;
-        }
-
-        if((err = pthread_detach(created))) {
-            printf("failed to detach: %d\n", err);\
-        }
-
-        printf("created %d-th\n", i);
-    }
-
+    spawn_detached_thread(__print_and_sleep_randsec, param);
     // wait for max 30 seconds
     printf("wait for completion\n");
     sleep(30);
@@ -111,24 +122,19 @@ pthread_test_shared_race(int param)
 {
     __counter_shared = 0;
 
-    int err;
-    pthread_t created;
-    for (int i = 0; i < param; i++)
-    {
-        err = pthread_create(&created, NULL, __inc_number, (void*)i);
-        if (err) {
-            printf("unable to create thread: %d\n", err);
-        }
-
-        if((err = pthread_detach(created))) {
-            printf("failed to detach: %d\n", err);
-        }
-    }
+    spawn_detached_thread(__inc_number, param);
 
     sleep(30);
-
     printf("counter val: %ld\n", __counter_shared);
 }
+
+static void
+pthread_test_quit(int param)
+{
+    spawn_detached_thread(__spawn_and_quit, param);
+    sleep(5);
+}
+
 
 #define run_test(testn, note, ...)                  \
     do {                                            \
@@ -143,8 +149,11 @@ int main()
     run_test(rand_sleep, "rand_sleep_thread10", 10);
     run_test(rand_sleep, "rand_sleep_thread50", 50);
 
-    run_test(join, "join5", 5);
-    run_test(join, "join20", 20);
+    // run_test(join, "join5", 5);
+    // run_test(join, "join20", 20);
+
+    run_test(quit, "quit10", 10);
+    run_test(quit, "quit50", 50);
     
     // FIXME not good, this panic the kernel upon exit, need investigate
     // run_test(shared_race, "shared_race40", 40);

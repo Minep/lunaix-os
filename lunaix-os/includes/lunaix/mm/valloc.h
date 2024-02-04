@@ -1,6 +1,8 @@
 #ifndef __LUNAIX_VALLOC_H
 #define __LUNAIX_VALLOC_H
 
+#include <lunaix/compiler.h>
+
 void*
 valloc(unsigned int size);
 
@@ -27,5 +29,8 @@ vfree_dma(void* ptr);
 
 void
 valloc_init();
+
+extern void 
+valloc_ensure_valid(void* ptr);
 
 #endif /* __LUNAIX_VALLOC_H */

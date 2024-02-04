@@ -71,6 +71,94 @@ mmap_user(void** addr_out,
     return mem_map(addr_out, created, addr, file, param);
 }
 
+static ptr_t
+__mem_find_slot_backward(struct mm_region* lead, struct mmap_param* param, struct mm_region* anchor)
+{
+    ptr_t size = param->mlen;
+    struct mm_region *pos = anchor, 
+                     *n = next_region(pos);
+    while (pos != lead)
+    {
+        if (pos == lead) {
+            break;
+        }
+
+        ptr_t end = n->start;
+        if (n == lead) {
+            end = param->range_end;
+        }
+
+        if (end - pos->end >= size) {
+            return pos->end;
+        }
+
+        pos = n;
+        n = next_region(pos);
+    }
+    
+    return 0;
+}
+
+static ptr_t
+__mem_find_slot_forward(struct mm_region* lead, struct mmap_param* param, struct mm_region* anchor)
+{
+    ptr_t size = param->mlen;
+    struct mm_region *pos = anchor, 
+                     *prev = prev_region(pos);
+    while (lead != pos)
+    {
+        ptr_t end = prev->end;
+        if (prev == lead) {
+            end = param->range_start;
+        }
+
+        if (pos->start - end >= size) {
+            return pos->start - size;
+        }
+
+        pos = prev;
+        prev = prev_region(pos);
+    }
+
+    return 0;
+}
+
+static ptr_t
+__mem_find_slot(vm_regions_t* lead, struct mmap_param* param, struct mm_region* anchor)
+{
+    ptr_t result = 0;
+    struct mm_region* _lead = get_region(lead);
+    if ((result = __mem_find_slot_backward(_lead, param, anchor))) {
+        return result;
+    }
+
+    return __mem_find_slot_forward(_lead, param, anchor);
+}
+
+static struct mm_region*
+__mem_find_nearest(vm_regions_t* lead, ptr_t addr)
+{   
+    ptr_t min_dist = (ptr_t)-1;
+    struct mm_region *pos, *n, *min = NULL;
+    llist_for_each(pos, n, lead, head) {
+        if (region_contains(pos, addr)) {
+            return pos;
+        }
+
+        ptr_t dist = addr - pos->end;
+        if (addr < pos->start) {
+            dist = pos->start - addr;
+        }
+
+        if (dist < min_dist) {
+            min_dist = dist;
+            min = pos;
+        }
+    }
+
+    return min;
+}
+
 int
 mem_map(void** addr_out,
         struct mm_region** created,
@@ -80,7 +168,7 @@ mem_map(void** addr_out,
 {
     assert_msg(addr, "addr can not be NULL");
 
-    ptr_t last_end = USR_EXEC, found_loc = addr;
+    ptr_t last_end = USR_EXEC, found_loc = PG_ALIGN(addr);
     struct mm_region *pos, *n;
 
     vm_regions_t* vm_regions = &param->pvms->regions;
@@ -101,17 +189,13 @@ mem_map(void** addr_out,
         goto found;
     }
 
-    llist_for_each(pos, n, vm_regions, head)
-    {
-        if (last_end < found_loc) {
-            size_t avail_space = pos->start - found_loc;
-            if (pos->start > found_loc && avail_space > param->mlen) {
-                goto found;
-            }
-            found_loc = pos->end + MEM_PAGE;
-        }
+    if (llist_empty(vm_regions)) {
+        goto found;
+    }
 
-        last_end = pos->end;
+    struct mm_region* anchor = __mem_find_nearest(vm_regions, found_loc);
+    if ((found_loc = __mem_find_slot(vm_regions, param, anchor))) {
+        goto found;
     }
 
     return ENOMEM;
@@ -245,6 +329,8 @@ mem_unmap_region(ptr_t mnt, struct mm_region* region)
     if (!region) {
         return;
     }
+    
+    valloc_ensure_valid(region);
     
     size_t len = ROUNDUP(region->end - region->start, PG_SIZE);
     mem_sync_pages(mnt, region, region->start, len, 0);

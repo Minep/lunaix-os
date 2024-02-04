@@ -74,7 +74,6 @@ __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
             vmm_set_mapping(vm_mnt, kstack, 0, 0, VMAP_GUARDPAGE);
         } else {
             ptr_t ppa = vmm_dup_page(PG_ENTRY_ADDR(p));
-            pmm_free_page(PG_ENTRY_ADDR(p));
             vmm_set_mapping(vm_mnt, kstack, ppa, p & 0xfff, 0);
         }
 

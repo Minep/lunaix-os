@@ -33,13 +33,13 @@ __alloc_user_thread_stack(struct proc_info* proc, struct mm_region** stack_regio
                                 .pvms = mm,
                                 .mlen = USR_STACK_SIZE,
                                 .proct = PROT_READ | PROT_WRITE,
-                                .flags = MAP_ANON | MAP_PRIVATE | MAP_FIXED,
+                                .flags = MAP_ANON | MAP_PRIVATE,
                                 .type = REGION_TYPE_STACK };
 
     int errno = mmap_user((void**)&th_stack_top, &vmr, th_stack_top, NULL, &param);
 
     if (errno) {
-        WARN("failed to create user thread stack: %d", errno);
+        FATAL("failed to create user thread stack: %d", errno);
         return 0;
     }
 
@@ -104,6 +104,9 @@ thread_release_mem(struct thread* thread, ptr_t vm_mnt)
     }
     
     if (thread->ustack) {
+        if ((thread->ustack->start & 0xfff)) {
+            fail("invalid ustack struct");
+        }
         mem_unmap_region(vm_mnt, thread->ustack);
     }
 }
