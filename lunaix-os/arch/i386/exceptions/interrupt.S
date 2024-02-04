@@ -55,10 +55,7 @@
         pushl %ebx
         pushl %eax
 
-        movl current_thread, %eax
-        movl thread_intr_ctx(%eax), %eax
-        incl %eax
-        pushl %eax          # nested intr: current depth
+        pushl $0      // placeholder for depth accounting
 
         movl ics(%esp), %eax   /* 取出 %cs */
         andl $0x3, %eax          /* 判断 RPL */
@@ -115,6 +112,7 @@
         andl $3, %eax
         jz 1f 
 
+        ## FIXME x87 fpu context 
         movl current_thread, %eax
         movl thread_ustack_top(%eax), %eax
         test %eax, %eax

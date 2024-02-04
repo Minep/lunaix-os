@@ -45,7 +45,6 @@ init_termios(int fd) {
 int
 main(int argc, const char** argv)
 {
-
     mkdir("/dev");
     mkdir("/sys");
     mkdir("/task");
@@ -75,6 +74,8 @@ main(int argc, const char** argv)
     if (WEXITSTATUS(err)) {
         printf("shell exit abnormally (%d)", err);
     }
+
+    printf("init exiting");
 
     return err;
 }

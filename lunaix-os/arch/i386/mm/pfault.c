@@ -9,6 +9,7 @@
 #include <lunaix/trace.h>
 
 #include <sys/interrupts.h>
+#include <sys/mm/mm_defs.h>
 
 #include <klibc/string.h>
 
@@ -24,6 +25,12 @@ __print_panic_msg(const char* msg, const isr_param* param);
 void
 intr_routine_page_fault(const isr_param* param)
 {
+    if (param->depth > 10) {
+        // Too many nested fault! we must messed up something
+        // XXX should we failed silently?
+        spin();
+    }
+
     uint32_t errcode = param->execp->err_code;
     ptr_t ptr = cpu_ldeaddr();
     if (!ptr) {
@@ -37,6 +44,13 @@ intr_routine_page_fault(const isr_param* param)
 
     // XXX do kernel trigger pfault?
 
+    volatile x86_pte_t* pte = &PTE_MOUNTED(VMS_SELF, ptr >> 12);
+
+    if (guardian_page(*pte)) {
+        ERROR("memory region over-running");
+        goto segv_term;
+    }
+    
     vm_regions_t* vmr = vmregions(__current);
     struct mm_region* hit_region = region_get(vmr, ptr);
 
@@ -45,7 +59,6 @@ intr_routine_page_fault(const isr_param* param)
         goto segv_term;
     }
 
-    volatile x86_pte_t* pte = &PTE_MOUNTED(VMS_SELF, ptr >> 12);
     if (PG_IS_PRESENT(*pte)) {
         if (((errcode ^ mapping.flags) & PG_ALLOW_USER)) {
             // invalid access

@@ -6,7 +6,7 @@
 #include <lunaix/trace.h>
 
 #include <sys/abi.h>
-#include <sys/mm/mempart.h>
+#include <sys/mm/mm_defs.h>
 
 #include <klibc/string.h>
 
@@ -78,7 +78,8 @@ ksym_getstr(struct ksym_entry* sym)
 }
 
 static inline bool valid_fp(ptr_t ptr) {
-    return KSTACK_AREA < ptr && ptr < KSTACK_AREA_END;
+    ptr_t start = ROUNDUP(current_thread->kstack - KSTACK_SIZE, MEM_PAGE);
+    return start < ptr && ptr < current_thread->kstack;
 }
 
 int
@@ -188,6 +189,11 @@ trace_printstack_isr(const isr_param* isrm)
         }
 
         fp = saved_fp(p);
+        if (!valid_fp(fp)) {
+            DEBUG("??? invalid frame: %p", fp);
+            break;
+        }
+
         trace_printstack_of(fp);
 
         prev_usrctx = !kernel_context(p);

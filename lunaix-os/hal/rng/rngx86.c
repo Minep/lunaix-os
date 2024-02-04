@@ -1,6 +1,8 @@
 #include <lunaix/device.h>
 #include <lunaix/mm/page.h>
 
+#include <klibc/string.h>
+
 static inline void
 rng_fill(void* data, size_t len)
 {
@@ -24,13 +26,20 @@ __rand_rd_pg(struct device* dev, void* buf, size_t offset)
 static int
 __rand_rd(struct device* dev, void* buf, size_t offset, size_t len)
 {
-    rng_fill(buf, len);
+    if (unlikely(len < 4)) {
+        int tmp_buf = 0;
+        rng_fill(&tmp_buf, 4);
+        memcpy(buf, &tmp_buf, len);
+    } else {
+        rng_fill(buf, len);
+    }
     return len;
 }
 
 int
 pdev_randdev_init(struct device_def* devdef)
 {
+    // FIXME add check on cpuid for presence of rdrand
     struct device* devrand = device_allocseq(NULL, NULL);
     devrand->ops.read = __rand_rd;
     devrand->ops.read_page = __rand_rd_pg;

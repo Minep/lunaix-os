@@ -5,6 +5,7 @@ get_qemu_options = -s -S -m 1G \
 				-rtc base=utc \
 				-no-reboot \
 				-machine q35 \
+				-cpu pentium3,rdrand \
 				-no-shutdown \
 				-d cpu_reset \
 				-d trace:ide_dma_cb \

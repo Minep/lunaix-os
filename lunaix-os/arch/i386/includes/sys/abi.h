@@ -60,7 +60,7 @@ switch_context() {
     }
 
 
-static inline ptr_t
+static inline ptr_t must_inline
 abi_get_callframe()
 {
     ptr_t val;

@@ -14,15 +14,28 @@
 
 LOG_MODULE("INTR")
 
+static inline void
+update_thread_context(isr_param* param)
+{
+    if (!current_thread) {
+        return;
+    }
+
+    isr_param* ppctx = current_thread->intr_ctx;
+    param->execp->saved_prev_ctx = ppctx;
+    current_thread->intr_ctx = param;
+
+    if (ppctx) {
+        param->depth = ppctx->depth + 1;
+    }
+}
+
 void
 intr_handler(isr_param* param)
 {
-    isr_param* intrctx = current_thread->intr_ctx;
-    param->execp->saved_prev_ctx = intrctx;
-    current_thread->intr_ctx = param;
+    update_thread_context(param);
 
     volatile struct exec_param* execp = param->execp;
-
     if (execp->vector <= 255) {
         isr_cb subscriber = isrm_get(execp->vector);
         subscriber(param);

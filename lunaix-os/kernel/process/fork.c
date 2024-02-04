@@ -68,11 +68,16 @@ __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
     for (size_t i = 0; i < PN(KSTACK_SIZE); i++) {
         volatile x86_pte_t* orig_ppte = &PTE_MOUNTED(VMS_SELF, kstack_pn);
         x86_pte_t p = *orig_ppte;
-        ptr_t ppa = vmm_dup_page(PG_ENTRY_ADDR(p));
-        pmm_free_page(PG_ENTRY_ADDR(p));
-        
         ptr_t kstack = kstack_pn * PG_SIZE;
-        vmm_set_mapping(vm_mnt, kstack, ppa, p & 0xfff, 0);
+
+        if (guardian_page(p)) {
+            vmm_set_mapping(vm_mnt, kstack, 0, 0, VMAP_GUARDPAGE);
+        } else {
+            ptr_t ppa = vmm_dup_page(PG_ENTRY_ADDR(p));
+            pmm_free_page(PG_ENTRY_ADDR(p));
+            vmm_set_mapping(vm_mnt, kstack, ppa, p & 0xfff, 0);
+        }
+
         kstack_pn--;
     }
 }

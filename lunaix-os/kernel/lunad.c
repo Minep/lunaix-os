@@ -112,7 +112,7 @@ init_platform()
     // FIXME Re-design needed!!
     // sdbg_init();
     
-    spawn_process(NULL, (ptr_t)lunad_do_usr, true);
+    assert(!spawn_process(NULL, (ptr_t)lunad_do_usr, true));
 
     exit_thread(NULL);
 }

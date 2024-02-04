@@ -450,6 +450,7 @@ destory_thread(ptr_t vm_mnt, struct thread* thread)
     llist_delete(&thread->sched_sibs);
     llist_delete(&thread->proc_sibs);
     llist_delete(&thread->sleep.sleepers);
+    waitq_cancel_wait(&thread->waitqueue);
 
     thread_release_mem(thread, vm_mnt);
 
@@ -552,6 +553,12 @@ terminate_current_thread(ptr_t val) {
 
 void 
 terminate_proccess(struct proc_info* proc, int exit_code) {
+    assert(!kernel_process(proc));
+
+    if (proc->pid == 1) {
+        panick("Attempt to kill init");
+    }
+
     terminate_proc_only(proc, exit_code);
 
     struct thread *pos, *n;

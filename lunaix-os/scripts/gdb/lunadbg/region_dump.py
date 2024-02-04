@@ -12,8 +12,12 @@ def parse_type(attr):
     attr = (attr >> 16) & 0xf
     return ["exec", ]
 
-class RegionDumpHelper:
-    def __region_callback(self, idx, region, ident):
+class MemoryRegionDump(gdb.Command):
+    """Dump virtual memory regions associated with a process"""
+    def __init__(self) -> None:
+        super().__init__("vmrs", gdb.COMMAND_USER)
+
+    def region_callback(self, idx, region):
         print(f"VMR #{idx}:")
         print( "  0x%x...0x%x [0x%x]"%(
             region['start'], region['end'], 
@@ -37,24 +41,15 @@ class RegionDumpHelper:
             print( "     dnode: %s @0x%x"%(file["dnode"]["name"]["value"].string(), file))
             print( "     range: 0x%x+0x%x"%(region["foff"], region["flen"]))
 
-class MemoryRegionDump(gdb.Command):
-    """Dump virtual memory regions associated with a process"""
-    def __init__(self) -> None:
-        super().__init__("vmrs", gdb.COMMAND_USER)
-
-    
-
-    
-
     def invoke(self, argument: str, from_tty: bool) -> None:
         argument = pid_argument(argument)
         
         pid = gdb.parse_and_eval(f"{argument}->pid")
 
-        argument = f"&{argument}->mm.regions"
+        argument = f"&{argument}->mm->regions"
         val = gdb.parse_and_eval(argument)
         region_t = gdb.lookup_type("struct mm_region").pointer()
         
         print("VMRS (pid: %d)"%(pid))
 
-        llist_foreach(val, region_t, "head", lambda a,b: self.region_callback(a,b))
+        llist_foreach(val, region_t, "head", lambda a,b: self.region_callback(a,b), inclusive=False)

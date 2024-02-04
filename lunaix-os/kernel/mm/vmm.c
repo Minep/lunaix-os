@@ -5,7 +5,7 @@
 #include <lunaix/syslog.h>
 
 #include <sys/cpu.h>
-#include <sys/mm/mempart.h>
+#include <sys/mm/mm_defs.h>
 
 LOG_MODULE("VMM")
 
@@ -79,7 +79,12 @@ vmm_set_mapping(ptr_t mnt, ptr_t va, ptr_t pa, pt_attr attr, int options)
         return 1;
     }
 
-    l2pt->entry[l2_inx] = NEW_L2_ENTRY(attr, pa);
+    if (!(options & VMAP_GUARDPAGE)) {
+        l2pt->entry[l2_inx] = NEW_L2_ENTRY(attr, pa);
+    } else {
+        l2pt->entry[l2_inx] = MEMGUARD;
+    }
+    
     return 1;
 }
 

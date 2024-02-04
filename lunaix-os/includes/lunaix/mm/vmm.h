@@ -20,6 +20,12 @@
 #define VMAP_NOMAP 2
 
 /**
+ * @brief 映射页墙：将虚拟地址映射为页墙，忽略给定的物理地址和页属性
+ *
+ */
+#define VMAP_GUARDPAGE 4
+
+/**
  * @brief 规定下一个可用页映射应当限定在指定的4MB地址空间内
  *
  */

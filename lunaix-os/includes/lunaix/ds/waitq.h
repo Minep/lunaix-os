@@ -20,6 +20,12 @@ waitq_empty(waitq_t* waitq)
     return llist_empty(&waitq->waiters);
 }
 
+static inline void
+waitq_cancel_wait(waitq_t* waitq)
+{
+    llist_delete(&waitq->waiters);
+}
+
 void
 pwait(waitq_t* queue);
 

@@ -31,7 +31,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + 虚拟内存
 + 内存管理与按需分页
 + 键盘输入
-+ 多进程
++ 进程模型
 + 54个常见的Linux/POSIX系统调用（[附录1](#appendix1)）
 + 用户模式
 + 信号机制
@@ -50,6 +50,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 + 通用图形设备抽象层
   + 标准VGA实现
 + 虚拟终端设备接口（兼容 POSIX.1-2008）
++ 线程模型
 
 已经测试过的环境：
 
@@ -175,7 +176,10 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 
 + `vmrs [pid]` 列举进程`<pid>`的内存区域图（Memory Regions），如果`<pid>`未指定，则默认为正在运行的进程（smp=1）。
 + `proc [pid]` 打印进程`<pid>`的进程控制块状态，如果`<pid>`未指定，则默认为正在运行的进程（smp=1）。
-+ `proc_table` 列举所有非终止的进程以及他们的状态。
++ `sched <threads | procs> [-l]` 查看调度器信息，接受两个参数：
+  + `threads` 打印所有依然在调度器中有注册的线程
+  + `procs` 打印所有依然在调度器中有注册的进程
+  + 可选开关 `-l` 决定是否以长列表打印（更详细的信息）
 
 该插件可以通过运行以下命令来进行安装：
 
@@ -232,9 +236,9 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 
 + Linux Manual - 用于查询*nix API的一些具体行为。
 
-## 附录1：支持的系统调用<a id="appendix1"></a>
+## 附录1：实现的 POSIX 系统接口 <a id="appendix1"></a>
 
-**Unix/Linux/POSIX**
+LunaixOS 提供对以下POSIX的系统接口的实现。内核定义的系统调用号可以参考 [LunaixOS系统调用表](docs/lunaix-syscall-table.md) 。
 
 1. `sleep(3)`
 1. `wait(2)`
@@ -290,14 +294,14 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 3. `epoll_create(2)` (via `pollctl`)
 3. `epoll_ctl(2)` (via `pollctl`)
 3. `epoll_wait(2)` (via `pollctl`)
+4. `pthread_create`
+4. `pthread_self`
+4. `pthread_exit`
+4. `pthread_join`
+4. `pthread_kill`
+4. `pthread_detach`
+4. `pthread_sigmask`
 
-**LunaixOS自有**
-
-1. `yield`
-2. `geterrno`
-3. `realpathat`
-4. `syslog`
-5. `pollctl`
 
 ( **※**：该系统调用暂未经过测试 )
 
