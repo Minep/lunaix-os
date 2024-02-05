@@ -340,14 +340,18 @@ get_free_pid() {
 
 struct thread*
 alloc_thread(struct proc_info* process) {
+    if (process->thread_count >= MAX_THREAD_PP) {
+        return NULL;
+    }
+    
     struct thread* th = cake_grab(thread_pile);
 
     th->process = process;
     th->created = clock_systime();
 
     // FIXME we need a better tid allocation method!
-    th->tid = th->created - process->created;
-    th->tid += ((ptr_t)th) & 0xff;
+    th->tid = th->created;
+    th->tid = (th->created ^ ((ptr_t)th)) % MAX_THREAD_PP;
 
     th->state = PS_CREATED;
     

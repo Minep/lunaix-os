@@ -5,6 +5,7 @@
 #include <lunaix/process.h>
 
 #define SCHED_TIME_SLICE 300
+#define MAX_THREAD_PP 1024
 
 #define PROC_TABLE_SIZE 8192
 #define MAX_PROCESS (PROC_TABLE_SIZE / sizeof(ptr_t))

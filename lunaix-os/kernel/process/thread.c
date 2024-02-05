@@ -128,6 +128,10 @@ create_thread(struct proc_info* proc, ptr_t vm_mnt, bool with_ustack)
     }
 
     struct thread* th = alloc_thread(proc);
+    if (!th) {
+        return NULL;
+    }
+    
     th->kstack = kstack;
     th->ustack = ustack_region;
 
