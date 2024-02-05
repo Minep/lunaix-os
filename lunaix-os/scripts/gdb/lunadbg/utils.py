@@ -14,6 +14,8 @@ def llist_foreach(head: gdb.Value, container_type: gdb.Type, field, cb, inclusiv
 
     if not inclusive:
         c = c["next"]
+        if c == head:
+            return 0
 
     while (True):
         current = gdb.Value(int(c) - offset_p)
@@ -23,15 +25,18 @@ def llist_foreach(head: gdb.Value, container_type: gdb.Type, field, cb, inclusiv
         i+=1
         if c == head:
             break
+    return i
 
 def get_dnode_name(dnode):
     return dnode['name']['value'].string()
 
 def get_dnode_path(dnode):
-    components = ['']
+    components = []
     current = dnode
     while (current != 0 and current != current['parent']):
         components.append(get_dnode_name(current))
         current = current['parent']
+    if len(components) == 0:
+        components.append('')
     components.append('')
     return '/'.join(reversed(components))
