@@ -1,17 +1,13 @@
 from gdb import Type, Value, lookup_type
 from . import KernelStruct
-
-MAX_LEVEL = 2
+from ..arch import PageTableHelper as TLB
 
 class PageTableEntry(KernelStruct):
     def __init__(self, gdb_inferior: Value, level, va) -> None:
-        if level == -1:
-            self.level = MAX_LEVEL
-        else:
-            self.level = level
-
-        self.pg_mask = self.get_page_mask(level)
+        self.level = level
+        self.pg_mask = self.get_page_mask()
         self.va = va & ~self.pg_mask
+        self.base_page_order = TLB.translation_shift_bits(-1)
 
         ptep = gdb_inferior[va // (self.pg_mask + 1)].address
         super().__init__(ptep, PageTableEntry)
@@ -21,6 +17,8 @@ class PageTableEntry(KernelStruct):
         except:
             self.pte = 0
 
+        self.pa = TLB.physical_pfn(self.pte) << self.base_page_order
+
     def print_abstract(self, pp, *args):
         self.print_detailed(pp, *args)
 
@@ -28,79 +26,56 @@ class PageTableEntry(KernelStruct):
         self.print_detailed(pp, *args)
 
     def print_detailed(self, pp, *args):
-        if not self.pte:
+        if self.null():
             pp.print("<Mapping not exists>")
             return
         
-        pa = self.pte & ~0xfff
-        size = 0x1000
-        if self.check_huge_page(self.pte):
-            size = self.pg_mask + 1
+        page_order = TLB.translation_shift_bits(self.level)
+        page_order -= self.base_page_order
         
-        pp.printf("Level %d Translation", self.level)
+        pp.printf("Level %d Translation", TLB.translation_level(self.level))
 
         pp2 = pp.next_level()
-        pp2.printf("Table entry: 0x%x", self.pte)
-        pp2.printf("Virtual address: 0x%x (self.ptep=0x%x)", self.va, int(self._kstruct))
-        pp2.printf("Mapped physical: 0x%x (order=0x%x)", pa, size)
-        pp2.printf("Protection: %s", self.get_page_prot(self.pte))
-        pp2.printf("Present: %s", self.check_presence(self.pte))
-        pp2.printf("Huge: %s", self.check_huge_page(self.pte))
-        pp2.print("All attributes:")
-        pp2.next_level().print(self.get_attributes(self.pte))
+        pp2.printf("Entry value: 0x%x", self.pte)
+        pp2.printf("Virtual address: 0x%x (ptep=0x%x)", self.va, int(self._kstruct))
+        pp2.printf("Mapped physical: 0x%x (order %d page)", self.pa, page_order)
+        pp2.printf("Page Protection: %s", self.get_page_prot())
+        pp2.printf("Present: %s", self.present())
+        pp2.printf("Huge: %s", TLB.huge_page(self.pte))
+        pp2.print("Attributes:")
+        pp2.next_level().print(self.get_attributes())
 
     @staticmethod
     def get_type() -> Type:
         return lookup_type("unsigned int").pointer()
-    
-    def check_huge_page(self, pte):
-        return bool(pte & (1 << 7))
 
-    def get_page_mask(self, level):
-        return PageTableEntry.get_level_shift(level) - 1
+    def get_page_mask(self):
+        return PageTableEntry.get_level_shift(self.level) - 1
     
-    def check_presence(self, pte):
-        return bool(pte & 1)
+    def present(self):
+        return TLB.mapping_present(self.pte)
     
-    def get_page_prot(self, pte):
-        prot = ['R'] # RWXUP
-        if (pte & (1 << 1)):
-            prot.append('W')
-        if (pte & -1):
-            prot.append('X')
-        if (pte & (1 << 2)):
-            prot.append('U')
-        if (pte & (1)):
-            prot.append('P')
-        return ''.join(prot)
+    def get_page_prot(self):
+        return ''.join(TLB.protections(self.pte))
 
-    def get_attributes(self, pte):
-        attrs = [self.get_page_prot(pte)]
-        if (pte & (1 << 5)):
-            attrs.append("accessed")
-        if (pte & (1 << 6)):
-            attrs.append("dirty")
-        if (pte & (1 << 3)):
-            attrs.append("write_through")
-        if (pte & (1 << 4)):
-            attrs.append("no_cache")
-        if (self.level == MAX_LEVEL and pte & (1 << 8)):
-            attrs.append("global")
+    def get_attributes(self):
+        attrs = [ self.get_page_prot(),
+                  *TLB.other_attributes(self.level, self.pte) ]
         return ', '.join(attrs)
     
-    def non_null(self):
-        return bool(self.pte)
+    def null(self):
+        return TLB.null_mapping(self.pte)
     
     def same_kind_to(self, pte2):
-        attr_mask = 0x19f  # P, R/W, U/S, PWT, PCD, PS, G
-        return (self.pte & attr_mask) == (pte2.pte & attr_mask)
+        return TLB.same_kind(self.pte, pte2.pte)
     
     @staticmethod
     def get_level_shift(level):
-        if level == -1:
-            return 0x1000
-        else:
-            return (1 << (12 + 9 * (2 - level - 1)))
+        return 1 << TLB.translation_shift_bits(level)
+    
+    @staticmethod
+    def max_page_count():
+        return 1 << (TLB.vaddr_width() - TLB.translation_shift_bits(-1))
 
 class PageTable():
     def __init__(self) -> None:
@@ -116,13 +91,13 @@ class PageTable():
         start_va = pte_head.va
         end_va = pte_tail.va
         sz = end_va - start_va
-        if pte_head.non_null() and pte_tail.non_null():
-            pp.printf("0x%016x...0x%016x [0x%08x] %s", 
-                    start_va, end_va - 1, sz, 
-                    pte_head.get_attributes(pte_head.pte))
+        if not (pte_head.null() and pte_tail.null()):
+            pp.printf("0x%016x...0x%016x, 0x%016x [0x%08x] %s", 
+                    start_va, end_va - 1, pte_head.pa, sz,
+                    pte_head.get_attributes())
         else:
-            pp.printf("0x%016x...0x%016x [0x%08x] <no mapping>", 
-                    start_va, end_va - 1, sz)
+            pp.printfa("0x{:016x}...0x{:016x}, {:^18s} [0x{:08x}] <no mapping>", 
+                    start_va, end_va - 1, "n/a", sz)
     
     def print_ptes_between(self, pp, va, va_end, level=-1):
         shift = PageTableEntry.get_level_shift(level)
@@ -133,6 +108,9 @@ class PageTable():
         head_pte = PageTableEntry(self.levels[level], level, va)
         curr_pte = head_pte
         va = head_pte.va
+
+        pp.printfa("{:^18s}   {:^18s}  {:^18s}  {:^10s}  {:^20s}", 
+                   "va-start", "va-end", "physical", "size", "attributes")
         for i in range(1, pte_num):
             va_ = va + i * PageTableEntry.get_level_shift(level)
             curr_pte = PageTableEntry(self.levels[level], level, va_)

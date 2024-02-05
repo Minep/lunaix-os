@@ -23,10 +23,10 @@ class TypeConverter(Enum):
     CString = lambda v: v.string()
 
 class MyPrettyPrinter:
-    INDENT = 2
-    def __init__(self, base_indent = 0, prefix='') -> None:
-        self.__base_indent = base_indent
-        self.__padding = " " * MyPrettyPrinter.INDENT * base_indent
+    INDENT = 3
+    def __init__(self, level = 0, prefix='') -> None:
+        self.__level = level
+        self.__padding = " " * MyPrettyPrinter.INDENT * level
         self.__prefix = prefix
 
     def set_prefix(self, prefix):
@@ -38,7 +38,7 @@ class MyPrettyPrinter:
         return self
 
     def next_level(self, indent_inc = 1):
-        return MyPrettyPrinter(indent_inc + self.__base_indent, self.__prefix)
+        return MyPrettyPrinter(indent_inc + self.__level, self.__prefix)
     
     def print(self, *vals, indent=0, mode=PrintMode.Simple):
         val = '' if len(vals) == 0 else vals[0]
@@ -59,6 +59,12 @@ class MyPrettyPrinter:
         assert isinstance(fmt, str)
         self.print(fmt%args, indent=indent)
         return self
+    
+    def printfa(self, fmt, *args, indent=0):
+        assert isinstance(fmt, str)
+        self.print(fmt.format(*args), indent=indent)
+        return self
+
 
     def print_field(self, obj, field, fmt=None, val=None, cast=TypeConverter.Identity):
         val = obj[field] if val is None else val

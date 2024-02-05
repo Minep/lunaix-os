@@ -28,10 +28,12 @@ class MMStats(LunadbgCommand):
 
         pp.printf("Total: %dKiB (%d@4K)", 
                   pmem.max_mem_sz, pmem.max_mem_pg)
+        
         pp.printf("Used:  %dKiB (%d@4K) ~%.2f%%", 
-                  pmem.consumed_pg * 4096, pmem.consumed_pg, pmem.utilisation)
-        pp.printf("Discontigs: %d ", pmem.discontig)
-        pp.printf("Avg. Frag: %.2f%%", pmem.fragmentation, indent=1)
+                  pmem.consumed_pg * 4096, 
+                  pmem.consumed_pg, pmem.utilisation)
+        
+        pp.printf("Fragmentations: %d ~%.2f%%", pmem.discontig, pmem.fragmentation)
         pp.print()
         
         pp.print("Distribution")
