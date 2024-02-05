@@ -37,8 +37,7 @@ boot_begin(struct boot_handoff* bhctx)
     /* Reserve region for all loaded modules */
     for (size_t i = 0; i < bhctx->mods.mods_num; i++) {
         struct boot_modent* mod = &bhctx->mods.entries[i];
-        pmm_mark_chunk_occupied(KERNEL_PID,
-                                PN(mod->start),
+        pmm_mark_chunk_occupied(PN(mod->start),
                                 CEIL(mod->end - mod->start, PG_SIZE_BITS),
                                 PP_FGLOCKED);
     }
@@ -87,7 +86,7 @@ boot_cleanup()
     // clean up
     for (size_t i = 0; i < (ptr_t)(&__kexec_boot_end); i += PG_SIZE) {
         vmm_del_mapping(VMS_SELF, (ptr_t)i);
-        pmm_free_page(KERNEL_PID, (ptr_t)i);
+        pmm_free_page((ptr_t)i);
     }
 }
 

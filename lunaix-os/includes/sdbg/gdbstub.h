@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_GDBSTUB_H
 #define __LUNAIX_GDBSTUB_H
 
-#include <sys/interrupts.h>
+#include <lunaix/pcontext.h>
 
 void
 gdbstub_loop(isr_param* param);

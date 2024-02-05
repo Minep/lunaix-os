@@ -88,6 +88,22 @@ llist_empty(struct llist_header* elem)
 #define list_entry(ptr, type, member) container_of(ptr, type, member)
 
 /**
+ * list_next - get the struct for next entry
+ * @ptr:	the &struct list_head pointer.
+ * @type:	the type of the struct this is embedded in.
+ * @member:	the name of the list_struct within the struct.
+ */
+#define list_next(current, type, member) container_of(current->member.next, type, member)
+
+/**
+ * list_prev - get the struct for prev entry
+ * @ptr:	the &struct list_head pointer.
+ * @type:	the type of the struct this is embedded in.
+ * @member:	the name of the list_struct within the struct.
+ */
+#define list_prev(current, type, member) container_of(current->member.prev, type, member)
+
+/**
  * list_for_each_entry	-	iterate over list of given type
  * @pos:	the type * to use as a loop counter.
  * @head:	the head for your list.

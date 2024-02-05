@@ -23,21 +23,21 @@ static void
 pcache_free_page(void* va)
 {
     ptr_t pa = vmm_del_mapping(VMS_SELF, (ptr_t)va);
-    pmm_free_page(KERNEL_PID, pa);
+    pmm_free_page(pa);
 }
 
 static void*
 pcache_alloc_page()
 {
     int i = 0;
-    ptr_t pp = pmm_alloc_page(KERNEL_PID, 0), va = 0;
+    ptr_t pp = pmm_alloc_page(0), va = 0;
 
     if (!pp) {
         return NULL;
     }
 
     if (!(va = (ptr_t)vmap(pp, PG_SIZE, PG_PREM_RW, 0))) {
-        pmm_free_page(KERNEL_PID, pp);
+        pmm_free_page(pp);
         return NULL;
     }
 

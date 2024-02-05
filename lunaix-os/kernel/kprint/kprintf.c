@@ -23,7 +23,7 @@ static struct kp_records kprecs = {
     .max_recs = MAX_KPENT_NUM,
     .kp_ent_wp = &kprecs.kp_ents.ents
 };
-export_symbol(debug, kprecs);
+export_symbol(debug, kprintf, kprecs);
 
 static char*
 shift_level(const char* str, int* level)

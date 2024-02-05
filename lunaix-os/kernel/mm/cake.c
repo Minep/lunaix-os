@@ -28,7 +28,7 @@ struct llist_header piles = { .next = &piles, .prev = &piles };
 void*
 __alloc_cake(unsigned int cake_pg)
 {
-    ptr_t pa = (ptr_t)pmm_alloc_cpage(KERNEL_PID, cake_pg, 0);
+    ptr_t pa = (ptr_t)pmm_alloc_cpage(cake_pg, 0);
     if (!pa) {
         return NULL;
     }
@@ -205,6 +205,8 @@ found:
     } else {
         llist_append(&pile->partial, &pos->cakes);
     }
+
+    *((unsigned int*)area) = DEADCAKE_MARK;
 
     return 1;
 }

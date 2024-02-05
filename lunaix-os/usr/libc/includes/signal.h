@@ -25,4 +25,8 @@ sigsuspend(const sigset_t* mask);
 extern int
 sigprocmask(int how, const sigset_t* set, sigset_t* oldset);
 
+int 
+pthread_sigmask(int how, const sigset_t *restrict set,
+                    sigset_t *restrict oset);
+
 #endif /* __LUNAIX_SIGNAL_H */

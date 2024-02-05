@@ -2,7 +2,6 @@
 #define __LUNAIX_CODVAR_H
 
 #include <lunaix/ds/llist.h>
-#include <lunaix/sched.h>
 
 typedef struct waitq
 {
@@ -21,6 +20,12 @@ waitq_empty(waitq_t* waitq)
     return llist_empty(&waitq->waiters);
 }
 
+static inline void
+waitq_cancel_wait(waitq_t* waitq)
+{
+    llist_delete(&waitq->waiters);
+}
+
 void
 pwait(waitq_t* queue);
 
@@ -29,10 +34,5 @@ pwake_one(waitq_t* queue);
 
 void
 pwake_all(waitq_t* queue);
-
-#define wait_if(cond)                                                          \
-    while ((cond)) {                                                           \
-        sched_yieldk();                                                        \
-    }
 
 #endif /* __LUNAIX_CODVAR_H */

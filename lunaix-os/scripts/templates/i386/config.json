@@ -53,9 +53,9 @@
         },
         "regions": [
             {
-                "name": "kernel_stack",
-                "start": "3@1M",
-                "size": "1@1M",
+                "name": "kstack_area",
+                "start": "1@1M",
+                "size": "3@1M",
                 "stk_align": 16
             },
             {
@@ -68,7 +68,7 @@
             },
             {
                 "name": "usr_stack",
-                "size": "1@4M",
+                "size": "64@page",
                 "stk_align": 16
             },
             {

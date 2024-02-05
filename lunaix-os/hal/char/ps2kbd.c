@@ -5,13 +5,13 @@
 #include <lunaix/keyboard.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
+#include <lunaix/pcontext.h>
 
 #include <hal/intc.h>
 
 #include <klibc/string.h>
 
 #include <sys/cpu.h>
-#include <sys/interrupts.h>
 #include <sys/port_io.h>
 
 #define PS2_PORT_ENC_DATA 0x60
@@ -260,8 +260,6 @@ ps2_kbd_init(struct device_def* devdef)
 
     char result;
 
-    cpu_disable_interrupt();
-
     // 1、禁用任何的PS/2设备
     ps2_post_cmd(PS2_PORT_CTRL_CMDREG, PS2_CMD_PORT1_DISABLE, PS2_NO_ARG);
     ps2_post_cmd(PS2_PORT_CTRL_CMDREG, PS2_CMD_PORT2_DISABLE, PS2_NO_ARG);
@@ -311,7 +309,6 @@ ps2_kbd_init(struct device_def* devdef)
      */
     isrm_bindirq(PC_AT_IRQ_KBD, intr_ps2_kbd_handler);
 
-    cpu_enable_interrupt();
     return 0;
 
 done:

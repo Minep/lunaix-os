@@ -9,23 +9,13 @@
 #include <lunaix/trace.h>
 
 #include <sys/interrupts.h>
+#include <sys/mm/mm_defs.h>
 
 #include <klibc/string.h>
 
 LOG_MODULE("pf")
 
-static u32_t
-get_ptattr(struct mm_region* vmr)
-{
-    u32_t vmr_attr = vmr->attr;
-    u32_t ptattr = PG_PRESENT | PG_ALLOW_USER;
 
-    if ((vmr_attr & PROT_WRITE)) {
-        ptattr |= PG_WRITE;
-    }
-
-    return ptattr & 0xfff;
-}
 
 #define COW_MASK (REGION_RSHARED | REGION_READ | REGION_WRITE)
 
@@ -35,6 +25,12 @@ __print_panic_msg(const char* msg, const isr_param* param);
 void
 intr_routine_page_fault(const isr_param* param)
 {
+    if (param->depth > 10) {
+        // Too many nested fault! we must messed up something
+        // XXX should we failed silently?
+        spin();
+    }
+
     uint32_t errcode = param->execp->err_code;
     ptr_t ptr = cpu_ldeaddr();
     if (!ptr) {
@@ -48,7 +44,14 @@ intr_routine_page_fault(const isr_param* param)
 
     // XXX do kernel trigger pfault?
 
-    vm_regions_t* vmr = (vm_regions_t*)&__current->mm.regions;
+    volatile x86_pte_t* pte = &PTE_MOUNTED(VMS_SELF, ptr >> 12);
+
+    if (guardian_page(*pte)) {
+        ERROR("memory region over-running");
+        goto segv_term;
+    }
+    
+    vm_regions_t* vmr = vmregions(__current);
     struct mm_region* hit_region = region_get(vmr, ptr);
 
     if (!hit_region) {
@@ -56,7 +59,6 @@ intr_routine_page_fault(const isr_param* param)
         goto segv_term;
     }
 
-    volatile x86_pte_t* pte = &PTE_MOUNTED(VMS_SELF, ptr >> 12);
     if (PG_IS_PRESENT(*pte)) {
         if (((errcode ^ mapping.flags) & PG_ALLOW_USER)) {
             // invalid access
@@ -70,9 +72,9 @@ intr_routine_page_fault(const isr_param* param)
             // normal page fault, do COW
             cpu_flush_page((ptr_t)pte);
 
-            ptr_t pa = (ptr_t)vmm_dup_page(__current->pid, PG_ENTRY_ADDR(*pte));
+            ptr_t pa = (ptr_t)vmm_dup_page(PG_ENTRY_ADDR(*pte));
 
-            pmm_free_page(__current->pid, *pte & ~0xFFF);
+            pmm_free_page(*pte & ~0xFFF);
             *pte = (*pte & 0xFFF & ~PG_DIRTY) | pa | PG_WRITE;
 
             goto resolved;
@@ -87,12 +89,12 @@ intr_routine_page_fault(const isr_param* param)
         if (!PG_IS_PRESENT(*pte)) {
             cpu_flush_page((ptr_t)pte);
 
-            ptr_t pa = pmm_alloc_page(__current->pid, 0);
+            ptr_t pa = pmm_alloc_page(0);
             if (!pa) {
                 goto oom;
             }
 
-            *pte = pa | get_ptattr(hit_region);
+            *pte = pa | region_ptattr(hit_region);
             memset((void*)PG_ALIGN(ptr), 0, PG_SIZE);
             goto resolved;
         }
@@ -108,14 +110,14 @@ intr_routine_page_fault(const isr_param* param)
 
         u32_t mseg_off = (ptr - hit_region->start);
         u32_t mfile_off = mseg_off + hit_region->foff;
-        ptr_t pa = pmm_alloc_page(__current->pid, 0);
+        ptr_t pa = pmm_alloc_page(0);
 
         if (!pa) {
             goto oom;
         }
 
         cpu_flush_page((ptr_t)pte);
-        *pte = pa | get_ptattr(hit_region);
+        *pte = pa | region_ptattr(hit_region);
 
         memset((void*)ptr, 0, PG_SIZE);
 
@@ -147,9 +149,15 @@ segv_term:
           param->execp->eip,
           param->execp->err_code);
 
-    sigset_add(__current->sigctx.sig_pending, _SIGSEGV);
-
     trace_printstack_isr(param);
+
+    if (kernel_context(param)) {
+        ERROR("[page fault on kernel]");
+        // halt kernel if segv comes from kernel space
+        spin();
+    }
+
+    thread_setsignal(current_thread, _SIGSEGV);
 
     schedule();
     // should not reach

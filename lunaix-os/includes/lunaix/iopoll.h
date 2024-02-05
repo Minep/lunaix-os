@@ -6,7 +6,9 @@
 
 #include <usr/lunaix/poll.h>
 
-struct v_fd; // <lunaix/fs.h>
+struct thread;  // <lunaix/process.h>
+struct proc_info;  // <lunaix/process.h>
+struct v_fd;    // <lunaix/fs.h>
 
 typedef struct llist_header poll_evt_q;
 
@@ -21,7 +23,7 @@ struct iopoller
 {
     poll_evt_q evt_listener;
     struct v_file* file_ref;
-    pid_t pid;
+    struct thread* thread;
 };
 
 struct iopoll
@@ -49,13 +51,13 @@ void
 iopoll_init(struct iopoll*);
 
 void
-iopoll_free(pid_t, struct iopoll*);
+iopoll_free(struct proc_info*);
 
 int
-iopoll_install(pid_t, struct iopoll*, struct v_fd*);
+iopoll_install(struct thread* thread, struct v_fd* fd);
 
 int
-iopoll_remove(pid_t, struct iopoll*, int);
+iopoll_remove(struct thread*, int);
 
 static inline void
 poll_setrevt(struct poll_info* pinfo, int evt)

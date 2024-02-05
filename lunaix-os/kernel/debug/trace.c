@@ -5,8 +5,8 @@
 #include <lunaix/syslog.h>
 #include <lunaix/trace.h>
 
-#include <sys/cpu.h>
-#include <sys/mm/mempart.h>
+#include <sys/abi.h>
+#include <sys/mm/mm_defs.h>
 
 #include <klibc/string.h>
 
@@ -78,7 +78,8 @@ ksym_getstr(struct ksym_entry* sym)
 }
 
 static inline bool valid_fp(ptr_t ptr) {
-    return KERNEL_STACK < ptr && ptr < KERNEL_EXEC_END;
+    ptr_t start = ROUNDUP(current_thread->kstack - KSTACK_SIZE, MEM_PAGE);
+    return start < ptr && ptr < current_thread->kstack;
 }
 
 int
@@ -92,7 +93,7 @@ trace_walkback(struct trace_record* tb_buffer,
     int i = 0;
 
     while (valid_fp((ptr_t)frame) && i < limit) {
-        ptr_t pc = *(frame + 1);
+        ptr_t pc = abi_get_retaddrat((ptr_t)frame);
 
         current = trace_sym_lookup(pc);
         tb_buffer[i] =
@@ -118,7 +119,11 @@ trace_walkback(struct trace_record* tb_buffer,
 static inline void
 trace_print_code_entry(ptr_t sym_pc, ptr_t inst_pc, char* sym)
 {
-    DEBUG("%p+%p: %s", sym_pc, inst_pc - sym_pc, sym);
+    if (sym_pc) {
+        DEBUG("%p+%p: %s", sym_pc, inst_pc - sym_pc, sym);
+    } else {
+        DEBUG("%p+%p: %s", inst_pc, sym_pc, sym);
+    }
 }
 
 void
@@ -142,19 +147,20 @@ trace_printstack_of(ptr_t fp)
 void
 trace_printstack()
 {
-    trace_printstack_of(cpu_get_fp());
+    trace_printstack_of(abi_get_callframe());
 }
 
 static void
-trace_printswctx(const isr_param* p, char* direction)
+trace_printswctx(const isr_param* p, bool from_usr, bool to_usr)
 {
 
     struct ksym_entry* sym = trace_sym_lookup(p->execp->eip);
 
-    DEBUG(">> (sw:%s) iv:%d, errno:%p <<",
-          direction,
+    DEBUG("^^^^^ --- %s", to_usr ? "user" : "kernel");
+    DEBUG("  interrupted on #%d, ecode=%p",
           p->execp->vector,
           p->execp->err_code);
+    DEBUG("vvvvv --- %s", from_usr ? "user" : "kernel");
 
     ptr_t sym_pc = sym ? sym->pc : p->execp->eip;
     trace_print_code_entry(sym_pc, p->execp->eip, ksym_getstr(sym));
@@ -164,28 +170,33 @@ void
 trace_printstack_isr(const isr_param* isrm)
 {
     isr_param* p = isrm;
-    ptr_t fp = cpu_get_fp();
-    int prev_fromusr = 0;
+    ptr_t fp = abi_get_callframe();
+    int prev_usrctx = 0;
 
     DEBUG("stack trace (pid=%d)\n", __current->pid);
 
     trace_printstack_of(fp);
 
     while (p) {
-        if (!prev_fromusr) {
-            if (uspace_context(p)) {
-                trace_printswctx(p, "s/u");
+        if (!prev_usrctx) {
+            if (!kernel_context(p)) {
+                trace_printswctx(p, true, false);
             } else {
-                trace_printswctx(p, "s/s");
+                trace_printswctx(p, false, false);
             }
         } else {
-            trace_printswctx(p, "u/s");
+            trace_printswctx(p, false, true);
         }
 
         fp = saved_fp(p);
+        if (!valid_fp(fp)) {
+            DEBUG("??? invalid frame: %p", fp);
+            break;
+        }
+
         trace_printstack_of(fp);
 
-        prev_fromusr = uspace_context(p);
+        prev_usrctx = !kernel_context(p);
 
         p = p->execp->saved_prev_ctx;
     }

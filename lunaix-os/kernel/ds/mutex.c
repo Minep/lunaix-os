@@ -1,5 +1,6 @@
 #include <lunaix/ds/mutex.h>
 #include <lunaix/process.h>
+#include <lunaix/sched.h>
 
 void
 mutex_lock(mutex_t* mutex)
@@ -10,7 +11,7 @@ mutex_lock(mutex_t* mutex)
     }
 
     while (atomic_load(&mutex->lk)) {
-        sched_yieldk();
+        sched_pass();
     }
 
     atomic_fetch_add(&mutex->lk, 1);

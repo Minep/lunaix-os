@@ -9,7 +9,6 @@
  * @copyright Copyright (c) 2022
  *
  */
-#include <sys/interrupts.h>
 
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/valloc.h>
@@ -17,6 +16,7 @@
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
+#include <lunaix/pcontext.h>
 
 #include <hal/hwtimer.h>
 

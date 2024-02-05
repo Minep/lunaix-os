@@ -25,7 +25,6 @@ typedef u32_t pp_attr_t;
 
 struct pp_struct
 {
-    pid_t owner;
     u32_t ref_counts;
     pp_attr_t attr;
 };
@@ -44,7 +43,7 @@ pmm_mark_page_free(ptr_t ppn);
  * @param ppn
  */
 void
-pmm_mark_page_occupied(pid_t owner, ptr_t ppn, pp_attr_t attr);
+pmm_mark_page_occupied(ptr_t ppn, pp_attr_t attr);
 
 /**
  * @brief 标注多个连续的物理页为可用
@@ -62,8 +61,7 @@ pmm_mark_chunk_free(ptr_t start_ppn, size_t page_count);
  * @param page_count 数量
  */
 void
-pmm_mark_chunk_occupied(pid_t owner,
-                        u32_t start_ppn,
+pmm_mark_chunk_occupied(u32_t start_ppn,
                         size_t page_count,
                         pp_attr_t attr);
 
@@ -73,7 +71,7 @@ pmm_mark_chunk_occupied(pid_t owner,
  * @return void* 可用的页地址，否则为 NULL
  */
 ptr_t
-pmm_alloc_page(pid_t owner, pp_attr_t attr);
+pmm_alloc_page(pp_attr_t attr);
 
 /**
  * @brief 分配一个连续的物理内存区域
@@ -84,7 +82,7 @@ pmm_alloc_page(pid_t owner, pp_attr_t attr);
  * @return ptr_t
  */
 ptr_t
-pmm_alloc_cpage(pid_t owner, size_t num_pages, pp_attr_t attr);
+pmm_alloc_cpage(size_t num_pages, pp_attr_t attr);
 
 /**
  * @brief 初始化物理内存管理器
@@ -104,9 +102,9 @@ pmm_query(ptr_t pa);
  * @return 是否成功
  */
 int
-pmm_free_page(pid_t owner, ptr_t page);
+pmm_free_page(ptr_t page);
 
 int
-pmm_ref_page(pid_t owner, ptr_t page);
+pmm_ref_page(ptr_t page);
 
 #endif /* __LUNAIX_PMM_H */
