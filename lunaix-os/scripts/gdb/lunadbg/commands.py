@@ -7,8 +7,8 @@ class LunadbgCommand(Command):
         super().__init__(name, COMMAND_USER)
         self._parser = argparse.ArgumentParser()
 
-    def _parse_args(self, gdb_argstr):
-        args, argv = self._parser.parse_known_args(gdb_argstr.split(' '), None)
+    def _parse_args(self, gdb_argstr: str):
+        args, argv = self._parser.parse_known_args(gdb_argstr.strip().split(' '), None)
         if argv:
             print('unrecognized arguments: %s'%(' '.join(argv)))
             print(self._parser.format_usage())

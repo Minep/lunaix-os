@@ -39,7 +39,7 @@ __alloc_user_thread_stack(struct proc_info* proc, struct mm_region** stack_regio
     int errno = mmap_user((void**)&th_stack_top, &vmr, th_stack_top, NULL, &param);
 
     if (errno) {
-        FATAL("failed to create user thread stack: %d", errno);
+        WARN("failed to create user thread stack: %d", errno);
         return 0;
     }
 

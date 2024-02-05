@@ -4,8 +4,10 @@
 
 // This is a very large array...
 static struct pp_struct pm_table[PM_BMP_MAX_SIZE];
+export_symbol(debug, pmm, pm_table);
 
 static ptr_t max_pg;
+export_symbol(debug, pmm, max_pg);
 
 void
 pmm_mark_page_free(ptr_t ppn)

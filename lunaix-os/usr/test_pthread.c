@@ -4,6 +4,10 @@
 #include <fcntl.h>
 #include <errno.h>
 
+/*
+    Test payloads
+*/
+
 static void* 
 __print_and_sleep_randsec(void* value)
 {
@@ -28,6 +32,21 @@ __print_and_sleep_randsec(void* value)
     printf("thread %d: going to sleep %ds\n", tid, rand);
     sleep(rand);
     close(fd);
+    printf("thread %d: exit\n", tid);
+    return NULL;
+}
+
+static void* 
+__print_and_sleep_seq(void* value)
+{
+    pthread_t tid = pthread_self();
+    printf("thread %d: gets number %d\n", tid, (int)value);
+    
+    int second = (int)value % 30;
+
+    printf("thread %d: going to sleep %ds\n", tid, second);
+    sleep(second);
+
     printf("thread %d: exit\n", tid);
     return NULL;
 }
@@ -100,6 +119,16 @@ pthread_test_rand_sleep(int param)
 }
 
 static void
+pthread_test_seq_sleep(int param)
+{
+    printf("spawning %d threads\n", param);
+    spawn_detached_thread(__print_and_sleep_seq, param);
+    // wait for max 30 seconds
+    printf("wait for completion\n");
+    sleep(30);
+}
+
+static void
 pthread_test_join(int param)
 {
     int err;
@@ -124,7 +153,7 @@ pthread_test_shared_race(int param)
 
     spawn_detached_thread(__inc_number, param);
 
-    sleep(30);
+    sleep(10);
     printf("counter val: %ld\n", __counter_shared);
 }
 
@@ -145,18 +174,24 @@ pthread_test_quit(int param)
 
 int main()
 {
-    run_test(rand_sleep, "rand_sleep_thread5", 5);
-    run_test(rand_sleep, "rand_sleep_thread10", 10);
-    run_test(rand_sleep, "rand_sleep_thread50", 50);
+    run_test(rand_sleep, "rand_sleep5", 5);
+    run_test(rand_sleep, "rand_sleep10", 10);
+    run_test(rand_sleep, "rand_sleep50", 50);
 
-    // run_test(join, "join5", 5);
-    // run_test(join, "join20", 20);
+    run_test(seq_sleep, "seq_sleep50", 50);
+    run_test(seq_sleep, "seq_sleep100", 100);
+    run_test(seq_sleep, "seq_sleep200", 200);
+
+    run_test(join, "join5", 5);
+    run_test(join, "join20", 20);
 
     run_test(quit, "quit10", 10);
     run_test(quit, "quit50", 50);
+    run_test(quit, "quit100", 100);
     
     // FIXME not good, this panic the kernel upon exit, need investigate
-    // run_test(shared_race, "shared_race40", 40);
+    run_test(shared_race, "shared_race10", 10);
+    run_test(shared_race, "shared_race40", 40);
 
     // TODO test pthread + signal
     printf("All test passed.\n");

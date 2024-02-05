@@ -13,6 +13,3 @@ class KernelStruct(PrettyPrintable):
     @staticmethod
     def get_type() -> gdb.Type :
         return gdb.lookup_type("void").pointer()
-    
-    def cast(self, val):
-        return KernelStruct.cast(val)
