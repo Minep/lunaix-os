@@ -31,16 +31,15 @@ elf32_smap(struct load_context* ldctx,
     uintptr_t va = phdre->p_va + base_va;
     struct exec_container* container = ldctx->container;
     struct mmap_param param = { .vms_mnt = container->vms_mnt,
-                                .pvms = &container->proc->mm,
+                                .pvms = vmspace(container->proc),
                                 .proct = proct,
                                 .offset = PG_ALIGN(phdre->p_offset),
                                 .mlen = ROUNDUP(phdre->p_memsz, PG_SIZE),
-                                .flen = phdre->p_filesz,
                                 .flags = MAP_FIXED | MAP_PRIVATE,
                                 .type = REGION_TYPE_CODE };
 
     struct mm_region* seg_reg;
-    int status = mem_map(NULL, &seg_reg, PG_ALIGN(va), elfile, &param);
+    int status = mmap_user(NULL, &seg_reg, PG_ALIGN(va), elfile, &param);
 
     if (!status) {
         size_t next_addr = phdre->p_memsz + va;
@@ -48,7 +47,7 @@ elf32_smap(struct load_context* ldctx,
         ldctx->mem_sz += phdre->p_memsz;
     } else {
         // we probably fucked up our process
-        terminate_proc(-1);
+        terminate_current(-1);
     }
 
     return status;
@@ -77,8 +76,8 @@ load_executable(struct load_context* context, const struct v_file* exefile)
         goto done;
     }
 
-    ldpath = valloc(512);
-    errno = elf32_find_loader(&elf, ldpath, 512);
+    ldpath = valloc(256);
+    errno = elf32_find_loader(&elf, ldpath, 256);
     uintptr_t load_base = 0;
 
     if (errno < 0) {
@@ -131,6 +130,8 @@ done_close_elf32:
     elf32_close(&elf);
 
 done:
-    vfree_safe(ldpath);
+    if (!container->argv_pp[1]) {
+        vfree_safe(ldpath);
+    }
     return errno;
 }

@@ -7,6 +7,7 @@
 #define PROT_READ (1 << 2)
 #define PROT_WRITE (1 << 3)
 #define PROT_EXEC (1 << 4)
+#define PROT_NONE 0
 
 // identity mapped to region attributes
 
@@ -16,6 +17,7 @@
 #define MAP_PRIVATE MAP_RSHARED
 #define MAP_EXCLUSIVE 0x0
 #define MAP_ANON (1 << 5)
+#define MAP_ANONYMOUS MAP_ANON
 #define MAP_STACK 0 // no effect in Lunaix
 
 // other MAP_* goes should beyond 0x20

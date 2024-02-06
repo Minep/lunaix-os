@@ -13,7 +13,7 @@
 static inline void
 current_rmiopoll(int pld)
 {
-    iopoll_remove(__current->pid, &__current->pollctx, pld);
+    iopoll_remove(current_thread, pld);
 }
 
 static struct iopoller*
@@ -138,7 +138,7 @@ __append_pollers(int* ds, int npoller)
             continue;
         }
 
-        int pld = iopoll_install(__current->pid, &__current->pollctx, fd_s);
+        int pld = iopoll_install(current_thread, fd_s);
         if (pld < 0) {
             nc++;
         }
@@ -152,8 +152,8 @@ __append_pollers(int* ds, int npoller)
 static void
 __wait_until_event()
 {
-    block_current();
-    sched_yieldk();
+    block_current_thread();
+    sched_pass();
 }
 
 void
@@ -164,8 +164,10 @@ iopoll_init(struct iopoll* ctx)
 }
 
 void
-iopoll_free(pid_t pid, struct iopoll* ctx)
+iopoll_free(struct proc_info* proc)
 {
+    pid_t pid = proc->pid;
+    struct iopoll* ctx = &proc->pollctx;
     for (int i = 0; i < MAX_POLLER_COUNT; i++) {
         struct iopoller* poller = ctx->pollers[i];
         if (poller) {
@@ -184,24 +186,27 @@ iopoll_wake_pollers(poll_evt_q* pollers_q)
     struct iopoller *pos, *n;
     llist_for_each(pos, n, pollers_q, evt_listener)
     {
-        struct proc_info* proc = get_process(pos->pid);
-        if (proc_hanged(proc)) {
-            resume_process(proc);
+        struct thread* thread = pos->thread;
+        assert(!proc_terminated(thread));
+        
+        if (proc_hanged(thread)) {
+            resume_thread(thread);
         }
-
-        assert(!proc_terminated(proc));
     }
 }
 
 int
-iopoll_remove(pid_t pid, struct iopoll* ctx, int pld)
+iopoll_remove(struct thread* thread, int pld)
 {
+    struct proc_info* proc = thread->process;
+    struct iopoll* ctx = &proc->pollctx;
     struct iopoller* poller = ctx->pollers[pld];
     if (!poller) {
         return ENOENT;
     }
 
-    vfs_pclose(poller->file_ref, pid);
+    // FIXME vfs locking model need to rethink in the presence of threads
+    vfs_pclose(poller->file_ref, proc->pid);
     vfree(poller);
     ctx->pollers[pld] = NULL;
     ctx->n_poller--;
@@ -210,7 +215,7 @@ iopoll_remove(pid_t pid, struct iopoll* ctx, int pld)
 }
 
 int
-iopoll_install(pid_t pid, struct iopoll* pollctx, struct v_fd* fd)
+iopoll_install(struct thread* thread, struct v_fd* fd)
 {
     int pld = __alloc_pld();
     if (pld < 0) {
@@ -220,12 +225,14 @@ iopoll_install(pid_t pid, struct iopoll* pollctx, struct v_fd* fd)
     struct iopoller* iop = valloc(sizeof(struct iopoller));
     *iop = (struct iopoller){
         .file_ref = fd->file,
-        .pid = pid,
+        .thread = thread,
     };
 
     vfs_ref_file(fd->file);
-    __current->pollctx.pollers[pld] = iop;
-    __current->pollctx.n_poller++;
+
+    struct proc_info* proc = thread->process;
+    proc->pollctx.pollers[pld] = iop;
+    proc->pollctx.n_poller++;
 
     struct device* dev;
     if ((dev = fd2dev(fd))) {
@@ -248,7 +255,7 @@ __DEFINE_LXSYSCALL2(int, pollctl, int, action, va_list, va)
         } break;
         case _SPOLL_RM: {
             int pld = va_arg(va, int);
-            retcode = iopoll_remove(__current->pid, &__current->pollctx, pld);
+            retcode = iopoll_remove(current_thread, pld);
         } break;
         case _SPOLL_WAIT: {
             struct poll_info* pinfos = va_arg(va, struct poll_info*);

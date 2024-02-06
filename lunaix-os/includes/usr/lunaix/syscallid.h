@@ -66,6 +66,14 @@
 #define __SYSCALL_fstat 55
 #define __SYSCALL_pollctl 56
 
+#define __SYSCALL_th_create 57
+#define __SYSCALL_th_self 58
+#define __SYSCALL_th_exit 59
+#define __SYSCALL_th_join 60
+#define __SYSCALL_th_kill 61
+#define __SYSCALL_th_detach 62
+#define __SYSCALL_th_sigmask 63
+
 #define __SYSCALL_MAX 0x100
 
 #endif /* __LUNAIX_SYSCALLID_H */

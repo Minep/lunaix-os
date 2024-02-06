@@ -4,8 +4,10 @@
 
 // This is a very large array...
 static struct pp_struct pm_table[PM_BMP_MAX_SIZE];
+export_symbol(debug, pmm, pm_table);
 
 static ptr_t max_pg;
+export_symbol(debug, pmm, max_pg);
 
 void
 pmm_mark_page_free(ptr_t ppn)
@@ -14,10 +16,10 @@ pmm_mark_page_free(ptr_t ppn)
 }
 
 void
-pmm_mark_page_occupied(pid_t owner, ptr_t ppn, pp_attr_t attr)
+pmm_mark_page_occupied(ptr_t ppn, pp_attr_t attr)
 {
     pm_table[ppn] =
-      (struct pp_struct){ .owner = owner, .ref_counts = 1, .attr = attr };
+      (struct pp_struct){ .ref_counts = 1, .attr = attr };
 }
 
 void
@@ -29,14 +31,13 @@ pmm_mark_chunk_free(ptr_t start_ppn, size_t page_count)
 }
 
 void
-pmm_mark_chunk_occupied(pid_t owner,
-                        u32_t start_ppn,
+pmm_mark_chunk_occupied(u32_t start_ppn,
                         size_t page_count,
                         pp_attr_t attr)
 {
     for (size_t i = start_ppn; i < start_ppn + page_count && i < max_pg; i++) {
         pm_table[i] =
-          (struct pp_struct){ .owner = owner, .ref_counts = 1, .attr = attr };
+          (struct pp_struct){ .ref_counts = 1, .attr = attr };
     }
 }
 
@@ -55,12 +56,12 @@ pmm_init(ptr_t mem_upper_lim)
     // mark all as occupied
     for (size_t i = 0; i < PM_BMP_MAX_SIZE; i++) {
         pm_table[i] =
-          (struct pp_struct){ .owner = 0, .attr = 0, .ref_counts = 1 };
+          (struct pp_struct){ .attr = 0, .ref_counts = 1 };
     }
 }
 
 ptr_t
-pmm_alloc_cpage(pid_t owner, size_t num_pages, pp_attr_t attr)
+pmm_alloc_cpage(size_t num_pages, pp_attr_t attr)
 {
     size_t p1 = 0;
     size_t p2 = 0;
@@ -73,13 +74,13 @@ pmm_alloc_cpage(pid_t owner, size_t num_pages, pp_attr_t attr)
         return NULLPTR;
     }
 
-    pmm_mark_chunk_occupied(owner, p1, num_pages, attr);
+    pmm_mark_chunk_occupied(p1, num_pages, attr);
 
     return p1 << 12;
 }
 
 ptr_t
-pmm_alloc_page(pid_t owner, pp_attr_t attr)
+pmm_alloc_page(pp_attr_t attr)
 {
     // Next fit approach. Maximize the throughput!
     ptr_t good_page_found = (ptr_t)NULL;
@@ -91,7 +92,6 @@ pmm_alloc_page(pid_t owner, pp_attr_t attr)
 
         if (!pm->ref_counts) {
             *pm = (struct pp_struct){ .attr = attr,
-                                      .owner = owner,
                                       .ref_counts = 1 };
             good_page_found = pg_lookup_ptr << 12;
             break;
@@ -112,7 +112,7 @@ pmm_alloc_page(pid_t owner, pp_attr_t attr)
 }
 
 int
-pmm_free_page(pid_t owner, ptr_t page)
+pmm_free_page(ptr_t page)
 {
     struct pp_struct* pm = &pm_table[page >> 12];
 
@@ -133,10 +133,8 @@ pmm_free_page(pid_t owner, ptr_t page)
 }
 
 int
-pmm_ref_page(pid_t owner, ptr_t page)
+pmm_ref_page(ptr_t page)
 {
-    (void)owner; // TODO: do smth with owner
-
     u32_t ppn = page >> 12;
 
     if (ppn >= PM_BMP_MAX_SIZE) {

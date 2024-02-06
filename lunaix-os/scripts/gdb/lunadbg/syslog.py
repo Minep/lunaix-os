@@ -17,8 +17,8 @@ class SysLogDump(gdb.Command):
         print(f"[{time_str}] <L{self.log_level[lvl]}> {log.string()}")
 
     def invoke(self, argument: str, from_tty: bool) -> None:
-        log_recs = LunaixSymbols.exported(SymbolDomain.DEBUG, "kprecs")
+        log_recs = LunaixSymbols.exported(SymbolDomain.DEBUG, "kprintf", "kprecs")
         head = log_recs.deref_and_access("kp_ents.ents").address
 
         ent_type = gdb.lookup_type("struct kp_entry").pointer()
-        llist_foreach(head, ent_type, lambda a,b: self.syslog_entry_callback(a, b))
+        llist_foreach(head, ent_type, "ents", lambda a,b: self.syslog_entry_callback(a, b))

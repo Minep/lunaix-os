@@ -4,13 +4,39 @@ def pid_argument(argument):
     if not argument:
         return "__current"
     else:
-        return f"sched_ctx._procs[({argument})]"
+        return f"sched_ctx.procs[({argument})]"
 
-def llist_foreach(head, container_type, cb):
+def llist_foreach(head: gdb.Value, container_type: gdb.Type, field, cb, inclusive=True):
     c = head
     i = 0
-    while (c["next"] != head):
-        el = c["next"].cast(container_type)
+    offset = gdb.Value(0).cast(container_type)[field].address
+    offset_p = int(offset)
+
+    if not inclusive:
+        c = c["next"]
+        if c == head:
+            return 0
+
+    while (True):
+        current = gdb.Value(int(c) - offset_p)
+        el = current.cast(container_type)
         cb(i, el)
         c = c["next"]
         i+=1
+        if c == head:
+            break
+    return i
+
+def get_dnode_name(dnode):
+    return dnode['name']['value'].string()
+
+def get_dnode_path(dnode):
+    components = []
+    current = dnode
+    while (current != 0 and current != current['parent']):
+        components.append(get_dnode_name(current))
+        current = current['parent']
+    if len(components) == 0:
+        components.append('')
+    components.append('')
+    return '/'.join(reversed(components))

@@ -54,7 +54,7 @@ __valloc(unsigned int size,
     i -= boffset;
 
     if (i >= len)
-        return NULL;
+        i = 0;
 
     return cake_grab(segregate_list[i]);
 }
@@ -131,4 +131,9 @@ void
 vfree_dma(void* ptr)
 {
     __vfree(ptr, piles_dma, CLASS_LEN(piles_names_dma));
+}
+
+inline void must_inline
+valloc_ensure_valid(void* ptr) {
+    cake_ensure_valid(ptr);
 }

@@ -2,7 +2,7 @@
 #define __LUNAIX_TRACE_H
 
 #include <lunaix/boot_generic.h>
-#include <sys/interrupts.h>
+#include <lunaix/pcontext.h>
 
 struct ksym_entry
 {

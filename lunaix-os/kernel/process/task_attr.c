@@ -2,20 +2,6 @@
 #include <lunaix/process.h>
 
 void
-__read_pending_sig(struct twimap* map)
-{
-    struct proc_info* proc = twimap_data(map, struct proc_info*);
-    twimap_printf(map, "%bb", proc->sigctx.sig_pending);
-}
-
-void
-__read_masked_sig(struct twimap* map)
-{
-    struct proc_info* proc = twimap_data(map, struct proc_info*);
-    twimap_printf(map, "%bb", proc->sigctx.sig_mask);
-}
-
-void
 __read_parent(struct twimap* map)
 {
     struct proc_info* proc = twimap_data(map, struct proc_info*);
@@ -76,13 +62,15 @@ void
 export_task_attr()
 {
     struct twimap* map;
-    map = twimap_create(NULL);
-    map->read = __read_pending_sig;
-    taskfs_export_attr("sig_pending", map);
+    
+    // FIXME goes to thread specific location
+    // map = twimap_create(NULL);
+    // map->read = __read_pending_sig;
+    // taskfs_export_attr("sig_pending", map);
 
-    map = twimap_create(NULL);
-    map->read = __read_masked_sig;
-    taskfs_export_attr("sig_masked", map);
+    // map = twimap_create(NULL);
+    // map->read = __read_masked_sig;
+    // taskfs_export_attr("sig_masked", map);
 
     map = twimap_create(NULL);
     map->read = __read_parent;

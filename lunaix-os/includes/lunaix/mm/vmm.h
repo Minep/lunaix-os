@@ -20,6 +20,12 @@
 #define VMAP_NOMAP 2
 
 /**
+ * @brief 映射页墙：将虚拟地址映射为页墙，忽略给定的物理地址和页属性
+ *
+ */
+#define VMAP_GUARDPAGE 4
+
+/**
  * @brief 规定下一个可用页映射应当限定在指定的4MB地址空间内
  *
  */
@@ -90,10 +96,7 @@ vmm_lookupat(ptr_t mnt, ptr_t va, v_mapping* mapping);
  *
  */
 ptr_t
-vmm_dup_page(pid_t pid, ptr_t pa);
-
-ptr_t
-vmm_dup_vmspace(pid_t pid);
+vmm_dup_page(ptr_t pa);
 
 /**
  * @brief 挂载另一个虚拟地址空间至当前虚拟地址空间
@@ -110,6 +113,19 @@ vmm_mount_pd(ptr_t mnt, ptr_t pde);
  */
 ptr_t
 vmm_unmount_pd(ptr_t mnt);
+
+static inline ptr_t 
+vmm_mount_pg(ptr_t mnt, ptr_t pa) {
+    assert(pa);
+    vmm_set_mapping(VMS_SELF, mnt, pa, PG_PREM_RW, 0);
+    return mnt;
+}
+
+static inline ptr_t 
+vmm_unmount_pg(ptr_t mnt) {
+    vmm_del_mapping(VMS_SELF, mnt);
+    return mnt;
+}
 
 void*
 vmm_ioremap(ptr_t paddr, size_t size);

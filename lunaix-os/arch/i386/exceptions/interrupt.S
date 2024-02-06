@@ -55,10 +55,7 @@
         pushl %ebx
         pushl %eax
 
-        movl __current, %eax
-        movl proc_intr_ctx(%eax), %eax
-        incl %eax
-        pushl %eax          # nested intr: current depth
+        pushl $0      // placeholder for depth accounting
 
         movl ics(%esp), %eax   /* 取出 %cs */
         andl $0x3, %eax          /* 判断 RPL */
@@ -71,18 +68,22 @@
         movw %ax, %ds
         movw %ax, %es
 
-        movl __current, %ebx
+        movl current_thread, %ebx
+        movl iuesp(%esp), %eax
 
         # Save x87 context to user stack, rather than kernel's memory.
         # XXX what will happen if we triggered a page fault during fxsave?
-        # FIXME can we remove this overhead?
-        movl iuesp(%esp), %eax
-        andl $stack_alignment, %eax 
-        subl $512, %eax
-        fxsave (%eax)
+        # FIXME I think we should defer this to scheduler, and pratice lazy save/load
+        #       Doing this will also make it safe from nested interrupt due to potential 
+        #       page fault when saving
+        # FIXME Also, generalise it to any FPU context, without constraining it to x87.
+
+        #andl $stack_alignment, %eax 
+        #subl $512, %eax
+        #fxsave (%eax)
 
         # 保存用户栈顶指针。因为我们允许同级中断的产生，所以需要该手段跟踪用户栈的地址。
-        movl %eax, proc_ustack_top(%ebx)     # 存入__current->ustack_top
+        movl %eax, thread_ustack_top(%ebx)     # 存入__current->ustack_top
 
     /* kernel space same-level switch */
     1:
@@ -111,11 +112,12 @@
         andl $3, %eax
         jz 1f 
 
-        movl __current, %eax
-        movl proc_ustack_top(%eax), %eax
+        ## FIXME x87 fpu context 
+        movl current_thread, %eax
+        movl thread_ustack_top(%eax), %eax
         test %eax, %eax
         jz 1f
-        fxrstor (%eax)
+        # fxrstor (%eax)
 
 1:
         popl %eax   # discard isr_param::depth
@@ -135,10 +137,10 @@
         movl 16(%esp), %esp
 
         movl %eax, tmp_store
-        movl __current, %eax
+        movl current_thread, %eax
 
         # nested intr: restore saved context
-        popl proc_intr_ctx(%eax)
+        popl thread_intr_ctx(%eax)
 
         addl $8, %esp
 
@@ -160,30 +162,28 @@
 
         iret
 
-    .type switch_to, @function
-    .global switch_to
-    switch_to:
-        # 约定
-        # arg1: 目标进程PCB地址 (next
+    .type do_switch, @function
+    .global do_switch
+    do_switch:
+        # Assumption: __current already hold the target process
 
-        movl %eax, %ebx               # next
-        movl __current, %eax    
-        movl proc_page_table(%eax), %ecx     # __current->pagetable
-        movl proc_page_table(%ebx), %eax     # next->pagetable
-        
-        cmpl %ecx, %eax         # if(next->pagtable != __current->pagetable) {
+        call proc_vmroot
+
+        movl %eax, %ebx
+        movl %cr3, %eax
+        xorl %ebx, %eax         # avoid setting cr3 if just local thread switch.
         jz 1f
-        movl %eax, %cr3         #   cpu_lcr3(next->pagetable)
-                                # }
-    1:
-        movl %ebx, __current    # __current = next
 
-        # 我们已经处在了新的地址空间，为了避免影响其先前的栈布局
-        # 需要使用一个临时的栈空间
+        movl %ebx, %cr3         
+
+    1:
+        # the address space could be changed. A temporary stack
+        # is required to prevent corrupt existing stack
         movl $tmp_stack, %esp
 
         call signal_dispatch    # kernel/signal.c
 
+        movl current_thread, %ebx
         test %eax, %eax         # do we have signal to handle?
         jz 1f
 
@@ -195,13 +195,13 @@
             由于这中间没有进行地址空间的交换，所以第二次跳转使用的是同一个内核栈，而之前默认tss.esp0的值是永远指向最顶部
             这样一来就有可能会覆盖更早的上下文信息（比如嵌套的信号捕获函数）
         */
-        movl proc_intr_ctx(%ebx), %ecx      # __current->intr_ctx
+        movl thread_intr_ctx(%ebx), %ecx      # __current->intr_ctx
         movl %ecx, (tss_esp0_off + _tss)
 
         jmp handle_signal
 
     1:
-        movl proc_intr_ctx(%ebx), %eax
+        movl thread_intr_ctx(%ebx), %eax
         jmp soft_iret
 
     .type handle_signal, @function 

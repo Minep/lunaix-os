@@ -5,11 +5,12 @@ get_qemu_options = -s -S -m 1G \
 				-rtc base=utc \
 				-no-reboot \
 				-machine q35 \
+				-cpu pentium3,rdrand \
 				-no-shutdown \
 				-d cpu_reset \
 				-d trace:ide_dma_cb \
 				-vga std,retrace=precise \
-				-serial telnet::12345,server,nowait\
+				-serial telnet::12345,server,nowait,logfile=lunaix_ttyS0.log\
 				-drive id=cdrom,file="$(1)",readonly=on,if=none,format=raw \
 				-device ahci,id=ahci \
 				-device ide-cd,drive=cdrom,bus=ahci.0 \

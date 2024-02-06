@@ -9,8 +9,8 @@ strcpy(char* dest, const char* src)
         dest[i] = c;
         i++;
     }
-    dest[i] = '\0';
-    return dest;
+    dest[i++] = '\0';
+    return &dest[i];
 }
 
 char*

@@ -24,7 +24,7 @@ create_heap(struct proc_mm* pvms, ptr_t addr)
                                     .mlen = PG_SIZE };
     int status = 0;
     struct mm_region* heap;
-    if ((status = mem_map(NULL, &heap, addr, NULL, &map_param))) {
+    if ((status = mmap_user(NULL, &heap, addr, NULL, &map_param))) {
         return status;
     }
 
@@ -36,7 +36,7 @@ create_heap(struct proc_mm* pvms, ptr_t addr)
 
 __DEFINE_LXSYSCALL1(void*, sbrk, ssize_t, incr)
 {
-    struct proc_mm* pvms = (struct proc_mm*)&__current->mm;
+    struct proc_mm* pvms = vmspace(__current);
     struct mm_region* heap = pvms->heap;
 
     assert(heap);
@@ -49,7 +49,7 @@ __DEFINE_LXSYSCALL1(void*, sbrk, ssize_t, incr)
 
 __DEFINE_LXSYSCALL1(int, brk, void*, addr)
 {
-    struct proc_mm* pvms = (struct proc_mm*)&__current->mm;
+    struct proc_mm* pvms = vmspace(__current);
     struct mm_region* heap = pvms->heap;
 
     if (!heap) {

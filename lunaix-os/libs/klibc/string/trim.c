@@ -27,7 +27,7 @@ strltrim_safe(char* str)
         l++;
     }
 
-    if (!l)
-        return str;
-    return strcpy(str, str + l);
+    if (l)
+        strcpy(str, str + l);
+    return str;
 }

@@ -17,13 +17,6 @@ cpu_trap_sched();
 void
 cpu_trap_panic(char* message);
 
-static inline ptr_t
-cpu_get_fp()
-{
-    ptr_t val;
-    asm("movl %%ebp, %0" : "=r"(val)::);
-    return val;
-}
 
 /**
  * @brief Load current processor state

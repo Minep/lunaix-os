@@ -88,7 +88,7 @@ int
 elf32_open(struct elf32* elf, const char* path);
 
 int
-elf32_openat(struct elf32* elf, const void* elf_vfile);
+elf32_openat(struct elf32* elf, void* elf_vfile);
 
 int
 elf32_static_linked(const struct elf32* elf);

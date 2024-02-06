@@ -26,7 +26,7 @@ do_read_raw(struct term* tdev)
 
     while (sz <= min && dt <= expr) {
         // XXX should we held the device lock while we are waiting?
-        sched_yieldk();
+        sched_pass();
         dt = clock_systime() - t;
         t += dt;
 

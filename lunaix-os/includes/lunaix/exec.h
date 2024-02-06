@@ -43,7 +43,7 @@ struct uexec_param
     char** argv;
     int envc;
     char** envp;
-} PACKED;
+} compact;
 
 #ifndef __USR_WRAPPER__
 
@@ -55,6 +55,13 @@ exec_load(struct exec_container* container, struct v_file* executable);
 
 int
 exec_kexecve(const char* filename, const char* argv[], const char* envp[]);
+
+void
+exec_init_container(struct exec_container* param,
+                    struct thread* thread,
+                    ptr_t vms,
+                    const char** argv,
+                    const char** envp);
 
 #endif
 

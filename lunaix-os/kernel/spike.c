@@ -1,6 +1,6 @@
 #include <klibc/strfmt.h>
 #include <lunaix/spike.h>
-#include <sys/interrupts.h>
+#include <lunaix/pcontext.h>
 
 static char buffer[1024];
 

@@ -2,6 +2,7 @@
 #define __LUNAIX_CAKE_H
 
 #include <lunaix/ds/llist.h>
+#include <lunaix/spike.h>
 
 #define PILE_NAME_MAXLEN 20
 
@@ -86,5 +87,14 @@ cake_export();
 
 void
 cake_ctor_zeroing(struct cake_pile* pile, void* piece);
+
+#define DEADCAKE_MARK 0xdeadcafeUL
+
+static inline void
+cake_ensure_valid(void* area) {
+    if (unlikely(*(unsigned int*)area == DEADCAKE_MARK)) {
+        fail("access to freed cake piece");
+    }
+}
 
 #endif /* __LUNAIX_VALLOC_H */

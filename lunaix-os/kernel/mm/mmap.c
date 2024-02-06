@@ -3,11 +3,12 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
-
 #include <lunaix/syscall.h>
 #include <lunaix/syscall_utils.h>
 
 #include <sys/mm/mempart.h>
+
+#include <usr/lunaix/mann_flags.h>
 
 // any size beyond this is bullshit
 #define BS_SIZE (KERNEL_EXEC - USR_MMAP)
@@ -57,6 +58,107 @@ mem_adjust_inplace(vm_regions_t* regions,
     return 0;
 }
 
+int 
+mmap_user(void** addr_out,
+        struct mm_region** created,
+        ptr_t addr,
+        struct v_file* file,
+        struct mmap_param* param) 
+{
+    param->range_end = KERNEL_EXEC;
+    param->range_start = USR_EXEC;
+
+    return mem_map(addr_out, created, addr, file, param);
+}
+
+static ptr_t
+__mem_find_slot_backward(struct mm_region* lead, struct mmap_param* param, struct mm_region* anchor)
+{
+    ptr_t size = param->mlen;
+    struct mm_region *pos = anchor, 
+                     *n = next_region(pos);
+    while (pos != lead)
+    {
+        if (pos == lead) {
+            break;
+        }
+
+        ptr_t end = n->start;
+        if (n == lead) {
+            end = param->range_end;
+        }
+
+        if (end - pos->end >= size) {
+            return pos->end;
+        }
+
+        pos = n;
+        n = next_region(pos);
+    }
+    
+    return 0;
+}
+
+static ptr_t
+__mem_find_slot_forward(struct mm_region* lead, struct mmap_param* param, struct mm_region* anchor)
+{
+    ptr_t size = param->mlen;
+    struct mm_region *pos = anchor, 
+                     *prev = prev_region(pos);
+    while (lead != pos)
+    {
+        ptr_t end = prev->end;
+        if (prev == lead) {
+            end = param->range_start;
+        }
+
+        if (pos->start - end >= size) {
+            return pos->start - size;
+        }
+
+        pos = prev;
+        prev = prev_region(pos);
+    }
+
+    return 0;
+}
+
+static ptr_t
+__mem_find_slot(vm_regions_t* lead, struct mmap_param* param, struct mm_region* anchor)
+{
+    ptr_t result = 0;
+    struct mm_region* _lead = get_region(lead);
+    if ((result = __mem_find_slot_backward(_lead, param, anchor))) {
+        return result;
+    }
+
+    return __mem_find_slot_forward(_lead, param, anchor);
+}
+
+static struct mm_region*
+__mem_find_nearest(vm_regions_t* lead, ptr_t addr)
+{   
+    ptr_t min_dist = (ptr_t)-1;
+    struct mm_region *pos, *n, *min = NULL;
+    llist_for_each(pos, n, lead, head) {
+        if (region_contains(pos, addr)) {
+            return pos;
+        }
+
+        ptr_t dist = addr - pos->end;
+        if (addr < pos->start) {
+            dist = pos->start - addr;
+        }
+
+        if (dist < min_dist) {
+            min_dist = dist;
+            min = pos;
+        }
+    }
+
+    return min;
+}
+
 int
 mem_map(void** addr_out,
         struct mm_region** created,
@@ -66,7 +168,7 @@ mem_map(void** addr_out,
 {
     assert_msg(addr, "addr can not be NULL");
 
-    ptr_t last_end = USR_EXEC, found_loc = addr;
+    ptr_t last_end = USR_EXEC, found_loc = PG_ALIGN(addr);
     struct mm_region *pos, *n;
 
     vm_regions_t* vm_regions = &param->pvms->regions;
@@ -87,23 +189,19 @@ mem_map(void** addr_out,
         goto found;
     }
 
-    llist_for_each(pos, n, vm_regions, head)
-    {
-        if (last_end < found_loc) {
-            size_t avail_space = pos->start - found_loc;
-            if (pos->start > found_loc && avail_space > param->mlen) {
-                goto found;
-            }
-            found_loc = pos->end + MEM_PAGE;
-        }
+    if (llist_empty(vm_regions)) {
+        goto found;
+    }
 
-        last_end = pos->end;
+    struct mm_region* anchor = __mem_find_nearest(vm_regions, found_loc);
+    if ((found_loc = __mem_find_slot(vm_regions, param, anchor))) {
+        goto found;
     }
 
     return ENOMEM;
 
 found:
-    if (found_loc >= KERNEL_EXEC || found_loc < USR_EXEC) {
+    if (found_loc >= param->range_end || found_loc < param->range_start) {
         return ENOMEM;
     }
 
@@ -118,12 +216,16 @@ found:
 
     region_add(vm_regions, region);
 
-    u32_t attr = PG_ALLOW_USER;
-    if ((param->proct & REGION_WRITE)) {
+    int proct = param->proct;
+    int attr = PG_ALLOW_USER;
+    if ((proct & REGION_WRITE)) {
         attr |= PG_WRITE;
     }
+    if ((proct & REGION_KERNEL)) {
+        attr &= ~PG_ALLOW_USER;
+    }
 
-    for (u32_t i = 0; i < param->mlen; i += PG_SIZE) {
+    for (size_t i = 0; i < param->mlen; i += PG_SIZE) {
         vmm_set_mapping(param->vms_mnt, found_loc + i, 0, attr, 0);
     }
 
@@ -190,7 +292,7 @@ mem_sync_pages(ptr_t mnt,
 
     invalidate:
         *mapping.pte &= ~PG_PRESENT;
-        pmm_free_page(KERNEL_PID, mapping.pa);
+        pmm_free_page(mapping.pa);
         cpu_flush_page((ptr_t)mapping.pte);
     }
 }
@@ -224,15 +326,22 @@ mem_msync(ptr_t mnt,
 void
 mem_unmap_region(ptr_t mnt, struct mm_region* region)
 {
+    if (!region) {
+        return;
+    }
+    
+    valloc_ensure_valid(region);
+    
     size_t len = ROUNDUP(region->end - region->start, PG_SIZE);
     mem_sync_pages(mnt, region, region->start, len, 0);
 
     for (size_t i = region->start; i <= region->end; i += PG_SIZE) {
         ptr_t pa = vmm_del_mapping(mnt, i);
         if (pa) {
-            pmm_free_page(__current->pid, pa);
+            pmm_free_page(pa);
         }
     }
+    
     llist_delete(&region->head);
     region_release(region);
 }
@@ -302,7 +411,7 @@ __unmap_overlapped_cases(ptr_t mnt,
     for (size_t i = 0; i < umps_len; i += PG_SIZE) {
         ptr_t pa = vmm_del_mapping(mnt, vmr->start + i);
         if (pa) {
-            pmm_free_page(vmr->proc_vms->pid, pa);
+            pmm_free_page(pa);
         }
     }
 
@@ -389,24 +498,23 @@ __DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
 
     struct mmap_param param = { .flags = options,
                                 .mlen = ROUNDUP(length, PG_SIZE),
-                                .flen = length,
                                 .offset = offset,
                                 .type = REGION_TYPE_GENERAL,
                                 .proct = proct,
-                                .pvms = (struct proc_mm*)&__current->mm,
+                                .pvms = vmspace(__current),
                                 .vms_mnt = VMS_SELF };
 
-    errno = mem_map(&result, NULL, addr_ptr, file, &param);
+    errno = mmap_user(&result, NULL, addr_ptr, file, &param);
 
 done:
-    __current->k_status = errno;
+    syscall_result(errno);
     return result;
 }
 
 __DEFINE_LXSYSCALL2(int, munmap, void*, addr, size_t, length)
 {
     return mem_unmap(
-      VMS_SELF, (vm_regions_t*)&__current->mm.regions, (ptr_t)addr, length);
+      VMS_SELF, vmregions(__current), (ptr_t)addr, length);
 }
 
 __DEFINE_LXSYSCALL3(int, msync, void*, addr, size_t, length, int, flags)
@@ -416,7 +524,7 @@ __DEFINE_LXSYSCALL3(int, msync, void*, addr, size_t, length, int, flags)
     }
 
     int status = mem_msync(VMS_SELF,
-                           (vm_regions_t*)&__current->mm.regions,
+                           vmregions(__current),
                            (ptr_t)addr,
                            length,
                            flags);

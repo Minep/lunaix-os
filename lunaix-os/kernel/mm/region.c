@@ -2,6 +2,7 @@
 #include <lunaix/mm/region.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
+#include <lunaix/process.h>
 
 #include <sys/mm/mempart.h>
 
@@ -75,7 +76,8 @@ region_release(struct mm_region* region)
     }
 
     if (region->mfile) {
-        vfs_pclose(region->mfile, region->proc_vms->pid);
+        struct proc_mm* mm = region->proc_vms;
+        vfs_pclose(region->mfile, mm->proc->pid);
     }
 
     if (region->index) {

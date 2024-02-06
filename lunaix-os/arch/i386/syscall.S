@@ -64,20 +64,29 @@
         .long __lxsys_execve
         .long __lxsys_fstat         /* 55 */
         .long __lxsys_pollctl
+        .long __lxsys_th_create
+        .long __lxsys_th_self
+        .long __lxsys_th_exit
+        .long __lxsys_th_join       /* 60 */
+        .long __lxsys_th_kill
+        .long __lxsys_th_detach
+        .long __lxsys_th_sigmask
         2:
         .rept __SYSCALL_MAX - (2b - 1b)/4
             .long 0
         .endr
 
-.global syscall_hndlr
 
 .section .text
+    .type syscall_hndlr, @function
+    .global syscall_hndlr
     syscall_hndlr:
         pushl %ebp
-        movl 8(%esp), %ebp          // isr_param*
+        movl %esp, %ebp
+        movl 8(%esp), %ebx          // isr_param*
 
-        addl $4, %ebp
-        movl (%ebp), %eax          /* eax: call code as well as the return value from syscall */
+        addl $4, %ebx
+        movl (%ebx), %eax          /* eax: call code as well as the return value from syscall */
         cmpl $__SYSCALL_MAX, %eax
         jae 2f
 
@@ -87,21 +96,26 @@
         jne 1f
     2:    
         neg   %eax
+        movl %ebp, %esp
         popl  %ebp
         ret
+
     1:
-        pushl 24(%ebp)      /* esi - #5 arg */
-        pushl 16(%ebp)      /* edi - #4 arg */
-        pushl 12(%ebp)      /* edx - #3 arg */
-        pushl 8(%ebp)       /* ecx - #2 arg */
-        pushl 4(%ebp)       /* ebx - #1 arg */
+        pushl %ebx
+        pushl 24(%ebx)      /* esi - #5 arg */
+        pushl 16(%ebx)      /* edi - #4 arg */
+        pushl 12(%ebx)      /* edx - #3 arg */
+        pushl 8(%ebx)       /* ecx - #2 arg */
+        pushl 4(%ebx)       /* ebx - #1 arg */
         
         call *(%eax)
 
-        movl %eax, (%ebp)    /* save the return value */
-
         addl $20, %esp      /* remove the parameters from stack */
-
+        
+        popl %ebx
+        movl %eax, (%ebx)    /* save the return value */
+        
+        movl %ebp, %esp
         popl %ebp
         
         ret

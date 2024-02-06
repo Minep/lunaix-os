@@ -67,7 +67,7 @@ done:
 
     for (size_t i = 0; i < size; i += PG_SIZE) {
         vmm_set_mapping(VMS_SELF, alloc_begin + i, paddr + i, attr, 0);
-        pmm_ref_page(KERNEL_PID, paddr + i);
+        pmm_ref_page(paddr + i);
     }
 
     return (void*)alloc_begin;

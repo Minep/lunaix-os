@@ -1,5 +1,4 @@
 #include <sys/abi.h>
-#include <sys/interrupts.h>
 #include <sys/mm/mempart.h>
 
 #include <hal/intc.h>
@@ -11,6 +10,7 @@
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
+#include <lunaix/mm/procvm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/signal.h>
@@ -18,104 +18,125 @@
 #include <lunaix/status.h>
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
+#include <lunaix/pcontext.h>
+#include <lunaix/kpreempt.h>
 
 #include <klibc/string.h>
 
 volatile struct proc_info* __current;
-
-static struct proc_info dummy_proc;
-
-struct proc_info dummy;
+volatile struct thread* current_thread;
 
 struct scheduler sched_ctx;
 
-struct cake_pile* proc_pile;
+struct cake_pile *proc_pile ,*thread_pile;
 
 LOG_MODULE("SCHED")
-
-void
-sched_init_dummy();
 
 void
 sched_init()
 {
     proc_pile = cake_new_pile("proc", sizeof(struct proc_info), 1, 0);
+    thread_pile = cake_new_pile("thread", sizeof(struct thread), 1, 0);
     cake_set_constructor(proc_pile, cake_ctor_zeroing);
+    cake_set_constructor(thread_pile, cake_ctor_zeroing);
 
     sched_ctx = (struct scheduler){
-        ._procs = vzalloc(PROC_TABLE_SIZE), .ptable_len = 0, .procs_index = 0};
-
-    // TODO initialize dummy_proc
-    sched_init_dummy();
-}
-
-#define DUMMY_STACK_SIZE 2048
-
-void
-sched_init_dummy()
-{
-    // This surely need to be simplified or encapsulated!
-    // It is a living nightmare!
-
-    extern void my_dummy();
-    static char dummy_stack[DUMMY_STACK_SIZE] __attribute__((aligned(16)));
-
-    ptr_t stktop = (ptr_t)dummy_stack + DUMMY_STACK_SIZE;
-
-    dummy_proc = (struct proc_info){};
-
-    proc_init_transfer(&dummy_proc, stktop, (ptr_t)my_dummy, TRANSFER_IE);
-
-    dummy_proc.page_table = cpu_ldvmspace();
-    dummy_proc.state = PS_READY;
-    dummy_proc.parent = &dummy_proc;
-    dummy_proc.pid = KERNEL_PID;
-
-    __current = &dummy_proc;
+        .procs = vzalloc(PROC_TABLE_SIZE), .ptable_len = 0, .procs_index = 0};
+    
+    llist_init_head(&sched_ctx.sleepers);
 }
 
 void
-run(struct proc_info* proc)
+run(struct thread* thread)
 {
-    proc->state = PS_RUNNING;
+    thread->state = PS_RUNNING;
+    thread->process->state = PS_RUNNING;
+    thread->process->th_active = thread;
 
-    intc_notify_eos(0);
-    switch_context(proc);
+    set_current_executing(thread);
+
+    switch_context();
+    fail("unexpected return from switching");
+}
+
+/*
+    Currently, we do not allow self-destorying thread, doing
+    so will eliminate current kernel stack which is disaster.
+    A compromise solution is to perform a regular scan and 
+    clean-up on these thread, in the preemptible kernel thread.
+*/
+
+void _preemptible
+cleanup_detached_threads() {
+    ensure_preempt_caller();
+
+    // XXX may be a lock on sched_context will ben the most appropriate?
+    cpu_disable_interrupt();
+
+    int i = 0;
+    struct thread *pos, *n;
+    llist_for_each(pos, n, sched_ctx.threads, sched_sibs) {
+        if (likely(!proc_terminated(pos) || !thread_detached(pos))) {
+            continue;
+        }
+
+        vmm_mount_pd(VMS_MOUNT_1, vmroot(pos->process));
+        destory_thread(VMS_MOUNT_1, pos);
+        vmm_unmount_pd(VMS_MOUNT_1);
+        
+        i++;
+    }
+
+    if (i) {
+        INFO("cleaned %d terminated detached thread(s)", i);
+    }
+
+    cpu_enable_interrupt();
 }
 
 int
-can_schedule(struct proc_info* proc)
+can_schedule(struct thread* thread)
 {
-    if (!proc) {
+    if (!thread) {
         return 0;
     }
 
-    struct sighail* sh = &proc->sigctx;
+    if (unlikely(kernel_process(thread->process))) {
+        // a kernel process is always runnable
+        return thread->state == PS_READY;
+    }
 
-    if ((proc->state & PS_PAUSED)) {
+    struct sigctx* sh = &thread->sigctx;
+
+    if ((thread->state & PS_PAUSED)) {
         return !!(sh->sig_pending & ~1);
     }
-    if ((proc->state & PS_BLOCKED)) {
+    if ((thread->state & PS_BLOCKED)) {
         return sigset_test(sh->sig_pending, _SIGINT);
     }
 
-    if (sigset_test(sh->sig_pending, _SIGCONT)) {
-        sigset_clear(sh->sig_pending, _SIGSTOP);
-    } else if (sigset_test(sh->sig_pending, _SIGSTOP)) {
-        // 如果进程受到SIGSTOP，则该进程不给予调度。
+    if (sigset_test(sh->sig_pending, _SIGSTOP)) {
+        // If one thread is experiencing SIGSTOP, then we know
+        // all other threads are also SIGSTOP (as per POSIX-2008.1)
+        // In which case, the entire process is stopped.
+        thread->state = PS_STOPPED;
         return 0;
     }
+    if (sigset_test(sh->sig_pending, _SIGCONT)) {
+        thread->state = PS_READY;
+    }
 
-    return (proc->state == PS_READY);
+    return (thread->state == PS_READY) \
+            && proc_runnable(thread->process);
 }
 
 void
 check_sleepers()
 {
-    struct proc_info* leader = sched_ctx._procs[0];
-    struct proc_info *pos, *n;
+    struct thread *pos, *n;
     time_t now = clock_systime() / 1000;
-    llist_for_each(pos, n, &leader->sleep.sleepers, sleep.sleepers)
+
+    llist_for_each(pos, n, &sched_ctx.sleepers, sleep.sleepers)
     {
         if (proc_terminated(pos)) {
             goto del;
@@ -131,7 +152,7 @@ check_sleepers()
 
         if (atime && now >= atime) {
             pos->sleep.alarm_time = 0;
-            proc_setsignal(pos, _SIGALRM);
+            thread_setsignal(pos, _SIGALRM);
         }
 
         if (!wtime && !atime) {
@@ -144,44 +165,49 @@ check_sleepers()
 void
 schedule()
 {
-    if (!sched_ctx.ptable_len) {
-        return;
-    }
+    assert(sched_ctx.ptable_len && sched_ctx.ttable_len);
 
     // 上下文切换相当的敏感！我们不希望任何的中断打乱栈的顺序……
     cpu_disable_interrupt();
-    struct proc_info* next;
-    int prev_ptr = sched_ctx.procs_index;
-    int ptr = prev_ptr;
-    int found = 0;
 
-    if (!(__current->state & ~PS_RUNNING)) {
+    if (!(current_thread->state & ~PS_RUNNING)) {
+        current_thread->state = PS_READY;
         __current->state = PS_READY;
     }
 
     check_sleepers();
 
     // round-robin scheduler
+    
+    struct thread* current = current_thread;
+    struct thread* to_check = current;
+    
     do {
-        ptr = (ptr + 1) % sched_ctx.ptable_len;
-        next = sched_ctx._procs[ptr];
+        to_check = list_next(to_check, struct thread, sched_sibs);
 
-        if (!(found = can_schedule(next))) {
-            if (ptr == prev_ptr) {
-                next = &dummy_proc;
-                goto done;
-            }
+        if (can_schedule(to_check)) {
+            break;
         }
-    } while (!found);
 
-    sched_ctx.procs_index = ptr;
+        if (to_check == current) {
+            // FIXME do something less leathal here
+            fail("Ran out of threads!")
+            goto done;  
+        }
+
+    } while (1);
+
+    sched_ctx.procs_index = to_check->process->pid;
 
 done:
-    run(next);
+    intc_notify_eos(0);
+    run(to_check);
+
+    fail("unexpected return from scheduler");
 }
 
 void
-sched_yieldk()
+sched_pass()
 {
     cpu_enable_interrupt();
     cpu_trap_sched();
@@ -194,21 +220,21 @@ __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
     }
 
     time_t systime = clock_systime() / 1000;
+    struct haybed* bed = &current_thread->sleep;
 
-    if (__current->sleep.wakeup_time) {
-        return (__current->sleep.wakeup_time - systime);
+    if (bed->wakeup_time) {
+        return (bed->wakeup_time - systime);
     }
 
-    struct proc_info* root_proc = sched_ctx._procs[0];
-    __current->sleep.wakeup_time = systime + seconds;
+    bed->wakeup_time = systime + seconds;
 
-    if (llist_empty(&__current->sleep.sleepers)) {
-        llist_append(&root_proc->sleep.sleepers, &__current->sleep.sleepers);
+    if (llist_empty(&bed->sleepers)) {
+        llist_append(&sched_ctx.sleepers, &bed->sleepers);
     }
 
     store_retval(seconds);
 
-    block_current();
+    block_current_thread();
     schedule();
 
     return 0;
@@ -216,14 +242,15 @@ __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
 
 __DEFINE_LXSYSCALL1(unsigned int, alarm, unsigned int, seconds)
 {
-    time_t prev_ddl = __current->sleep.alarm_time;
+    struct haybed* bed = &current_thread->sleep;
+    time_t prev_ddl = bed->alarm_time;
     time_t now = clock_systime() / 1000;
 
-    __current->sleep.alarm_time = seconds ? now + seconds : 0;
+    bed->alarm_time = seconds ? now + seconds : 0;
 
-    struct proc_info* root_proc = sched_ctx._procs[0];
-    if (llist_empty(&__current->sleep.sleepers)) {
-        llist_append(&root_proc->sleep.sleepers, &__current->sleep.sleepers);
+    struct proc_info* root_proc = sched_ctx.procs[0];
+    if (llist_empty(&bed->sleepers)) {
+        llist_append(&sched_ctx.sleepers, &bed->sleepers);
     }
 
     return prev_ddl ? (prev_ddl - now) : 0;
@@ -231,7 +258,7 @@ __DEFINE_LXSYSCALL1(unsigned int, alarm, unsigned int, seconds)
 
 __DEFINE_LXSYSCALL1(void, exit, int, status)
 {
-    terminate_proc(status);
+    terminate_current(status);
     schedule();
 }
 
@@ -255,7 +282,7 @@ __DEFINE_LXSYSCALL3(pid_t, waitpid, pid_t, pid, int*, status, int, options)
 
 __DEFINE_LXSYSCALL(int, geterrno)
 {
-    return __current->k_status;
+    return current_thread->syscall_ret;
 }
 
 pid_t
@@ -287,7 +314,7 @@ repeat:
         return 0;
     }
     // 放弃当前的运行机会
-    sched_yieldk();
+    sched_pass();
     goto repeat;
 
 done:
@@ -297,92 +324,171 @@ done:
     return destroy_process(proc->pid);
 }
 
+static inline pid_t
+get_free_pid() {
+    pid_t i = 0;
+    
+    for (; i < sched_ctx.ptable_len && sched_ctx.procs[i]; i++)
+        ;
+    
+    if (unlikely(i == MAX_PROCESS)) {
+        panick("Panic in Ponyville shimmer!");
+    }
+
+    return i;
+}
+
+struct thread*
+alloc_thread(struct proc_info* process) {
+    if (process->thread_count >= MAX_THREAD_PP) {
+        return NULL;
+    }
+    
+    struct thread* th = cake_grab(thread_pile);
+
+    th->process = process;
+    th->created = clock_systime();
+
+    // FIXME we need a better tid allocation method!
+    th->tid = th->created;
+    th->tid = (th->created ^ ((ptr_t)th)) % MAX_THREAD_PP;
+
+    th->state = PS_CREATED;
+    
+    llist_init_head(&th->sleep.sleepers);
+    llist_init_head(&th->sched_sibs);
+    llist_init_head(&th->proc_sibs);
+    waitq_init(&th->waitqueue);
+
+    return th;
+}
+
 struct proc_info*
 alloc_process()
 {
-    pid_t i = 0;
-    for (; i < sched_ctx.ptable_len && sched_ctx._procs[i]; i++)
-        ;
-
-    if (i == MAX_PROCESS) {
-        panick("Panic in Ponyville shimmer!");
-    }
+    pid_t i = get_free_pid();
 
     if (i == sched_ctx.ptable_len) {
         sched_ctx.ptable_len++;
     }
 
     struct proc_info* proc = cake_grab(proc_pile);
+    if (!proc) {
+        return NULL;
+    }
 
     proc->state = PS_CREATED;
     proc->pid = i;
-    proc->mm.pid = i;
     proc->created = clock_systime();
     proc->pgid = proc->pid;
+
+    proc->sigreg = vzalloc(sizeof(struct sigregister));
     proc->fdtable = vzalloc(sizeof(struct v_fdtable));
 
-    llist_init_head(&proc->mm.regions);
+    proc->mm = procvm_create(proc);
+    
     llist_init_head(&proc->tasks);
     llist_init_head(&proc->children);
     llist_init_head(&proc->grp_member);
-    llist_init_head(&proc->sleep.sleepers);
+    llist_init_head(&proc->threads);
 
     iopoll_init(&proc->pollctx);
-    waitq_init(&proc->waitqueue);
 
-    sched_ctx._procs[i] = proc;
+    sched_ctx.procs[i] = proc;
 
     return proc;
 }
 
 void
+commit_thread(struct thread* thread) {
+    struct proc_info* process = thread->process;
+
+    assert(process && !proc_terminated(process));
+
+    llist_append(&process->threads, &thread->proc_sibs);
+    
+    if (sched_ctx.threads) {
+        llist_append(sched_ctx.threads, &thread->sched_sibs);
+    } else {
+        sched_ctx.threads = &thread->sched_sibs;
+    }
+
+    sched_ctx.ttable_len++;
+    process->thread_count++;
+    thread->state = PS_READY;
+}
+
+void
 commit_process(struct proc_info* process)
 {
-    assert(process == sched_ctx._procs[process->pid]);
-
-    if (process->state != PS_CREATED) {
-        __current->k_status = EINVAL;
-        return;
-    }
+    assert(process == sched_ctx.procs[process->pid]);
+    assert(process->state == PS_CREATED);
 
     // every process is the child of first process (pid=1)
     if (!process->parent) {
-        process->parent = sched_ctx._procs[1];
+        if (likely(!kernel_process(process))) {
+            process->parent = sched_ctx.procs[1];
+        } else {
+            process->parent = process;
+        }
+    } else {
+        assert(!proc_terminated(process->parent));
+    }
+
+    if (sched_ctx.proc_list) {
+        llist_append(sched_ctx.proc_list, &process->tasks);
+    } else {
+        sched_ctx.proc_list = &process->tasks;
     }
 
     llist_append(&process->parent->children, &process->siblings);
-    llist_append(&sched_ctx._procs[0]->tasks, &process->tasks);
 
     process->state = PS_READY;
 }
 
-// from <kernel/process.c>
-extern void
-__del_pagetable(pid_t pid, ptr_t mount_point);
-
-pid_t
-destroy_process(pid_t pid)
+void
+destory_thread(ptr_t vm_mnt, struct thread* thread) 
 {
-    int index = pid;
-    if (index <= 0 || index > sched_ctx.ptable_len) {
-        __current->k_status = EINVAL;
-        return -1;
-    }
+    cake_ensure_valid(thread);
+    
+    struct proc_info* proc = thread->process;
 
-    struct proc_info* proc = sched_ctx._procs[index];
-    sched_ctx._procs[index] = 0;
+    llist_delete(&thread->sched_sibs);
+    llist_delete(&thread->proc_sibs);
+    llist_delete(&thread->sleep.sleepers);
+    waitq_cancel_wait(&thread->waitqueue);
+
+    thread_release_mem(thread, vm_mnt);
+
+    proc->thread_count--;
+    sched_ctx.ttable_len--;
+
+    cake_release(thread_pile, thread);
+}
+
+void 
+delete_process(struct proc_info* proc)
+{
+    pid_t pid = proc->pid;
+
+    assert(pid);    // long live the pid0 !!
+
+    sched_ctx.procs[pid] = NULL;
 
     llist_delete(&proc->siblings);
     llist_delete(&proc->grp_member);
     llist_delete(&proc->tasks);
-    llist_delete(&proc->sleep.sleepers);
 
-    iopoll_free(pid, &proc->pollctx);
+    iopoll_free(proc);
 
     taskfs_invalidate(pid);
 
     if (proc->cwd) {
         vfs_unref_dnode(proc->cwd);
+    }
+
+    if (proc->cmd) {
+        vfree(proc->cmd);
     }
 
     for (size_t i = 0; i < VFS_MAX_FD; i++) {
@@ -395,31 +501,82 @@ destroy_process(pid_t pid)
 
     vfree(proc->fdtable);
 
-    vmm_mount_pd(VMS_MOUNT_1, proc->page_table);
+    signal_free_registers(proc->sigreg);
 
-    struct mm_region *pos, *n;
-    llist_for_each(pos, n, &proc->mm.regions, head)
-    {
-        mem_sync_pages(VMS_MOUNT_1, pos, pos->start, pos->end - pos->start, 0);
-        region_release(pos);
+    vmm_mount_pd(VMS_MOUNT_1, vmroot(proc));
+    
+    struct thread *pos, *n;
+    llist_for_each(pos, n, &proc->threads, proc_sibs) {
+        // terminate and destory all thread unconditionally
+        destory_thread(VMS_MOUNT_1, pos);
     }
 
-    __del_pagetable(pid, VMS_MOUNT_1);
+    procvm_cleanup(VMS_MOUNT_1, proc);
 
     vmm_unmount_pd(VMS_MOUNT_1);
 
     cake_release(proc_pile, proc);
+}
+
+pid_t
+destroy_process(pid_t pid)
+{
+    int index = pid;
+    if (index <= 0 || index > sched_ctx.ptable_len) {
+        syscall_result(EINVAL);
+        return -1;
+    }
+
+    struct proc_info* proc = sched_ctx.procs[index];
+    delete_process(proc);
 
     return pid;
 }
 
-void
-terminate_proc(int exit_code)
-{
-    __current->state = PS_TERMNAT;
-    __current->exit_code = exit_code;
+static void 
+terminate_proc_only(struct proc_info* proc, int exit_code) {
+    proc->state = PS_TERMNAT;
+    proc->exit_code = exit_code;
 
-    proc_setsignal(__current->parent, _SIGCHLD);
+    proc_setsignal(proc->parent, _SIGCHLD);
+}
+
+void
+terminate_thread(struct thread* thread, ptr_t val) {
+    thread->exit_val = val;
+    thread->state = PS_TERMNAT;
+
+    struct proc_info* proc = thread->process;
+    if (proc->thread_count == 1) {
+        terminate_proc_only(thread->process, 0);
+    }
+}
+
+void
+terminate_current_thread(ptr_t val) {
+    terminate_thread(current_thread, val);
+}
+
+void 
+terminate_proccess(struct proc_info* proc, int exit_code) {
+    assert(!kernel_process(proc));
+
+    if (proc->pid == 1) {
+        panick("Attempt to kill init");
+    }
+
+    terminate_proc_only(proc, exit_code);
+
+    struct thread *pos, *n;
+    llist_for_each(pos, n, &__current->threads, proc_sibs) {
+        pos->state = PS_TERMNAT;
+    }
+}
+
+void
+terminate_current(int exit_code)
+{
+    terminate_proccess(__current, exit_code);
 }
 
 struct proc_info*
@@ -429,7 +586,7 @@ get_process(pid_t pid)
     if (index < 0 || index > sched_ctx.ptable_len) {
         return NULL;
     }
-    return sched_ctx._procs[index];
+    return sched_ctx.procs[index];
 }
 
 int
@@ -439,7 +596,7 @@ orphaned_proc(pid_t pid)
         return 0;
     if (pid >= sched_ctx.ptable_len)
         return 0;
-    struct proc_info* proc = sched_ctx._procs[pid];
+    struct proc_info* proc = sched_ctx.procs[pid];
     struct proc_info* parent = proc->parent;
 
     // 如果其父进程的状态是terminated 或 destroy中的一种
