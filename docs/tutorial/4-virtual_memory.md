@@ -442,7 +442,7 @@ void vmm_unmap_page(void* vpn) {
 }
 ```
 
-获得页表地址，再根据pt_offset偏移获得要写的entry的地址。TLB是虚拟地址到网络地址映射的缓存，相当于数据结构的map。修改entry前需要使用invlpg来刷新TLB缓存。
+获得页表地址，再根据pt_offset偏移获得要写的entry的地址。TLB是虚拟地址到物理地址映射的缓存，相当于数据结构的map。修改entry前需要使用invlpg来刷新TLB缓存。
 
 ```c
         pt_t* pt = (pt_t*)PT_VADDR(pd_offset);
