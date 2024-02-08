@@ -3,6 +3,8 @@
 
 #include <lunaix/types.h>
 
+#include <sys/mm/memory.h>
+
 #include <usr/lunaix/mann_flags.h>
 
 /**

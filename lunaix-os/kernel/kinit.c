@@ -23,7 +23,7 @@
 #include <hal/intc.h>
 
 #include <sys/abi.h>
-#include <sys/mm/mempart.h>
+#include <sys/mm/mm_defs.h>
 
 #include <klibc/strfmt.h>
 #include <klibc/string.h>
@@ -124,13 +124,15 @@ kmem_init(struct boot_handoff* bhctx)
 {
     extern u8_t __kexec_end;
     // 将内核占据的页，包括前1MB，hhk_init 设为已占用
-    size_t pg_count = ((ptr_t)&__kexec_end - KERNEL_EXEC) >> PG_SIZE_BITS;
+    size_t pg_count = ((ptr_t)&__kexec_end - KERNEL_RESIDENT) >> PG_SIZE_BITS;
     pmm_mark_chunk_occupied(0, pg_count, PP_FGLOCKED);
 
-    // reserve higher half
-    for (size_t i = L1_INDEX(KERNEL_EXEC); i < 1023; i++) {
-        assert(vmm_set_mapping(VMS_SELF, i << 22, 0, 0, VMAP_NOMAP));
-    }
+    pte_t* ptep = mkptep_va(VMS_SELF, KERNEL_RESIDENT);
+    ptep = mkl0tep(ptep);
+
+    do {
+        assert(mkl1t(ptep++, 0));
+    } while (ptep_vm_pfn(ptep));
 
     // allocators
     cake_init();

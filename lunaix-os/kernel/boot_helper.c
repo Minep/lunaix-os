@@ -5,7 +5,7 @@
 #include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
 #include <lunaix/kcmd.h>
-#include <sys/mm/mempart.h>
+#include <sys/mm/mm_defs.h>
 
 /**
  * @brief Reserve memory for kernel bootstrapping initialization
@@ -27,11 +27,12 @@ boot_begin(struct boot_handoff* bhctx)
             continue;
         }
 
-        ptr_t pa = PG_ALIGN(mmapent->start);
-        for (size_t j = 0; j < size_pg && pa < KERNEL_EXEC;
-             j++, pa += PM_PAGE_SIZE) {
-            vmm_set_mapping(VMS_SELF, pa, pa, PG_PREM_RW, VMAP_IGNORE);
-        }
+        pte_t* ptep = mkptep_va(VMS_SELF, mmapent->start);
+        pte_t pte = mkpte(mmapent->start, KERNEL_DATA);
+        pfn_t lowmem_n = pfn(KERNEL_RESIDENT) - pfn(mmapent->start);
+        lowmem_n = MIN(lowmem_n, pfn(mmapent->size));
+
+        vmm_set_ptes_contig(ptep, pte, lowmem_n, LFT_SIZE);
     }
 
     /* Reserve region for all loaded modules */
@@ -43,7 +44,7 @@ boot_begin(struct boot_handoff* bhctx)
     }
 }
 
-extern u8_t __kexec_boot_end; /* link/linker.ld */
+extern u8_t __kboot_end; /* link/linker.ld */
 
 /**
  * @brief Release memory for kernel bootstrapping initialization
@@ -58,7 +59,7 @@ boot_end(struct boot_handoff* bhctx)
         mmapent = &mmap[i];
         size_t size_pg = PN(ROUNDUP(mmapent->size, PG_SIZE));
 
-        if (mmapent->start >= KERNEL_EXEC || mmapent->type == BOOT_MMAP_FREE) {
+        if (mmapent->start >= KERNEL_RESIDENT || mmapent->type == BOOT_MMAP_FREE) {
             continue;
         }
 
@@ -67,7 +68,7 @@ boot_end(struct boot_handoff* bhctx)
         }
 
         ptr_t pa = PG_ALIGN(mmapent->start);
-        for (size_t j = 0; j < size_pg && pa < KERNEL_EXEC;
+        for (size_t j = 0; j < size_pg && pa < KERNEL_RESIDENT;
              j++, pa += PM_PAGE_SIZE) {
             vmm_del_mapping(VMS_SELF, pa);
         }
@@ -84,7 +85,7 @@ void
 boot_cleanup()
 {
     // clean up
-    for (size_t i = 0; i < (ptr_t)(&__kexec_boot_end); i += PG_SIZE) {
+    for (size_t i = 0; i < (ptr_t)(&__kboot_end); i += PG_SIZE) {
         vmm_del_mapping(VMS_SELF, (ptr_t)i);
         pmm_free_page((ptr_t)i);
     }

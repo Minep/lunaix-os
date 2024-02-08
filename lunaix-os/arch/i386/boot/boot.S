@@ -17,20 +17,6 @@
         .skip 4096, 0
     __stack_top:
 
-
-/* 
-    1 page directory, 
-    9 page tables:
-        1. Mapping reserved area and hhk_init
-        2-9. Remapping the kernels
-*/
-
-.section .kpg
-    .global _k_ptd
-    _k_ptd:
-        .skip KPG_SIZE, 0
-
-
 .section .boot.text
     .global start_
     .type start_, @function     /* Optional, this just give the 
@@ -56,8 +42,6 @@
                 1. 初始化最简单的PD与PT（重新映射我们的内核至3GiB处，以及对相应的地方进行Identity Map）
         */
 
-        movl $(KPG_SIZE), 4(%esp)
-        movl $(_k_ptd - 0xC0000000), (%esp)    /* PTD物理地址 */
         call kpg_init
 
         /*

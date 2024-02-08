@@ -6,7 +6,6 @@
 #include <hal/intc.h>
 
 #include <lunaix/isrm.h>
-#include <lunaix/mm/page.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>

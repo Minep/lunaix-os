@@ -4,6 +4,7 @@
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
+#define __section(name) __attribute__((section(name)))
 #define weak_alias(name) __attribute__((weak, alias(name)))
 #define weak __attribute__((weak))
 #define noret __attribute__((noreturn))

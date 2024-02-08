@@ -6,7 +6,7 @@
 #include <lunaix/fs.h>
 #include <lunaix/iopoll.h>
 #include <lunaix/mm/mm.h>
-#include <lunaix/mm/page.h>
+#include <lunaix/mm/pagetable.h>
 #include <lunaix/mm/region.h>
 #include <lunaix/signal.h>
 #include <lunaix/timer.h>

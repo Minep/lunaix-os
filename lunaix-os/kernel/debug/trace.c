@@ -43,7 +43,7 @@ trace_sym_lookup(ptr_t addr)
 
     int i = c - 1, j = 0, m = 0;
 
-    if (addr > ksent[i].pc || addr < ksent[j].pc || addr < KERNEL_EXEC) {
+    if (addr > ksent[i].pc || addr < ksent[j].pc || !kernel_addr(addr)) {
         return NULL;
     }
 

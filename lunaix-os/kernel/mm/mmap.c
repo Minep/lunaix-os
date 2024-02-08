@@ -6,12 +6,12 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syscall_utils.h>
 
-#include <sys/mm/mempart.h>
+#include <sys/mm/mm_defs.h>
 
 #include <usr/lunaix/mann_flags.h>
 
 // any size beyond this is bullshit
-#define BS_SIZE (KERNEL_EXEC - USR_MMAP)
+#define BS_SIZE (KERNEL_RESIDENT - USR_MMAP)
 
 int
 mem_has_overlap(vm_regions_t* regions, ptr_t start, ptr_t end)
@@ -65,7 +65,7 @@ mmap_user(void** addr_out,
         struct v_file* file,
         struct mmap_param* param) 
 {
-    param->range_end = KERNEL_EXEC;
+    param->range_end = KERNEL_RESIDENT;
     param->range_start = USR_EXEC;
 
     return mem_map(addr_out, created, addr, file, param);
@@ -225,8 +225,12 @@ found:
         attr &= ~PG_ALLOW_USER;
     }
 
-    for (size_t i = 0; i < param->mlen; i += PG_SIZE) {
-        vmm_set_mapping(param->vms_mnt, found_loc + i, 0, attr, 0);
+    pte_t* ptep = mkptep_va(param->vms_mnt, found_loc);
+    pte_t mmap_pte = mkpte(0, USER_DATA);
+    mmap_pte = pte_mkunloaded(mmap_pte);
+
+    for (size_t i = 0; i < pfn(param->mlen); i++) {
+        vmm_set_pte(ptep++, mmap_pte);
     }
 
     if (file) {

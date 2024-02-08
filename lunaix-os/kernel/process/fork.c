@@ -62,22 +62,23 @@ __dup_fdtable(struct proc_info* pcb)
 static void
 __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
 {
-    ptr_t kstack_pn = PN(current_thread->kstack);
+    ptr_t kstack_pn = pfn(current_thread->kstack);
 
     // copy the kernel stack
-    for (size_t i = 0; i < PN(KSTACK_SIZE); i++) {
-        volatile x86_pte_t* orig_ppte = &PTE_MOUNTED(VMS_SELF, kstack_pn);
-        x86_pte_t p = *orig_ppte;
-        ptr_t kstack = kstack_pn * PG_SIZE;
+    pte_t* src_ptep = mkptep_pn(VMS_SELF, kstack_pn);
+    pte_t* dest_ptep = mkptep_pn(vm_mnt, kstack_pn);
+    for (size_t i = 0; i < pfn(KSTACK_SIZE); i++) {
+        pte_t p = *src_ptep;
 
         if (guardian_page(p)) {
-            vmm_set_mapping(vm_mnt, kstack, 0, 0, VMAP_GUARDPAGE);
+            vmm_set_pte(dest_ptep, mkpte_raw(MEMGUARD));
         } else {
-            ptr_t ppa = vmm_dup_page(PG_ENTRY_ADDR(p));
-            vmm_set_mapping(vm_mnt, kstack, ppa, p & 0xfff, 0);
+            ptr_t ppa = vmm_dup_page(pte_paddr(p));
+            vmm_set_pte(dest_ptep, pte_setpaddr(p, ppa));
         }
 
-        kstack_pn--;
+        src_ptep++;
+        dest_ptep++;
     }
 }
 

@@ -44,9 +44,14 @@ intr_routine_page_fault(const isr_param* param)
 
     // XXX do kernel trigger pfault?
 
-    volatile x86_pte_t* pte = &PTE_MOUNTED(VMS_SELF, ptr >> 12);
+    // FIXME use latest vmm api
 
-    if (guardian_page(*pte)) {
+    pte_t* fault_ptep   = mkptep_va(VMS_SELF, ptr);
+    pte_t fault_pte     = *fault_ptep;
+    ptr_t fault_pa      = pte_paddr(fault_pte);
+    pte_t resolved_pte  = fault_pte;
+
+    if (guardian_page(fault_pte)) {
         ERROR("memory region over-running");
         goto segv_term;
     }
@@ -59,8 +64,8 @@ intr_routine_page_fault(const isr_param* param)
         goto segv_term;
     }
 
-    if (PG_IS_PRESENT(*pte)) {
-        if (((errcode ^ mapping.flags) & PG_ALLOW_USER)) {
+    if (pte_isloaded(fault_pte)) {
+        if (!pte_allow_user(fault_pte)) {
             // invalid access
             DEBUG("invalid user access. (%p->%p, attr:0x%x)",
                   mapping.va,
@@ -68,42 +73,47 @@ intr_routine_page_fault(const isr_param* param)
                   mapping.flags);
             goto segv_term;
         }
-        if ((hit_region->attr & COW_MASK) == COW_MASK) {
+
+        assert(pte_iswprotect(fault_pte));
+
+        if (writable_region(hit_region)) {
             // normal page fault, do COW
-            cpu_flush_page((ptr_t)pte);
+            ptr_t pa = (ptr_t)vmm_dup_page(fault_pa);
 
-            ptr_t pa = (ptr_t)vmm_dup_page(PG_ENTRY_ADDR(*pte));
-
-            pmm_free_page(*pte & ~0xFFF);
-            *pte = (*pte & 0xFFF & ~PG_DIRTY) | pa | PG_WRITE;
+            pmm_free_page(fault_pa);
+            resolved_pte = pte_setpaddr(fault_pte, pa);
+            resolved_pte = pte_mkwritable(resolved_pte);
 
             goto resolved;
         }
+        
         // impossible cases or accessing privileged page
         goto segv_term;
     }
 
     // an anonymous page and not present
     //   -> a new page need to be alloc
-    if ((hit_region->attr & REGION_ANON)) {
-        if (!PG_IS_PRESENT(*pte)) {
-            cpu_flush_page((ptr_t)pte);
-
+    if (anon_region(hit_region)) {
+        if (!pte_isloaded(fault_pte)) {
             ptr_t pa = pmm_alloc_page(0);
             if (!pa) {
                 goto oom;
             }
 
-            *pte = pa | region_ptattr(hit_region);
+            pte_attr_t prot = region_pteprot(hit_region);
+            resolved_pte = mkpte(pa, prot);
+
+            // FIXME zeroing page should be handled in a common way
             memset((void*)PG_ALIGN(ptr), 0, PG_SIZE);
             goto resolved;
         }
+
         // permission denied on anon page (e.g., write on readonly page)
         goto segv_term;
     }
 
     // if mfile is set (Non-anonymous), then it is a mem map
-    if (hit_region->mfile && !PG_IS_PRESENT(*pte)) {
+    if (hit_region->mfile && !pte_isloaded(fault_pte)) {
         struct v_file* file = hit_region->mfile;
 
         ptr = PG_ALIGN(ptr);
@@ -116,9 +126,10 @@ intr_routine_page_fault(const isr_param* param)
             goto oom;
         }
 
-        cpu_flush_page((ptr_t)pte);
-        *pte = pa | region_ptattr(hit_region);
+        pte_attr_t prot = region_pteprot(hit_region);
+        resolved_pte = mkpte(pa, prot);
 
+        // FIXME zeroing page should be handled in a common way
         memset((void*)ptr, 0, PG_SIZE);
 
         int errno = file->ops->read_page(file->inode, (void*)ptr, mfile_off);
@@ -127,8 +138,6 @@ intr_routine_page_fault(const isr_param* param)
             ERROR("fail to populate page (%d)", errno);
             goto segv_term;
         }
-
-        *pte &= ~PG_DIRTY;
 
         goto resolved;
     }
@@ -165,6 +174,9 @@ segv_term:
         ;
 
 resolved:
+    pte_write_entry(fault_ptep, resolved_pte);
+
     cpu_flush_page(ptr);
+    cpu_flush_page((ptr_t)fault_ptep);
     return;
 }

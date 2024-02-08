@@ -6,7 +6,7 @@
 #include <lunaix/mm/mmap.h>
 #include <lunaix/process.h>
 
-#include <sys/mm/mempart.h>
+#include <sys/mm/mm_defs.h>
 
 #include <klibc/string.h>
 
@@ -27,13 +27,15 @@ procvm_create(struct proc_info* proc) {
 static ptr_t
 __dup_vmspace(ptr_t mount_point, bool only_kernel)
 {
+    // FIXME use new vmm api
+
     ptr_t ptd_pp = pmm_alloc_page(PP_FGPERSIST);
-    vmm_set_mapping(VMS_SELF, PG_MOUNT_1, ptd_pp, PG_PREM_RW, VMAP_NULL);
+    vmm_set_mapping(VMS_SELF, PG_MOUNT_1, ptd_pp, KERNEL_DATA);
 
     x86_page_table* ptd = (x86_page_table*)PG_MOUNT_1;
     x86_page_table* pptd = (x86_page_table*)(mount_point | (0x3FF << 12));
 
-    size_t kspace_l1inx = L1_INDEX(KERNEL_EXEC);
+    size_t kspace_l1inx = L1_INDEX(KERNEL_RESIDENT);
     size_t i = 1;   // skip first 4MiB, to avoid bring other thread's stack
 
     ptd->entry[0] = 0;
@@ -54,7 +56,7 @@ __dup_vmspace(ptr_t mount_point, bool only_kernel)
 
         // 复制L2页表
         ptr_t pt_pp = pmm_alloc_page(PP_FGPERSIST);
-        vmm_set_mapping(VMS_SELF, PG_MOUNT_2, pt_pp, PG_PREM_RW, VMAP_NULL);
+        vmm_set_mapping(VMS_SELF, PG_MOUNT_2, pt_pp, KERNEL_DATA);
 
         x86_page_table* ppt = (x86_page_table*)(mount_point | (i << 12));
         x86_page_table* pt = (x86_page_table*)PG_MOUNT_2;
@@ -98,7 +100,7 @@ __delete_vmspace(ptr_t vm_mnt)
     x86_page_table* pptd = (x86_page_table*)(vm_mnt | (0x3FF << 12));
 
     // only remove user address space
-    for (size_t i = 0; i < L1_INDEX(KERNEL_EXEC); i++) {
+    for (size_t i = 0; i < L1_INDEX(KERNEL_RESIDENT); i++) {
         x86_pte_t ptde = pptd->entry[i];
         if (!ptde || !(ptde & PG_PRESENT)) {
             continue;
@@ -151,19 +153,20 @@ procvm_enter_remote(struct remote_vmctx* rvmctx, struct proc_mm* mm,
     rvmctx->remote = remote_base;
     rvmctx->local_mnt = PG_MOUNT_4_END + 1;
 
+    // FIXME use latest vmm api
     v_mapping m;
-    unsigned int pattr = region_ptattr(region);
+    unsigned int pattr = region_pteprot(region);
     ptr_t raddr = remote_base, lmnt = rvmctx->local_mnt;
     for (size_t i = 0; i < size_pn; i++, lmnt += MEM_PAGE, raddr += MEM_PAGE)
     {
         if (vmm_lookupat(vm_mnt, raddr, &m) && PG_IS_PRESENT(m.flags)) {
-            vmm_set_mapping(VMS_SELF, lmnt, m.pa, PG_PREM_RW, 0);
+            vmm_set_mapping(VMS_SELF, lmnt, m.pa, KERNEL_DATA);
             continue;
         }
 
         ptr_t pa = pmm_alloc_page(0);
-        vmm_set_mapping(VMS_SELF, lmnt, pa, PG_PREM_RW, 0);
-        vmm_set_mapping(vm_mnt, raddr, pa, pattr, 0);
+        vmm_set_mapping(VMS_SELF, lmnt, pa, KERNEL_DATA);
+        vmm_set_mapping(vm_mnt, raddr, pa, pattr);
     }
 
     return vm_mnt;

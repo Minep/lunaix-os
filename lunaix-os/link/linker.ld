@@ -2,6 +2,7 @@ ENTRY(start_)
 
 SECTIONS {
     . = 0x100000;
+    __kboot_start = .;
 
     /* 这里是我们的高半核初始化代码段和数据段 */
     .boot.text BLOCK(4K) : 
@@ -29,7 +30,7 @@ SECTIONS {
     {
         *(.boot.rodata)
     }
-    __kexec_boot_end = ALIGN(4K);
+    __kboot_end = ALIGN(4K);
 
     /* ---- boot end ---- */
 

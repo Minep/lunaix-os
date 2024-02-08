@@ -102,7 +102,7 @@ typedef struct
 /*
     当前进程内存空间挂载点
 */
-#define VMS_SELF L2_BASE_VADDR
+// #define VMS_SELF L2_BASE_VADDR
 
 #define PTE_MOUNTED(mnt, vpn)                                                  \
     (((x86_page_table*)((mnt) | (((vpn)&0xffc00) << 2)))->entry[(vpn)&0x3ff])

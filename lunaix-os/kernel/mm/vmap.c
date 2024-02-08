@@ -57,16 +57,18 @@ done:
     ptr_t alloc_begin = current_addr - examed_size;
     start = alloc_begin + size;
 
+    // FIXME use latest vmm api
     if ((flags & VMAP_NOMAP)) {
         for (size_t i = 0; i < size; i += PG_SIZE) {
-            vmm_set_mapping(VMS_SELF, alloc_begin + i, -1, 0, 0);
+            vmm_set_mapping(VMS_SELF, alloc_begin + i, -1, 0);
         }
 
         return (void*)alloc_begin;
     }
 
+    // FIXME use latest vmm api
     for (size_t i = 0; i < size; i += PG_SIZE) {
-        vmm_set_mapping(VMS_SELF, alloc_begin + i, paddr + i, attr, 0);
+        vmm_set_mapping(VMS_SELF, alloc_begin + i, paddr + i, attr);
         pmm_ref_page(paddr + i);
     }
 

@@ -31,6 +31,21 @@ region_size(struct mm_region* mm) {
     return mm->end - mm->start;
 }
 
+static inline bool
+anon_region(struct mm_region* mm) {
+    return (mm->attr & REGION_ANON);
+}
+
+static inline bool
+writable_region(struct mm_region* mm) {
+    return !!(mm->attr & (REGION_RSHARED | REGION_WRITE));
+}
+
+static inline bool
+shared_writable_region(struct mm_region* mm) {
+    return !!(mm->attr & REGION_WSHARED);
+}
+
 
 struct mm_region*
 region_create(ptr_t start, ptr_t end, u32_t attr);
@@ -56,17 +71,10 @@ region_copy_mm(struct proc_mm* src, struct proc_mm* dest);
 struct mm_region*
 region_dup(struct mm_region* origin);
 
-static u32_t
-region_ptattr(struct mm_region* vmr)
+static inline pte_attr_t
+region_pteprot(struct mm_region* vmr)
 {
-    u32_t vmr_attr = vmr->attr;
-    u32_t ptattr = PG_PRESENT | PG_ALLOW_USER;
-
-    if ((vmr_attr & PROT_WRITE)) {
-        ptattr |= PG_WRITE;
-    }
-
-    return ptattr & 0xfff;
+    return translate_vmr_prot(vmr->attr);
 }
 
 #endif /* __LUNAIX_REGION_H */

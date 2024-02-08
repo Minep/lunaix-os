@@ -1,5 +1,7 @@
 #ifndef __LUNAIX_VMM_H
 #define __LUNAIX_VMM_H
+
+#include <lunaix/mm/pagetable.h>
 #include <lunaix/mm/page.h>
 #include <lunaix/process.h>
 #include <lunaix/types.h>
@@ -56,7 +58,26 @@ vmm_init_pd();
  * @return int
  */
 int
-vmm_set_mapping(ptr_t mnt, ptr_t va, ptr_t pa, pt_attr attr, int options);
+vmm_set_mapping(ptr_t mnt, ptr_t va, ptr_t pa, pte_attr_t prot);
+
+void 
+vmm_set_pte_at(pte_t* ptep, pte_t pte, size_t lvl_size);
+
+static inline void 
+vmm_set_ptes_contig(pte_t* ptep, pte_t pte, size_t n, size_t lvl_size)
+{
+    do {
+        vmm_set_pte_at(ptep++, pte, lvl_size);
+        pte_val(pte) += lvl_size;
+    } while (--n > 0);
+}
+
+
+static inline void 
+vmm_set_pte(pte_t* ptep, pte_t pte)
+{
+    vmm_set_pte_at(ptep, pte, LFT_SIZE);
+}
 
 /**
  * @brief 删除一个映射
@@ -117,7 +138,7 @@ vmm_unmount_pd(ptr_t mnt);
 static inline ptr_t 
 vmm_mount_pg(ptr_t mnt, ptr_t pa) {
     assert(pa);
-    vmm_set_mapping(VMS_SELF, mnt, pa, PG_PREM_RW, 0);
+    vmm_set_mapping(VMS_SELF, mnt, pa, KERNEL_DATA);
     return mnt;
 }
 
