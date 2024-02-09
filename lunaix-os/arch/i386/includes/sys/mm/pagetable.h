@@ -90,6 +90,9 @@
 #define PAGE_SIZE           _PAGE_BASE_SIZE
 #define PAGE_MASK           _PAGE_BASE_MASK
 
+// max PTEs number
+#define MAX_PTEN             _PAGE_LEVEL_SIZE
+
 
 /* ******** PTE Manipulation ******** */
 
@@ -131,7 +134,7 @@ typedef unsigned int pte_attr_t;
 static inline pte_t
 mkpte(ptr_t paddr, pte_attr_t prot)
 {
-    return __mkpte_from((paddr & ~_PTE_PROT_MASK) | (prot & _PTE_PROT_MASK) | _PTE_P);
+    return __mkpte_from((paddr & ~_PAGE_BASE_MASK) | (prot & _PTE_PROT_MASK) | _PTE_P);
 }
 
 static inline pte_t
@@ -161,7 +164,7 @@ pte_setprot(pte_t pte, ptr_t prot)
 static inline bool
 pte_isnull(pte_t pte)
 {
-    return !!pte.val;
+    return !pte.val;
 }
 
 static inline pte_t

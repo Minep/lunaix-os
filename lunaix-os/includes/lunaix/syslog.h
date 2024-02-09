@@ -2,6 +2,7 @@
 #define __LUNAIX_SYSLOG_H
 
 #include <lunaix/compiler.h>
+#include <lunaix/spike.h>
 #include <stdarg.h>
 
 #define KLOG_DEBUG 0
@@ -35,7 +36,7 @@
 #define FATAL(fmt, ...)                                                        \
     ({                                                                         \
         kprintf(KFATAL fmt, ##__VA_ARGS__);                                    \
-        spin();                                                                \
+        fail("critical failure");                                              \
     })
 
 void

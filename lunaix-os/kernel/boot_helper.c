@@ -20,17 +20,22 @@ boot_begin(struct boot_handoff* bhctx)
     struct boot_mmapent *mmap = bhctx->mem.mmap, *mmapent;
     for (size_t i = 0; i < bhctx->mem.mmap_len; i++) {
         mmapent = &mmap[i];
-        size_t size_pg = PN(ROUNDUP(mmapent->size, PG_SIZE));
+        size_t size_pg = page_count(mmapent->size);
+        pfn_t start_pfn = pfn(mmapent->start);
 
         if (mmapent->type == BOOT_MMAP_FREE) {
-            pmm_mark_chunk_free(PN(mmapent->start), size_pg);
+            pmm_mark_chunk_free(start_pfn, size_pg);
+            continue;
+        }
+
+        if (mmapent->start >= KERNEL_RESIDENT) {
             continue;
         }
 
         pte_t* ptep = mkptep_va(VMS_SELF, mmapent->start);
         pte_t pte = mkpte(mmapent->start, KERNEL_DATA);
-        pfn_t lowmem_n = pfn(KERNEL_RESIDENT) - pfn(mmapent->start);
-        lowmem_n = MIN(lowmem_n, pfn(mmapent->size));
+        pfn_t lowmem_n = pfn(KERNEL_RESIDENT) - start_pfn;
+        lowmem_n = MIN(lowmem_n, size_pg);
 
         vmm_set_ptes_contig(ptep, pte, lowmem_n, LFT_SIZE);
     }
@@ -59,12 +64,12 @@ boot_end(struct boot_handoff* bhctx)
         mmapent = &mmap[i];
         size_t size_pg = PN(ROUNDUP(mmapent->size, PG_SIZE));
 
-        if (mmapent->start >= KERNEL_RESIDENT || mmapent->type == BOOT_MMAP_FREE) {
-            continue;
-        }
-
         if (mmapent->type == BOOT_MMAP_RCLM) {
             pmm_mark_chunk_free(PN(mmapent->start), size_pg);
+        }
+
+        if (mmapent->start >= KERNEL_RESIDENT || mmapent->type == BOOT_MMAP_FREE) {
+            continue;
         }
 
         ptr_t pa = PG_ALIGN(mmapent->start);

@@ -10,6 +10,7 @@ static ptr_t start = VMAP;
 void*
 vmap(ptr_t paddr, size_t size, pt_attr attr, int flags)
 {
+    // FIXME update to latest vmm api
     // next fit
     assert_msg((paddr & 0xfff) == 0, "vmap: bad alignment");
     size = ROUNDUP(size, PG_SIZE);

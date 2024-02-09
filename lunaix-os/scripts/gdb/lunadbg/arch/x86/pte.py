@@ -53,8 +53,8 @@ class PageTableHelper32(PageTableHelperBase):
         return bool(pte & 1)
     
     @staticmethod
-    def huge_page(pte):
-        return bool(pte & (1 << 7))
+    def huge_page(pte, po):
+        return bool(pte & (1 << 7)) and po 
     
     @staticmethod
     def protections(pte):

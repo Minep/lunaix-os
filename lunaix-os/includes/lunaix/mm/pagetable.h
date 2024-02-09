@@ -16,41 +16,26 @@ typedef struct __pte pte_t;
 #define _LFTEP_AT(vm_mnt)       ( ((vm_mnt) | L0T_MASK) & ~L0T_MASK )
 
 #define _VM_OF(ptep)            ( (ptr_t)(ptep) & ~L0T_MASK )
-#define _VM_PFN_OF(ptep)        ( (ptr_t)(ptep) & L0T_MASK )
+#define _VM_PFN_OF(ptep)        ( ((ptr_t)(ptep) & L0T_MASK) / sizeof(pte_t) )
 #define VMS_SELF             VMS_MASK
-
-ptr_t 
-pagetable_alloc_one();
-
-#define __LnTEP(ptep, va, n)\
-    (pte_t*)( _VM_OF(ptep) | (((va) & VMS_MASK) / L##n##T_SIZE) )
 
 #define __LnTI_OF(ptep, n)\
     (_VM_PFN_OF(ptep) * LFT_SIZE / L##n##T_SIZE)
 
+#define __LnTEP(ptep, va, n)\
+    ( (pte_t*)_L##n##TEP_AT(_VM_OF(ptep)) + (((va) & VMS_MASK) / L##n##T_SIZE) )
+
 #define __LnTEP_OF(ptep, n)\
-    (pte_t*)( _L##n##TEP_AT(_VM_OF(ptep)) | __LnTI_OF(ptep, n))
+    ( (pte_t*)_L##n##TEP_AT(_VM_OF(ptep)) + __LnTI_OF(ptep, n))
 
-#define has_LnT(n) (L##n##T_SIZE != LFT_SIZE)
+#define __LnTEP_SHIFT_NEXT(ptep)\
+    ( (pte_t*)(_VM_OF(ptep) | ((_VM_PFN_OF(ptep) * LFT_SIZE) & L0T_MASK)) )
 
-static inline bool
-__ensure_sublevel(pte_t* ptep, pte_t pte)
-{
-    if (!pte_isnull(pte)) {
-        return true;
-    }
+#define _has_LnT(n) (L##n##T_SIZE != LFT_SIZE)
+#define PAGETABLE_LEVEL(n) _has_LnT(n)
 
-    ptr_t pa = pagetable_alloc_one();
-    if (!pa) {
-        return false;
-    }
-
-    pte_t pte_ = mkpte(pa, KERNEL_DATA);
-    pte_write_entry(ptep, pte_);
-
-    cpu_flush_page((ptr_t)ptep);
-    return true;
-}
+bool 
+pagetable_alloc(pte_t* ptep, pte_t pte);
 
 static inline ptr_t
 ptep_vm_pfn(pte_t* ptep)
@@ -122,15 +107,19 @@ mkl3tep(pte_t* ptep)
 static inline pte_t*
 mkl1t(pte_t* l0t_ptep, ptr_t va)
 {
-#if has_LnT(1)
+#if _has_LnT(1)
+    if (!l0t_ptep) {
+        return NULL;
+    }
+
     pte_t pte = pte_unref(l0t_ptep);
     
     if (pte_isleaf(pte)) {
         return l0t_ptep;
     }
     
-    return __ensure_sublevel(l0t_ptep, pte) ? __LnTEP(l0t_ptep, va, 1) 
-                                            : NULL;
+    return pagetable_alloc(l0t_ptep, pte) ? __LnTEP(l0t_ptep, va, 1) 
+                                          : NULL;
 #else
     return l0t_ptep;
 #endif
@@ -146,15 +135,19 @@ mkl1t(pte_t* l0t_ptep, ptr_t va)
 static inline pte_t*
 mkl2t(pte_t* l1t_ptep, ptr_t va)
 {
-#if has_LnT(2)
+#if _has_LnT(2)
+    if (!l1t_ptep) {
+        return NULL;
+    }
+
     pte_t pte = pte_unref(l1t_ptep);
     
     if (pte_isleaf(pte)) {
         return l1t_ptep;
     }
 
-    return __ensure_sublevel(l1t_ptep, pte) ? __LnTEP(l1t_ptep, va, 2) 
-                                            : NULL;
+    return pagetable_alloc(l1t_ptep, pte) ? __LnTEP(l1t_ptep, va, 2) 
+                                          : NULL;
 #else
     return l1t_ptep;
 #endif
@@ -170,15 +163,19 @@ mkl2t(pte_t* l1t_ptep, ptr_t va)
 static inline pte_t*
 mkl3t(pte_t* l2t_ptep, ptr_t va)
 {
-#if has_LnT(3)
+#if _has_LnT(3)
+    if (!l2t_ptep) {
+        return NULL;
+    }
+ 
     pte_t pte = pte_unref(l2t_ptep);
     
     if (pte_isleaf(pte)) {
         return l2t_ptep;
     }
 
-    return __ensure_sublevel(l2t_ptep, pte) ? __LnTEP(l2t_ptep, va, 3) 
-                                            : NULL;
+    return pagetable_alloc(l2t_ptep, pte) ? __LnTEP(l2t_ptep, va, 3) 
+                                          : NULL;
 #else
     return l2t_ptep;
 #endif
@@ -194,14 +191,18 @@ mkl3t(pte_t* l2t_ptep, ptr_t va)
 static inline pte_t*
 mklft(pte_t* l3t_ptep, ptr_t va)
 {
+    if (!l3t_ptep) {
+        return NULL;
+    }
+
     pte_t pte = pte_unref(l3t_ptep);
     
     if (pte_isleaf(pte)) {
         return l3t_ptep;
     }
 
-    return __ensure_sublevel(l3t_ptep, pte) ? __LnTEP(l3t_ptep, va, F) 
-                                            : NULL;
+    return pagetable_alloc(l3t_ptep, pte) ? __LnTEP(l3t_ptep, va, F) 
+                                          : NULL;
 }
 
 static inline unsigned int
@@ -229,6 +230,11 @@ pfn(ptr_t addr) {
     return addr / PAGE_SIZE;
 }
 
+static inline size_t
+page_count(size_t size) {
+    return (size + PAGE_MASK) / PAGE_SIZE;
+}
+
 static inline unsigned int
 va_offset(ptr_t addr) {
     return addr & PAGE_MASK;
@@ -247,13 +253,13 @@ va_align(ptr_t va) {
 static inline pte_t*
 mkptep_va(ptr_t vm_mnt, ptr_t vaddr)
 {
-    return (pte_t*)((vm_mnt & ~L0T_MASK) | pfn(vaddr));
+    return (pte_t*)(vm_mnt & ~L0T_MASK) + pfn(vaddr);
 }
 
 static inline pte_t*
 mkptep_pn(ptr_t vm_mnt, ptr_t pn)
 {
-    return (pte_t*)((vm_mnt & ~L0T_MASK) | (pn & L0T_MASK));
+    return (pte_t*)(vm_mnt & ~L0T_MASK) + (pn & L0T_MASK);
 }
 
 static inline pfn_t

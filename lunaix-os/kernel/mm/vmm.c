@@ -7,7 +7,7 @@
 #include <sys/cpu.h>
 #include <sys/mm/mm_defs.h>
 
-LOG_MODULE("VMM")
+LOG_MODULE("VM")
 
 void
 vmm_init()
@@ -30,13 +30,25 @@ vmm_init_pd()
     return dir;
 }
 
-ptr_t 
-pagetable_alloc_one()
+bool 
+pagetable_alloc(pte_t* ptep, pte_t pte)
 {
-    ptr_t pa = pmm_alloc_page(PP_FGPERSIST);
-    if (pa) {
-        memset((void*)pa, 0, LFT_SIZE);
+    if (!pte_isnull(pte)) {
+        return true;
     }
+
+    ptr_t pa = pmm_alloc_page(PP_FGPERSIST);
+    if (!pa) {
+        return false;
+    }
+
+    pte_t pte_ = mkpte(pa, KERNEL_DATA);
+    pte_write_entry(ptep, pte_);
+
+    pte_t* ptep_next = __LnTEP_SHIFT_NEXT(ptep);
+    cpu_flush_page((ptr_t)ptep_next);
+
+    memset(ptep_next, 0, LFT_SIZE);
 
     return pa;
 }
@@ -58,7 +70,8 @@ void
 vmm_set_pte_at(pte_t* ptep, pte_t pte, size_t lvl_size) 
 {
     ptr_t va = page_addr(ptep_vm_pfn(ptep));
-    pte_t* ptep_ = mkl1tep(ptep);
+    pte_t* ptep_ = mkl0tep(ptep);
+    size_t size = 0;
 
     if (lvl_size <= L1T_SIZE) {
         assert(ptep_ = mkl1t(ptep_, va));
@@ -76,8 +89,10 @@ vmm_set_pte_at(pte_t* ptep, pte_t pte, size_t lvl_size)
         assert(ptep_ = mklft(ptep_, va));
     }
 
-    // We should arrive with the same ptep.
-    assert(ptep_ == ptep);
+    if (ptep_ != ptep) {
+        spin();
+        FATAL("conflict mapping: ptep=%p!!ptep_=%p, va=%p", ptep, ptep_, va);
+    }
 
     pte_write_entry(ptep_, pte);
     

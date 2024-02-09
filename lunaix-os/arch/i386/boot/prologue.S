@@ -3,12 +3,18 @@
 #define __ASM__
 #include <sys/abi.h>
 
+.section .bss
+    .align 16
+    .skip 512, 0
+    __kinit_stack_top:
+
 .section .text
     .global hhk_entry_
     hhk_entry_:
         /*
             欢迎来到虚拟内存的世界！ :D
          */
+        movl $__kinit_stack_top, %esp
         andl $stack_alignment, %esp
         subl $16, %esp
         /* 

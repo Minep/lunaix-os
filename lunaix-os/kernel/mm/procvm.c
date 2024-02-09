@@ -159,6 +159,7 @@ procvm_enter_remote(struct remote_vmctx* rvmctx, struct proc_mm* mm,
     ptr_t raddr = remote_base, lmnt = rvmctx->local_mnt;
     for (size_t i = 0; i < size_pn; i++, lmnt += MEM_PAGE, raddr += MEM_PAGE)
     {
+        // FIXME need a new way to probe the existence of a mapping 
         if (vmm_lookupat(vm_mnt, raddr, &m) && PG_IS_PRESENT(m.flags)) {
             vmm_set_mapping(VMS_SELF, lmnt, m.pa, KERNEL_DATA);
             continue;

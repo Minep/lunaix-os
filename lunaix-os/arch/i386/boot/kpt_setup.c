@@ -45,7 +45,7 @@ _init_page()
     pfn_t kboot_end = pfn((ptr_t)__kboot_end);
     
     pte = pte_mkleaf(pte);
-    for (u32_t i = 0; i < kboot_end; i++) {
+    for (size_t i = 0; i < kboot_end; i++) {
         pte = pte_setpaddr(pte, page_addr(i));
         pte_write_entry(boot_l1tep, pte);
 
@@ -76,8 +76,9 @@ _init_page()
 
     pte = pte_mkleaf(pte);
 
-    pfn_t i = pfn(to_kphysical(__kexec_text_start));
     pfn_t kimg_end = pfn(to_kphysical(__kexec_end));
+    pfn_t i = pfn(to_kphysical(__kexec_text_start));
+    kl1tep += i;
 
     // kernel .text
     pte = pte_setprot(pte, KERNEL_EXEC);
@@ -102,10 +103,10 @@ _init_page()
 
     // Build up self-reference
     pte = mkpte((ptr_t)kpt_pa, KERNEL_DATA);
-    pte_write_entry(kl0tep + _PAGE_LEVEL_MASK, pte_mkroot(pte));
+    pte_write_entry(boot_l0tep + _PAGE_LEVEL_MASK, pte_mkroot(pte));
 }
 
-void boot_text
+ptr_t boot_text
 kpg_init()
 {
     ptr_t kmap_pa = to_kphysical(&kernel_pt);
@@ -114,4 +115,6 @@ kpg_init()
     }
 
     _init_page();
+
+    return kmap_pa;
 }

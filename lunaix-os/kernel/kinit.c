@@ -94,6 +94,7 @@ kernel_bootstrap(struct boot_handoff* bhctx)
      * and start geting into uspace
      */
     boot_end(bhctx);
+    boot_cleanup();
 
     spawn_lunad();
 }
@@ -131,8 +132,16 @@ kmem_init(struct boot_handoff* bhctx)
     ptep = mkl0tep(ptep);
 
     do {
+#if   PAGETABLE_LEVEL(1)
         assert(mkl1t(ptep++, 0));
-    } while (ptep_vm_pfn(ptep));
+#elif PAGETABLE_LEVEL(2)
+        assert(mkl2t(ptep++, 0));
+#elif PAGETABLE_LEVEL(3)
+        assert(mkl3t(ptep++, 0));
+#else
+        assert(mklft(ptep++, 0));
+#endif
+    } while (ptep_vm_pfn(ptep) + 1 < MAX_PTEN);
 
     // allocators
     cake_init();

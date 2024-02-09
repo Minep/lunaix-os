@@ -41,7 +41,7 @@ class PageTableEntry(KernelStruct):
         pp2.printf("Mapped physical: 0x%x (order %d page)", self.pa, page_order)
         pp2.printf("Page Protection: %s", self.get_page_prot())
         pp2.printf("Present: %s", self.present())
-        pp2.printf("Huge: %s", TLB.huge_page(self.pte))
+        pp2.printf("Huge: %s", TLB.huge_page(self.pte, page_order))
         pp2.print("Attributes:")
         pp2.next_level().print(self.get_attributes())
 
