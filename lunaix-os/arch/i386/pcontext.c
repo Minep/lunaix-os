@@ -13,14 +13,14 @@ volatile struct x86_tss _tss = { .link = 0,
 bool
 inject_transfer_context(ptr_t vm_mnt, struct transfer_context* tctx)
 {
-    v_mapping mapping;
-    if (!vmm_lookupat(vm_mnt, tctx->inject, &mapping)) {
+    pte_t pte;
+    if (!vmm_lookupat(vm_mnt, tctx->inject, &pte)) {
         return false;
     }
 
-    vmm_mount_pg(PG_MOUNT_4, mapping.pa);
+    vmm_mount_pg(PG_MOUNT_4, pte_paddr(pte));
 
-    ptr_t mount_inject = PG_MOUNT_4 + PG_OFFSET(tctx->inject);
+    ptr_t mount_inject = PG_MOUNT_4 + va_offset(tctx->inject);
     memcpy((void*)mount_inject, &tctx->transfer, sizeof(tctx->transfer));
     
     vmm_unmount_pg(PG_MOUNT_4);

@@ -112,11 +112,11 @@
         andl $3, %eax
         jz 1f 
 
-        ## FIXME x87 fpu context 
-        movl current_thread, %eax
-        movl thread_ustack_top(%eax), %eax
-        test %eax, %eax
-        jz 1f
+        # # FIXME x87 fpu context 
+        # movl current_thread, %eax
+        # movl thread_ustack_top(%eax), %eax
+        # test %eax, %eax
+        # jz 1f
         # fxrstor (%eax)
 
 1:

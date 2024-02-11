@@ -69,33 +69,35 @@ struct __pte {
 typedef unsigned int pfn_t;
 typedef unsigned int pte_attr_t;
 
-#define _PTE_P  (1 << 0)
-#define _PTE_W  (1 << 1)
-#define _PTE_U  (1 << 2)
-#define _PTE_WT (1 << 3)
-#define _PTE_CD (1 << 4)
-#define _PTE_A  (1 << 5)
-#define _PTE_D  (1 << 6)
-#define _PTE_PS (1 << 7)
-#define _PTE_G  (1 << 8)
-#define _PTE_X  (0)
-#define _PTE_R  (0)
+#define _PTE_P                  (1 << 0)
+#define _PTE_W                  (1 << 1)
+#define _PTE_U                  (1 << 2)
+#define _PTE_WT                 (1 << 3)
+#define _PTE_CD                 (1 << 4)
+#define _PTE_A                  (1 << 5)
+#define _PTE_D                  (1 << 6)
+#define _PTE_PS                 (1 << 7)
+#define _PTE_G                  (1 << 8)
+#define _PTE_X                  (0)
+#define _PTE_R                  (0)
 
-#define _PTE_PROT_MASK  ( _PTE_W | _PTE_U | _PTE_X )
+#define _PTE_PROT_MASK          ( _PTE_W | _PTE_U | _PTE_X )
 
-#define KERNEL_EXEC     ( _PTE_P | _PTE_X )
-#define KERNEL_DATA     ( _PTE_P | _PTE_W  )
-#define KERNEL_RDONLY   ( _PTE_P )
+#define KERNEL_EXEC             ( _PTE_P | _PTE_X )
+#define KERNEL_DATA             ( _PTE_P | _PTE_W  )
+#define KERNEL_RDONLY           ( _PTE_P )
 
-#define USER_EXEC       ( _PTE_P | _PTE_X  | _PTE_U )
-#define USER_DATA       ( _PTE_P | _PTE_W  | _PTE_U )
-#define USER_RDONLY     ( _PTE_P | _PTE_U )
+#define USER_EXEC               ( _PTE_P | _PTE_X  | _PTE_U )
+#define USER_DATA               ( _PTE_P | _PTE_W  | _PTE_U )
+#define USER_RDONLY             ( _PTE_P | _PTE_U )
 
-#define SELF_MAP        ( KERNEL_DATA | _PTE_WT | _PTE_CD )
+#define SELF_MAP                ( KERNEL_DATA | _PTE_WT | _PTE_CD )
 
 
-#define __mkpte_from(pte_val) ((pte_t){ .val = (pte_val) })
-#define pte_val(pte) (pte.val)
+#define __mkpte_from(pte_val)   ((pte_t){ .val = (pte_val) })
+
+#define pte_val(pte)            ( pte.val )
+#define null_pte                ( mkpte_raw(0) )
 
 static inline pte_t
 mkpte(ptr_t paddr, pte_attr_t prot)

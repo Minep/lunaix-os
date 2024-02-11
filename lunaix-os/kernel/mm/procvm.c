@@ -82,8 +82,8 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
     // Ensure we step back to L0T
     assert(!level);
     
-    // Carry over the kernel
-    while (ptep_vfn(ptep) + 1 < MAX_PTEN) {
+    // Carry over the kernel (exclude last two entry)
+    while (ptep_vfn(ptep) < MAX_PTEN - 2) {
         pte_t pte = *ptep;
         assert(!pte_isnull(pte));
 
@@ -94,7 +94,7 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
         ptep_dest++;
     }
 
-    return pte_paddr(*ptep_dest);
+    return pte_paddr(*(ptep_dest + 1));
 }
 
 static void
@@ -176,7 +176,7 @@ ptr_t
 procvm_enter_remote(struct remote_vmctx* rvmctx, struct proc_mm* mm, 
                     ptr_t vm_mnt, ptr_t remote_base, size_t size)
 {
-    ptr_t size_pn = PN(size + MEM_PAGE);
+    pfn_t size_pn = pfn(size + MEM_PAGE);
     assert(size_pn < REMOTEVM_MAX_PAGES);
 
     struct mm_region* region = region_get(&mm->regions, remote_base);
@@ -185,25 +185,25 @@ procvm_enter_remote(struct remote_vmctx* rvmctx, struct proc_mm* mm,
     rvmctx->vms_mnt = vm_mnt;
     rvmctx->page_cnt = size_pn;
 
-    remote_base = PG_ALIGN(remote_base);
+    remote_base = va_align(remote_base);
     rvmctx->remote = remote_base;
     rvmctx->local_mnt = PG_MOUNT_4_END + 1;
 
-    // FIXME use latest vmm api
-    v_mapping m;
+    pte_t* rptep = mkptep_va(vm_mnt, remote_base);
+    pte_t* lptep = mkptep_va(VMS_SELF, rvmctx->local_mnt);
     unsigned int pattr = region_pteprot(region);
-    ptr_t raddr = remote_base, lmnt = rvmctx->local_mnt;
-    for (size_t i = 0; i < size_pn; i++, lmnt += MEM_PAGE, raddr += MEM_PAGE)
+
+    for (size_t i = 0; i < size_pn; i++)
     {
-        // FIXME need a new way to probe the existence of a mapping 
-        if (vmm_lookupat(vm_mnt, raddr, &m) && PG_IS_PRESENT(m.flags)) {
-            vmm_set_mapping(VMS_SELF, lmnt, m.pa, KERNEL_DATA);
+        pte_t pte = vmm_tryptep(rptep, PAGE_SIZE);
+        if (pte_isloaded(pte)) {
+            set_pte(lptep, pte);
             continue;
         }
 
         ptr_t pa = pmm_alloc_page(0);
-        vmm_set_mapping(VMS_SELF, lmnt, pa, KERNEL_DATA);
-        vmm_set_mapping(vm_mnt, raddr, pa, pattr);
+        set_pte(lptep, mkpte(pa, KERNEL_DATA));
+        set_pte(rptep, mkpte(pa, pattr));
     }
 
     return vm_mnt;
@@ -219,7 +219,7 @@ procvm_copy_remote_transaction(struct remote_vmctx* rvmctx,
     }
 
     ptr_t offset = remote_dest - rvmctx->remote;
-    if (PN(offset + sz) >= rvmctx->page_cnt) {
+    if (pfn(offset + sz) >= rvmctx->page_cnt) {
         return -1;
     }
 
@@ -231,9 +231,6 @@ procvm_copy_remote_transaction(struct remote_vmctx* rvmctx,
 void
 procvm_exit_remote_transaction(struct remote_vmctx* rvmctx)
 {
-    ptr_t lmnt = rvmctx->local_mnt;
-    for (size_t i = 0; i < rvmctx->page_cnt; i++, lmnt += MEM_PAGE)
-    {
-        vmm_del_mapping(VMS_SELF, lmnt);
-    }
+    pte_t* lptep = mkptep_va(VMS_SELF, rvmctx->local_mnt);
+    vmm_unset_ptes(lptep, rvmctx->page_cnt);
 }

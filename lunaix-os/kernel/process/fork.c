@@ -25,24 +25,21 @@ region_maybe_cow(struct mm_region* region)
         return;
     }
 
-    ptr_t start_vpn = PN(region->start);
-    ptr_t end_vpn = PN(region->end);
-    for (size_t i = start_vpn; i <= end_vpn; i++) {
-        x86_pte_t* curproc = &PTE_MOUNTED(VMS_SELF, i);
-        x86_pte_t* newproc = &PTE_MOUNTED(VMS_MOUNT_1, i);
+    pfn_t start_pn = pfn(region->start);
+    pfn_t end_pn = pfn(region->end);
+    
+    for (size_t i = start_pn; i <= end_pn; i++) {
+        pte_t* self = mkptep_pn(VMS_SELF, i);
+        pte_t* guest = mkptep_pn(VMS_MOUNT_1, i);
 
-        cpu_flush_page((ptr_t)newproc);
+        cpu_flush_page(page_addr(ptep_pfn(self)));
 
         if ((attr & REGION_MODE_MASK) == REGION_RSHARED) {
-            // 如果读共享，则将两者的都标注为只读，那么任何写入都将会应用COW策略。
-            cpu_flush_page((ptr_t)curproc);
-            cpu_flush_page((ptr_t)(i << 12));
-
-            *curproc = *curproc & ~PG_WRITE;
-            *newproc = *newproc & ~PG_WRITE;
+            set_pte(self, pte_mkwprotect(*self));
+            set_pte(guest, pte_mkwprotect(*guest));
         } else {
             // 如果是私有页，则将该页从新进程中移除。
-            *newproc = 0;
+            set_pte(guest, null_pte);
         }
     }
 }

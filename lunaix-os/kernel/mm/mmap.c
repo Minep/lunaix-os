@@ -268,22 +268,24 @@ mem_sync_pages(ptr_t mnt,
     if (!region->mfile || !(region->attr & REGION_WSHARED)) {
         return;
     }
+    
+    pte_t* ptep = mkptep_va(mnt, start);
+    ptr_t va    = va_align(start);
 
-    v_mapping mapping;
-    for (size_t i = 0; i < length; i += PG_SIZE) {
-        if (!vmm_lookupat(mnt, start + i, &mapping)) {
+    for (; va < start + length; va += PAGE_SIZE, ptep++) {
+        pte_t pte = vmm_tryptep(ptep, LFT_SIZE);
+        if (pte_isnull(pte)) {
             continue;
         }
 
-        if (PG_IS_DIRTY(*mapping.pte)) {
-            size_t offset = mapping.va - region->start + region->foff;
+        if (pte_dirty(pte)) {
+            size_t offset = va - region->start + region->foff;
             struct v_inode* inode = region->mfile->inode;
 
-            region->mfile->ops->write_page(inode, (void*)mapping.va, offset);
+            region->mfile->ops->write_page(inode, (void*)va, offset);
 
-            *mapping.pte &= ~PG_DIRTY;
-
-            cpu_flush_page((ptr_t)mapping.pte);
+            set_pte(ptep, pte_mkclean(pte));
+            cpu_flush_page(va);
         } else if ((options & MS_INVALIDATE)) {
             goto invalidate;
         }
@@ -295,9 +297,9 @@ mem_sync_pages(ptr_t mnt,
         continue;
 
     invalidate:
-        *mapping.pte &= ~PG_PRESENT;
-        pmm_free_page(mapping.pa);
-        cpu_flush_page((ptr_t)mapping.pte);
+        set_pte(ptep, null_pte);
+        pmm_free_page(pte_paddr(pte));
+        cpu_flush_page(va);
     }
 }
 

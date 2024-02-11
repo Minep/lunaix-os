@@ -4,7 +4,8 @@
 #include "mempart.h"
 #include "pagetable.h"
 
-#define KSTACK_SIZE             (3 * MEM_PAGE)
+#define KSTACK_PAGES            3
+#define KSTACK_SIZE             (KSTACK_PAGES * MEM_PAGE)
 
 #define MEMGUARD                0xdeadc0deUL
 

@@ -23,8 +23,10 @@
 
 #include <klibc/string.h>
 
+struct thread empty_thread_obj;
+
 volatile struct proc_info* __current;
-volatile struct thread* current_thread;
+volatile struct thread* current_thread = &empty_thread_obj;
 
 struct scheduler sched_ctx;
 

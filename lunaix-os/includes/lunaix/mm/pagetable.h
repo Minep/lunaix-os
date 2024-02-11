@@ -342,6 +342,38 @@ mklft(pte_t* l3t_ptep, ptr_t va)
                                         : NULL;
 }
 
+static inline pte_t*
+getl1tep(pte_t* l0t_ptep, ptr_t va) {
+#if _has_LnT(1)
+    return __LnTEP(l0t_ptep, va, 1); 
+#else
+    return l0t_ptep;
+#endif
+}
+
+static inline pte_t*
+getl2tep(pte_t* l1t_ptep, ptr_t va) {
+#if _has_LnT(2)
+    return __LnTEP(l1t_ptep, va, 2);
+#else
+    return l1t_ptep;
+#endif
+}
+
+static inline pte_t*
+getl3tep(pte_t* l2t_ptep, ptr_t va) {
+#if _has_LnT(3)
+    return __LnTEP(l2t_ptep, va, 3); 
+#else
+    return l2t_ptep;
+#endif
+}
+
+static inline pte_t*
+getlftep(pte_t* l3t_ptep, ptr_t va) {
+    return __LnTEP(l3t_ptep, va, F);
+}
+
 static inline unsigned int
 l0te_index(pte_t* ptep) {
     return __LnTI_OF(ptep, 1);

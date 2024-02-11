@@ -84,7 +84,7 @@ static inline void
 vmm_unset_ptes(pte_t* ptep, size_t n)
 {
     do {
-        set_pte(ptep, mkpte_raw(0));
+        set_pte(ptep, null_pte);
         ptep++;
     } while (--n > 0);
 }
@@ -101,14 +101,8 @@ vmm_unset_ptes(pte_t* ptep, size_t n)
 ptr_t
 vmm_del_mapping(ptr_t mnt, ptr_t va);
 
-/**
- * @brief 在当前虚拟地址空间里查找一个映射
- *
- * @param va 虚拟地址
- * @param mapping 映射相关属性
- */
-int
-vmm_lookup(ptr_t va, v_mapping* mapping);
+pte_t
+vmm_tryptep(pte_t* ptep, size_t lvl_size);
 
 /**
  * @brief 在指定的虚拟地址空间里查找一个映射
@@ -118,8 +112,15 @@ vmm_lookup(ptr_t va, v_mapping* mapping);
  * @param mapping 映射相关属性
  * @return int
  */
-int
-vmm_lookupat(ptr_t mnt, ptr_t va, v_mapping* mapping);
+static inline bool
+vmm_lookupat(ptr_t mnt, ptr_t va, pte_t* pte_out)
+{
+    pte_t pte = vmm_tryptep(mkptep_va(mnt, va), LFT_SIZE);
+    *pte_out = pte;
+
+    return !pte_isnull(pte);
+}
+
 
 /**
  * @brief (COW) 为虚拟页创建副本。

@@ -15,7 +15,7 @@ struct remote_vmctx
     ptr_t vms_mnt;
     ptr_t local_mnt;
     ptr_t remote;
-    size_t page_cnt;
+    pfn_t page_cnt;
 };
 
 

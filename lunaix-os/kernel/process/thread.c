@@ -64,47 +64,45 @@ __alloc_user_thread_stack(struct proc_info* proc, struct mm_region** stack_regio
 static ptr_t
 __alloc_kernel_thread_stack(struct proc_info* proc, ptr_t vm_mnt)
 {
-    v_mapping mapping;
-    ptr_t kstack = PG_ALIGN(KSTACK_AREA_END - KSTACK_SIZE);
-    while (kstack >= KSTACK_AREA) {
+    pfn_t kstack_end = pfn(KSTACK_AREA);
+    pte_t* ptep      = mkptep_va(vm_mnt, KSTACK_AREA_END);
+    while (ptep_pfn(ptep) > kstack_end) {
+        ptep -= KSTACK_PAGES;
+
         // first page in the kernel stack is guardian page
-        if (!vmm_lookupat(vm_mnt, kstack + MEM_PAGE, &mapping) 
-            || !PG_IS_PRESENT(mapping.flags)) 
-        {
-            break;
+        pte_t pte = *(ptep + 1);
+        if (pte_isnull(pte)) {
+            goto found;
         }
-
-        kstack -= KSTACK_SIZE;
     }
 
-    if (kstack < KSTACK_AREA) {
-        WARN("failed to create kernel stack: max stack num reach\n");
-        return 0;
-    }
+    WARN("failed to create kernel stack: max stack num reach\n");
+    return 0;
 
-    ptr_t pa = pmm_alloc_cpage(PN(KSTACK_SIZE) - 1, 0);
+found:;
+    ptr_t pa = pmm_alloc_cpage(KSTACK_PAGES - 1, 0);
 
     if (!pa) {
         WARN("failed to create kernel stack: nomem\n");
         return 0;
     }
 
-    // FIXME use latest vmm api
-    inject_guardian_page(vm_mnt, kstack);
-    for (size_t i = MEM_PAGE, j = 0; i < KSTACK_SIZE; i+=MEM_PAGE, j+=MEM_PAGE) {
-        vmm_set_mapping(vm_mnt, kstack + i, pa + j, PG_PREM_RW);
-    }
+    set_pte(ptep, mkpte_raw(MEMGUARD));
 
-    return align_stack(kstack + KSTACK_SIZE - 1);
+    pte_t pte = mkpte(pa, KERNEL_DATA);
+    vmm_set_ptes_contig(ptep + 1, pte, LFT_SIZE, KSTACK_PAGES - 1);
+
+    ptep += KSTACK_PAGES;
+    return align_stack(ptep_va(ptep, LFT_SIZE) - 1);
 }
 
 void
 thread_release_mem(struct thread* thread, ptr_t vm_mnt)
 {
-    for (size_t i = 0; i < KSTACK_SIZE; i+=MEM_PAGE) {
-        ptr_t stack_page = PG_ALIGN(thread->kstack - i);
-        vmm_del_mapping(vm_mnt, stack_page);
-    }
+    pte_t* ptep = mkptep_va(vm_mnt, thread->kstack);
+    
+    ptep -= KSTACK_PAGES + 1;
+    vmm_unset_ptes(ptep, KSTACK_PAGES);
     
     if (thread->ustack) {
         if ((thread->ustack->start & 0xfff)) {
