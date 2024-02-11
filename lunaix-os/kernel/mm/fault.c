@@ -85,6 +85,7 @@ fault_handle_kernel_page(struct fault_context* fault)
     // TODO add check on faulting pointer
     //      we must ensure only ptep fault is resolvable
     fault_resolved(fault, pte_mkroot(fault->resolving), 0);
+    pmm_set_attr(fault->prealloc_pa, PP_FGPERSIST);
 }
 
 
@@ -96,12 +97,16 @@ fault_prealloc_page(struct fault_context* fault)
     }
 
     pte_t pte = mkpte(0, KERNEL_DATA);
-    if (!vmm_alloc_page(fault->fault_ptep, pte)) {
+    
+    pte = vmm_alloc_page(fault->fault_ptep, pte);
+    if (pte_isnull(pte)) {
         return;
     }
 
-    fault->resolving = *fault->fault_ptep;
+    fault->resolving = pte;
     fault->prealloc_pa = pte_paddr(fault->resolving);
+
+    pmm_set_attr(fault->prealloc_pa, 0);
 }
 
 

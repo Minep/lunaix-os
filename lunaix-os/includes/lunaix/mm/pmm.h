@@ -13,13 +13,13 @@
  * @brief 长久页：不会被缓存，但允许释放
  *
  */
-#define PP_FGPERSIST 0x1
+#define PP_FGPERSIST    0b00001
 
 /**
  * @brief 锁定页：不会被缓存，不能被释放
  *
  */
-#define PP_FGLOCKED 0x2
+#define PP_FGLOCKED     0b00011
 
 typedef u32_t pp_attr_t;
 
@@ -96,15 +96,42 @@ struct pp_struct*
 pmm_query(ptr_t pa);
 
 /**
- * @brief 释放一个已分配的物理页，假若页地址不存在，则无操作。
+ * @brief Free physical page with given attributes
+ * 
+ * @param page 
+ * @return int 
+ */
+int
+pmm_free_one(ptr_t page, pp_attr_t attr_mask);
+
+/**
+ * @brief Free a normal physical page
  *
  * @param page 页地址
  * @return 是否成功
  */
-int
-pmm_free_page(ptr_t page);
+static inline int
+pmm_free_page(ptr_t page)
+{
+    return pmm_free_one(page, 0);
+}
+
+/**
+ * @brief Free physical page regardless of it's attribute
+ * 
+ * @param page 
+ * @return int 
+ */
+static inline int
+pmm_free_any(ptr_t page)
+{
+    return pmm_free_one(page, -1);
+}
 
 int
 pmm_ref_page(ptr_t page);
+
+void
+pmm_set_attr(ptr_t page, pp_attr_t attr);
 
 #endif /* __LUNAIX_PMM_H */

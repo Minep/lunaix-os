@@ -47,26 +47,26 @@ struct proc_mm*
 procvm_create(struct proc_info* proc);
 
 /**
- * @brief Initialize the vm of `proc` to duplication of current process
+ * @brief Initialize and mount the vm of `proc` to duplication of current process
  * 
  * @param proc 
  * @return struct proc_mm* 
  */
 void
-procvm_dup(struct proc_info* proc);
+procvm_dup_and_mount(ptr_t vm_mnt, struct proc_info* proc);
 
 void
 procvm_cleanup(ptr_t vm_mnt, struct proc_info* proc);
 
 
 /**
- * @brief Initialize the vm of `proc` as a clean slate which contains
+ * @brief Initialize and mount the vms of `proc` as a clean slate which contains
  * nothing but shared global mapping of kernel image.
  * 
  * @param proc 
  */
 void
-procvm_init_clean(struct proc_info* proc);
+procvm_init_and_mount(ptr_t vm_mnt, struct proc_info* proc);
 
 
 /*

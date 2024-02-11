@@ -80,9 +80,9 @@ cleanup_detached_threads() {
             continue;
         }
 
-        vmm_mount_pd(VMS_MOUNT_1, vmroot(pos->process));
+        vms_mount(VMS_MOUNT_1, vmroot(pos->process));
         destory_thread(VMS_MOUNT_1, pos);
-        vmm_unmount_pd(VMS_MOUNT_1);
+        vms_unmount(VMS_MOUNT_1);
         
         i++;
     }
@@ -503,7 +503,7 @@ delete_process(struct proc_info* proc)
 
     signal_free_registers(proc->sigreg);
 
-    vmm_mount_pd(VMS_MOUNT_1, vmroot(proc));
+    vms_mount(VMS_MOUNT_1, vmroot(proc));
     
     struct thread *pos, *n;
     llist_for_each(pos, n, &proc->threads, proc_sibs) {
@@ -513,7 +513,7 @@ delete_process(struct proc_info* proc)
 
     procvm_cleanup(VMS_MOUNT_1, proc);
 
-    vmm_unmount_pd(VMS_MOUNT_1);
+    vms_unmount(VMS_MOUNT_1);
 
     cake_release(proc_pile, proc);
 }

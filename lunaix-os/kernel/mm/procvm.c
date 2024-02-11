@@ -23,103 +23,139 @@ procvm_create(struct proc_info* proc) {
     return mm;
 }
 
-
 static ptr_t
-__dup_vmspace(ptr_t mount_point, bool only_kernel)
+vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
 {
-    // FIXME use new vmm api
+    pte_t* ptep_dest    = mkl0tep(mkptep_va(dest_mnt, 0));
+    pte_t* ptep         = mkl0tep(mkptep_va(src_mnt, 0));
+    pte_t* ptep_kernel  = mkl0tep(mkptep_va(src_mnt, KERNEL_RESIDENT));
 
-    ptr_t ptd_pp = pmm_alloc_page(PP_FGPERSIST);
-    vmm_set_mapping(VMS_SELF, PG_MOUNT_1, ptd_pp, KERNEL_DATA);
+    // Build the self-reference on dest vms, it will create the required
+    // L0T page table automatically. (one page fault)
+    pte_t* vms_dest     =  mkptep_va(VMS_SELF, (ptr_t)ptep_dest);
+    pte_t vms_dest_pte  = *mkptep_va(VMS_SELF, (ptr_t)vms_dest);
+    set_pte(vms_dest, vms_dest_pte);
 
-    x86_page_table* ptd = (x86_page_table*)PG_MOUNT_1;
-    x86_page_table* pptd = (x86_page_table*)(mount_point | (0x3FF << 12));
-
-    size_t kspace_l1inx = L1_INDEX(KERNEL_RESIDENT);
-    size_t i = 1;   // skip first 4MiB, to avoid bring other thread's stack
-
-    ptd->entry[0] = 0;
     if (only_kernel) {
-        i = kspace_l1inx;
-        memset(ptd, 0, PG_SIZE);
+        ptep = ptep_kernel;
+        ptep_dest += ptep_vfn(ptep_kernel);
+    } else {
+        ptep++;
+        ptep_dest++;
     }
 
-    for (; i < PG_MAX_ENTRIES - 1; i++) {
+    int level = 0;
+    while (ptep < ptep_kernel)
+    {
+        pte_t pte = *ptep;
+        ptr_t pa  = pte_paddr(pte);
 
-        x86_pte_t ptde = pptd->entry[i];
-        // 空或者是未在内存中的L1页表项直接照搬过去。
-        // 内核地址空间直接共享过去。
-        if (!ptde || i >= kspace_l1inx || !(ptde & PG_PRESENT)) {
-            ptd->entry[i] = ptde;
+        if (pte_isnull(pte)) {
+            goto cont;
+        } 
+        
+        if (pte_isleaf(pte)) {
+            set_pte(ptep_dest, pte);
+            pmm_ref_page(pa);
+        }
+        
+        if (ptep_vfn(ptep) == MAX_PTEN - 1) {
+            ptep = ptep_step_out(ptep);
+            ptep_dest = ptep_step_out(ptep_dest);
+            level--;
+        }
+        else if (level < MAX_LEVEL - 1) {
+            vmm_alloc_page(ptep_dest, pte);
+
+            ptep = ptep_step_into(ptep);
+            ptep_dest = ptep_step_into(ptep_dest);
+            level++;
+
             continue;
         }
 
-        // 复制L2页表
-        ptr_t pt_pp = pmm_alloc_page(PP_FGPERSIST);
-        vmm_set_mapping(VMS_SELF, PG_MOUNT_2, pt_pp, KERNEL_DATA);
-
-        x86_page_table* ppt = (x86_page_table*)(mount_point | (i << 12));
-        x86_page_table* pt = (x86_page_table*)PG_MOUNT_2;
-
-        for (size_t j = 0; j < PG_MAX_ENTRIES; j++) {
-            x86_pte_t pte = ppt->entry[j];
-            pmm_ref_page(PG_ENTRY_ADDR(pte));
-            pt->entry[j] = pte;
-        }
-
-        ptd->entry[i] = (ptr_t)pt_pp | PG_ENTRY_FLAGS(ptde);
+    cont:
+        ptep++;
+        ptep_dest++;
     }
 
-    ptd->entry[PG_MAX_ENTRIES - 1] = NEW_L1_ENTRY(T_SELF_REF_PERM, ptd_pp);
+    // Ensure we step back to L0T
+    assert(!level);
+    
+    // Carry over the kernel
+    while (ptep_vfn(ptep) + 1 < MAX_PTEN) {
+        pte_t pte = *ptep;
+        assert(!pte_isnull(pte));
 
-    return ptd_pp;
+        set_pte(ptep_dest, pte);
+        pmm_ref_page(pte_paddr(pte));
+        
+        ptep++;
+        ptep_dest++;
+    }
+
+    return pte_paddr(*ptep_dest);
+}
+
+static void
+vmsfree(ptr_t vm_mnt)
+{
+    pte_t* ptep_head    = mkl0tep(mkptep_va(vm_mnt, 0));
+    pte_t* ptep_kernel  = mkl0tep(mkptep_va(vm_mnt, KERNEL_RESIDENT));
+
+    int level = 0;
+    pte_t* ptep = ptep_head;
+    while (ptep < ptep_kernel)
+    {
+        pte_t pte = *ptep;
+        ptr_t pa  = pte_paddr(pte);
+
+        if (pte_isnull(pte)) {
+            goto cont;
+        } 
+
+        if (pte_isleaf(pte)) {
+            pmm_free_any(pa);
+            goto cont;
+        } 
+
+        if (ptep_vfn(ptep) == MAX_PTEN - 1) {
+            ptep = ptep_step_out(ptep);
+            pmm_free_any(pte_paddr(*ptep));
+            level--;
+        }
+        else if (level < MAX_LEVEL - 1) {
+            ptep = ptep_step_into(ptep);
+            level++;
+
+            continue;
+        }
+
+        pmm_free_any(pa);
+    cont:
+        ptep++;
+    }
+
+    ptr_t self_pa = pte_paddr(ptep_head[MAX_LEVEL - 1]);
+    pmm_free_any(self_pa);
 }
 
 void
-procvm_dup(struct proc_info* proc) {
+procvm_dup_and_mount(ptr_t mnt, struct proc_info* proc) {
    struct proc_mm* mm = vmspace(proc);
    struct proc_mm* mm_current = vmspace(__current);
    
    mm->heap = mm_current->heap;
-   mm->vmroot = __dup_vmspace(VMS_SELF, false);
+   mm->vmroot = vmscpy(mnt, VMS_SELF, false);
    
    region_copy_mm(mm_current, mm);
 }
 
 void
-procvm_init_clean(struct proc_info* proc)
+procvm_init_and_mount(ptr_t mnt, struct proc_info* proc)
 {
     struct proc_mm* mm = vmspace(proc);
-    mm->vmroot = __dup_vmspace(VMS_SELF, true);
-}
-
-
-static void
-__delete_vmspace(ptr_t vm_mnt)
-{
-    x86_page_table* pptd = (x86_page_table*)(vm_mnt | (0x3FF << 12));
-
-    // only remove user address space
-    for (size_t i = 0; i < L1_INDEX(KERNEL_RESIDENT); i++) {
-        x86_pte_t ptde = pptd->entry[i];
-        if (!ptde || !(ptde & PG_PRESENT)) {
-            continue;
-        }
-
-        x86_page_table* ppt = (x86_page_table*)(vm_mnt | (i << 12));
-
-        for (size_t j = 0; j < PG_MAX_ENTRIES; j++) {
-            x86_pte_t pte = ppt->entry[j];
-            // free the 4KB data page
-            if ((pte & PG_PRESENT)) {
-                pmm_free_page(PG_ENTRY_ADDR(pte));
-            }
-        }
-        // free the L2 page table
-        pmm_free_page(PG_ENTRY_ADDR(ptde));
-    }
-    // free the L1 directory
-    pmm_free_page(PG_ENTRY_ADDR(pptd->entry[PG_MAX_ENTRIES - 1]));
+    mm->vmroot = vmscpy(mnt, VMS_SELF, true);
 }
 
 void
@@ -133,7 +169,7 @@ procvm_cleanup(ptr_t vm_mnt, struct proc_info* proc) {
 
     vfree(proc->mm);
 
-    __delete_vmspace(vm_mnt);
+    vmsfree(vm_mnt);
 }
 
 ptr_t

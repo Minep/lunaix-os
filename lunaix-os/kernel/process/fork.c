@@ -167,14 +167,13 @@ dup_proc()
     }
 
     __dup_fdtable(pcb);
-    procvm_dup(pcb);
 
-    vmm_mount_pd(VMS_MOUNT_1, vmroot(pcb));
+    procvm_dup_and_mount(VMS_MOUNT_1, pcb);
 
     struct thread* main_thread = dup_active_thread(VMS_MOUNT_1, pcb);
     if (!main_thread) {
         syscall_result(ENOMEM);
-        vmm_unmount_pd(VMS_MOUNT_1);
+        vms_unmount(VMS_MOUNT_1);
         delete_process(pcb);
         return -1;
     }
@@ -186,7 +185,7 @@ dup_proc()
         region_maybe_cow(pos);
     }
 
-    vmm_unmount_pd(VMS_MOUNT_1);
+    vms_unmount(VMS_MOUNT_1);
 
     commit_process(pcb);
     commit_thread(main_thread);

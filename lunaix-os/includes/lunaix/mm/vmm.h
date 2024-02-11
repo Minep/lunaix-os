@@ -137,14 +137,14 @@ vmm_dup_page(ptr_t pa);
  * @return ptr_t
  */
 ptr_t
-vmm_mount_pd(ptr_t mnt, ptr_t pde);
+vms_mount(ptr_t mnt, ptr_t pde);
 
 /**
  * @brief 卸载已挂载的虚拟地址空间
  *
  */
 ptr_t
-vmm_unmount_pd(ptr_t mnt);
+vms_unmount(ptr_t mnt);
 
 static inline ptr_t 
 vmm_mount_pg(ptr_t mnt, ptr_t pa) {

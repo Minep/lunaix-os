@@ -15,27 +15,12 @@ vmm_init()
     // XXX: something here?
 }
 
-x86_page_table*
-vmm_init_pd()
-{
-    x86_page_table* dir =
-      (x86_page_table*)pmm_alloc_page(PP_FGPERSIST);
-    for (size_t i = 0; i < PG_MAX_ENTRIES; i++) {
-        dir->entry[i] = PTE_NULL;
-    }
-
-    // 递归映射，方便我们在软件层面进行查表地址转换
-    dir->entry[PG_MAX_ENTRIES - 1] = NEW_L1_ENTRY(T_SELF_REF_PERM, dir);
-
-    return dir;
-}
-
-bool 
+pte_t 
 vmm_alloc_page(pte_t* ptep, pte_t pte)
 {
     ptr_t pa = pmm_alloc_page(PP_FGPERSIST);
     if (!pa) {
-        return false;
+        return mkpte_raw(0);
     }
 
     pte = pte_setpaddr(pte, pa);
@@ -47,7 +32,7 @@ vmm_alloc_page(pte_t* ptep, pte_t pte)
 
     memset(ptep_next, 0, LFT_SIZE);
 
-    return pa;
+    return pte;
 }
 
 int
@@ -150,7 +135,7 @@ vmm_v2pat(ptr_t mnt, ptr_t va)
 }
 
 ptr_t
-vmm_mount_pd(ptr_t mnt, ptr_t pde)
+vms_mount(ptr_t mnt, ptr_t pde)
 {
     assert(pde);
 
@@ -161,7 +146,7 @@ vmm_mount_pd(ptr_t mnt, ptr_t pde)
 }
 
 ptr_t
-vmm_unmount_pd(ptr_t mnt)
+vms_unmount(ptr_t mnt)
 {
     x86_page_table* l1pt = (x86_page_table*)L1_BASE_VADDR;
     l1pt->entry[(mnt >> 22)] = 0;

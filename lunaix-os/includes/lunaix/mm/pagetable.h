@@ -135,7 +135,7 @@ typedef struct __pte pte_t;
         ((ptr_t)(ptep) & __p) == __p;                   \
     })
 
-bool 
+pte_t 
 vmm_alloc_page(pte_t* ptep, pte_t pte);
 
 static inline bool
@@ -147,7 +147,7 @@ __alloc_level(pte_t* ptep, pte_t pte)
 
     pte = pte_mkroot(pte);
     pte = pte_setprot(pte, KERNEL_DATA);
-    return vmm_alloc_page(ptep, pte);
+    return !pte_isnull(vmm_alloc_page(ptep, pte));
 }
 
 /**
@@ -436,5 +436,16 @@ ptep_step_out(pte_t* ptep)
     return mkptep_va(_VM_OF(ptep), (ptr_t)ptep);
 }
 
+/**
+ * @brief Make a L0TEP from given mnt and va
+ * 
+ * @param ptep 
+ * @return pte_t* 
+ */
+static inline pte_t*
+mkl0tep_va(ptr_t mnt, ptr_t va)
+{
+    return mkl1tep(mkptep_va(mnt, va));
+}
 
 #endif /* __LUNAIX_PAGETABLE_H */

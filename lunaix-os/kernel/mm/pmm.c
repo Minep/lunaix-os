@@ -1,6 +1,7 @@
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/status.h>
+#include <lunaix/mm/pagetable.h>
 
 // This is a very large array...
 static struct pp_struct pm_table[PM_BMP_MAX_SIZE];
@@ -118,22 +119,20 @@ pmm_alloc_page(pp_attr_t attr)
 }
 
 int
-pmm_free_page(ptr_t page)
+pmm_free_one(ptr_t page, pp_attr_t attr_mask)
 {
-    struct pp_struct* pm = &pm_table[page >> 12];
+    pfn_t ppfn = pfn(page);
+    struct pp_struct* pm = &pm_table[ppfn];
 
     // Is this a MMIO mapping or double free?
-    if ((page >> 12) >= max_pg || !(pm->ref_counts)) {
+    if (ppfn >= max_pg || !(pm->ref_counts)) {
         return 0;
     }
 
-    // 如果是锁定页，则不作处理
-    if ((pm->attr & PP_FGLOCKED)) {
+    if (pm->attr && !(pm->attr & attr_mask)) {
         return 0;
     }
 
-    // TODO: 检查权限，保证：1) 只有正在使用该页（包括被分享者）的进程可以释放；
-    // 2) 内核可释放所有页。
     pm->ref_counts--;
     return 1;
 }
@@ -141,7 +140,7 @@ pmm_free_page(ptr_t page)
 int
 pmm_ref_page(ptr_t page)
 {
-    u32_t ppn = page >> 12;
+    u32_t ppn = pfn(page);
 
     if (ppn >= PM_BMP_MAX_SIZE) {
         return 0;
@@ -154,6 +153,16 @@ pmm_ref_page(ptr_t page)
 
     pm->ref_counts++;
     return 1;
+}
+
+void
+pmm_set_attr(ptr_t page, pp_attr_t attr)
+{
+    struct pp_struct* pp = &pm_table[pfn(page)];
+    
+    if (pp->ref_counts) {
+        pp->attr = attr;
+    }
 }
 
 struct pp_struct*

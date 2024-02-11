@@ -135,6 +135,12 @@ pte_setprot(pte_t pte, ptr_t prot)
     return __mkpte_from((pte.val & ~_PTE_PROT_MASK) | (prot & _PTE_PROT_MASK));
 }
 
+static inline pte_attr_t
+pte_prot(pte_t pte)
+{
+    return (pte.val & _PTE_PROT_MASK);
+}
+
 static inline bool
 pte_isnull(pte_t pte)
 {
