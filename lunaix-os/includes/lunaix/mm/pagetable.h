@@ -13,11 +13,16 @@
         + LFT: Leaf-Level Table, indexed by L3P entries    
     
     Therefore, "LnTE" can be used to refer "Entry in a Level-n Table".
+    Consequently, we can further define 
+        
+        + LnTEP - pointer to an entry within LnT
+        + LnTP  - pointer to (the first entry of) LnT
+        
     To better identify all derived value from virtual and physical 
     adress, we defines:
         
         + Virtual Address Space (VAS):
-          A set of all virtual address space that can be interpreted
+          A set of all virtual addresses that can be interpreted
           by page table walker.
 
         + Virtual Mappings Space (VMS):
@@ -26,9 +31,9 @@
           space to physical memory address. (Note: mappings are stored 
           in the hierarchy of page tables, however it is transparent, 
           just as indexing into a big linear table, thus 'imaginary')
-          A VMS defines a meaningful VAS.
+          A VMS is a realisation of a VAS.
 
-        + Virtual Mappings Mounting Point (VM_MNT or MNT):
+        + Virtual Mappings Mounting (VM_MNT or MNT):
           A subregion within current VAS for where the VA/PA mappings
           of another VMS are accessible.
 
@@ -44,7 +49,7 @@
           table
 
     In the context of x86 archiecture (regardless x86_32 or x86_64),
-    these naming have the following projection:
+    these naming have the following realisations:
         
         + L0T: PD           (32-Bit 2-Level paging)
                PML4         (4-Level Paging)
@@ -64,7 +69,8 @@
 
         + LFT: Page Table   (All)
 
-        + VAS: [0, 2^32)    (32-Bit 2-Level paging)
+        + VAS: 
+               [0, 2^32)    (32-Bit 2-Level paging)
                [0, 2^48)    (4-Level Paging)
                [0, 2^57)    (5-Level Paging)
 
@@ -78,8 +84,8 @@
                [0, 2^52)    (x86_64, all paging modes)
 
         + VFN: [0, 1024)    (32-Bit 2-Level paging)
-               [0, 512)    (4-Level Paging)
-               [0, 512)    (5-Level Paging)
+               [0, 512)     (4-Level Paging)
+               [0, 512)     (5-Level Paging)
 
     In addition, we also defines VMS_{MASK|SIZE} to provide
     information about maximium size of addressable virtual 
@@ -106,7 +112,7 @@ typedef struct __pte pte_t;
 
 #define _VM_OF(ptep)            ( (ptr_t)(ptep) & ~L0T_MASK )
 #define _VM_PFN_OF(ptep)        ( ((ptr_t)(ptep) & L0T_MASK) / sizeof(pte_t) )
-#define VMS_SELF             VMS_MASK
+#define VMS_SELF                VMS_MASK
 
 #define __LnTI_OF(ptep, n)\
     (_VM_PFN_OF(ptep) * LFT_SIZE / L##n##T_SIZE)
@@ -126,11 +132,23 @@ typedef struct __pte pte_t;
 #define ptep_with_level(ptep, lvl_size)                 \
     ({                                                  \
         ptr_t __p = _LnTEP_AT(_VM_OF(ptep), lvl_size);  \
-        ((ptr_t)(ptep) & __p) == __p;                    \
+        ((ptr_t)(ptep) & __p) == __p;                   \
     })
 
 bool 
-pagetable_alloc(pte_t* ptep, pte_t pte);
+vmm_alloc_page(pte_t* ptep, pte_t pte);
+
+static inline bool
+__alloc_level(pte_t* ptep, pte_t pte)
+{
+    if (!pte_isnull(pte)) {
+        return true;
+    }
+
+    pte = pte_mkroot(pte);
+    pte = pte_setprot(pte, KERNEL_DATA);
+    return vmm_alloc_page(ptep, pte);
+}
 
 /**
  * @brief Get the page frame number encoded in ptep
@@ -237,7 +255,7 @@ mkl1t(pte_t* l0t_ptep, ptr_t va)
         return l0t_ptep;
     }
     
-    return pagetable_alloc(l0t_ptep, pte) ? __LnTEP(l0t_ptep, va, 1) 
+    return __alloc_level(l0t_ptep, pte) ? __LnTEP(l0t_ptep, va, 1) 
                                           : NULL;
 #else
     return l0t_ptep;
@@ -265,7 +283,7 @@ mkl2t(pte_t* l1t_ptep, ptr_t va)
         return l1t_ptep;
     }
 
-    return pagetable_alloc(l1t_ptep, pte) ? __LnTEP(l1t_ptep, va, 2) 
+    return __alloc_level(l1t_ptep, pte) ? __LnTEP(l1t_ptep, va, 2) 
                                           : NULL;
 #else
     return l1t_ptep;
@@ -293,7 +311,7 @@ mkl3t(pte_t* l2t_ptep, ptr_t va)
         return l2t_ptep;
     }
 
-    return pagetable_alloc(l2t_ptep, pte) ? __LnTEP(l2t_ptep, va, 3) 
+    return __alloc_level(l2t_ptep, pte) ? __LnTEP(l2t_ptep, va, 3) 
                                           : NULL;
 #else
     return l2t_ptep;
@@ -320,8 +338,8 @@ mklft(pte_t* l3t_ptep, ptr_t va)
         return l3t_ptep;
     }
 
-    return pagetable_alloc(l3t_ptep, pte) ? __LnTEP(l3t_ptep, va, F) 
-                                          : NULL;
+    return __alloc_level(l3t_ptep, pte) ? __LnTEP(l3t_ptep, va, F) 
+                                        : NULL;
 }
 
 static inline unsigned int

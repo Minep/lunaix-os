@@ -43,7 +43,8 @@ __alloc_contig_ptes(pte_t* ptep, size_t base_sz, int n)
         return NULL;
     }
 
-    return mkptep_va(ptep_vm_mnt(ptep), va - base_sz * n);
+    va -= MAX(sz, base_sz * n);
+    return mkptep_va(ptep_vm_mnt(ptep), va);
 }
 
 ptr_t

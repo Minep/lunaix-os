@@ -9,7 +9,8 @@ STRIP_OSDEP_LD := -nostdlib -nolibc -z noexecstack -no-pie -Wl,--build-id=none
 
 ARCH_OPT := -m32 -D__ARCH_IA32
 O := -O2
-W := -Wall -Wextra -Werror -Wno-unknown-pragmas \
+W := -Wall -Wextra -Werror \
+		-Wno-unknown-pragmas \
 		-Wno-unused-function \
 		-Wno-unused-variable\
 		-Wno-unused-but-set-variable \

@@ -12,6 +12,9 @@ export_symbol(debug, pmm, max_pg);
 void
 pmm_mark_page_free(ptr_t ppn)
 {
+    if ((pm_table[ppn].attr & PP_FGLOCKED)) {
+        return;
+    }
     pm_table[ppn].ref_counts = 0;
 }
 
@@ -26,6 +29,9 @@ void
 pmm_mark_chunk_free(ptr_t start_ppn, size_t page_count)
 {
     for (size_t i = start_ppn; i < start_ppn + page_count && i < max_pg; i++) {
+        if ((pm_table[i].attr & PP_FGLOCKED)) {
+            continue;
+        }
         pm_table[i].ref_counts = 0;
     }
 }

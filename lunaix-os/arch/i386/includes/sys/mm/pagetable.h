@@ -54,10 +54,10 @@
 #define LEVEL_MASK          _PAGE_LEVEL_MASK
 
 // max PTEs number
-#define MAX_PTEN             _PAGE_LEVEL_SIZE
+#define MAX_PTEN            _PAGE_LEVEL_SIZE
 
 // max translation level supported
-#define MAX_LEVEL            _PTW_LEVEL
+#define MAX_LEVEL           _PTW_LEVEL
 
 
 /* ******** PTE Manipulation ******** */
@@ -100,7 +100,15 @@ typedef unsigned int pte_attr_t;
 static inline pte_t
 mkpte(ptr_t paddr, pte_attr_t prot)
 {
-    return __mkpte_from((paddr & ~_PAGE_BASE_MASK) | (prot & _PTE_PROT_MASK) | _PTE_P);
+    pte_attr_t attrs = (prot & _PTE_PROT_MASK) | _PTE_P | _PTE_PS;
+    return __mkpte_from((paddr & ~_PAGE_BASE_MASK) | attrs);
+}
+
+static inline pte_t
+mkpte_root(ptr_t paddr, pte_attr_t prot)
+{
+    pte_attr_t attrs = (prot & _PTE_PROT_MASK) | _PTE_P;
+    return __mkpte_from((paddr & ~_PAGE_BASE_MASK) | attrs);
 }
 
 static inline pte_t

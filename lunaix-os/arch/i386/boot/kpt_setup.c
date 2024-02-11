@@ -17,7 +17,6 @@ extern u8_t __kboot_end[];
 // define the initial page table layout
 struct kernel_map {
     pte_t l0t[_PAGE_LEVEL_SIZE];
-    pte_t lft_bootmap[_PAGE_LEVEL_SIZE];
 
     struct {
         pte_t _lft[_PAGE_LEVEL_SIZE];
@@ -36,26 +35,14 @@ _init_page()
     pte_t* kl0tep       = (pte_t*) &kpt_pa->l0t[pfn_at(KERNEL_RESIDENT, L0T_SIZE)];
     pte_t* kl1tep       = (pte_t*)  kpt_pa->kernel_lfts;    
     pte_t* boot_l0tep   = (pte_t*)  kpt_pa;
-    pte_t* boot_l1tep   = (pte_t*) &kpt_pa->lft_bootmap;
-    pte_t pte           = mkpte((ptr_t)boot_l1tep, KERNEL_DATA);
 
-    set_pte(boot_l0tep, pte);
-
-    // Identity map on everything <= __kboot_end (which include first 1MiB)
-    pfn_t kboot_end = pfn((ptr_t)__kboot_end);
-    
-    pte = pte_mkleaf(pte);
-    for (size_t i = 0; i < kboot_end; i++) {
-        pte = pte_setpaddr(pte, page_addr(i));
-        set_pte(boot_l1tep, pte);
-
-        boot_l1tep++;
-    }
+    set_pte(boot_l0tep, mkpte(0, KERNEL_DATA));
 
     // --- 将内核重映射至高半区 ---
 
     // Hook the kernel reserved LFTs onto L0T
-    pte = pte_mkroot(pte);
+    pte_t pte = mkpte_root((ptr_t)kl1tep, KERNEL_DATA);
+    
     for (u32_t i = 0; i < KEXEC_RSVD; i++) {
         pte = pte_setpaddr(pte, (ptr_t)&kpt_pa->kernel_lfts[i]);
         set_pte(kl0tep, pte);
@@ -102,7 +89,7 @@ _init_page()
     // XXX: Mapping the kernel .rodata section?
 
     // Build up self-reference
-    pte = mkpte((ptr_t)kpt_pa, KERNEL_DATA);
+    pte = mkpte_root((ptr_t)kpt_pa, KERNEL_DATA);
     set_pte(boot_l0tep + _PAGE_LEVEL_MASK, pte_mkroot(pte));
 }
 

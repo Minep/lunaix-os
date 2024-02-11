@@ -16,6 +16,12 @@ void
 boot_begin(struct boot_handoff* bhctx)
 {
     bhctx->prepare(bhctx);
+    
+    // Identity-map the first 3GiB address spaces
+    pte_t* ptep  = mkl0tep(mkptep_va(VMS_SELF, 0));
+    pte_t pte    = mkpte(0, KERNEL_DATA);
+    size_t count = page_count(KERNEL_RESIDENT, L0T_SIZE);
+    vmm_set_ptes_contig(ptep, pte, L0T_SIZE, count);
 
     struct boot_mmapent *mmap = bhctx->mem.mmap, *mmapent;
     for (size_t i = 0; i < bhctx->mem.mmap_len; i++) {
@@ -27,25 +33,14 @@ boot_begin(struct boot_handoff* bhctx)
             pmm_mark_chunk_free(start_pfn, size_pg);
             continue;
         }
-
-        if (mmapent->start >= KERNEL_RESIDENT) {
-            continue;
-        }
-
-        pte_t* ptep = mkptep_va(VMS_SELF, mmapent->start);
-        pte_t pte = mkpte(mmapent->start, KERNEL_DATA);
-        pfn_t lowmem_n = pfn(KERNEL_RESIDENT) - start_pfn;
-        lowmem_n = MIN(lowmem_n, size_pg);
-
-        vmm_set_ptes_contig(ptep, pte, LFT_SIZE, lowmem_n);
     }
 
     /* Reserve region for all loaded modules */
     for (size_t i = 0; i < bhctx->mods.mods_num; i++) {
         struct boot_modent* mod = &bhctx->mods.entries[i];
-        pmm_mark_chunk_occupied(PN(mod->start),
-                                CEIL(mod->end - mod->start, PG_SIZE_BITS),
-                                PP_FGLOCKED);
+        unsigned int counts = leaf_count(mod->end - mod->start);
+
+        pmm_mark_chunk_occupied(pfn(mod->start), counts, PP_FGLOCKED);
     }
 }
 
@@ -68,14 +63,8 @@ boot_end(struct boot_handoff* bhctx)
             pmm_mark_chunk_free(PN(mmapent->start), size_pg);
         }
 
-        if (mmapent->start >= KERNEL_RESIDENT || mmapent->type == BOOT_MMAP_FREE) {
+        if (mmapent->type == BOOT_MMAP_FREE) {
             continue;
-        }
-
-        ptr_t pa = PG_ALIGN(mmapent->start);
-        for (size_t j = 0; j < size_pg && pa < KERNEL_RESIDENT;
-             j++, pa += PM_PAGE_SIZE) {
-            vmm_del_mapping(VMS_SELF, pa);
         }
     }
 
@@ -89,11 +78,9 @@ boot_end(struct boot_handoff* bhctx)
 void
 boot_cleanup()
 {
-    // clean up
-    for (size_t i = 0; i < (ptr_t)(&__kboot_end); i += PG_SIZE) {
-        vmm_del_mapping(VMS_SELF, (ptr_t)i);
-        pmm_free_page((ptr_t)i);
-    }
+    pte_t* ptep  = mkl0tep(mkptep_va(VMS_SELF, 0));
+    size_t count = page_count(KERNEL_RESIDENT, L0T_SIZE);
+    vmm_unset_ptes(ptep, count);
 }
 
 void

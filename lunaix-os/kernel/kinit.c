@@ -141,7 +141,7 @@ kmem_init(struct boot_handoff* bhctx)
 #else
         assert(mklft(ptep++, 0));
 #endif
-    } while (va_offset((ptr_t)ptep) < MAX_PTEN - 1);
+    } while (ptep_vfn(ptep) < MAX_PTEN - 1);
 
     // allocators
     cake_init();

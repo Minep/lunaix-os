@@ -31,19 +31,16 @@ vmm_init_pd()
 }
 
 bool 
-pagetable_alloc(pte_t* ptep, pte_t pte)
+vmm_alloc_page(pte_t* ptep, pte_t pte)
 {
-    if (!pte_isnull(pte)) {
-        return true;
-    }
-
     ptr_t pa = pmm_alloc_page(PP_FGPERSIST);
     if (!pa) {
         return false;
     }
 
-    pte_t pte_ = mkpte(pa, KERNEL_DATA);
-    set_pte(ptep, pte_);
+    pte = pte_setpaddr(pte, pa);
+    pte = pte_mkloaded(pte);
+    set_pte(ptep, pte);
 
     pte_t* ptep_next = __LnTEP_SHIFT_NEXT(ptep);
     cpu_flush_page((ptr_t)ptep_next);

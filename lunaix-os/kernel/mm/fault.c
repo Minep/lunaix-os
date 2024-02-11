@@ -79,6 +79,14 @@ fault_handle_named_region(struct fault_context* fault)
     fault_resolved(fault, pte, 0);
 }
 
+static void
+fault_handle_kernel_page(struct fault_context* fault)
+{
+    // TODO add check on faulting pointer
+    //      we must ensure only ptep fault is resolvable
+    fault_resolved(fault, pte_mkroot(fault->resolving), 0);
+}
+
 
 static void
 fault_prealloc_page(struct fault_context* fault)
@@ -87,7 +95,8 @@ fault_prealloc_page(struct fault_context* fault)
         return;
     }
 
-    if (!pagetable_alloc(fault->fault_ptep, fault->fault_pte)) {
+    pte_t pte = mkpte(0, KERNEL_DATA);
+    if (!vmm_alloc_page(fault->fault_ptep, pte)) {
         return;
     }
 
@@ -134,7 +143,8 @@ __try_resolve_fault(struct fault_context* fault)
     }
 
     if (fault->kernel_fault) {
-        return true;
+        fault_handle_kernel_page(fault);
+        goto done;
     }
 
     if (fault->vmr) {
@@ -155,6 +165,7 @@ __try_resolve_fault(struct fault_context* fault)
         ERROR("WIP page fault route");
     }
     
+done:
     return !!(fault->resolve_type & RESOLVE_OK);
 }
 

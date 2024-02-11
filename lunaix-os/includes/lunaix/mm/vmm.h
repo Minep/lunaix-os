@@ -70,6 +70,26 @@ vmm_set_ptes_contig(pte_t* ptep, pte_t pte, size_t lvl_size, size_t n)
     } while (--n > 0);
 }
 
+static inline void 
+vmm_set_ptes(pte_t* ptep, pte_t pte, size_t n)
+{
+    do {
+        set_pte(ptep, pte);
+        ptep++;
+    } while (--n > 0);
+}
+
+
+static inline void 
+vmm_unset_ptes(pte_t* ptep, size_t n)
+{
+    do {
+        set_pte(ptep, mkpte_raw(0));
+        ptep++;
+    } while (--n > 0);
+}
+
+
 /**
  * @brief 删除一个映射
  *
