@@ -5,34 +5,10 @@
 #include <lunaix/ds/mutex.h>
 #include <lunaix/fs.h>
 #include <lunaix/types.h>
+#include <lunaix/mm/mm.h>
 
 struct proc_mm;
 struct proc_info;
-
-struct mm_region
-{
-    struct llist_header head; // must be first field!
-    struct proc_mm* proc_vms;
-
-    // file mapped to this region
-    struct v_file* mfile;
-    // mapped file offset
-    off_t foff;
-    // mapped file length
-    u32_t flen; // XXX it seems that we don't need this actually..
-
-    ptr_t start;
-    ptr_t end;
-    u32_t attr;
-
-    void** index; // fast reference, to accelerate access to this very region.
-
-    void* data;
-    // when a region is copied
-    void (*region_copied)(struct mm_region*);
-    // when a region is unmapped
-    void (*destruct_region)(struct mm_region*);
-};
 
 struct remote_vmctx
 {

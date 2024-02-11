@@ -36,7 +36,7 @@ pcache_alloc_page()
         return NULL;
     }
 
-    if (!(va = (ptr_t)vmap(pp, PG_SIZE, PG_PREM_RW, 0))) {
+    if (!(va = (ptr_t)vmap(pp, PG_SIZE, KERNEL_DATA))) {
         pmm_free_page(pp);
         return NULL;
     }

@@ -19,7 +19,7 @@ static inline void
 inject_guardian_page(ptr_t vm_mnt, ptr_t va)
 {
     pte_t* ptep = mkptep_va(vm_mnt, va);
-    vmm_set_pte(ptep, mkpte_raw(MEMGUARD));
+    set_pte(ptep, mkpte_raw(MEMGUARD));
 }
 
 static ptr_t

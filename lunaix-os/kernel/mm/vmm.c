@@ -43,7 +43,7 @@ pagetable_alloc(pte_t* ptep, pte_t pte)
     }
 
     pte_t pte_ = mkpte(pa, KERNEL_DATA);
-    pte_write_entry(ptep, pte_);
+    set_pte(ptep, pte_);
 
     pte_t* ptep_next = __LnTEP_SHIFT_NEXT(ptep);
     cpu_flush_page((ptr_t)ptep_next);
@@ -61,44 +61,9 @@ vmm_set_mapping(ptr_t mnt, ptr_t va, ptr_t pa, pte_attr_t prot)
     pte_t* ptep = mkptep_va(mnt, va);
     pte_t  pte  = mkpte(pa, prot);
 
-    vmm_set_pte_at(ptep, pte_mkleaf(pte), LFT_SIZE);
+    set_pte(ptep, pte);
 
     return 1;
-}
-
-void 
-vmm_set_pte_at(pte_t* ptep, pte_t pte, size_t lvl_size) 
-{
-    ptr_t va = page_addr(ptep_vm_pfn(ptep));
-    pte_t* ptep_ = mkl0tep(ptep);
-    size_t size = 0;
-
-    if (lvl_size <= L1T_SIZE) {
-        assert(ptep_ = mkl1t(ptep_, va));
-    }
-
-    if (lvl_size <= L2T_SIZE) {
-        assert(ptep_ = mkl2t(ptep_, va));
-    }
-
-    if (lvl_size <= L3T_SIZE) {
-        assert(ptep_ = mkl3t(ptep_, va));
-    }
-
-    if (lvl_size <= LFT_SIZE) {
-        assert(ptep_ = mklft(ptep_, va));
-    }
-
-    if (ptep_ != ptep) {
-        spin();
-        FATAL("conflict mapping: ptep=%p!!ptep_=%p, va=%p", ptep, ptep_, va);
-    }
-
-    pte_write_entry(ptep_, pte);
-    
-    if (ptep_vm_mnt(ptep_) == VMS_SELF) {
-        cpu_flush_page(va);
-    }
 }
 
 ptr_t
@@ -110,7 +75,7 @@ vmm_del_mapping(ptr_t mnt, ptr_t va)
 
     pte_t old = *ptep;
 
-    vmm_set_pte(ptep, mkpte_raw(0));
+    set_pte(ptep, mkpte_raw(0));
 
     return pte_paddr(old);
 }

@@ -49,7 +49,9 @@ intr_handler(isr_param* param)
 
 done:
 
-    intc_notify_eoi(0, execp->vector);
+    if (execp->vector > IV_BASE_END) {
+        intc_notify_eoi(0, execp->vector);
+    }
 
     return;
 }

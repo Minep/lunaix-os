@@ -60,23 +60,14 @@ vmm_init_pd();
 int
 vmm_set_mapping(ptr_t mnt, ptr_t va, ptr_t pa, pte_attr_t prot);
 
-void 
-vmm_set_pte_at(pte_t* ptep, pte_t pte, size_t lvl_size);
-
 static inline void 
-vmm_set_ptes_contig(pte_t* ptep, pte_t pte, size_t n, size_t lvl_size)
+vmm_set_ptes_contig(pte_t* ptep, pte_t pte, size_t lvl_size, size_t n)
 {
     do {
-        vmm_set_pte_at(ptep++, pte, lvl_size);
+        set_pte(ptep, pte);
         pte_val(pte) += lvl_size;
+        ptep++;
     } while (--n > 0);
-}
-
-
-static inline void 
-vmm_set_pte(pte_t* ptep, pte_t pte)
-{
-    vmm_set_pte_at(ptep, pte, LFT_SIZE);
 }
 
 /**
@@ -185,42 +176,45 @@ struct vmap_area
 };
 
 /**
- * @brief 将连续的物理地址空间映射到内核虚拟地址空间
- *
- * @param paddr 物理地址空间的基地址
- * @param size 物理地址空间的大小
- * @return void*
- */
-void*
-vmap(ptr_t paddr, size_t size, pt_attr attr, int flags);
-
-/**
- * @brief 创建一个 vmap 区域
- *
- * @param paddr
- * @param attr
- * @return ptr_t
- */
-struct vmap_area*
-vmap_varea(size_t size, pt_attr attr);
-
-/**
- * @brief 在 vmap区域内映射一个单页
- *
- * @param paddr
- * @param attr
- * @return ptr_t
+ * @brief Maps a number of contiguous ptes in kernel 
+ *        address space
+ * 
+ * @param pte the pte to be mapped
+ * @param lvl_size size of the page pointed by the given pte
+ * @param n number of ptes
+ * @return ptr_t 
  */
 ptr_t
-vmap_area_page(struct vmap_area* area, ptr_t paddr, pt_attr attr);
+vmap_ptes_at(pte_t pte, size_t lvl_size, int n);
 
 /**
- * @brief 在 vmap区域删除一个已映射的页
- *
- * @param paddr
- * @return ptr_t
+ * @brief Maps a number of contiguous ptes in kernel 
+ *        address space (leaf page size)
+ * 
+ * @param pte the pte to be mapped
+ * @param n number of ptes
+ * @return ptr_t 
  */
-ptr_t
-vmap_area_rmpage(struct vmap_area* area, ptr_t vaddr);
+static inline ptr_t
+vmap_leaf_ptes(pte_t pte, int n)
+{
+    return vmap_ptes_at(pte, LFT_SIZE, n);
+}
+
+/**
+ * @brief Maps a contiguous range of physical address 
+ *        into kernel address space (leaf page size)
+ * 
+ * @param paddr start of the physical address range
+ * @param size size of the physical range
+ * @param prot default protection to be applied
+ * @return ptr_t 
+ */
+static inline ptr_t
+vmap(ptr_t paddr, size_t size, pt_attr prot)
+{
+    pte_t _pte = mkpte(paddr, prot);
+    return vmap_ptes_at(_pte, LFT_SIZE, leaf_count(size));
+}
 
 #endif /* __LUNAIX_VMM_H */

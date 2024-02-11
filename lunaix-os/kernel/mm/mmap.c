@@ -230,7 +230,7 @@ found:
     mmap_pte = pte_mkunloaded(mmap_pte);
 
     for (size_t i = 0; i < pfn(param->mlen); i++) {
-        vmm_set_pte(ptep++, mmap_pte);
+        set_pte(ptep++, mmap_pte);
     }
 
     if (file) {

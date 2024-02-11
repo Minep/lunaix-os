@@ -1,6 +1,94 @@
 #ifndef __LUNAIX_PAGETABLE_H
 #define __LUNAIX_PAGETABLE_H
 
+/*
+    Defines page related attributes for different page table
+    hierarchies. In Lunaix, we define five arch-agnostic alias
+    to those arch-dependent hierarchies:
+
+        + L0T: Level-0 Table, the root page table    
+        + L1T: Level-1 Table, indexed by L0P entries 
+        + L2T: Level-2 Table, indexed by L1P entries 
+        + L3T: Level-3 Table, indexed by L2P entries 
+        + LFT: Leaf-Level Table, indexed by L3P entries    
+    
+    Therefore, "LnTE" can be used to refer "Entry in a Level-n Table".
+    To better identify all derived value from virtual and physical 
+    adress, we defines:
+        
+        + Virtual Address Space (VAS):
+          A set of all virtual address space that can be interpreted
+          by page table walker.
+
+        + Virtual Mappings Space (VMS):
+          A imaginary linear table compose a set of mappings that 
+          define the translation rules from virtual memory address 
+          space to physical memory address. (Note: mappings are stored 
+          in the hierarchy of page tables, however it is transparent, 
+          just as indexing into a big linear table, thus 'imaginary')
+          A VMS defines a meaningful VAS.
+
+        + Virtual Mappings Mounting Point (VM_MNT or MNT):
+          A subregion within current VAS for where the VA/PA mappings
+          of another VMS are accessible.
+
+        + Page Frame Number (PFN): 
+          Index of a page with it's base size. For most machine, it
+          is 4K. Note, this is not limited to physical address, for 
+          virtual address, this is the index of a virtual page within
+          it's VMS.
+
+        + Virtual Frame Number (VFN):
+          Index of a virtual page within it's parent page table. It's
+          range is bounded aboved by maximium number of PTEs per page
+          table
+
+    In the context of x86 archiecture (regardless x86_32 or x86_64),
+    these naming have the following projection:
+        
+        + L0T: PD           (32-Bit 2-Level paging)
+               PML4         (4-Level Paging)
+               PML5         (5-Level Paging)
+
+        + L1T: ( N/A )      (32-Bit 2-Level paging)
+               PDP          (4-Level Paging)
+               PML4         (5-Level Paging)
+        
+        + L2T: ( N/A )      (32-Bit 2-Level paging)
+               PD           (4-Level Paging)
+               PDP          (5-Level Paging)
+
+        + L3T: ( N/A )      (32-Bit 2-Level paging)
+               ( N/A )      (4-Level Paging)
+               PD           (5-Level Paging)
+
+        + LFT: Page Table   (All)
+
+        + VAS: [0, 2^32)    (32-Bit 2-Level paging)
+               [0, 2^48)    (4-Level Paging)
+               [0, 2^57)    (5-Level Paging)
+
+        + PFN (Vitrual): 
+               [0, 2^22)    (32-Bit 2-Level paging)
+               [0, 2^36)    (4-Level Paging)
+               [0, 2^45)    (5-Level Paging)
+        
+        + PFN (Physical):
+               [0, 2^32)    (x86_32)
+               [0, 2^52)    (x86_64, all paging modes)
+
+        + VFN: [0, 1024)    (32-Bit 2-Level paging)
+               [0, 512)    (4-Level Paging)
+               [0, 512)    (5-Level Paging)
+
+    In addition, we also defines VMS_{MASK|SIZE} to provide
+    information about maximium size of addressable virtual 
+    memory space (hence VMS). Which is effectively a 
+    "Level -1 Page" (i.e., _PAGE_Ln_SIZE(-1))
+
+
+*/
+
 struct __pte;
 typedef struct __pte pte_t;
 
@@ -9,6 +97,7 @@ typedef struct __pte pte_t;
 #include <sys/mm/pagetable.h>
 #include <sys/cpu.h>
 
+#define _LnTEP_AT(vm_mnt, sz)   ( ((vm_mnt) | L0T_MASK) & ~(sz) )
 #define _L0TEP_AT(vm_mnt)       ( ((vm_mnt) | L0T_MASK) & ~LFT_MASK )
 #define _L1TEP_AT(vm_mnt)       ( ((vm_mnt) | L0T_MASK) & ~L3T_MASK )
 #define _L2TEP_AT(vm_mnt)       ( ((vm_mnt) | L0T_MASK) & ~L2T_MASK )
@@ -32,15 +121,45 @@ typedef struct __pte pte_t;
     ( (pte_t*)(_VM_OF(ptep) | ((_VM_PFN_OF(ptep) * LFT_SIZE) & L0T_MASK)) )
 
 #define _has_LnT(n) (L##n##T_SIZE != LFT_SIZE)
-#define PAGETABLE_LEVEL(n) _has_LnT(n)
+#define LnT_ENABLED(n) _has_LnT(n)
+
+#define ptep_with_level(ptep, lvl_size)                 \
+    ({                                                  \
+        ptr_t __p = _LnTEP_AT(_VM_OF(ptep), lvl_size);  \
+        ((ptr_t)(ptep) & __p) == __p;                    \
+    })
 
 bool 
 pagetable_alloc(pte_t* ptep, pte_t pte);
 
+/**
+ * @brief Get the page frame number encoded in ptep
+ * 
+ * @param ptep 
+ * @return ptr_t 
+ */
 static inline ptr_t
-ptep_vm_pfn(pte_t* ptep)
+ptep_pfn(pte_t* ptep)
 {
     return _VM_PFN_OF(ptep);
+}
+
+/**
+ * @brief Get the virtual frame number encoded in ptep
+ * 
+ * @param ptep 
+ * @return ptr_t 
+ */
+static inline unsigned int
+ptep_vfn(pte_t* ptep)
+{
+    return ((ptr_t)ptep & PAGE_MASK) / sizeof(pte_t);
+}
+
+static inline ptr_t
+ptep_va(pte_t* ptep, size_t lvl_size)
+{
+    return ((ptr_t)ptep) / sizeof(pte_t) * lvl_size;
 }
 
 static inline ptr_t
@@ -227,12 +346,17 @@ l3te_index(pte_t* ptep) {
 
 static inline pfn_t
 pfn(ptr_t addr) {
-    return addr / PAGE_SIZE;
+    return (addr / PAGE_SIZE) & VMS_MASK;
 }
 
 static inline size_t
-page_count(size_t size) {
+leaf_count(size_t size) {
     return (size + PAGE_MASK) / PAGE_SIZE;
+}
+
+static inline size_t
+page_count(size_t size, size_t page_size) {
+    return (size + (page_size - 1)) / page_size;
 }
 
 static inline unsigned int
@@ -266,5 +390,33 @@ static inline pfn_t
 pfn_at(ptr_t va, size_t lvl_size) {
     return va / lvl_size;
 }
+
+
+/**
+ * @brief Shift the ptep such that it points to an
+ *        immediate lower level of page table
+ * 
+ * @param ptep 
+ * @return pte_t* 
+ */
+static inline pte_t*
+ptep_step_into(pte_t* ptep)
+{
+    return __LnTEP_SHIFT_NEXT(ptep);
+}
+
+/**
+ * @brief Shift the ptep such that it points to an
+ *        immediate upper level of page table
+ * 
+ * @param ptep 
+ * @return pte_t* 
+ */
+static inline pte_t*
+ptep_step_out(pte_t* ptep)
+{
+    return mkptep_va(_VM_OF(ptep), (ptr_t)ptep);
+}
+
 
 #endif /* __LUNAIX_PAGETABLE_H */

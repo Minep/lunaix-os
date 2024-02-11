@@ -39,7 +39,7 @@ _init_page()
     pte_t* boot_l1tep   = (pte_t*) &kpt_pa->lft_bootmap;
     pte_t pte           = mkpte((ptr_t)boot_l1tep, KERNEL_DATA);
 
-    pte_write_entry(boot_l0tep, pte);
+    set_pte(boot_l0tep, pte);
 
     // Identity map on everything <= __kboot_end (which include first 1MiB)
     pfn_t kboot_end = pfn((ptr_t)__kboot_end);
@@ -47,7 +47,7 @@ _init_page()
     pte = pte_mkleaf(pte);
     for (size_t i = 0; i < kboot_end; i++) {
         pte = pte_setpaddr(pte, page_addr(i));
-        pte_write_entry(boot_l1tep, pte);
+        set_pte(boot_l1tep, pte);
 
         boot_l1tep++;
     }
@@ -58,7 +58,7 @@ _init_page()
     pte = pte_mkroot(pte);
     for (u32_t i = 0; i < KEXEC_RSVD; i++) {
         pte = pte_setpaddr(pte, (ptr_t)&kpt_pa->kernel_lfts[i]);
-        pte_write_entry(kl0tep, pte);
+        set_pte(kl0tep, pte);
 
         kl0tep++;
     }
@@ -85,7 +85,7 @@ _init_page()
     pfn_t ktext_end = pfn(to_kphysical(__kexec_text_end));
     for (; i < ktext_end; i++) {
         pte = pte_setpaddr(pte, page_addr(i));
-        pte_write_entry(kl1tep, pte);
+        set_pte(kl1tep, pte);
 
         kl1tep++;
     }
@@ -94,7 +94,7 @@ _init_page()
     pte = pte_setprot(pte, KERNEL_DATA);
     for (; i < kimg_end; i++) {
         pte = pte_setpaddr(pte, page_addr(i));
-        pte_write_entry(kl1tep, pte);
+        set_pte(kl1tep, pte);
 
         kl1tep++;
     }
@@ -103,7 +103,7 @@ _init_page()
 
     // Build up self-reference
     pte = mkpte((ptr_t)kpt_pa, KERNEL_DATA);
-    pte_write_entry(boot_l0tep + _PAGE_LEVEL_MASK, pte_mkroot(pte));
+    set_pte(boot_l0tep + _PAGE_LEVEL_MASK, pte_mkroot(pte));
 }
 
 ptr_t boot_text

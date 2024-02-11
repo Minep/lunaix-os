@@ -20,7 +20,7 @@ boot_begin(struct boot_handoff* bhctx)
     struct boot_mmapent *mmap = bhctx->mem.mmap, *mmapent;
     for (size_t i = 0; i < bhctx->mem.mmap_len; i++) {
         mmapent = &mmap[i];
-        size_t size_pg = page_count(mmapent->size);
+        size_t size_pg = leaf_count(mmapent->size);
         pfn_t start_pfn = pfn(mmapent->start);
 
         if (mmapent->type == BOOT_MMAP_FREE) {
@@ -37,7 +37,7 @@ boot_begin(struct boot_handoff* bhctx)
         pfn_t lowmem_n = pfn(KERNEL_RESIDENT) - start_pfn;
         lowmem_n = MIN(lowmem_n, size_pg);
 
-        vmm_set_ptes_contig(ptep, pte, lowmem_n, LFT_SIZE);
+        vmm_set_ptes_contig(ptep, pte, LFT_SIZE, lowmem_n);
     }
 
     /* Reserve region for all loaded modules */

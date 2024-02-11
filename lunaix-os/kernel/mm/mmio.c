@@ -6,7 +6,9 @@
 void*
 ioremap(ptr_t paddr, u32_t size)
 {
-    void* ptr = vmap(paddr, size, PG_PREM_RW | PG_DISABLE_CACHE, 0);
+    // FIXME implement a page policy interface allow to decouple the 
+    //       arch-dependent caching behaviour
+    void* ptr = (void*)vmap(paddr, size, PG_PREM_RW);
 
     if (ptr) {
         pmm_mark_chunk_occupied(paddr >> PG_SIZE_BITS,

@@ -132,16 +132,16 @@ kmem_init(struct boot_handoff* bhctx)
     ptep = mkl0tep(ptep);
 
     do {
-#if   PAGETABLE_LEVEL(1)
+#if   LnT_ENABLED(1)
         assert(mkl1t(ptep++, 0));
-#elif PAGETABLE_LEVEL(2)
+#elif LnT_ENABLED(2)
         assert(mkl2t(ptep++, 0));
-#elif PAGETABLE_LEVEL(3)
+#elif LnT_ENABLED(3)
         assert(mkl3t(ptep++, 0));
 #else
         assert(mklft(ptep++, 0));
 #endif
-    } while (ptep_vm_pfn(ptep) + 1 < MAX_PTEN);
+    } while (va_offset((ptr_t)ptep) < MAX_PTEN - 1);
 
     // allocators
     cake_init();

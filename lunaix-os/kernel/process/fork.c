@@ -71,10 +71,10 @@ __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
         pte_t p = *src_ptep;
 
         if (guardian_page(p)) {
-            vmm_set_pte(dest_ptep, mkpte_raw(MEMGUARD));
+            set_pte(dest_ptep, mkpte_raw(MEMGUARD));
         } else {
             ptr_t ppa = vmm_dup_page(pte_paddr(p));
-            vmm_set_pte(dest_ptep, pte_setpaddr(p, ppa));
+            set_pte(dest_ptep, pte_setpaddr(p, ppa));
         }
 
         src_ptep++;

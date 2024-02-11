@@ -18,45 +18,6 @@
 #define _PAGE_LEVEL_MASK    ( _PAGE_LEVEL_SIZE - 1 )
 #define _PAGE_Ln_SIZE(n)    ( 1UL << (_PAGE_BASE_SHIFT + _PAGE_LEVEL_SHIFT * (_PTW_LEVEL - (n) - 1)) )
 
-/*
-    Defines page related attributes for different page table
-    hierarchies. In Lunaix, we define five arch-agnostic alias
-    to those arch-dependent hierarchies:
-
-        * L0T: Level-0 Table, the root page table    
-        * L1T: Level-1 Table, indexed by L0P entries 
-        * L2T: Level-2 Table, indexed by L1P entries 
-        * L3T: Level-3 Table, indexed by L2P entries 
-        * LFT: Leaf-Level Table, indexed by L3P entries    
-    
-    Therefore, "LnTE" can be used to refer "Entry in a Level-n Table"
-    In the context of x86 archiecture (regardless x86_32 or x86_64),
-    these naming have the following projection:
-        
-        * L0T: PD           (32-Bit 2-Level paging)
-               PML4         (4-Level Paging)
-               PML5         (5-Level Paging)
-
-        * L1T: ( N/A )      (32-Bit 2-Level paging)
-               PDP          (4-Level Paging)
-               PML4         (5-Level Paging)
-        
-        * L2T: ( N/A )      (32-Bit 2-Level paging)
-               PD           (4-Level Paging)
-               PDP          (5-Level Paging)
-
-        * L3T: ( N/A )      (32-Bit 2-Level paging)
-               ( N/A )      (4-Level Paging)
-               PD           (5-Level Paging)
-
-        * LFT: Page Table   (All)
-
-    In addition, we also defines VMS_{MASK|SIZE} to provide
-    information about maximium size of addressable virtual 
-    memory space (hence VMS). Which is effectively a 
-    "Level -1 Page" (i.e., _PAGE_Ln_SIZE(-1))
-*/
-
 // Note: we set VMS_SIZE = VMS_MASK as it is impossible
 //       to express 4Gi in 32bit unsigned integer
 
@@ -89,9 +50,14 @@
 
 #define PAGE_SIZE           _PAGE_BASE_SIZE
 #define PAGE_MASK           _PAGE_BASE_MASK
+#define LEVEL_SIZE          _PAGE_LEVEL_SIZE
+#define LEVEL_MASK          _PAGE_LEVEL_MASK
 
 // max PTEs number
 #define MAX_PTEN             _PAGE_LEVEL_SIZE
+
+// max translation level supported
+#define MAX_LEVEL            _PTW_LEVEL
 
 
 /* ******** PTE Manipulation ******** */
@@ -282,7 +248,7 @@ pte_dirty(pte_t pte)
 }
 
 static inline void
-pte_write_entry(pte_t* ptep, pte_t pte)
+set_pte(pte_t* ptep, pte_t pte)
 {
     ptep->val = pte.val;
 }
