@@ -18,12 +18,12 @@ inject_transfer_context(ptr_t vm_mnt, struct transfer_context* tctx)
         return false;
     }
 
-    vmm_mount_pg(PG_MOUNT_4, pte_paddr(pte));
+    mount_page(PG_MOUNT_4, pte_paddr(pte));
 
     ptr_t mount_inject = PG_MOUNT_4 + va_offset(tctx->inject);
     memcpy((void*)mount_inject, &tctx->transfer, sizeof(tctx->transfer));
     
-    vmm_unmount_pg(PG_MOUNT_4);
+    unmount_page(PG_MOUNT_4);
     return true;
 }
 

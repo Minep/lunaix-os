@@ -67,8 +67,8 @@ __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
     for (size_t i = 0; i < pfn(KSTACK_SIZE); i++) {
         pte_t p = *src_ptep;
 
-        if (guardian_page(p)) {
-            set_pte(dest_ptep, mkpte_raw(MEMGUARD));
+        if (pte_isguardian(p)) {
+            set_pte(dest_ptep, guard_pte);
         } else {
             ptr_t ppa = vmm_dup_page(pte_paddr(p));
             set_pte(dest_ptep, pte_setpaddr(p, ppa));

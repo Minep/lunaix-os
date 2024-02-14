@@ -14,4 +14,4 @@ get_qemu_options = -s -S -m 1G \
 				-drive id=cdrom,file="$(1)",readonly=on,if=none,format=raw \
 				-device ahci,id=ahci \
 				-device ide-cd,drive=cdrom,bus=ahci.0 \
-				-monitor telnet::$(QEMU_MON_PORT),server,nowait &
+				-monitor telnet::$(QEMU_MON_PORT),server,nowait,logfile=qm.log &

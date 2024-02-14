@@ -168,7 +168,7 @@ mem_map(void** addr_out,
 {
     assert_msg(addr, "addr can not be NULL");
 
-    ptr_t last_end = USR_EXEC, found_loc = PG_ALIGN(addr);
+    ptr_t last_end = USR_EXEC, found_loc = va_align(addr);
     struct mm_region *pos, *n;
 
     vm_regions_t* vm_regions = &param->pvms->regions;
@@ -215,24 +215,7 @@ found:
     region->proc_vms = param->pvms;
 
     region_add(vm_regions, region);
-
-    int proct = param->proct;
-    int attr = PG_ALLOW_USER;
-    if ((proct & REGION_WRITE)) {
-        attr |= PG_WRITE;
-    }
-    if ((proct & REGION_KERNEL)) {
-        attr &= ~PG_ALLOW_USER;
-    }
-
-    pte_t* ptep = mkptep_va(param->vms_mnt, found_loc);
-    pte_t mmap_pte = mkpte(0, USER_DATA);
-    mmap_pte = pte_mkunloaded(mmap_pte);
-
-    for (size_t i = 0; i < pfn(param->mlen); i++) {
-        set_pte(ptep++, mmap_pte);
-    }
-
+    
     if (file) {
         vfs_ref_file(file);
     }
@@ -473,7 +456,7 @@ __DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
 
     ptr_t addr_ptr = (ptr_t)addr;
 
-    if (!length || length > BS_SIZE || !PG_ALIGNED(addr_ptr)) {
+    if (!length || length > BS_SIZE || va_offset(addr_ptr)) {
         errno = EINVAL;
         goto done;
     }

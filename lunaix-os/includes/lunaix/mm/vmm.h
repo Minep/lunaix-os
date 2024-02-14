@@ -148,15 +148,18 @@ ptr_t
 vms_unmount(ptr_t mnt);
 
 static inline ptr_t 
-vmm_mount_pg(ptr_t mnt, ptr_t pa) {
+mount_page(ptr_t mnt, ptr_t pa) {
     assert(pa);
-    vmm_set_mapping(VMS_SELF, mnt, pa, KERNEL_DATA);
+    pte_t* ptep = mkptep_va(VMS_SELF, mnt);
+    set_pte(ptep, mkpte(pa, KERNEL_DATA));
+    cpu_flush_page(mnt);
     return mnt;
 }
 
 static inline ptr_t 
-vmm_unmount_pg(ptr_t mnt) {
-    vmm_del_mapping(VMS_SELF, mnt);
+unmount_page(ptr_t mnt) {
+    pte_t* ptep = mkptep_va(VMS_SELF, mnt);
+    set_pte(ptep, null_pte);
     return mnt;
 }
 

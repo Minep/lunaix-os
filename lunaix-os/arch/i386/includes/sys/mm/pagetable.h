@@ -3,6 +3,7 @@
 
 #include <lunaix/types.h>
 #include <lunaix/compiler.h>
+#include <sys/cpu.h>
 
 /* ******** Page Table Manipulation ******** */
 
@@ -77,32 +78,50 @@ typedef unsigned int pte_attr_t;
 #define _PTE_A                  (1 << 5)
 #define _PTE_D                  (1 << 6)
 #define _PTE_PS                 (1 << 7)
+#define _PTE_PAT                (1 << 7)
 #define _PTE_G                  (1 << 8)
 #define _PTE_X                  (0)
 #define _PTE_R                  (0)
 
 #define _PTE_PROT_MASK          ( _PTE_W | _PTE_U | _PTE_X )
 
-#define KERNEL_EXEC             ( _PTE_P | _PTE_X )
-#define KERNEL_DATA             ( _PTE_P | _PTE_W  )
-#define KERNEL_RDONLY           ( _PTE_P )
+#define KERNEL_PAGE             ( _PTE_P )
+#define KERNEL_EXEC             ( KERNEL_PAGE | _PTE_X )
+#define KERNEL_DATA             ( KERNEL_PAGE | _PTE_W  )
+#define KERNEL_RDONLY           ( KERNEL_PAGE )
 
-#define USER_EXEC               ( _PTE_P | _PTE_X  | _PTE_U )
-#define USER_DATA               ( _PTE_P | _PTE_W  | _PTE_U )
-#define USER_RDONLY             ( _PTE_P | _PTE_U )
+#define USER_PAGE               ( _PTE_P | _PTE_U )
+#define USER_EXEC               ( USER_PAGE | _PTE_X )
+#define USER_DATA               ( USER_PAGE | _PTE_W )
+#define USER_RDONLY             ( USER_PAGE )
 
 #define SELF_MAP                ( KERNEL_DATA | _PTE_WT | _PTE_CD )
 
-
 #define __mkpte_from(pte_val)   ((pte_t){ .val = (pte_val) })
+#define __MEMGUARD               0xdeadc0deUL
 
+#define null_pte                ( __mkpte_from(0) )
+#define guard_pte               ( __mkpte_from(__MEMGUARD) )
 #define pte_val(pte)            ( pte.val )
-#define null_pte                ( mkpte_raw(0) )
+
+
+static inline bool
+pte_isguardian(pte_t pte)
+{
+    return pte.val == __MEMGUARD;
+}
+
+static inline pte_t
+mkpte_prot(pte_attr_t prot)
+{
+    pte_attr_t attrs = (prot & _PTE_PROT_MASK) | _PTE_P;
+    return __mkpte_from(attrs);
+}
 
 static inline pte_t
 mkpte(ptr_t paddr, pte_attr_t prot)
 {
-    pte_attr_t attrs = (prot & _PTE_PROT_MASK) | _PTE_P | _PTE_PS;
+    pte_attr_t attrs = (prot & _PTE_PROT_MASK) | _PTE_P;
     return __mkpte_from((paddr & ~_PAGE_BASE_MASK) | attrs);
 }
 
@@ -150,9 +169,15 @@ pte_isnull(pte_t pte)
 }
 
 static inline pte_t
-pte_mkleaf(pte_t pte) 
+pte_mkhuge(pte_t pte) 
 {
     return __mkpte_from(pte.val | _PTE_PS);
+}
+
+static inline pte_t
+pte_mkvolatile(pte_t pte) 
+{
+    return __mkpte_from(pte.val | _PTE_WT | _PTE_CD);
 }
 
 static inline pte_t
@@ -161,8 +186,14 @@ pte_mkroot(pte_t pte)
     return __mkpte_from(pte.val & ~_PTE_PS);
 }
 
+static inline pte_t
+pte_usepat(pte_t pte) 
+{
+    return __mkpte_from(pte.val | _PTE_PAT);
+}
+
 static inline bool
-pte_isleaf(pte_t pte) 
+pte_huge(pte_t pte) 
 {
     return !!(pte.val & _PTE_PS);
 }
@@ -200,7 +231,7 @@ pte_mkwritable(pte_t pte)
 static inline bool
 pte_iswprotect(pte_t pte) 
 {
-    return !!(pte.val & _PTE_W);
+    return !(pte.val & _PTE_W);
 }
 
 static inline pte_t
@@ -268,8 +299,6 @@ set_pte(pte_t* ptep, pte_t pte)
 {
     ptep->val = pte.val;
 }
-
-
 
 
 #endif /* __LUNAIX_ARCH_PAGETABLE_H */

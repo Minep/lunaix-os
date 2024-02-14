@@ -27,10 +27,11 @@ vmm_alloc_page(pte_t* ptep, pte_t pte)
     pte = pte_mkloaded(pte);
     set_pte(ptep, pte);
 
-    pte_t* ptep_next = __LnTEP_SHIFT_NEXT(ptep);
-    cpu_flush_page((ptr_t)ptep_next);
+    mount_page(PG_MOUNT_1, pa);
+    memset((void*)PG_MOUNT_1, 0, LFT_SIZE);
+    unmount_page(PG_MOUNT_1);
 
-    memset(ptep_next, 0, LFT_SIZE);
+    cpu_flush_page((ptr_t)ptep);
 
     return pte;
 }

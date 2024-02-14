@@ -19,7 +19,7 @@ static inline void
 inject_guardian_page(ptr_t vm_mnt, ptr_t va)
 {
     pte_t* ptep = mkptep_va(vm_mnt, va);
-    set_pte(ptep, mkpte_raw(MEMGUARD));
+    set_pte(ptep, guard_pte);
 }
 
 static ptr_t
@@ -44,28 +44,20 @@ __alloc_user_thread_stack(struct proc_info* proc, struct mm_region** stack_regio
         return 0;
     }
 
-    // FIXME use latest vmm api
-    // Pre-allocate a page contains stack top, to avoid immediate trap to kernel
-    //  upon thread execution
-    ptr_t pa = pmm_alloc_page(0);
-    ptr_t stack_top = align_stack(th_stack_top + USR_STACK_SIZE - 1);
-    if (likely(pa)) {
-        vmm_set_mapping(vm_mnt, page_addr(stack_top), 
-                        pa, region_pteprot(vmr));
-    }
-
     inject_guardian_page(vm_mnt, vmr->start);
 
     *stack_region = vmr;
 
+    ptr_t stack_top = align_stack(th_stack_top + USR_STACK_SIZE - 1);
     return stack_top;
 }
 
 static ptr_t
 __alloc_kernel_thread_stack(struct proc_info* proc, ptr_t vm_mnt)
 {
+    pfn_t kstack_top = leaf_count(KSTACK_AREA_END);
     pfn_t kstack_end = pfn(KSTACK_AREA);
-    pte_t* ptep      = mkptep_va(vm_mnt, KSTACK_AREA_END);
+    pte_t* ptep      = mkptep_pn(vm_mnt, kstack_top);
     while (ptep_pfn(ptep) > kstack_end) {
         ptep -= KSTACK_PAGES;
 
@@ -87,7 +79,7 @@ found:;
         return 0;
     }
 
-    set_pte(ptep, mkpte_raw(MEMGUARD));
+    set_pte(ptep, guard_pte);
 
     pte_t pte = mkpte(pa, KERNEL_DATA);
     vmm_set_ptes_contig(ptep + 1, pte, LFT_SIZE, KSTACK_PAGES - 1);

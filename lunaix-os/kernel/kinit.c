@@ -133,13 +133,13 @@ kmem_init(struct boot_handoff* bhctx)
 
     do {
 #if   LnT_ENABLED(1)
-        assert(mkl1t(ptep++, 0));
+        assert(mkl1t(ptep++, 0, KERNEL_DATA));
 #elif LnT_ENABLED(2)
-        assert(mkl2t(ptep++, 0));
+        assert(mkl2t(ptep++, 0, KERNEL_DATA));
 #elif LnT_ENABLED(3)
-        assert(mkl3t(ptep++, 0));
+        assert(mkl3t(ptep++, 0, KERNEL_DATA));
 #else
-        assert(mklft(ptep++, 0));
+        assert(mklft(ptep++, 0, KERNEL_DATA));
 #endif
     } while (ptep_vfn(ptep) < MAX_PTEN - 1);
 

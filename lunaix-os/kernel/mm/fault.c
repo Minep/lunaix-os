@@ -35,7 +35,6 @@ fault_handle_conflict_pte(struct fault_context* fault)
         pte_t new_pte = pte_setpaddr(pte, pa);
         new_pte = pte_mkwritable(new_pte);
 
-        set_pte(fault->fault_ptep, pte);
         fault_resolved(fault, new_pte, NO_PREALLOC);
     }
 
@@ -50,7 +49,6 @@ fault_handle_anon_region(struct fault_context* fault)
     pte_attr_t prot = region_pteprot(fault->vmr);
     pte = pte_setprot(pte, prot);
 
-    set_pte(fault->fault_ptep, pte);
     fault_resolved(fault, pte, 0);
 }
 
@@ -62,13 +60,10 @@ fault_handle_named_region(struct fault_context* fault)
     struct v_file* file = vmr->mfile;
 
     pte_t pte       = fault->resolving;
-    ptr_t fault_va  = page_addr(fault->fault_va);
+    ptr_t fault_va  = va_align(fault->fault_va);
 
     u32_t mseg_off  = (fault_va - vmr->start);
     u32_t mfile_off = mseg_off + vmr->foff;
-
-    pte_attr_t prot = region_pteprot(vmr);
-    pte = pte_setprot(pte, prot);
 
     int errno = file->ops->read_page(file->inode, (void*)fault_va, mfile_off);
     if (errno < 0) {
@@ -76,15 +71,21 @@ fault_handle_named_region(struct fault_context* fault)
         return;
     }
 
+    pte_attr_t prot = region_pteprot(vmr);
+    pte = pte_setprot(pte, prot);
+
     fault_resolved(fault, pte, 0);
 }
 
 static void
 fault_handle_kernel_page(struct fault_context* fault)
 {
-    // TODO add check on faulting pointer
-    //      we must ensure only ptep fault is resolvable
-    fault_resolved(fault, pte_mkroot(fault->resolving), 0);
+    // we must ensure only ptep fault is resolvable
+    if (fault->fault_va < VMS_MOUNT_1) {
+        return;
+    }
+    
+    fault_resolved(fault, fault->resolving, 0);
     pmm_set_attr(fault->prealloc_pa, PP_FGPERSIST);
 }
 
@@ -96,7 +97,7 @@ fault_prealloc_page(struct fault_context* fault)
         return;
     }
 
-    pte_t pte = mkpte(0, KERNEL_DATA);
+    pte_t pte = mkpte_prot(KERNEL_DATA);
     
     pte = vmm_alloc_page(fault->fault_ptep, pte);
     if (pte_isnull(pte)) {
@@ -107,6 +108,7 @@ fault_prealloc_page(struct fault_context* fault)
     fault->prealloc_pa = pte_paddr(fault->resolving);
 
     pmm_set_attr(fault->prealloc_pa, 0);
+    cpu_flush_page(fault->fault_va);
 }
 
 
@@ -142,7 +144,7 @@ static bool
 __try_resolve_fault(struct fault_context* fault)
 {
     pte_t fault_pte = fault->fault_pte;
-    if (guardian_page(fault_pte)) {
+    if (pte_isguardian(fault_pte)) {
         ERROR("memory region over-running");
         return false;
     }
@@ -152,7 +154,7 @@ __try_resolve_fault(struct fault_context* fault)
         goto done;
     }
 
-    if (fault->vmr) {
+    if (!fault->vmr) {
         return false;
     }
 

@@ -36,12 +36,12 @@ _init_page()
     pte_t* kl1tep       = (pte_t*)  kpt_pa->kernel_lfts;    
     pte_t* boot_l0tep   = (pte_t*)  kpt_pa;
 
-    set_pte(boot_l0tep, mkpte(0, KERNEL_DATA));
+    set_pte(boot_l0tep, pte_mkhuge(mkpte_prot(KERNEL_DATA)));
 
     // --- 将内核重映射至高半区 ---
 
     // Hook the kernel reserved LFTs onto L0T
-    pte_t pte = mkpte_root((ptr_t)kl1tep, KERNEL_DATA);
+    pte_t pte = mkpte((ptr_t)kl1tep, KERNEL_DATA);
     
     for (u32_t i = 0; i < KEXEC_RSVD; i++) {
         pte = pte_setpaddr(pte, (ptr_t)&kpt_pa->kernel_lfts[i]);
@@ -60,8 +60,6 @@ _init_page()
     }
 
     // Now, map the kernel
-
-    pte = pte_mkleaf(pte);
 
     pfn_t kimg_end = pfn(to_kphysical(__kexec_end));
     pfn_t i = pfn(to_kphysical(__kexec_text_start));
@@ -90,7 +88,7 @@ _init_page()
 
     // Build up self-reference
     pte = mkpte_root((ptr_t)kpt_pa, KERNEL_DATA);
-    set_pte(boot_l0tep + _PAGE_LEVEL_MASK, pte_mkroot(pte));
+    set_pte(boot_l0tep + _PAGE_LEVEL_MASK, pte);
 }
 
 ptr_t boot_text

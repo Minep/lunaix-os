@@ -7,8 +7,6 @@
 #define KSTACK_PAGES            3
 #define KSTACK_SIZE             (KSTACK_PAGES * MEM_PAGE)
 
-#define MEMGUARD                0xdeadc0deUL
-
 /*
     Regardless architecture we need to draw the line very carefully, and must 
     take the size of VM into account. In general, we aims to achieve 
@@ -28,7 +26,6 @@
 #define KEXEC_RSVD              16
 
 #define kernel_addr(addr)       ((addr) >= KERNEL_RESIDENT)
-#define guardian_page(pte)      (pte_val(pte) == MEMGUARD)
 
 #define to_kphysical(k_va)      ((ptr_t)(k_va) - KERNEL_RESIDENT)
 #define to_kvirtual(k_pa)       ((ptr_t)(k_pa) - KERNEL_RESIDENT)

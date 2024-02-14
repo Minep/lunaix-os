@@ -38,6 +38,10 @@ class PageTableHelperBase:
     @staticmethod
     def vaddr_width():
         raise NotImplementedError()
+    
+    @staticmethod
+    def pte_size():
+        raise NotImplementedError()
 
 class PageTableHelper32(PageTableHelperBase):
     @staticmethod
@@ -45,8 +49,12 @@ class PageTableHelper32(PageTableHelperBase):
         return [0, 1][level]
     
     @staticmethod
+    def pgtable_len():
+        return (1 << 10)
+    
+    @staticmethod
     def translation_shift_bits(level):
-        return [9, 0][level] + 12
+        return [10, 0][level] + 12
     
     @staticmethod
     def mapping_present(pte):
@@ -96,6 +104,10 @@ class PageTableHelper32(PageTableHelperBase):
     @staticmethod
     def vaddr_width():
         return 32
+    
+    @staticmethod
+    def pte_size():
+        return 4
 
 class PageTableHelper64(PageTableHelperBase):
     pass

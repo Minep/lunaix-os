@@ -10,7 +10,7 @@
         + L1T: Level-1 Table, indexed by L0P entries 
         + L2T: Level-2 Table, indexed by L1P entries 
         + L3T: Level-3 Table, indexed by L2P entries 
-        + LFT: Leaf-Level Table, indexed by L3P entries    
+        + LFT: Leaf-Level Table (Level-4), indexed by L3P entries    
     
     Therefore, "LnTE" can be used to refer "Entry in a Level-n Table".
     Consequently, we can further define 
@@ -139,14 +139,13 @@ pte_t
 vmm_alloc_page(pte_t* ptep, pte_t pte);
 
 static inline bool
-__alloc_level(pte_t* ptep, pte_t pte)
+__alloc_level(pte_t* ptep, pte_t pte, pte_attr_t prot)
 {
     if (!pte_isnull(pte)) {
         return true;
     }
 
-    pte = pte_mkroot(pte);
-    pte = pte_setprot(pte, KERNEL_DATA);
+    pte = pte_setprot(pte, prot);
     return !pte_isnull(vmm_alloc_page(ptep, pte));
 }
 
@@ -242,7 +241,7 @@ mkl3tep(pte_t* ptep)
  * @return pte_t* 
  */
 static inline pte_t*
-mkl1t(pte_t* l0t_ptep, ptr_t va)
+mkl1t(pte_t* l0t_ptep, ptr_t va, pte_attr_t prot)
 {
 #if _has_LnT(1)
     if (!l0t_ptep) {
@@ -251,12 +250,13 @@ mkl1t(pte_t* l0t_ptep, ptr_t va)
 
     pte_t pte = pte_unref(l0t_ptep);
     
-    if (pte_isleaf(pte)) {
+    if (pte_huge(pte)) {
         return l0t_ptep;
     }
     
-    return __alloc_level(l0t_ptep, pte) ? __LnTEP(l0t_ptep, va, 1) 
-                                          : NULL;
+    return __alloc_level(l0t_ptep, pte, prot) 
+                ? __LnTEP(l0t_ptep, va, 1) 
+                : NULL;
 #else
     return l0t_ptep;
 #endif
@@ -270,7 +270,7 @@ mkl1t(pte_t* l0t_ptep, ptr_t va)
  * @return pte_t* 
  */
 static inline pte_t*
-mkl2t(pte_t* l1t_ptep, ptr_t va)
+mkl2t(pte_t* l1t_ptep, ptr_t va, pte_attr_t prot)
 {
 #if _has_LnT(2)
     if (!l1t_ptep) {
@@ -279,12 +279,13 @@ mkl2t(pte_t* l1t_ptep, ptr_t va)
 
     pte_t pte = pte_unref(l1t_ptep);
     
-    if (pte_isleaf(pte)) {
+    if (pte_huge(pte)) {
         return l1t_ptep;
     }
 
-    return __alloc_level(l1t_ptep, pte) ? __LnTEP(l1t_ptep, va, 2) 
-                                          : NULL;
+    return __alloc_level(l1t_ptep, pte, prot) 
+                ? __LnTEP(l1t_ptep, va, 2) 
+                : NULL;
 #else
     return l1t_ptep;
 #endif
@@ -298,7 +299,7 @@ mkl2t(pte_t* l1t_ptep, ptr_t va)
  * @return pte_t* 
  */
 static inline pte_t*
-mkl3t(pte_t* l2t_ptep, ptr_t va)
+mkl3t(pte_t* l2t_ptep, ptr_t va, pte_attr_t prot)
 {
 #if _has_LnT(3)
     if (!l2t_ptep) {
@@ -307,12 +308,13 @@ mkl3t(pte_t* l2t_ptep, ptr_t va)
  
     pte_t pte = pte_unref(l2t_ptep);
     
-    if (pte_isleaf(pte)) {
+    if (pte_huge(pte)) {
         return l2t_ptep;
     }
 
-    return __alloc_level(l2t_ptep, pte) ? __LnTEP(l2t_ptep, va, 3) 
-                                          : NULL;
+    return __alloc_level(l2t_ptep, pte, prot) 
+                ? __LnTEP(l2t_ptep, va, 3) 
+                : NULL;
 #else
     return l2t_ptep;
 #endif
@@ -326,7 +328,7 @@ mkl3t(pte_t* l2t_ptep, ptr_t va)
  * @return pte_t* 
  */
 static inline pte_t*
-mklft(pte_t* l3t_ptep, ptr_t va)
+mklft(pte_t* l3t_ptep, ptr_t va, pte_attr_t prot)
 {
     if (!l3t_ptep) {
         return NULL;
@@ -334,12 +336,13 @@ mklft(pte_t* l3t_ptep, ptr_t va)
 
     pte_t pte = pte_unref(l3t_ptep);
     
-    if (pte_isleaf(pte)) {
+    if (pte_huge(pte)) {
         return l3t_ptep;
     }
 
-    return __alloc_level(l3t_ptep, pte) ? __LnTEP(l3t_ptep, va, F) 
-                                        : NULL;
+    return __alloc_level(l3t_ptep, pte, prot) 
+                ? __LnTEP(l3t_ptep, va, F) 
+                : NULL;
 }
 
 static inline pte_t*
@@ -477,7 +480,13 @@ ptep_step_out(pte_t* ptep)
 static inline pte_t*
 mkl0tep_va(ptr_t mnt, ptr_t va)
 {
-    return mkl1tep(mkptep_va(mnt, va));
+    return mkl0tep(mkptep_va(mnt, va));
+}
+
+static inline bool
+pt_last_level(int level)
+{
+    return level == _PTW_LEVEL - 1;
 }
 
 #endif /* __LUNAIX_PAGETABLE_H */

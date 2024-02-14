@@ -30,11 +30,12 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
     pte_t* ptep         = mkl0tep(mkptep_va(src_mnt, 0));
     pte_t* ptep_kernel  = mkl0tep(mkptep_va(src_mnt, KERNEL_RESIDENT));
 
-    // Build the self-reference on dest vms, it will create the required
-    // L0T page table automatically. (one page fault)
-    pte_t* vms_dest     =  mkptep_va(VMS_SELF, (ptr_t)ptep_dest);
-    pte_t vms_dest_pte  = *mkptep_va(VMS_SELF, (ptr_t)vms_dest);
-    set_pte(vms_dest, vms_dest_pte);
+    // Build the self-reference on dest vms
+    pte_t* ptep_sms     = mkptep_va(VMS_SELF, (ptr_t)ptep_dest);
+    pte_t* ptep_ssm     = mkptep_va(VMS_SELF, (ptr_t)ptep_sms);
+    pte_t  pte_sms      = mkpte_prot(KERNEL_DATA);
+
+    set_pte(ptep_sms, vmm_alloc_page(ptep_ssm, pte_sms));
 
     if (only_kernel) {
         ptep = ptep_kernel;
@@ -54,7 +55,7 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
             goto cont;
         } 
         
-        if (pte_isleaf(pte)) {
+        if (pt_last_level(level) || pte_huge(pte)) {
             set_pte(ptep_dest, pte);
             pmm_ref_page(pa);
         }
@@ -64,7 +65,7 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
             ptep_dest = ptep_step_out(ptep_dest);
             level--;
         }
-        else if (level < MAX_LEVEL - 1) {
+        else if (!pt_last_level(level)) {
             vmm_alloc_page(ptep_dest, pte);
 
             ptep = ptep_step_into(ptep);
@@ -114,7 +115,7 @@ vmsfree(ptr_t vm_mnt)
             goto cont;
         } 
 
-        if (pte_isleaf(pte)) {
+        if (pt_last_level(level) || pte_huge(pte)) {
             pmm_free_any(pa);
             goto cont;
         } 

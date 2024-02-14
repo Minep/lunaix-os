@@ -32,6 +32,9 @@ __alloc_contig_ptes(pte_t* ptep, size_t base_sz, int n)
 
         if (ptep_vfn(ptep) + 1 == LEVEL_SIZE) {
             ptep = ptep_step_out(ptep + 1);
+            va += sz;
+            
+            sz = sz * LEVEL_SIZE;
             continue;
         }
         

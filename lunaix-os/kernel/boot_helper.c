@@ -19,9 +19,10 @@ boot_begin(struct boot_handoff* bhctx)
     
     // Identity-map the first 3GiB address spaces
     pte_t* ptep  = mkl0tep(mkptep_va(VMS_SELF, 0));
-    pte_t pte    = mkpte(0, KERNEL_DATA);
+    pte_t pte    = mkpte_prot(KERNEL_DATA);
     size_t count = page_count(KERNEL_RESIDENT, L0T_SIZE);
-    vmm_set_ptes_contig(ptep, pte, L0T_SIZE, count);
+
+    vmm_set_ptes_contig(ptep, pte_mkhuge(pte), L0T_SIZE, count);
 
     struct boot_mmapent *mmap = bhctx->mem.mmap, *mmapent;
     for (size_t i = 0; i < bhctx->mem.mmap_len; i++) {
