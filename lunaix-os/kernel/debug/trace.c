@@ -148,7 +148,12 @@ trace_printstack_of(ptr_t fp)
 void
 trace_printstack()
 {
-    trace_printstack_of(abi_get_callframe());
+    if (current_thread) {
+        trace_printstack_isr(current_thread->intr_ctx);
+    }
+    else {
+        trace_printstack_of(abi_get_callframe());
+    }
 }
 
 static void

@@ -127,7 +127,7 @@ __fail_to_resolve(struct fault_context* fault)
 
     trace_printstack_isr(fault->ictx);
 
-    if (fault->kernel_address) {
+    if (fault->kernel_vmfault) {
         FATAL("[page fault on kernel]");
         unreachable;
     }
@@ -149,7 +149,7 @@ __try_resolve_fault(struct fault_context* fault)
         return false;
     }
 
-    if (fault->kernel_address) {
+    if (fault->kernel_vmfault) {
         fault_handle_kernel_page(fault);
         goto done;
     }
@@ -187,7 +187,7 @@ intr_routine_page_fault(const isr_param* param)
 
     struct fault_context fault = { .ictx = param };
 
-    if (!arch_fault_get_context(&fault)) {
+    if (!fault_populate_core_state(&fault)) {
         __fail_to_resolve(&fault);
     }
 

@@ -151,25 +151,3 @@ vms_unmount(ptr_t mnt)
     cpu_flush_page(mnt);
     return mnt;
 }
-
-ptr_t
-vmm_dup_page(ptr_t pa)
-{
-    // FIXME use latest vmm api
-    ptr_t new_ppg = pmm_alloc_page(0);
-    vmm_set_mapping(VMS_SELF, PG_MOUNT_3, new_ppg, KERNEL_DATA);
-    vmm_set_mapping(VMS_SELF, PG_MOUNT_4, pa, KERNEL_DATA);
-
-    // FIXME Arch-dependent feature
-    asm volatile("movl %1, %%edi\n"
-                 "movl %2, %%esi\n"
-                 "rep movsl\n" ::"c"(1024),
-                 "r"(PG_MOUNT_3),
-                 "r"(PG_MOUNT_4)
-                 : "memory", "%edi", "%esi");
-
-    vmm_del_mapping(VMS_SELF, PG_MOUNT_3);
-    vmm_del_mapping(VMS_SELF, PG_MOUNT_4);
-
-    return new_ppg;
-}

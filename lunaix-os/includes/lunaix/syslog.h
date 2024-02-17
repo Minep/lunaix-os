@@ -36,7 +36,7 @@
 #define FATAL(fmt, ...)                                                        \
     ({                                                                         \
         kprintf(KFATAL fmt, ##__VA_ARGS__);                                    \
-        fail("critical failure");                                              \
+        fail(fmt);                                                             \
     })
 
 void

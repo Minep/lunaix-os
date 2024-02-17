@@ -167,19 +167,19 @@ set_current_executing(struct thread* thread)
 static inline struct proc_mm* 
 vmspace(struct proc_info* proc) 
 {
-    return proc->mm;
+    return proc ? proc->mm : NULL;
 }
 
 static inline ptr_t
 vmroot(struct proc_info* proc) 
 {
-    return proc->mm->vmroot;
+    return proc ? proc->mm->vmroot : 0;
 }
 
 static inline vm_regions_t* 
 vmregions(struct proc_info* proc) 
 {
-    return &proc->mm->regions;
+    return proc ? &proc->mm->regions : NULL;
 }
 
 static inline void
@@ -302,7 +302,7 @@ struct thread*
 alloc_thread(struct proc_info* process);
 
 void
-destory_thread(ptr_t vm_mnt, struct thread* thread);
+destory_thread(struct thread* thread);
 
 void
 terminate_thread(struct thread* thread, ptr_t val);
@@ -311,26 +311,26 @@ void
 terminate_current_thread(ptr_t val);
 
 struct thread*
-create_thread(struct proc_info* proc, ptr_t vm_mnt, bool with_ustack);
+create_thread(struct proc_info* proc, bool with_ustack);
 
 void
-start_thread(struct thread* th, ptr_t vm_mnt, ptr_t entry);
+start_thread(struct thread* th, ptr_t entry);
 
 static inline void
 spawn_kthread(ptr_t entry) {
     assert(kernel_process(__current));
 
-    struct thread* th = create_thread(__current, VMS_SELF, false);
+    struct thread* th = create_thread(__current, false);
     
     assert(th);
-    start_thread(th, VMS_SELF, entry);
+    start_thread(th, entry);
 }
 
 void 
 exit_thread(void* val);
 
 void
-thread_release_mem(struct thread* thread, ptr_t vm_mnt);
+thread_release_mem(struct thread* thread);
 
 /* 
     ========= Signal =========

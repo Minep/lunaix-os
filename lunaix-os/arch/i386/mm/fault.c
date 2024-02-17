@@ -49,10 +49,19 @@ __unpack_fault_address(struct fault_context* context, ptr_t fault_ptr)
     pte_t* ptep = (pte_t*)fault_ptr;
     ptr_t mnt = ptep_vm_mnt(ptep);
     
+    if (__current)
+        context->mm = vmspace(__current);
+
     if (mnt < VMS_MOUNT_1) 
         return fault_ptr;
 
     context->ptep_fault = true;
+    context->remote_fault = (mnt != VMS_SELF);
+    
+    if (context->remote_fault && context->mm) {
+        assert(context->mm->guest_mm);
+        context->mm = context->mm->guest_mm;
+    }
 
 #if LnT_ENABLED(1)
     ptep = (pte_t*)page_addr(ptep_pfn(ptep));
@@ -84,7 +93,7 @@ __unpack_fault_address(struct fault_context* context, ptr_t fault_ptr)
 
 // TODO refactor this, not everything down there are arch-dependent!
 bool
-arch_fault_get_context(struct fault_context* context)
+fault_populate_core_state(struct fault_context* context)
 {
     isr_param* ictx = context->ictx;
     ptr_t ptr = cpu_ldeaddr();
@@ -94,7 +103,7 @@ arch_fault_get_context(struct fault_context* context)
 
     ptr_t refva = __unpack_fault_address(context, ptr);
 
-    bool kernel_address   = kernel_addr(ptr);
+    bool kernel_vmfault   = kernel_addr(ptr);
     bool kernel_refaddr   = kernel_addr(refva);
     pte_t* fault_ptep     = mkptep_va(VMS_SELF, ptr);
     fault_ensure_ptep_hierarchy(fault_ptep, ptr, kernel_refaddr);
@@ -112,22 +121,22 @@ arch_fault_get_context(struct fault_context* context)
     if (context->ptep_fault && !kernel_refaddr) {
         // for a ptep fault, the resolved pte should match the encoded address
         context->resolving = pte_setprot(fault_pte, USER_DATA);
-    }
-    else {
+    } else {
         context->resolving = pte_setprot(fault_pte, KERNEL_DATA);
     }
 
-    context->kernel_address = kernel_address;
+    context->kernel_vmfault = kernel_vmfault;
 
-    if (!__current) {
+    if (kernel_refaddr) {
         return true;
     }
 
-    vm_regions_t* vmr = vmregions(__current);
+    assert(context->mm);
+    vm_regions_t* vmr = &context->mm->regions;
     context->vmr = region_get(vmr, ptr);
 
     if (!context->vmr) {
-        return kernel_address;
+        return kernel_vmfault;
     }
 
     return true;

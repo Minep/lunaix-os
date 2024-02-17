@@ -468,7 +468,8 @@ ptep_step_into(pte_t* ptep)
 static inline pte_t*
 ptep_step_out(pte_t* ptep)
 {
-    return mkptep_va(_VM_OF(ptep), (ptr_t)ptep);
+    ptr_t unshifted = (ptr_t)mkptep_pn(VMS_SELF, ptep_pfn(ptep));
+    return mkptep_va(_VM_OF(ptep), unshifted);
 }
 
 /**

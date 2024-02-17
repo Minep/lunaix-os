@@ -28,6 +28,7 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
 {
     pte_t* ptep_dest    = mkl0tep(mkptep_va(dest_mnt, 0));
     pte_t* ptep         = mkl0tep(mkptep_va(src_mnt, 0));
+    pte_t* ptepd_kernel = mkl0tep(mkptep_va(dest_mnt, KERNEL_RESIDENT));
     pte_t* ptep_kernel  = mkl0tep(mkptep_va(src_mnt, KERNEL_RESIDENT));
 
     // Build the self-reference on dest vms
@@ -60,13 +61,9 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
         
         if (pt_last_level(level) || pte_huge(pte)) {
             set_pte(ptep_dest, pte);
-            pmm_ref_page(pa);
-        }
-        
-        if (ptep_vfn(ptep) == MAX_PTEN - 1) {
-            ptep = ptep_step_out(ptep);
-            ptep_dest = ptep_step_out(ptep_dest);
-            level--;
+            
+            if (pte_isloaded(pte))
+                pmm_ref_page(pa);
         }
         else if (!pt_last_level(level)) {
             vmm_alloc_page(ptep_dest, pte);
@@ -77,6 +74,13 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
 
             continue;
         }
+        
+        if (ptep_vfn(ptep) == MAX_PTEN - 1) {
+            assert(level > 0);
+            ptep = ptep_step_out(ptep);
+            ptep_dest = ptep_step_out(ptep_dest);
+            level--;
+        }
 
     cont:
         ptep++;
@@ -85,6 +89,7 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
 
     // Ensure we step back to L0T
     assert(!level);
+    assert(ptep_dest == ptepd_kernel);
     
     // Carry over the kernel (exclude last two entry)
     while (ptep_vfn(ptep) < MAX_PTEN - 2) {
@@ -144,42 +149,109 @@ vmsfree(ptr_t vm_mnt)
     pmm_free_any(self_pa);
 }
 
-void
-procvm_dup_and_mount(ptr_t mnt, struct proc_info* proc) {
-   struct proc_mm* mm = vmspace(proc);
-   struct proc_mm* mm_current = vmspace(__current);
-   
-   mm->heap = mm_current->heap;
-   mm->vmroot = vmscpy(mnt, VMS_SELF, false);
-   
-   region_copy_mm(mm_current, mm);
-}
-
-void
-procvm_init_and_mount(ptr_t mnt, struct proc_info* proc)
+static inline void
+__attach_to_current_vms(struct proc_mm* guest_mm)
 {
-    struct proc_mm* mm = vmspace(proc);
-    mm->vmroot = vmscpy(mnt, VMS_SELF, true);
+    struct proc_mm* mm_current = vmspace(__current);
+    if (mm_current) {
+        assert(!mm_current->guest_mm);
+        mm_current->guest_mm = guest_mm;
+    }
 }
 
 void
-procvm_cleanup(ptr_t vm_mnt, struct proc_info* proc) {
+procvm_dupvms_mount(struct proc_mm* mm) {
+    assert(__current);
+    assert(!mm->vm_mnt);
+
+    struct proc_mm* mm_current = vmspace(__current);
+    
+    __attach_to_current_vms(mm);
+   
+    mm->heap = mm_current->heap;
+    mm->vm_mnt = VMS_MOUNT_1;
+    mm->vmroot = vmscpy(VMS_MOUNT_1, VMS_SELF, false);
+    
+    region_copy_mm(mm_current, mm);
+}
+
+void
+procvm_mount(struct proc_mm* mm)
+{
+    assert(!mm->vm_mnt);
+    assert(mm->vmroot);
+
+    vms_mount(VMS_MOUNT_1, mm->vmroot);
+
+    __attach_to_current_vms(mm);
+
+    mm->vm_mnt = VMS_MOUNT_1;
+}
+
+void
+procvm_unmount(struct proc_mm* mm)
+{
+    assert(mm->vm_mnt);
+
+    vms_unmount(VMS_MOUNT_1);
+    struct proc_mm* mm_current = vmspace(__current);
+    if (mm_current) {
+        mm_current->guest_mm = NULL;
+    }
+
+    mm->vm_mnt = 0;
+}
+
+void
+procvm_initvms_mount(struct proc_mm* mm)
+{
+    assert(!mm->vm_mnt);
+
+    __attach_to_current_vms(mm);
+
+    mm->vm_mnt = VMS_MOUNT_1;
+    mm->vmroot = vmscpy(VMS_MOUNT_1, VMS_SELF, true);
+}
+
+void
+procvm_unmount_release(struct proc_mm* mm) {
+    ptr_t vm_mnt = mm->vm_mnt;
     struct mm_region *pos, *n;
-    llist_for_each(pos, n, vmregions(proc), head)
+    llist_for_each(pos, n, &mm->regions, head)
     {
         mem_sync_pages(vm_mnt, pos, pos->start, pos->end - pos->start, 0);
         region_release(pos);
     }
 
-    vfree(proc->mm);
-
+    vfree(mm);
     vmsfree(vm_mnt);
+    vms_unmount(vm_mnt);
+}
+
+void
+procvm_mount_self(struct proc_mm* mm) 
+{
+    assert(!mm->vm_mnt);
+    assert(!mm->guest_mm);
+
+    mm->vm_mnt = VMS_SELF;
+}
+
+void
+procvm_unmount_self(struct proc_mm* mm)
+{
+    assert(mm->vm_mnt == VMS_SELF);
+
+    mm->vm_mnt = 0;
 }
 
 ptr_t
 procvm_enter_remote(struct remote_vmctx* rvmctx, struct proc_mm* mm, 
-                    ptr_t vm_mnt, ptr_t remote_base, size_t size)
+                    ptr_t remote_base, size_t size)
 {
+    ptr_t vm_mnt = mm->vm_mnt;
+    assert(vm_mnt);
+    
     pfn_t size_pn = pfn(size + MEM_PAGE);
     assert(size_pn < REMOTEVM_MAX_PAGES);
 
@@ -233,7 +305,7 @@ procvm_copy_remote_transaction(struct remote_vmctx* rvmctx,
 }
 
 void
-procvm_exit_remote_transaction(struct remote_vmctx* rvmctx)
+procvm_exit_remote(struct remote_vmctx* rvmctx)
 {
     pte_t* lptep = mkptep_va(VMS_SELF, rvmctx->local_mnt);
     vmm_unset_ptes(lptep, rvmctx->page_cnt);

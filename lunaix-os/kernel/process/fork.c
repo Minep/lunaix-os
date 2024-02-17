@@ -60,6 +60,7 @@ static void
 __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
 {
     ptr_t kstack_pn = pfn(current_thread->kstack);
+    kstack_pn -= pfn(KSTACK_SIZE) - 1;
 
     // copy the kernel stack
     pte_t* src_ptep = mkptep_pn(VMS_SELF, kstack_pn);
@@ -165,12 +166,13 @@ dup_proc()
 
     __dup_fdtable(pcb);
 
-    procvm_dup_and_mount(VMS_MOUNT_1, pcb);
+    struct proc_mm* mm = vmspace(pcb);
+    procvm_dupvms_mount(mm);
 
     struct thread* main_thread = dup_active_thread(VMS_MOUNT_1, pcb);
     if (!main_thread) {
         syscall_result(ENOMEM);
-        vms_unmount(VMS_MOUNT_1);
+        procvm_unmount(mm);
         delete_process(pcb);
         return -1;
     }
@@ -182,7 +184,7 @@ dup_proc()
         region_maybe_cow(pos);
     }
 
-    vms_unmount(VMS_MOUNT_1);
+    procvm_unmount(mm);
 
     commit_process(pcb);
     commit_thread(main_thread);

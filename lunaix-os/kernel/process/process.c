@@ -61,21 +61,22 @@ int
 spawn_process(struct thread** created, ptr_t entry, bool with_ustack) 
 {
     struct proc_info* kproc = alloc_process();
+    struct proc_mm* mm = vmspace(kproc);
 
-    procvm_init_and_mount(VMS_MOUNT_1, kproc);
+    procvm_initvms_mount(mm);
     
-    struct thread* kthread = create_thread(kproc, VMS_MOUNT_1, with_ustack);
+    struct thread* kthread = create_thread(kproc, with_ustack);
 
     if (!kthread) {
-        vms_unmount(VMS_MOUNT_1);
+        procvm_unmount(mm);
         delete_process(kproc);
         return -1;
     }
 
     commit_process(kproc);
-    start_thread(kthread, VMS_MOUNT_1, entry);
+    start_thread(kthread, entry);
 
-    vms_unmount(VMS_MOUNT_1);
+    procvm_unmount(mm);
 
     if (created) {
         *created = kthread;
@@ -90,15 +91,16 @@ spawn_process_usr(struct thread** created, char* path,
 {
     // FIXME remote injection of user stack not yet implemented
 
-    struct proc_info* proc = alloc_process();
+    struct proc_info* proc   = alloc_process();
+    struct proc_mm*   mm     = vmspace(proc);
     
     assert(!kernel_process(proc));
 
-    procvm_init_and_mount(VMS_MOUNT_1, proc);
+    procvm_initvms_mount(mm);
 
     int errno = 0;
     struct thread* main_thread;
-    if (!(main_thread = create_thread(proc, VMS_MOUNT_1, true))) {
+    if (!(main_thread = create_thread(proc, true))) {
         errno = ENOMEM;
         goto fail;
     }
@@ -110,17 +112,17 @@ spawn_process_usr(struct thread** created, char* path,
     }
 
     commit_process(proc);
-    start_thread(main_thread, VMS_MOUNT_1, container.exe.entry);
+    start_thread(main_thread, container.exe.entry);
 
     if (created) {
         *created = main_thread;
     }
 
-    vms_unmount(VMS_MOUNT_1);
+    procvm_unmount(mm);
     return 0;
 
 fail:
-    vms_unmount(VMS_MOUNT_1);
+    procvm_unmount(mm);
     delete_process(proc);
     return errno;
 }

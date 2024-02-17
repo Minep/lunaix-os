@@ -3,6 +3,7 @@
 
 #include <lunaix/mm/mm.h>
 #include <lunaix/pcontext.h>
+#include <lunaix/mm/procvm.h>
 
 #define RESOLVE_OK      ( 0b000001 )
 #define NO_PREALLOC     ( 0b000010 )
@@ -24,15 +25,18 @@ struct fault_context
     ptr_t prealloc_pa;
 
     
-    bool kernel_address:1;      // faulting address that is kernel
-    bool ptep_fault:1;          // faulting address is a ptep
+    bool kernel_vmfault:1;          // faulting address that is kernel
+    bool kernel_ref_vmfault:1;      // referenced faulting address is kernel
+    bool ptep_fault:1;              // faulting address is a ptep
+    bool remote_fault:1;            // referenced faulting address is remote vms
     struct mm_region* vmr;
+    struct proc_mm* mm;
 
     int resolve_type;
 };
 
 bool
-arch_fault_get_context(struct fault_context* context);
+fault_populate_core_state(struct fault_context* context);
 
 static inline void
 fault_resolved(struct fault_context* fault, pte_t resolved, int flags)

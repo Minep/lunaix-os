@@ -82,8 +82,15 @@ found:;
 }
 
 void
-thread_release_mem(struct thread* thread, ptr_t vm_mnt)
+thread_release_mem(struct thread* thread)
 {
+    struct proc_mm* mm = vmspace(thread->process);
+    ptr_t vm_mnt = mm->vm_mnt;
+
+    // Ensure we have mounted and not self-mounted
+    assert(vm_mnt);
+    assert(thread != thread->process->th_active);
+
     pte_t* ptep = mkptep_va(vm_mnt, thread->kstack);
     
     ptep -= KSTACK_PAGES + 1;
@@ -98,8 +105,12 @@ thread_release_mem(struct thread* thread, ptr_t vm_mnt)
 }
 
 struct thread*
-create_thread(struct proc_info* proc, ptr_t vm_mnt, bool with_ustack)
+create_thread(struct proc_info* proc, bool with_ustack)
 {
+    struct proc_mm* mm = vmspace(proc);
+    assert(mm->vm_mnt);
+
+    ptr_t vm_mnt = mm->vm_mnt;
     struct mm_region* ustack_region = NULL;
     if (with_ustack && 
         !(__alloc_user_thread_stack(proc, &ustack_region, vm_mnt))) 
@@ -125,9 +136,12 @@ create_thread(struct proc_info* proc, ptr_t vm_mnt, bool with_ustack)
 }
 
 void
-start_thread(struct thread* th, ptr_t vm_mnt, ptr_t entry)
+start_thread(struct thread* th, ptr_t entry)
 {
     assert(th && entry);
+    struct proc_mm* mm = vmspace(th->process);
+
+    assert(mm->vm_mnt);
     
     struct transfer_context transfer;
     if (!kernel_addr(entry)) {
@@ -143,7 +157,7 @@ start_thread(struct thread* th, ptr_t vm_mnt, ptr_t entry)
         thread_create_kernel_transfer(&transfer, th->kstack, entry);
     }
 
-    inject_transfer_context(vm_mnt, &transfer);
+    inject_transfer_context(mm->vm_mnt, &transfer);
     th->intr_ctx = (isr_param*)transfer.inject;
 
     commit_thread(th);
@@ -171,12 +185,12 @@ thread_find(struct proc_info* proc, tid_t tid)
 __DEFINE_LXSYSCALL4(int, th_create, tid_t*, tid, struct uthread_info*, thinfo, 
                                     void*, entry, void*, param)
 {
-    struct thread* th = create_thread(__current, VMS_SELF, true);
+    struct thread* th = create_thread(__current, true);
     if (!th) {
         return EAGAIN;
     }
 
-    start_thread(th, VMS_SELF, (ptr_t)entry);
+    start_thread(th, (ptr_t)entry);
 
     ptr_t ustack_top = th->ustack_top;
     *((void**)ustack_top) = param;
@@ -220,7 +234,7 @@ __DEFINE_LXSYSCALL2(int, th_join, tid_t, tid, void**, val_ptr)
         *val_ptr = (void*)th->exit_val;
     }
 
-    destory_thread(VMS_SELF, th);
+    destory_thread(th);
 
     return 0;
 }
