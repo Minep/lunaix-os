@@ -35,7 +35,10 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
     pte_t* ptep_ssm     = mkptep_va(VMS_SELF, (ptr_t)ptep_sms);
     pte_t  pte_sms      = mkpte_prot(KERNEL_DATA);
 
-    set_pte(ptep_sms, vmm_alloc_page(ptep_ssm, pte_sms));
+    pte_sms = vmm_alloc_page(ptep_ssm, pte_sms);
+    set_pte(ptep_sms, pte_sms);    
+    
+    cpu_flush_page((ptr_t)dest_mnt);
 
     if (only_kernel) {
         ptep = ptep_kernel;

@@ -15,13 +15,6 @@
 
 LOG_MODULE("THREAD")
 
-static inline void 
-inject_guardian_page(ptr_t vm_mnt, ptr_t va)
-{
-    pte_t* ptep = mkptep_va(vm_mnt, va);
-    set_pte(ptep, guard_pte);
-}
-
 static ptr_t
 __alloc_user_thread_stack(struct proc_info* proc, struct mm_region** stack_region, ptr_t vm_mnt)
 {
@@ -44,7 +37,7 @@ __alloc_user_thread_stack(struct proc_info* proc, struct mm_region** stack_regio
         return 0;
     }
 
-    inject_guardian_page(vm_mnt, vmr->start);
+    set_pte(mkptep_va(vm_mnt, vmr->start), guard_pte);
 
     *stack_region = vmr;
 

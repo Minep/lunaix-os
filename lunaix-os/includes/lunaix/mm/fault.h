@@ -15,6 +15,7 @@ struct fault_context
     pte_t fault_pte;
     ptr_t fault_pa;
     ptr_t fault_va;
+    ptr_t fault_refva;
     ptr_t fault_data;
     ptr_t fault_instn;
 
@@ -22,7 +23,9 @@ struct fault_context
 
     ptr_t prealloc_pa;
 
-    bool kernel_fault;
+    
+    bool kernel_address:1;      // faulting address that is kernel
+    bool ptep_fault:1;          // faulting address is a ptep
     struct mm_region* vmr;
 
     int resolve_type;

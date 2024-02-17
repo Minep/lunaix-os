@@ -97,9 +97,9 @@ fault_prealloc_page(struct fault_context* fault)
         return;
     }
 
-    pte_t pte = mkpte_prot(KERNEL_DATA);
+    pte_t pte;
     
-    pte = vmm_alloc_page(fault->fault_ptep, pte);
+    pte = vmm_alloc_page(fault->fault_ptep, fault->resolving);
     if (pte_isnull(pte)) {
         return;
     }
@@ -127,7 +127,7 @@ __fail_to_resolve(struct fault_context* fault)
 
     trace_printstack_isr(fault->ictx);
 
-    if (fault->kernel_fault) {
+    if (fault->kernel_address) {
         FATAL("[page fault on kernel]");
         unreachable;
     }
@@ -149,7 +149,7 @@ __try_resolve_fault(struct fault_context* fault)
         return false;
     }
 
-    if (fault->kernel_fault) {
+    if (fault->kernel_address) {
         fault_handle_kernel_page(fault);
         goto done;
     }

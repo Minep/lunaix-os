@@ -2,10 +2,12 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
+#include <lunaix/syslog.h>
 
 #include <sys/mm/mempart.h>
 
 static ptr_t start = VMAP;
+static volatile ptr_t prev_va = 0;
 
 static pte_t*
 __alloc_contig_ptes(pte_t* ptep, size_t base_sz, int n)
@@ -31,7 +33,7 @@ __alloc_contig_ptes(pte_t* ptep, size_t base_sz, int n)
         }
 
         if (ptep_vfn(ptep) + 1 == LEVEL_SIZE) {
-            ptep = ptep_step_out(ptep + 1);
+            ptep = ptep_step_out(++ptep);
             va += sz;
             
             sz = sz * LEVEL_SIZE;
@@ -46,7 +48,10 @@ __alloc_contig_ptes(pte_t* ptep, size_t base_sz, int n)
         return NULL;
     }
 
-    va -= MAX(sz, base_sz * n);
+    va -= base_sz * _n;
+    assert(prev_va < va);
+    
+    prev_va = va;
     return mkptep_va(ptep_vm_mnt(ptep), va);
 }
 

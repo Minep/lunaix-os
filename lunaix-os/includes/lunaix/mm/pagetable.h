@@ -112,7 +112,7 @@ typedef struct __pte pte_t;
 
 #define _VM_OF(ptep)            ( (ptr_t)(ptep) & ~L0T_MASK )
 #define _VM_PFN_OF(ptep)        ( ((ptr_t)(ptep) & L0T_MASK) / sizeof(pte_t) )
-#define VMS_SELF                VMS_MASK
+#define VMS_SELF                ( ~L0T_MASK & VMS_MASK )
 
 #define __LnTI_OF(ptep, n)\
     (_VM_PFN_OF(ptep) * LFT_SIZE / L##n##T_SIZE)

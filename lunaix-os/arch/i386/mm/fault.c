@@ -43,6 +43,46 @@ fault_ensure_ptep_hierarchy(pte_t* ptep, ptr_t va, bool kernel_faul)
     assert(_ptep == ptep);
 }
 
+static ptr_t
+__unpack_fault_address(struct fault_context* context, ptr_t fault_ptr)
+{
+    pte_t* ptep = (pte_t*)fault_ptr;
+    ptr_t mnt = ptep_vm_mnt(ptep);
+    
+    if (mnt < VMS_MOUNT_1) 
+        return fault_ptr;
+
+    context->ptep_fault = true;
+
+#if LnT_ENABLED(1)
+    ptep = (pte_t*)page_addr(ptep_pfn(ptep));
+    mnt  = ptep_vm_mnt(ptep);
+    if (mnt < VMS_MOUNT_1) 
+        return (ptr_t)ptep;
+#endif
+
+#if LnT_ENABLED(2)
+    ptep = (pte_t*)page_addr(ptep_pfn(ptep));
+    mnt  = ptep_vm_mnt(ptep);
+    if (mnt < VMS_MOUNT_1) 
+        return (ptr_t)ptep;
+#endif
+
+#if LnT_ENABLED(3)
+    ptep = (pte_t*)page_addr(ptep_pfn(ptep));
+    mnt  = ptep_vm_mnt(ptep);
+    if (mnt < VMS_MOUNT_1) 
+        return (ptr_t)ptep;
+#endif
+
+    ptep = (pte_t*)page_addr(ptep_pfn(ptep));
+    mnt  = ptep_vm_mnt(ptep);
+    
+    assert(mnt < VMS_MOUNT_1);
+    return (ptr_t)ptep;
+}
+
+// TODO refactor this, not everything down there are arch-dependent!
 bool
 arch_fault_get_context(struct fault_context* context)
 {
@@ -52,20 +92,32 @@ arch_fault_get_context(struct fault_context* context)
         return false;
     }
 
-    bool kernel_fault   = kernel_addr(ptr);
-    pte_t* fault_ptep   = mkptep_va(VMS_SELF, ptr);
-    fault_ensure_ptep_hierarchy(fault_ptep, ptr, kernel_fault);
+    ptr_t refva = __unpack_fault_address(context, ptr);
 
-    pte_t fault_pte     = *fault_ptep;
+    bool kernel_address   = kernel_addr(ptr);
+    bool kernel_refaddr   = kernel_addr(refva);
+    pte_t* fault_ptep     = mkptep_va(VMS_SELF, ptr);
+    fault_ensure_ptep_hierarchy(fault_ptep, ptr, kernel_refaddr);
+
+    pte_t fault_pte       = *fault_ptep;
 
     context->fault_ptep   = fault_ptep;
     context->fault_pte    = fault_pte;
     context->fault_pa     = pte_paddr(fault_pte);
     context->fault_va     = ptr;
-    context->kernel_fault = kernel_fault;
+    context->fault_refva  = refva;
     context->fault_data   = ictx->execp->err_code;
     context->fault_instn  = ictx->execp->eip;
-    context->resolving    = fault_pte;
+    
+    if (context->ptep_fault && !kernel_refaddr) {
+        // for a ptep fault, the resolved pte should match the encoded address
+        context->resolving = pte_setprot(fault_pte, USER_DATA);
+    }
+    else {
+        context->resolving = pte_setprot(fault_pte, KERNEL_DATA);
+    }
+
+    context->kernel_address = kernel_address;
 
     if (!__current) {
         return true;
@@ -75,7 +127,7 @@ arch_fault_get_context(struct fault_context* context)
     context->vmr = region_get(vmr, ptr);
 
     if (!context->vmr) {
-        return kernel_fault;
+        return kernel_address;
     }
 
     return true;

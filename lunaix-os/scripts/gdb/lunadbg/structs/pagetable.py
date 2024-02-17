@@ -36,9 +36,9 @@ class PageTableEntry(KernelStruct):
         pp.printf("Level %d Translation", TLB.translation_level(self.level))
 
         pp2 = pp.next_level()
-        pp2.printf("Entry value: 0x%x", self.pte)
-        pp2.printf("Virtual address: 0x%x (ptep=0x%x)", self.va, int(self._kstruct))
-        pp2.printf("Mapped physical: 0x%x (order %d page)", self.pa, self.page_order)
+        pp2.printf("PTE raw value: 0x%016x", self.pte)
+        pp2.printf("Virtual address: 0x%016x (ptep=0x%016x)", self.va, int(self._kstruct))
+        pp2.printf("Mapped physical: 0x%016x (order %d page)", self.pa, self.page_order)
         pp2.printf("Page Protection: %s", self.get_page_prot())
         pp2.printf("Present: %s", self.present())
         pp2.printf("Huge: %s", TLB.huge_page(self.pte, self.page_order))
@@ -112,9 +112,10 @@ class PageTable():
         return (ptep & ~l0mask) | vpfn | (offset * TLB.pte_size())
     
     def to_level(self, mnt, va, level):
+        lfmask = (1 << TLB.translation_shift_bits(-1)) - 1
         lsize = (1 << TLB.translation_shift_bits(level))
         offset = (va // lsize) * TLB.pte_size()
-        return mnt | ~(lsize - 1) | offset
+        return mnt | ((lsize - 1) & ~lfmask) | offset
     
     def shift_ptep_nextlevel(self, ptep):
         mnt_mask = ~((1 << TLB.translation_shift_bits(0)) - 1)
@@ -183,8 +184,7 @@ class PageTable():
                     ptep = self.shift_ptep_prevlevel(ptep + TLB.pte_size())
                     level-=1
                     continue
-                else:
-                    break
+                break
             
             ptep += TLB.pte_size()
 

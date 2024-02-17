@@ -2,6 +2,7 @@
 #include <lunaix/mm/pmm.h>
 #include <lunaix/status.h>
 #include <lunaix/mm/pagetable.h>
+#include <lunaix/spike.h>
 
 // This is a very large array...
 static struct pp_struct pm_table[PM_BMP_MAX_SIZE];
@@ -124,11 +125,7 @@ pmm_free_one(ptr_t page, pp_attr_t attr_mask)
     pfn_t ppfn = pfn(page);
     struct pp_struct* pm = &pm_table[ppfn];
 
-    // Is this a MMIO mapping or double free?
-    if (ppfn >= max_pg || !(pm->ref_counts)) {
-        return 0;
-    }
-
+    assert(ppfn < max_pg && pm->ref_counts);
     if (pm->attr && !(pm->attr & attr_mask)) {
         return 0;
     }
@@ -147,9 +144,7 @@ pmm_ref_page(ptr_t page)
     }
 
     struct pp_struct* pm = &pm_table[ppn];
-    if (ppn >= max_pg || !pm->ref_counts) {
-        return 0;
-    }
+    assert(ppn < max_pg && pm->ref_counts);
 
     pm->ref_counts++;
     return 1;
