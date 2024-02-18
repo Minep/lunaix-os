@@ -127,8 +127,10 @@ __fail_to_resolve(struct fault_context* fault)
 
     trace_printstack_isr(fault->ictx);
 
-    if (fault->kernel_vmfault) {
-        FATAL("[page fault on kernel]");
+    if (fault->kernel_access) {
+        // if a page fault from kernel is not resolvable, then
+        //  something must be went south
+        FATAL("unresolvable page fault");
         unreachable;
     }
 

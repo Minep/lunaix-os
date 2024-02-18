@@ -29,6 +29,7 @@ struct fault_context
     bool kernel_ref_vmfault:1;      // referenced faulting address is kernel
     bool ptep_fault:1;              // faulting address is a ptep
     bool remote_fault:1;            // referenced faulting address is remote vms
+    bool kernel_access:1;           // access cause page fault is from kernel
     struct mm_region* vmr;
     struct proc_mm* mm;
 

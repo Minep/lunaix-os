@@ -1,4 +1,5 @@
 #include <lunaix/mm/vmm.h>
+#include <lunaix/mm/pmm.h>
 #include <sys/mm/mm_defs.h>
 
 ptr_t

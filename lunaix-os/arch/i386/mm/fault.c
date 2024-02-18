@@ -126,6 +126,7 @@ fault_populate_core_state(struct fault_context* context)
     }
 
     context->kernel_vmfault = kernel_vmfault;
+    context->kernel_access  = kernel_context(ictx);
 
     if (kernel_refaddr) {
         return true;

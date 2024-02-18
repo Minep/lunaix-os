@@ -300,5 +300,10 @@ set_pte(pte_t* ptep, pte_t pte)
     ptep->val = pte.val;
 }
 
+static inline pte_t
+pte_at(pte_t* ptep) {
+    return *ptep;
+}
+
 
 #endif /* __LUNAIX_ARCH_PAGETABLE_H */

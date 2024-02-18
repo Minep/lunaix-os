@@ -12,7 +12,7 @@
 
 struct proc_mm*
 procvm_create(struct proc_info* proc) {
-    struct proc_mm* mm = valloc(sizeof(struct proc_mm));
+    struct proc_mm* mm = vzalloc(sizeof(struct proc_mm));
 
     assert(mm);
 
@@ -75,6 +75,7 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
             continue;
         }
         
+    cont:
         if (ptep_vfn(ptep) == MAX_PTEN - 1) {
             assert(level > 0);
             ptep = ptep_step_out(ptep);
@@ -82,7 +83,6 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
             level--;
         }
 
-    cont:
         ptep++;
         ptep_dest++;
     }
@@ -106,14 +106,14 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
     return pte_paddr(*(ptep_dest + 1));
 }
 
-static void
+static void optimize("O0")
 vmsfree(ptr_t vm_mnt)
 {
     pte_t* ptep_head    = mkl0tep(mkptep_va(vm_mnt, 0));
     pte_t* ptep_kernel  = mkl0tep(mkptep_va(vm_mnt, KERNEL_RESIDENT));
 
     int level = 0;
-    pte_t* ptep = ptep_head;
+    volatile pte_t* ptep = ptep_head;
     while (ptep < ptep_kernel)
     {
         pte_t pte = *ptep;
@@ -123,29 +123,27 @@ vmsfree(ptr_t vm_mnt)
             goto cont;
         } 
 
-        if (pt_last_level(level) || pte_huge(pte)) {
-            pmm_free_any(pa);
-            goto cont;
-        } 
-
-        if (ptep_vfn(ptep) == MAX_PTEN - 1) {
-            ptep = ptep_step_out(ptep);
-            pmm_free_any(pte_paddr(*ptep));
-            level--;
-        }
-        else if (level < MAX_LEVEL - 1) {
+        if (!pt_last_level(level) && !pte_huge(pte)) {
             ptep = ptep_step_into(ptep);
             level++;
 
             continue;
         }
 
-        pmm_free_any(pa);
+        if (pte_isloaded(pte))
+            pmm_free_any(pa);
+
     cont:
+        if (ptep_vfn(ptep) == MAX_PTEN - 1) {
+            ptep = ptep_step_out(ptep);
+            pmm_free_any(pte_paddr(pte_at(ptep)));
+            level--;
+        }
+
         ptep++;
     }
 
-    ptr_t self_pa = pte_paddr(ptep_head[MAX_LEVEL - 1]);
+    ptr_t self_pa = pte_paddr(ptep_head[MAX_PTEN - 1]);
     pmm_free_any(self_pa);
 }
 
@@ -158,6 +156,17 @@ __attach_to_current_vms(struct proc_mm* guest_mm)
         mm_current->guest_mm = guest_mm;
     }
 }
+
+static inline void
+__detach_from_current_vms(struct proc_mm* guest_mm)
+{
+    struct proc_mm* mm_current = vmspace(__current);
+    if (mm_current) {
+        assert(mm_current->guest_mm == guest_mm);
+        mm_current->guest_mm = NULL;
+    }
+}
+
 
 void
 procvm_dupvms_mount(struct proc_mm* mm) {
@@ -226,6 +235,8 @@ procvm_unmount_release(struct proc_mm* mm) {
     vfree(mm);
     vmsfree(vm_mnt);
     vms_unmount(vm_mnt);
+
+    __detach_from_current_vms(mm);
 }
 
 void

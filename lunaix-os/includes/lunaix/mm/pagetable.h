@@ -98,7 +98,6 @@
 struct __pte;
 typedef struct __pte pte_t;
 
-#define pte_unref(ptep) ((pte_t)*(ptep))
 
 #include <sys/mm/pagetable.h>
 #include <sys/cpu.h>
@@ -248,7 +247,7 @@ mkl1t(pte_t* l0t_ptep, ptr_t va, pte_attr_t prot)
         return NULL;
     }
 
-    pte_t pte = pte_unref(l0t_ptep);
+    pte_t pte = pte_at(l0t_ptep);
     
     if (pte_huge(pte)) {
         return l0t_ptep;
@@ -277,7 +276,7 @@ mkl2t(pte_t* l1t_ptep, ptr_t va, pte_attr_t prot)
         return NULL;
     }
 
-    pte_t pte = pte_unref(l1t_ptep);
+    pte_t pte = pte_at(l1t_ptep);
     
     if (pte_huge(pte)) {
         return l1t_ptep;
@@ -306,7 +305,7 @@ mkl3t(pte_t* l2t_ptep, ptr_t va, pte_attr_t prot)
         return NULL;
     }
  
-    pte_t pte = pte_unref(l2t_ptep);
+    pte_t pte = pte_at(l2t_ptep);
     
     if (pte_huge(pte)) {
         return l2t_ptep;
@@ -334,7 +333,7 @@ mklft(pte_t* l3t_ptep, ptr_t va, pte_attr_t prot)
         return NULL;
     }
 
-    pte_t pte = pte_unref(l3t_ptep);
+    pte_t pte = pte_at(l3t_ptep);
     
     if (pte_huge(pte)) {
         return l3t_ptep;

@@ -87,13 +87,12 @@ thread_release_mem(struct thread* thread)
     struct proc_mm* mm = vmspace(thread->process);
     ptr_t vm_mnt = mm->vm_mnt;
 
-    // Ensure we have mounted and not self-mounted
+    // Ensure we have mounted
     assert(vm_mnt);
-    assert(thread != thread->process->th_active);
 
     pte_t* ptep = mkptep_va(vm_mnt, thread->kstack);
     
-    ptep -= KSTACK_PAGES + 1;
+    ptep -= KSTACK_PAGES - 1;
     vmm_unset_ptes(ptep, KSTACK_PAGES);
     
     if (thread->ustack) {

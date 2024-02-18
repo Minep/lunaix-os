@@ -324,10 +324,15 @@ mem_unmap_region(ptr_t mnt, struct mm_region* region)
     size_t len = ROUNDUP(region->end - region->start, PG_SIZE);
     mem_sync_pages(mnt, region, region->start, len, 0);
 
-    for (size_t i = region->start; i <= region->end; i += PG_SIZE) {
-        ptr_t pa = vmm_del_mapping(mnt, i);
-        if (pa) {
-            pmm_free_page(pa);
+    pfn_t pglen = leaf_count(region->end - region->start);
+    pte_t* ptep = mkptep_va(mnt, region->start);
+    for (size_t i = 0; i < pglen; i++, ptep++) {
+        pte_t pte = pte_at(ptep);
+        ptr_t pa  = pte_paddr(pte);
+
+        set_pte(ptep, null_pte);
+        if (pte_isloaded(pte)) {
+            pmm_free_page(pte_paddr(pte));
         }
     }
     
