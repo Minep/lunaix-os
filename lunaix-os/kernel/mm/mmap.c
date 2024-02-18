@@ -321,10 +321,9 @@ mem_unmap_region(ptr_t mnt, struct mm_region* region)
     
     valloc_ensure_valid(region);
     
-    size_t len = ROUNDUP(region->end - region->start, PG_SIZE);
-    mem_sync_pages(mnt, region, region->start, len, 0);
-
     pfn_t pglen = leaf_count(region->end - region->start);
+    mem_sync_pages(mnt, region, region->start, pglen * PAGE_SIZE, 0);
+
     pte_t* ptep = mkptep_va(mnt, region->start);
     for (size_t i = 0; i < pglen; i++, ptep++) {
         pte_t pte = pte_at(ptep);
@@ -402,7 +401,7 @@ __unmap_overlapped_cases(ptr_t mnt,
     }
 
     mem_sync_pages(mnt, vmr, vmr->start, umps_len, 0);
-    for (size_t i = 0; i < umps_len; i += PG_SIZE) {
+    for (size_t i = 0; i < umps_len; i += PAGE_SIZE) {
         ptr_t pa = vmm_del_mapping(mnt, vmr->start + i);
         if (pa) {
             pmm_free_page(pa);
@@ -428,8 +427,8 @@ __unmap_overlapped_cases(ptr_t mnt,
 int
 mem_unmap(ptr_t mnt, vm_regions_t* regions, ptr_t addr, size_t length)
 {
-    length = ROUNDUP(length, PG_SIZE);
-    ptr_t cur_addr = PG_ALIGN(addr);
+    length = ROUNDUP(length, PAGE_SIZE);
+    ptr_t cur_addr = va_align(addr);
     struct mm_region *pos, *n;
 
     llist_for_each(pos, n, regions, head)
@@ -491,7 +490,7 @@ __DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
     }
 
     struct mmap_param param = { .flags = options,
-                                .mlen = ROUNDUP(length, PG_SIZE),
+                                .mlen = ROUNDUP(length, PAGE_SIZE),
                                 .offset = offset,
                                 .type = REGION_TYPE_GENERAL,
                                 .proct = proct,
@@ -513,7 +512,7 @@ __DEFINE_LXSYSCALL2(int, munmap, void*, addr, size_t, length)
 
 __DEFINE_LXSYSCALL3(int, msync, void*, addr, size_t, length, int, flags)
 {
-    if (!PG_ALIGNED(addr) || ((flags & MS_ASYNC) && (flags & MS_SYNC))) {
+    if (va_offset((ptr_t)addr) || ((flags & MS_ASYNC) && (flags & MS_SYNC))) {
         return DO_STATUS(EINVAL);
     }
 

@@ -7,7 +7,6 @@
 #include <lunaix/input.h>
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/mmio.h>
-#include <lunaix/mm/page.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
@@ -56,7 +55,7 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     invoke_init_function(on_earlyboot);
 
     // FIXME this goes to hal/gfxa
-    tty_init(ioremap(0xB8000, PG_SIZE));
+    tty_init(ioremap(0xB8000, PAGE_SIZE));
     tty_set_theme(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
 
     device_sysconf_load();

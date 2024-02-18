@@ -1,4 +1,3 @@
-#include <lunaix/mm/page.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/status.h>
 #include <lunaix/mm/pagetable.h>
@@ -57,7 +56,7 @@ volatile size_t pg_lookup_ptr;
 void
 pmm_init(ptr_t mem_upper_lim)
 {
-    max_pg = (PG_ALIGN(mem_upper_lim) >> 12);
+    max_pg = pfn(mem_upper_lim);
 
     pg_lookup_ptr = LOOKUP_START;
 

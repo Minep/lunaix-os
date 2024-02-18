@@ -49,8 +49,11 @@
 #define L3T_INDEX_MASK      ( L2T_MASK ^ L3T_MASK )
 #define LFT_INDEX_MASK      ( L3T_MASK ^ LFT_MASK )
 
+#define PAGE_SHIFT          _PAGE_BASE_SHIFT
 #define PAGE_SIZE           _PAGE_BASE_SIZE
 #define PAGE_MASK           _PAGE_BASE_MASK
+
+#define LEVEL_SHIFT         _PAGE_LEVEL_SHIFT
 #define LEVEL_SIZE          _PAGE_LEVEL_SIZE
 #define LEVEL_MASK          _PAGE_LEVEL_MASK
 

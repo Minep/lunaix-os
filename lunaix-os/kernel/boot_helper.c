@@ -1,6 +1,5 @@
 #include <klibc/string.h>
 #include <lunaix/boot_generic.h>
-#include <lunaix/mm/page.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
@@ -58,10 +57,10 @@ boot_end(struct boot_handoff* bhctx)
     struct boot_mmapent *mmap = bhctx->mem.mmap, *mmapent;
     for (size_t i = 0; i < bhctx->mem.mmap_len; i++) {
         mmapent = &mmap[i];
-        size_t size_pg = PN(ROUNDUP(mmapent->size, PG_SIZE));
+        size_t size_pg = leaf_count(mmapent->size);
 
         if (mmapent->type == BOOT_MMAP_RCLM) {
-            pmm_mark_chunk_free(PN(mmapent->start), size_pg);
+            pmm_mark_chunk_free(pfn(mmapent->start), size_pg);
         }
 
         if (mmapent->type == BOOT_MMAP_FREE) {

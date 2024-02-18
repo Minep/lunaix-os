@@ -93,43 +93,12 @@ vmm_tryptep(pte_t* ptep, size_t lvl_size)
 }
 
 ptr_t
-vmm_v2p(ptr_t va)
-{
-    u32_t l1_index = L1_INDEX(va);
-    u32_t l2_index = L2_INDEX(va);
-
-    x86_page_table* l1pt = (x86_page_table*)L1_BASE_VADDR;
-    x86_pte_t l1pte = l1pt->entry[l1_index];
-
-    if (l1pte) {
-        x86_pte_t* l2pte =
-          &((x86_page_table*)L2_VADDR(l1_index))->entry[l2_index];
-
-        if (l2pte) {
-            return PG_ENTRY_ADDR(*l2pte) | ((ptr_t)va & 0xfff);
-        }
-    }
-    return 0;
-}
-
-ptr_t
 vmm_v2pat(ptr_t mnt, ptr_t va)
 {
-    u32_t l1_index = L1_INDEX(va);
-    u32_t l2_index = L2_INDEX(va);
+    ptr_t  va_off = va_offset(va);
+    pte_t* ptep   = mkptep_va(mnt, va);
 
-    x86_page_table* l1pt = (x86_page_table*)(mnt | 1023 << 12);
-    x86_pte_t l1pte = l1pt->entry[l1_index];
-
-    if (l1pte) {
-        x86_pte_t* l2pte =
-          &((x86_page_table*)(mnt | (l1_index << 12)))->entry[l2_index];
-
-        if (l2pte) {
-            return PG_ENTRY_ADDR(*l2pte) | ((ptr_t)va & 0xfff);
-        }
-    }
-    return 0;
+    return pte_paddr(pte_at(ptep)) + va_off;
 }
 
 ptr_t

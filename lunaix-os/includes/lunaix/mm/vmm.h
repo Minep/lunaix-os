@@ -2,7 +2,6 @@
 #define __LUNAIX_VMM_H
 
 #include <lunaix/mm/pagetable.h>
-#include <lunaix/mm/page.h>
 #include <lunaix/process.h>
 #include <lunaix/types.h>
 // Virtual memory manager
@@ -39,14 +38,6 @@
  */
 void
 vmm_init();
-
-/**
- * @brief 创建一个页目录
- *
- * @return ptd_entry* 页目录的物理地址，随时可以加载进CR3
- */
-x86_page_table*
-vmm_init_pd();
 
 /**
  * @brief 在指定地址空间中，添加一个映射
@@ -170,15 +161,6 @@ void*
 vmm_next_free(ptr_t start, int options);
 
 /**
- * @brief 将当前地址空间的虚拟地址转译为物理地址。
- *
- * @param va 虚拟地址
- * @return void*
- */
-ptr_t
-vmm_v2p(ptr_t va);
-
-/**
  * @brief 将指定地址空间的虚拟地址转译为物理地址
  *
  * @param mnt 地址空间锚定点
@@ -188,16 +170,17 @@ vmm_v2p(ptr_t va);
 ptr_t
 vmm_v2pat(ptr_t mnt, ptr_t va);
 
-/*
-    表示一个 vmap 区域
-    (One must not get confused with vmap_area in Linux!)
-*/
-struct vmap_area
+/**
+ * @brief 将当前地址空间的虚拟地址转译为物理地址。
+ *
+ * @param va 虚拟地址
+ * @return void*
+ */
+static inline ptr_t
+vmm_v2p(ptr_t va)
 {
-    ptr_t start;
-    size_t size;
-    pt_attr area_attr;
-};
+    return vmm_v2pat(VMS_SELF, va);
+}
 
 /**
  * @brief Maps a number of contiguous ptes in kernel 
@@ -235,7 +218,7 @@ vmap_leaf_ptes(pte_t pte, int n)
  * @return ptr_t 
  */
 static inline ptr_t
-vmap(ptr_t paddr, size_t size, pt_attr prot)
+vmap(ptr_t paddr, size_t size, pte_attr_t prot)
 {
     pte_t _pte = mkpte(paddr, prot);
     return vmap_ptes_at(_pte, LFT_SIZE, leaf_count(size));

@@ -3,7 +3,6 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syscall_utils.h>
 #include <lunaix/mm/mmap.h>
-#include <lunaix/mm/page.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/syslog.h>

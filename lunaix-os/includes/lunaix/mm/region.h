@@ -2,7 +2,6 @@
 #define __LUNAIX_REGION_H
 
 #include <lunaix/mm/mm.h>
-#include <lunaix/mm/page.h>
 #include <lunaix/mm/procvm.h>
 
 #define prev_region(vmr) list_prev(vmr, struct mm_region, head)

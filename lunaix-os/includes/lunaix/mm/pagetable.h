@@ -426,6 +426,11 @@ va_align(ptr_t va) {
     return va & ~PAGE_MASK;
 }
 
+static inline ptr_t
+va_alignup(ptr_t va) {
+    return (va + PAGE_MASK) & ~PAGE_MASK;
+}
+
 static inline pte_t*
 mkptep_va(ptr_t vm_mnt, ptr_t vaddr)
 {

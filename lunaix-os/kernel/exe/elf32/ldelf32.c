@@ -1,7 +1,6 @@
 #include <lunaix/exebi/elf32.h>
 #include <lunaix/load.h>
 #include <lunaix/mm/mmap.h>
-#include <lunaix/mm/page.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 
@@ -15,7 +14,7 @@ elf32_smap(struct load_context* ldctx,
 {
     struct v_file* elfile = (struct v_file*)elf->elf_file;
 
-    assert(PG_ALIGNED(phdre->p_offset));
+    assert(!va_offset(phdre->p_offset));
 
     int proct = 0;
     if ((phdre->p_flags & PF_R)) {
@@ -33,17 +32,17 @@ elf32_smap(struct load_context* ldctx,
     struct mmap_param param = { .vms_mnt = container->vms_mnt,
                                 .pvms = vmspace(container->proc),
                                 .proct = proct,
-                                .offset = PG_ALIGN(phdre->p_offset),
-                                .mlen = ROUNDUP(phdre->p_memsz, PG_SIZE),
+                                .offset = va_align(phdre->p_offset),
+                                .mlen = va_alignup(phdre->p_memsz),
                                 .flags = MAP_FIXED | MAP_PRIVATE,
                                 .type = REGION_TYPE_CODE };
 
     struct mm_region* seg_reg;
-    int status = mmap_user(NULL, &seg_reg, PG_ALIGN(va), elfile, &param);
+    int status = mmap_user(NULL, &seg_reg, va_align(va), elfile, &param);
 
     if (!status) {
         size_t next_addr = phdre->p_memsz + va;
-        ldctx->end = MAX(ldctx->end, ROUNDUP(next_addr, PG_SIZE));
+        ldctx->end = MAX(ldctx->end, va_alignup(next_addr));
         ldctx->mem_sz += phdre->p_memsz;
     } else {
         // we probably fucked up our process
@@ -117,7 +116,7 @@ load_executable(struct load_context* context, const struct v_file* exefile)
             continue;
         }
 
-        if (phdr->p_align != PG_SIZE) {
+        if (phdr->p_align != PAGE_SIZE) {
             // surprising alignment!
             errno = ENOEXEC;
             break;

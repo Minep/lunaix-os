@@ -1,4 +1,3 @@
-#include <lunaix/mm/page.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
@@ -23,7 +22,7 @@ trace_modksyms_init(struct boot_handoff* bhctx)
     for (size_t i = 0; i < bhctx->mods.mods_num; i++) {
         struct boot_modent* mod = &bhctx->mods.entries[i];
         if (streq(mod->str, "modksyms")) {
-            assert(PG_ALIGNED(mod->start));
+            assert(!va_offset(mod->start));
 
             pte_t pte = mkpte(mod->start, KERNEL_DATA);
             size_t n = pfn(mod->end) - pfn(mod->start);

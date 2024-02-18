@@ -1,7 +1,6 @@
 #include <klibc/string.h>
 #include <lunaix/ds/btrie.h>
 #include <lunaix/fs.h>
-#include <lunaix/mm/page.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
@@ -36,7 +35,7 @@ pcache_alloc_page()
         return NULL;
     }
 
-    if (!(va = (ptr_t)vmap(pp, PG_SIZE, KERNEL_DATA))) {
+    if (!(va = (ptr_t)vmap(pp, PAGE_SIZE, KERNEL_DATA))) {
         pmm_free_page(pp);
         return NULL;
     }
@@ -47,7 +46,7 @@ pcache_alloc_page()
 void
 pcache_init(struct pcache* pcache)
 {
-    btrie_init(&pcache->tree, PG_SIZE_BITS);
+    btrie_init(&pcache->tree, PAGE_SHIFT);
     llist_init_head(&pcache->dirty);
     llist_init_head(&pcache->pages);
 
@@ -134,7 +133,7 @@ pcache_write(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
     struct pcache_pg* pg;
 
     while (buf_off < len && errno >= 0) {
-        u32_t wr_bytes = MIN(PG_SIZE - pg_off, len - buf_off);
+        u32_t wr_bytes = MIN(PAGE_SIZE - pg_off, len - buf_off);
 
         int new_page = pcache_get_page(pcache, fpos, &pg_off, &pg);
 
@@ -145,7 +144,7 @@ pcache_write(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
             if (errno < 0) {
                 break;
             }
-            if (errno < PG_SIZE) {
+            if (errno < (int)PAGE_SIZE) {
                 // EOF
                 len = MIN(len, buf_off + errno);
             }
@@ -182,7 +181,7 @@ pcache_read(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
             if (errno < 0) {
                 break;
             }
-            if (errno < PG_SIZE) {
+            if (errno < (int)PAGE_SIZE) {
                 // EOF
                 len = MIN(len, buf_off + errno);
             }
