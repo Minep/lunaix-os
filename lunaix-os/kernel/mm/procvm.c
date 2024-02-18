@@ -106,14 +106,14 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
     return pte_paddr(*(ptep_dest + 1));
 }
 
-static void optimize("O0")
+static void
 vmsfree(ptr_t vm_mnt)
 {
     pte_t* ptep_head    = mkl0tep(mkptep_va(vm_mnt, 0));
     pte_t* ptep_kernel  = mkl0tep(mkptep_va(vm_mnt, KERNEL_RESIDENT));
 
     int level = 0;
-    volatile pte_t* ptep = ptep_head;
+    pte_t* ptep = ptep_head;
     while (ptep < ptep_kernel)
     {
         pte_t pte = *ptep;
