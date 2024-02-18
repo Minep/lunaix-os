@@ -120,3 +120,33 @@ vms_unmount(ptr_t mnt)
     cpu_flush_page(mnt);
     return mnt;
 }
+
+
+void
+ptep_alloc_hierarchy(pte_t* ptep, ptr_t va, pte_attr_t prot)
+{
+    pte_t* _ptep;
+    
+    _ptep = mkl0tep(ptep);
+    if (_ptep == ptep) {
+        return;
+    }
+
+    _ptep = mkl1t(_ptep, va, prot);
+    if (_ptep == ptep) {
+        return;
+    }
+
+    _ptep = mkl2t(_ptep, va, prot);
+    if (_ptep == ptep) {
+        return;
+    }
+
+    _ptep = mkl3t(_ptep, va, prot);
+    if (_ptep == ptep) {
+        return;
+    }
+
+    _ptep = mklft(_ptep, va, prot);
+    assert(_ptep == ptep);
+}

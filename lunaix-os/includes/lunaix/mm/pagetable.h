@@ -137,6 +137,16 @@ typedef struct __pte pte_t;
 pte_t 
 vmm_alloc_page(pte_t* ptep, pte_t pte);
 
+/**
+ * @brief Try page walk to the pte pointed by ptep and 
+ *        allocate any missing level-table en-route
+ * 
+ * @param ptep 
+ * @param va 
+ */
+void
+ptep_alloc_hierarchy(pte_t* ptep, ptr_t va, pte_attr_t prot);
+
 static inline bool
 __alloc_level(pte_t* ptep, pte_t pte, pte_attr_t prot)
 {

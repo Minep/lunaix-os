@@ -386,15 +386,18 @@ __unmap_overlapped_cases(ptr_t mnt,
         shrink = vmr->end - seg_start;
         umps_len = shrink;
         umps_start = seg_start;
-    } else if (CASE_HITE(vmr, seg_start, seg_len)) {
+    } 
+    else if (CASE_HITE(vmr, seg_start, seg_len)) {
         shrink = vmr->end - seg_start;
         umps_len = shrink;
         umps_start = seg_start;
-    } else if (CASE_HETI(vmr, seg_start, seg_len)) {
+    } 
+    else if (CASE_HETI(vmr, seg_start, seg_len)) {
         displ = seg_len - (vmr->start - seg_start);
         umps_len = displ;
         umps_start = vmr->start;
-    } else if (CASE_HETE(vmr, seg_start, seg_len)) {
+    } 
+    else if (CASE_HETE(vmr, seg_start, seg_len)) {
         shrink = vmr->end - vmr->start;
         umps_len = shrink;
         umps_start = vmr->start;

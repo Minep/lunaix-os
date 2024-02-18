@@ -16,10 +16,106 @@
 LOG_MODULE("pf")
 
 static void
-fault_handle_conflict_pte(struct fault_context* fault) 
+__gather_memaccess_info(struct fault_context* context)
+{
+    pte_t* ptep = (pte_t*)context->fault_va;
+    ptr_t mnt = ptep_vm_mnt(ptep);
+    ptr_t refva;
+    
+    context->mm = vmspace(__current);
+
+    if (mnt < VMS_MOUNT_1) {
+        refva = (ptr_t)ptep;
+        goto done;
+    }
+
+    context->ptep_fault = true;
+    context->remote_fault = (mnt != VMS_SELF);
+    
+    if (context->remote_fault && context->mm) {
+        context->mm = context->mm->guest_mm;
+        assert(context->mm);
+    }
+
+#if LnT_ENABLED(1)
+    ptep = (pte_t*)page_addr(ptep_pfn(ptep));
+    mnt  = ptep_vm_mnt(ptep);
+    if (mnt < VMS_MOUNT_1) {
+        refva = (ptr_t)ptep;
+        goto done;
+    }
+#endif
+
+#if LnT_ENABLED(2)
+    ptep = (pte_t*)page_addr(ptep_pfn(ptep));
+    mnt  = ptep_vm_mnt(ptep);
+    if (mnt < VMS_MOUNT_1) {
+        refva = (ptr_t)ptep;
+        goto done;
+    }
+#endif
+
+#if LnT_ENABLED(3)
+    ptep = (pte_t*)page_addr(ptep_pfn(ptep));
+    mnt  = ptep_vm_mnt(ptep);
+    if (mnt < VMS_MOUNT_1) {
+        refva = (ptr_t)ptep;
+        goto done;
+    }
+#endif
+
+    ptep = (pte_t*)page_addr(ptep_pfn(ptep));
+    mnt  = ptep_vm_mnt(ptep);
+    
+    assert(mnt < VMS_MOUNT_1);
+    refva = (ptr_t)ptep;
+
+done:
+    context->fault_refva = refva;
+}
+
+static bool
+__prepare_fault_context(struct fault_context* fault)
+{
+    if (!__arch_prepare_fault_context(fault)) {
+        return false;
+    }
+
+    __gather_memaccess_info(fault);
+
+    pte_t* fault_ptep      = fault->fault_ptep;
+    ptr_t  fault_va        = fault->fault_va;
+    pte_t  fault_pte       = *fault_ptep;
+    bool   kernel_vmfault  = kernel_addr(fault_va);
+    bool   kernel_refaddr  = kernel_addr(fault->fault_refva);
+    
+    // for a ptep fault, the parent page tables should match the actual
+    //  accesser permission
+    if (kernel_refaddr) {
+        ptep_alloc_hierarchy(fault_ptep, fault_va, KERNEL_DATA);
+    } else {
+        ptep_alloc_hierarchy(fault_ptep, fault_va, USER_DATA);
+    }
+
+    fault->fault_pte = fault_pte;
+    
+    if (fault->ptep_fault && !kernel_refaddr) {
+        fault->resolving = pte_setprot(fault_pte, USER_DATA);
+    } else {
+        fault->resolving = pte_setprot(fault_pte, KERNEL_DATA);
+    }
+
+    fault->kernel_vmfault = kernel_vmfault;
+    fault->kernel_access  = kernel_context(fault->ictx);
+
+    return true;
+}
+
+static void
+__handle_conflict_pte(struct fault_context* fault) 
 {
     pte_t pte = fault->fault_pte;
-    ptr_t fault_pa  = fault->fault_pa;
+    ptr_t fault_pa  = pte_paddr(pte);
     if (!pte_allow_user(pte)) {
         return;
     }
@@ -43,7 +139,7 @@ fault_handle_conflict_pte(struct fault_context* fault)
 
 
 static void
-fault_handle_anon_region(struct fault_context* fault)
+__handle_anon_region(struct fault_context* fault)
 {
     pte_t pte = fault->resolving;
     pte_attr_t prot = region_pteprot(fault->vmr);
@@ -54,7 +150,7 @@ fault_handle_anon_region(struct fault_context* fault)
 
 
 static void
-fault_handle_named_region(struct fault_context* fault)
+__handle_named_region(struct fault_context* fault)
 {
     struct mm_region* vmr = fault->vmr;
     struct v_file* file = vmr->mfile;
@@ -78,7 +174,7 @@ fault_handle_named_region(struct fault_context* fault)
 }
 
 static void
-fault_handle_kernel_page(struct fault_context* fault)
+__handle_kernel_page(struct fault_context* fault)
 {
     // we must ensure only ptep fault is resolvable
     if (fault->fault_va < VMS_MOUNT_1) {
@@ -151,23 +247,27 @@ __try_resolve_fault(struct fault_context* fault)
         return false;
     }
 
-    if (fault->kernel_vmfault) {
-        fault_handle_kernel_page(fault);
+    if (fault->kernel_vmfault && fault->kernel_access) {
+        __handle_kernel_page(fault);
         goto done;
     }
+
+    assert(fault->mm);
+    vm_regions_t* vmr = &fault->mm->regions;
+    fault->vmr = region_get(vmr, fault->fault_va);
 
     if (!fault->vmr) {
         return false;
     }
 
     if (pte_isloaded(fault_pte)) {
-        fault_handle_conflict_pte(fault);
+        __handle_conflict_pte(fault);
     }
     else if (anon_region(fault->vmr)) {
-        fault_handle_anon_region(fault);
+        __handle_anon_region(fault);
     }
     else if (fault->vmr->mfile) {
-        fault_handle_named_region(fault);
+        __handle_named_region(fault);
     }
     else {
         // page not present, might be a chance to introduce swap file?
@@ -189,7 +289,7 @@ intr_routine_page_fault(const isr_param* param)
 
     struct fault_context fault = { .ictx = param };
 
-    if (!fault_populate_core_state(&fault)) {
+    if (!__prepare_fault_context(&fault)) {
         __fail_to_resolve(&fault);
     }
 
