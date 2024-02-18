@@ -1,11 +1,11 @@
 #include <lunaix/device.h>
-#include <lunaix/mm/page.h>
+#include <lunaix/mm/pagetable.h>
 
 static int
 __null_wr_pg(struct device* dev, void* buf, size_t offset)
 {
     // do nothing
-    return PG_SIZE;
+    return PAGE_SIZE;
 }
 
 static int

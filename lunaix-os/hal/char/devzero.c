@@ -1,13 +1,13 @@
 #include <lunaix/device.h>
-#include <lunaix/mm/page.h>
+#include <lunaix/mm/pagetable.h>
 
 #include <klibc/string.h>
 
 static int
 __zero_rd_pg(struct device* dev, void* buf, size_t offset)
 {
-    memset(&((u8_t*)buf)[offset], 0, PG_SIZE);
-    return PG_SIZE;
+    memset(&((u8_t*)buf)[offset], 0, PAGE_SIZE);
+    return PAGE_SIZE;
 }
 
 static int

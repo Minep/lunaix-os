@@ -1,4 +1,3 @@
-#include <lunaix/mm/page.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
@@ -23,11 +22,12 @@ trace_modksyms_init(struct boot_handoff* bhctx)
     for (size_t i = 0; i < bhctx->mods.mods_num; i++) {
         struct boot_modent* mod = &bhctx->mods.entries[i];
         if (streq(mod->str, "modksyms")) {
-            assert(PG_ALIGNED(mod->start));
+            assert(!va_offset(mod->start));
 
-            ptr_t end = ROUNDUP(mod->end, PG_SIZE);
-            ptr_t ksym_va =
-              (ptr_t)vmap(mod->start, (end - mod->start), PG_PREM_R, 0);
+            pte_t pte = mkpte(mod->start, KERNEL_DATA);
+            size_t n = pfn(mod->end) - pfn(mod->start);
+            
+            ptr_t ksym_va = vmap_leaf_ptes(pte, n);
 
             assert(ksym_va);
             trace_ctx.ksym_table = (struct ksyms*)ksym_va;
@@ -43,7 +43,7 @@ trace_sym_lookup(ptr_t addr)
 
     int i = c - 1, j = 0, m = 0;
 
-    if (addr > ksent[i].pc || addr < ksent[j].pc || addr < KERNEL_EXEC) {
+    if (addr > ksent[i].pc || addr < ksent[j].pc || !kernel_addr(addr)) {
         return NULL;
     }
 
@@ -147,7 +147,12 @@ trace_printstack_of(ptr_t fp)
 void
 trace_printstack()
 {
-    trace_printstack_of(abi_get_callframe());
+    if (current_thread) {
+        trace_printstack_isr(current_thread->intr_ctx);
+    }
+    else {
+        trace_printstack_of(abi_get_callframe());
+    }
 }
 
 static void

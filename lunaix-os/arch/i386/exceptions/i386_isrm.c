@@ -90,7 +90,7 @@ isrm_bindirq(int irq, isr_cb irq_handler)
 {
     int iv;
     if (!(iv = isrm_ivexalloc(irq_handler))) {
-        panickf("out of IV resource. (irq=%d)", irq);
+        fail("out of IV resource.");
         return 0; // never reach
     }
 

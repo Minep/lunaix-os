@@ -6,12 +6,12 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syscall_utils.h>
 
-#include <sys/mm/mempart.h>
+#include <sys/mm/mm_defs.h>
 
 #include <usr/lunaix/mann_flags.h>
 
 // any size beyond this is bullshit
-#define BS_SIZE (KERNEL_EXEC - USR_MMAP)
+#define BS_SIZE (KERNEL_RESIDENT - USR_MMAP)
 
 int
 mem_has_overlap(vm_regions_t* regions, ptr_t start, ptr_t end)
@@ -65,7 +65,7 @@ mmap_user(void** addr_out,
         struct v_file* file,
         struct mmap_param* param) 
 {
-    param->range_end = KERNEL_EXEC;
+    param->range_end = KERNEL_RESIDENT;
     param->range_start = USR_EXEC;
 
     return mem_map(addr_out, created, addr, file, param);
@@ -168,7 +168,7 @@ mem_map(void** addr_out,
 {
     assert_msg(addr, "addr can not be NULL");
 
-    ptr_t last_end = USR_EXEC, found_loc = PG_ALIGN(addr);
+    ptr_t last_end = USR_EXEC, found_loc = va_align(addr);
     struct mm_region *pos, *n;
 
     vm_regions_t* vm_regions = &param->pvms->regions;
@@ -215,20 +215,7 @@ found:
     region->proc_vms = param->pvms;
 
     region_add(vm_regions, region);
-
-    int proct = param->proct;
-    int attr = PG_ALLOW_USER;
-    if ((proct & REGION_WRITE)) {
-        attr |= PG_WRITE;
-    }
-    if ((proct & REGION_KERNEL)) {
-        attr &= ~PG_ALLOW_USER;
-    }
-
-    for (size_t i = 0; i < param->mlen; i += PG_SIZE) {
-        vmm_set_mapping(param->vms_mnt, found_loc + i, 0, attr, 0);
-    }
-
+    
     if (file) {
         vfs_ref_file(file);
     }
@@ -264,22 +251,24 @@ mem_sync_pages(ptr_t mnt,
     if (!region->mfile || !(region->attr & REGION_WSHARED)) {
         return;
     }
+    
+    pte_t* ptep = mkptep_va(mnt, start);
+    ptr_t va    = va_align(start);
 
-    v_mapping mapping;
-    for (size_t i = 0; i < length; i += PG_SIZE) {
-        if (!vmm_lookupat(mnt, start + i, &mapping)) {
+    for (; va < start + length; va += PAGE_SIZE, ptep++) {
+        pte_t pte = vmm_tryptep(ptep, LFT_SIZE);
+        if (pte_isnull(pte)) {
             continue;
         }
 
-        if (PG_IS_DIRTY(*mapping.pte)) {
-            size_t offset = mapping.va - region->start + region->foff;
+        if (pte_dirty(pte)) {
+            size_t offset = va - region->start + region->foff;
             struct v_inode* inode = region->mfile->inode;
 
-            region->mfile->ops->write_page(inode, (void*)mapping.va, offset);
+            region->mfile->ops->write_page(inode, (void*)va, offset);
 
-            *mapping.pte &= ~PG_DIRTY;
-
-            cpu_flush_page((ptr_t)mapping.pte);
+            set_pte(ptep, pte_mkclean(pte));
+            cpu_flush_page(va);
         } else if ((options & MS_INVALIDATE)) {
             goto invalidate;
         }
@@ -291,9 +280,9 @@ mem_sync_pages(ptr_t mnt,
         continue;
 
     invalidate:
-        *mapping.pte &= ~PG_PRESENT;
-        pmm_free_page(mapping.pa);
-        cpu_flush_page((ptr_t)mapping.pte);
+        set_pte(ptep, null_pte);
+        pmm_free_page(pte_paddr(pte));
+        cpu_flush_page(va);
     }
 }
 
@@ -332,13 +321,17 @@ mem_unmap_region(ptr_t mnt, struct mm_region* region)
     
     valloc_ensure_valid(region);
     
-    size_t len = ROUNDUP(region->end - region->start, PG_SIZE);
-    mem_sync_pages(mnt, region, region->start, len, 0);
+    pfn_t pglen = leaf_count(region->end - region->start);
+    mem_sync_pages(mnt, region, region->start, pglen * PAGE_SIZE, 0);
 
-    for (size_t i = region->start; i <= region->end; i += PG_SIZE) {
-        ptr_t pa = vmm_del_mapping(mnt, i);
-        if (pa) {
-            pmm_free_page(pa);
+    pte_t* ptep = mkptep_va(mnt, region->start);
+    for (size_t i = 0; i < pglen; i++, ptep++) {
+        pte_t pte = pte_at(ptep);
+        ptr_t pa  = pte_paddr(pte);
+
+        set_pte(ptep, null_pte);
+        if (pte_isloaded(pte)) {
+            pmm_free_page(pte_paddr(pte));
         }
     }
     
@@ -393,22 +386,25 @@ __unmap_overlapped_cases(ptr_t mnt,
         shrink = vmr->end - seg_start;
         umps_len = shrink;
         umps_start = seg_start;
-    } else if (CASE_HITE(vmr, seg_start, seg_len)) {
+    } 
+    else if (CASE_HITE(vmr, seg_start, seg_len)) {
         shrink = vmr->end - seg_start;
         umps_len = shrink;
         umps_start = seg_start;
-    } else if (CASE_HETI(vmr, seg_start, seg_len)) {
+    } 
+    else if (CASE_HETI(vmr, seg_start, seg_len)) {
         displ = seg_len - (vmr->start - seg_start);
         umps_len = displ;
         umps_start = vmr->start;
-    } else if (CASE_HETE(vmr, seg_start, seg_len)) {
+    } 
+    else if (CASE_HETE(vmr, seg_start, seg_len)) {
         shrink = vmr->end - vmr->start;
         umps_len = shrink;
         umps_start = vmr->start;
     }
 
     mem_sync_pages(mnt, vmr, vmr->start, umps_len, 0);
-    for (size_t i = 0; i < umps_len; i += PG_SIZE) {
+    for (size_t i = 0; i < umps_len; i += PAGE_SIZE) {
         ptr_t pa = vmm_del_mapping(mnt, vmr->start + i);
         if (pa) {
             pmm_free_page(pa);
@@ -434,8 +430,8 @@ __unmap_overlapped_cases(ptr_t mnt,
 int
 mem_unmap(ptr_t mnt, vm_regions_t* regions, ptr_t addr, size_t length)
 {
-    length = ROUNDUP(length, PG_SIZE);
-    ptr_t cur_addr = PG_ALIGN(addr);
+    length = ROUNDUP(length, PAGE_SIZE);
+    ptr_t cur_addr = va_align(addr);
     struct mm_region *pos, *n;
 
     llist_for_each(pos, n, regions, head)
@@ -467,7 +463,7 @@ __DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
 
     ptr_t addr_ptr = (ptr_t)addr;
 
-    if (!length || length > BS_SIZE || !PG_ALIGNED(addr_ptr)) {
+    if (!length || length > BS_SIZE || va_offset(addr_ptr)) {
         errno = EINVAL;
         goto done;
     }
@@ -497,7 +493,7 @@ __DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
     }
 
     struct mmap_param param = { .flags = options,
-                                .mlen = ROUNDUP(length, PG_SIZE),
+                                .mlen = ROUNDUP(length, PAGE_SIZE),
                                 .offset = offset,
                                 .type = REGION_TYPE_GENERAL,
                                 .proct = proct,
@@ -519,7 +515,7 @@ __DEFINE_LXSYSCALL2(int, munmap, void*, addr, size_t, length)
 
 __DEFINE_LXSYSCALL3(int, msync, void*, addr, size_t, length, int, flags)
 {
-    if (!PG_ALIGNED(addr) || ((flags & MS_ASYNC) && (flags & MS_SYNC))) {
+    if (va_offset((ptr_t)addr) || ((flags & MS_ASYNC) && (flags & MS_SYNC))) {
         return DO_STATUS(EINVAL);
     }
 

@@ -7,9 +7,6 @@
 #include <lunaix/compiler.h>
 #include <sys/cpu.h>
 
-#define saved_fp(isrm) ((isrm)->registers.ebp)
-#define kernel_context(isrm) (!(((isrm)->execp->cs) & 0b11))
-
 struct exec_param;
 
 struct regcontext
@@ -49,6 +46,9 @@ struct exec_param
     u32_t esp;
     u32_t ss;
 } compact;
+
+#define saved_fp(isrm) ((isrm)->registers.ebp)
+#define kernel_context(isrm) (!(((isrm)->execp->cs) & 0b11))
 
 #endif
 

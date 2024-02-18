@@ -72,17 +72,10 @@
                 "stk_align": 16
             },
             {
-                "name": "kernel_exec",
+                "name": "kernel_img",
                 "start": "3@1G",
                 "size": "16@4M",
                 "block": "1@page"
-            },
-            {
-                "$type": "list",
-                "$range": "[1..*vms_mnts]",
-                "name": "vms_mount_{index}",
-                "size": "1@4M",
-                "block": "1@huge"
             },
             {
                 "$type": "list",
@@ -92,6 +85,13 @@
             },
             {
                 "name": "vmap",
+                "block": "1@huge"
+            },
+            {
+                "$type": "list",
+                "$range": "[1..*vms_mnts]",
+                "name": "vms_mount_{index}",
+                "size": "1@4M",
                 "block": "1@huge"
             },
             {

@@ -1,6 +1,7 @@
-#include <lunaix/mm/page.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/status.h>
+#include <lunaix/mm/pagetable.h>
+#include <lunaix/spike.h>
 
 // This is a very large array...
 static struct pp_struct pm_table[PM_BMP_MAX_SIZE];
@@ -12,6 +13,9 @@ export_symbol(debug, pmm, max_pg);
 void
 pmm_mark_page_free(ptr_t ppn)
 {
+    if ((pm_table[ppn].attr & PP_FGLOCKED)) {
+        return;
+    }
     pm_table[ppn].ref_counts = 0;
 }
 
@@ -26,6 +30,9 @@ void
 pmm_mark_chunk_free(ptr_t start_ppn, size_t page_count)
 {
     for (size_t i = start_ppn; i < start_ppn + page_count && i < max_pg; i++) {
+        if ((pm_table[i].attr & PP_FGLOCKED)) {
+            continue;
+        }
         pm_table[i].ref_counts = 0;
     }
 }
@@ -49,7 +56,7 @@ volatile size_t pg_lookup_ptr;
 void
 pmm_init(ptr_t mem_upper_lim)
 {
-    max_pg = (PG_ALIGN(mem_upper_lim) >> 12);
+    max_pg = pfn(mem_upper_lim);
 
     pg_lookup_ptr = LOOKUP_START;
 
@@ -112,22 +119,16 @@ pmm_alloc_page(pp_attr_t attr)
 }
 
 int
-pmm_free_page(ptr_t page)
+pmm_free_one(ptr_t page, pp_attr_t attr_mask)
 {
-    struct pp_struct* pm = &pm_table[page >> 12];
+    pfn_t ppfn = pfn(page);
+    struct pp_struct* pm = &pm_table[ppfn];
 
-    // Is this a MMIO mapping or double free?
-    if ((page >> 12) >= max_pg || !(pm->ref_counts)) {
+    assert(ppfn < max_pg && pm->ref_counts);
+    if (pm->attr && !(pm->attr & attr_mask)) {
         return 0;
     }
 
-    // 如果是锁定页，则不作处理
-    if ((pm->attr & PP_FGLOCKED)) {
-        return 0;
-    }
-
-    // TODO: 检查权限，保证：1) 只有正在使用该页（包括被分享者）的进程可以释放；
-    // 2) 内核可释放所有页。
     pm->ref_counts--;
     return 1;
 }
@@ -135,19 +136,27 @@ pmm_free_page(ptr_t page)
 int
 pmm_ref_page(ptr_t page)
 {
-    u32_t ppn = page >> 12;
+    u32_t ppn = pfn(page);
 
     if (ppn >= PM_BMP_MAX_SIZE) {
         return 0;
     }
 
     struct pp_struct* pm = &pm_table[ppn];
-    if (ppn >= max_pg || !pm->ref_counts) {
-        return 0;
-    }
+    assert(ppn < max_pg && pm->ref_counts);
 
     pm->ref_counts++;
     return 1;
+}
+
+void
+pmm_set_attr(ptr_t page, pp_attr_t attr)
+{
+    struct pp_struct* pp = &pm_table[pfn(page)];
+    
+    if (pp->ref_counts) {
+        pp->attr = attr;
+    }
 }
 
 struct pp_struct*

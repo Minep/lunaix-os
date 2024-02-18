@@ -99,13 +99,13 @@ done:
 int
 __tty_write_pg(struct device* dev, void* buf, size_t offset)
 {
-    return __tty_write(dev, buf, offset, PG_SIZE);
+    return __tty_write(dev, buf, offset, PAGE_SIZE);
 }
 
 int
 __tty_read_pg(struct device* dev, void* buf, size_t offset)
 {
-    return __tty_read(dev, buf, offset, PG_SIZE);
+    return __tty_read(dev, buf, offset, PAGE_SIZE);
 }
 
 int

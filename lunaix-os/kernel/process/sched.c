@@ -23,8 +23,10 @@
 
 #include <klibc/string.h>
 
+struct thread empty_thread_obj;
+
 volatile struct proc_info* __current;
-volatile struct thread* current_thread;
+volatile struct thread* current_thread = &empty_thread_obj;
 
 struct scheduler sched_ctx;
 
@@ -53,6 +55,7 @@ run(struct thread* thread)
     thread->process->state = PS_RUNNING;
     thread->process->th_active = thread;
 
+    procvm_mount_self(vmspace(thread->process));
     set_current_executing(thread);
 
     switch_context();
@@ -80,9 +83,11 @@ cleanup_detached_threads() {
             continue;
         }
 
-        vmm_mount_pd(VMS_MOUNT_1, vmroot(pos->process));
-        destory_thread(VMS_MOUNT_1, pos);
-        vmm_unmount_pd(VMS_MOUNT_1);
+        struct proc_mm* mm = vmspace(pos->process);
+
+        procvm_mount(mm);
+        destory_thread(pos);
+        procvm_unmount(mm);
         
         i++;
     }
@@ -173,8 +178,10 @@ schedule()
     if (!(current_thread->state & ~PS_RUNNING)) {
         current_thread->state = PS_READY;
         __current->state = PS_READY;
+
     }
 
+    procvm_unmount_self(vmspace(__current));
     check_sleepers();
 
     // round-robin scheduler
@@ -447,7 +454,7 @@ commit_process(struct proc_info* process)
 }
 
 void
-destory_thread(ptr_t vm_mnt, struct thread* thread) 
+destory_thread(struct thread* thread) 
 {
     cake_ensure_valid(thread);
     
@@ -458,7 +465,7 @@ destory_thread(ptr_t vm_mnt, struct thread* thread)
     llist_delete(&thread->sleep.sleepers);
     waitq_cancel_wait(&thread->waitqueue);
 
-    thread_release_mem(thread, vm_mnt);
+    thread_release_mem(thread);
 
     proc->thread_count--;
     sched_ctx.ttable_len--;
@@ -470,6 +477,7 @@ void
 delete_process(struct proc_info* proc)
 {
     pid_t pid = proc->pid;
+    struct proc_mm* mm = vmspace(proc);
 
     assert(pid);    // long live the pid0 !!
 
@@ -503,17 +511,15 @@ delete_process(struct proc_info* proc)
 
     signal_free_registers(proc->sigreg);
 
-    vmm_mount_pd(VMS_MOUNT_1, vmroot(proc));
+    procvm_mount(mm);
     
     struct thread *pos, *n;
     llist_for_each(pos, n, &proc->threads, proc_sibs) {
         // terminate and destory all thread unconditionally
-        destory_thread(VMS_MOUNT_1, pos);
+        destory_thread(pos);
     }
 
-    procvm_cleanup(VMS_MOUNT_1, proc);
-
-    vmm_unmount_pd(VMS_MOUNT_1);
+    procvm_unmount_release(mm);
 
     cake_release(proc_pile, proc);
 }

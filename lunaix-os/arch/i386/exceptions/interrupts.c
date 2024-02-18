@@ -6,7 +6,6 @@
 #include <hal/intc.h>
 
 #include <lunaix/isrm.h>
-#include <lunaix/mm/page.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
@@ -50,7 +49,9 @@ intr_handler(isr_param* param)
 
 done:
 
-    intc_notify_eoi(0, execp->vector);
+    if (execp->vector > IV_BASE_END) {
+        intc_notify_eoi(0, execp->vector);
+    }
 
     return;
 }

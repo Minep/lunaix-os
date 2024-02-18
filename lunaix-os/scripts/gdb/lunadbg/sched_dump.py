@@ -10,9 +10,9 @@ class ProcessDump(LunadbgCommand):
     def __init__(self) -> None:
         super().__init__("proc")
 
-    def invoke(self, argument: str, from_tty: bool) -> None:
+    def execute(self, parsed, gdb_args, from_tty):
         pp = MyPrettyPrinter()
-        ProcInfo.process_at(argument).print_detailed(pp)
+        ProcInfo.process_at(gdb_args).print_detailed(pp)
 
 
 class SchedulerDump(LunadbgCommand):
@@ -23,11 +23,7 @@ class SchedulerDump(LunadbgCommand):
         self._parser.add_argument("-l", "--long-list", 
                                   required=False, default=False, action='store_true')
 
-    def invoke(self, argument: str, from_tty: bool) -> None:
-        args = self._parse_args(argument)
-        if args is None:
-            return
-        
+    def on_execute(self, args, gdb_args, from_tty):
         sched_context = gdb.parse_and_eval("&sched_ctx")
         sched = Scheduler(sched_context)
 

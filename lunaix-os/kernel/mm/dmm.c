@@ -21,7 +21,7 @@ create_heap(struct proc_mm* pvms, ptr_t addr)
                                     .flags = MAP_ANON | MAP_PRIVATE,
                                     .type = REGION_TYPE_HEAP,
                                     .proct = PROT_READ | PROT_WRITE,
-                                    .mlen = PG_SIZE };
+                                    .mlen = PAGE_SIZE };
     int status = 0;
     struct mm_region* heap;
     if ((status = mmap_user(NULL, &heap, addr, NULL, &map_param))) {

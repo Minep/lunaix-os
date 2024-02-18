@@ -1,6 +1,7 @@
 #ifndef __LUNAIX_VMM_H
 #define __LUNAIX_VMM_H
-#include <lunaix/mm/page.h>
+
+#include <lunaix/mm/pagetable.h>
 #include <lunaix/process.h>
 #include <lunaix/types.h>
 // Virtual memory manager
@@ -39,14 +40,6 @@ void
 vmm_init();
 
 /**
- * @brief 创建一个页目录
- *
- * @return ptd_entry* 页目录的物理地址，随时可以加载进CR3
- */
-x86_page_table*
-vmm_init_pd();
-
-/**
  * @brief 在指定地址空间中，添加一个映射
  *
  * @param mnt 地址空间挂载点
@@ -56,7 +49,37 @@ vmm_init_pd();
  * @return int
  */
 int
-vmm_set_mapping(ptr_t mnt, ptr_t va, ptr_t pa, pt_attr attr, int options);
+vmm_set_mapping(ptr_t mnt, ptr_t va, ptr_t pa, pte_attr_t prot);
+
+static inline void 
+vmm_set_ptes_contig(pte_t* ptep, pte_t pte, size_t lvl_size, size_t n)
+{
+    do {
+        set_pte(ptep, pte);
+        pte_val(pte) += lvl_size;
+        ptep++;
+    } while (--n > 0);
+}
+
+static inline void 
+vmm_set_ptes(pte_t* ptep, pte_t pte, size_t n)
+{
+    do {
+        set_pte(ptep, pte);
+        ptep++;
+    } while (--n > 0);
+}
+
+
+static inline void 
+vmm_unset_ptes(pte_t* ptep, size_t n)
+{
+    do {
+        set_pte(ptep, null_pte);
+        ptep++;
+    } while (--n > 0);
+}
+
 
 /**
  * @brief 删除一个映射
@@ -69,14 +92,8 @@ vmm_set_mapping(ptr_t mnt, ptr_t va, ptr_t pa, pt_attr attr, int options);
 ptr_t
 vmm_del_mapping(ptr_t mnt, ptr_t va);
 
-/**
- * @brief 在当前虚拟地址空间里查找一个映射
- *
- * @param va 虚拟地址
- * @param mapping 映射相关属性
- */
-int
-vmm_lookup(ptr_t va, v_mapping* mapping);
+pte_t
+vmm_tryptep(pte_t* ptep, size_t lvl_size);
 
 /**
  * @brief 在指定的虚拟地址空间里查找一个映射
@@ -86,8 +103,15 @@ vmm_lookup(ptr_t va, v_mapping* mapping);
  * @param mapping 映射相关属性
  * @return int
  */
-int
-vmm_lookupat(ptr_t mnt, ptr_t va, v_mapping* mapping);
+static inline bool
+vmm_lookupat(ptr_t mnt, ptr_t va, pte_t* pte_out)
+{
+    pte_t pte = vmm_tryptep(mkptep_va(mnt, va), LFT_SIZE);
+    *pte_out = pte;
+
+    return !pte_isnull(pte);
+}
+
 
 /**
  * @brief (COW) 为虚拟页创建副本。
@@ -105,25 +129,28 @@ vmm_dup_page(ptr_t pa);
  * @return ptr_t
  */
 ptr_t
-vmm_mount_pd(ptr_t mnt, ptr_t pde);
+vms_mount(ptr_t mnt, ptr_t pde);
 
 /**
  * @brief 卸载已挂载的虚拟地址空间
  *
  */
 ptr_t
-vmm_unmount_pd(ptr_t mnt);
+vms_unmount(ptr_t mnt);
 
 static inline ptr_t 
-vmm_mount_pg(ptr_t mnt, ptr_t pa) {
+mount_page(ptr_t mnt, ptr_t pa) {
     assert(pa);
-    vmm_set_mapping(VMS_SELF, mnt, pa, PG_PREM_RW, 0);
+    pte_t* ptep = mkptep_va(VMS_SELF, mnt);
+    set_pte(ptep, mkpte(pa, KERNEL_DATA));
+    cpu_flush_page(mnt);
     return mnt;
 }
 
 static inline ptr_t 
-vmm_unmount_pg(ptr_t mnt) {
-    vmm_del_mapping(VMS_SELF, mnt);
+unmount_page(ptr_t mnt) {
+    pte_t* ptep = mkptep_va(VMS_SELF, mnt);
+    set_pte(ptep, null_pte);
     return mnt;
 }
 
@@ -132,15 +159,6 @@ vmm_ioremap(ptr_t paddr, size_t size);
 
 void*
 vmm_next_free(ptr_t start, int options);
-
-/**
- * @brief 将当前地址空间的虚拟地址转译为物理地址。
- *
- * @param va 虚拟地址
- * @return void*
- */
-ptr_t
-vmm_v2p(ptr_t va);
 
 /**
  * @brief 将指定地址空间的虚拟地址转译为物理地址
@@ -152,54 +170,58 @@ vmm_v2p(ptr_t va);
 ptr_t
 vmm_v2pat(ptr_t mnt, ptr_t va);
 
-/*
-    表示一个 vmap 区域
-    (One must not get confused with vmap_area in Linux!)
-*/
-struct vmap_area
-{
-    ptr_t start;
-    size_t size;
-    pt_attr area_attr;
-};
-
 /**
- * @brief 将连续的物理地址空间映射到内核虚拟地址空间
+ * @brief 将当前地址空间的虚拟地址转译为物理地址。
  *
- * @param paddr 物理地址空间的基地址
- * @param size 物理地址空间的大小
+ * @param va 虚拟地址
  * @return void*
  */
-void*
-vmap(ptr_t paddr, size_t size, pt_attr attr, int flags);
+static inline ptr_t
+vmm_v2p(ptr_t va)
+{
+    return vmm_v2pat(VMS_SELF, va);
+}
 
 /**
- * @brief 创建一个 vmap 区域
- *
- * @param paddr
- * @param attr
- * @return ptr_t
- */
-struct vmap_area*
-vmap_varea(size_t size, pt_attr attr);
-
-/**
- * @brief 在 vmap区域内映射一个单页
- *
- * @param paddr
- * @param attr
- * @return ptr_t
+ * @brief Maps a number of contiguous ptes in kernel 
+ *        address space
+ * 
+ * @param pte the pte to be mapped
+ * @param lvl_size size of the page pointed by the given pte
+ * @param n number of ptes
+ * @return ptr_t 
  */
 ptr_t
-vmap_area_page(struct vmap_area* area, ptr_t paddr, pt_attr attr);
+vmap_ptes_at(pte_t pte, size_t lvl_size, int n);
 
 /**
- * @brief 在 vmap区域删除一个已映射的页
- *
- * @param paddr
- * @return ptr_t
+ * @brief Maps a number of contiguous ptes in kernel 
+ *        address space (leaf page size)
+ * 
+ * @param pte the pte to be mapped
+ * @param n number of ptes
+ * @return ptr_t 
  */
-ptr_t
-vmap_area_rmpage(struct vmap_area* area, ptr_t vaddr);
+static inline ptr_t
+vmap_leaf_ptes(pte_t pte, int n)
+{
+    return vmap_ptes_at(pte, LFT_SIZE, n);
+}
+
+/**
+ * @brief Maps a contiguous range of physical address 
+ *        into kernel address space (leaf page size)
+ * 
+ * @param paddr start of the physical address range
+ * @param size size of the physical range
+ * @param prot default protection to be applied
+ * @return ptr_t 
+ */
+static inline ptr_t
+vmap(ptr_t paddr, size_t size, pte_attr_t prot)
+{
+    pte_t _pte = mkpte(paddr, prot);
+    return vmap_ptes_at(_pte, LFT_SIZE, leaf_count(size));
+}
 
 #endif /* __LUNAIX_VMM_H */

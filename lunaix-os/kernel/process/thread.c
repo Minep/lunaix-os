@@ -3,7 +3,6 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syscall_utils.h>
 #include <lunaix/mm/mmap.h>
-#include <lunaix/mm/page.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/syslog.h>
@@ -14,12 +13,6 @@
 #include <sys/mm/mm_defs.h>
 
 LOG_MODULE("THREAD")
-
-static inline void 
-inject_guardian_page(ptr_t vm_mnt, ptr_t va)
-{
-    vmm_set_mapping(vm_mnt, PG_ALIGN(va), 0, 0, VMAP_GUARDPAGE);
-}
 
 static ptr_t
 __alloc_user_thread_stack(struct proc_info* proc, struct mm_region** stack_region, ptr_t vm_mnt)
@@ -43,65 +36,63 @@ __alloc_user_thread_stack(struct proc_info* proc, struct mm_region** stack_regio
         return 0;
     }
 
-    // Pre-allocate a page contains stack top, to avoid immediate trap to kernel
-    //  upon thread execution
-    ptr_t pa = pmm_alloc_page(0);
-    ptr_t stack_top = align_stack(th_stack_top + USR_STACK_SIZE - 1);
-    if (likely(pa)) {
-        vmm_set_mapping(vm_mnt, PG_ALIGN(stack_top), 
-                        pa, region_ptattr(vmr), 0);
-    }
-
-    inject_guardian_page(vm_mnt, vmr->start);
+    set_pte(mkptep_va(vm_mnt, vmr->start), guard_pte);
 
     *stack_region = vmr;
 
+    ptr_t stack_top = align_stack(th_stack_top + USR_STACK_SIZE - 1);
     return stack_top;
 }
 
 static ptr_t
 __alloc_kernel_thread_stack(struct proc_info* proc, ptr_t vm_mnt)
 {
-    v_mapping mapping;
-    ptr_t kstack = PG_ALIGN(KSTACK_AREA_END - KSTACK_SIZE);
-    while (kstack >= KSTACK_AREA) {
+    pfn_t kstack_top = leaf_count(KSTACK_AREA_END);
+    pfn_t kstack_end = pfn(KSTACK_AREA);
+    pte_t* ptep      = mkptep_pn(vm_mnt, kstack_top);
+    while (ptep_pfn(ptep) > kstack_end) {
+        ptep -= KSTACK_PAGES;
+
         // first page in the kernel stack is guardian page
-        if (!vmm_lookupat(vm_mnt, kstack + MEM_PAGE, &mapping) 
-            || !PG_IS_PRESENT(mapping.flags)) 
-        {
-            break;
+        pte_t pte = *(ptep + 1);
+        if (pte_isnull(pte)) {
+            goto found;
         }
-
-        kstack -= KSTACK_SIZE;
     }
 
-    if (kstack < KSTACK_AREA) {
-        WARN("failed to create kernel stack: max stack num reach\n");
-        return 0;
-    }
+    WARN("failed to create kernel stack: max stack num reach\n");
+    return 0;
 
-    ptr_t pa = pmm_alloc_cpage(PN(KSTACK_SIZE) - 1, 0);
+found:;
+    ptr_t pa = pmm_alloc_cpage(KSTACK_PAGES - 1, 0);
 
     if (!pa) {
         WARN("failed to create kernel stack: nomem\n");
         return 0;
     }
 
-    inject_guardian_page(vm_mnt, kstack);
-    for (size_t i = MEM_PAGE, j = 0; i < KSTACK_SIZE; i+=MEM_PAGE, j+=MEM_PAGE) {
-        vmm_set_mapping(vm_mnt, kstack + i, pa + j, PG_PREM_RW, 0);
-    }
+    set_pte(ptep, guard_pte);
 
-    return align_stack(kstack + KSTACK_SIZE - 1);
+    pte_t pte = mkpte(pa, KERNEL_DATA);
+    vmm_set_ptes_contig(ptep + 1, pte, LFT_SIZE, KSTACK_PAGES - 1);
+
+    ptep += KSTACK_PAGES;
+    return align_stack(ptep_va(ptep, LFT_SIZE) - 1);
 }
 
 void
-thread_release_mem(struct thread* thread, ptr_t vm_mnt)
+thread_release_mem(struct thread* thread)
 {
-    for (size_t i = 0; i < KSTACK_SIZE; i+=MEM_PAGE) {
-        ptr_t stack_page = PG_ALIGN(thread->kstack - i);
-        vmm_del_mapping(vm_mnt, stack_page);
-    }
+    struct proc_mm* mm = vmspace(thread->process);
+    ptr_t vm_mnt = mm->vm_mnt;
+
+    // Ensure we have mounted
+    assert(vm_mnt);
+
+    pte_t* ptep = mkptep_va(vm_mnt, thread->kstack);
+    
+    ptep -= KSTACK_PAGES - 1;
+    vmm_unset_ptes(ptep, KSTACK_PAGES);
     
     if (thread->ustack) {
         if ((thread->ustack->start & 0xfff)) {
@@ -112,8 +103,12 @@ thread_release_mem(struct thread* thread, ptr_t vm_mnt)
 }
 
 struct thread*
-create_thread(struct proc_info* proc, ptr_t vm_mnt, bool with_ustack)
+create_thread(struct proc_info* proc, bool with_ustack)
 {
+    struct proc_mm* mm = vmspace(proc);
+    assert(mm->vm_mnt);
+
+    ptr_t vm_mnt = mm->vm_mnt;
     struct mm_region* ustack_region = NULL;
     if (with_ustack && 
         !(__alloc_user_thread_stack(proc, &ustack_region, vm_mnt))) 
@@ -139,9 +134,12 @@ create_thread(struct proc_info* proc, ptr_t vm_mnt, bool with_ustack)
 }
 
 void
-start_thread(struct thread* th, ptr_t vm_mnt, ptr_t entry)
+start_thread(struct thread* th, ptr_t entry)
 {
     assert(th && entry);
+    struct proc_mm* mm = vmspace(th->process);
+
+    assert(mm->vm_mnt);
     
     struct transfer_context transfer;
     if (!kernel_addr(entry)) {
@@ -157,7 +155,7 @@ start_thread(struct thread* th, ptr_t vm_mnt, ptr_t entry)
         thread_create_kernel_transfer(&transfer, th->kstack, entry);
     }
 
-    inject_transfer_context(vm_mnt, &transfer);
+    inject_transfer_context(mm->vm_mnt, &transfer);
     th->intr_ctx = (isr_param*)transfer.inject;
 
     commit_thread(th);
@@ -185,12 +183,12 @@ thread_find(struct proc_info* proc, tid_t tid)
 __DEFINE_LXSYSCALL4(int, th_create, tid_t*, tid, struct uthread_info*, thinfo, 
                                     void*, entry, void*, param)
 {
-    struct thread* th = create_thread(__current, VMS_SELF, true);
+    struct thread* th = create_thread(__current, true);
     if (!th) {
         return EAGAIN;
     }
 
-    start_thread(th, VMS_SELF, (ptr_t)entry);
+    start_thread(th, (ptr_t)entry);
 
     ptr_t ustack_top = th->ustack_top;
     *((void**)ustack_top) = param;
@@ -234,7 +232,7 @@ __DEFINE_LXSYSCALL2(int, th_join, tid_t, tid, void**, val_ptr)
         *val_ptr = (void*)th->exit_val;
     }
 
-    destory_thread(VMS_SELF, th);
+    destory_thread(th);
 
     return 0;
 }

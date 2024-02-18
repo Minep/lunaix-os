@@ -1,4 +1,3 @@
-#include <lunaix/mm/page.h>
 #include <lunaix/mm/region.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
@@ -11,8 +10,8 @@
 struct mm_region*
 region_create(ptr_t start, ptr_t end, u32_t attr)
 {
-    assert_msg(PG_ALIGNED(start), "not page aligned");
-    assert_msg(PG_ALIGNED(end), "not page aligned");
+    assert_msg(!va_offset(start), "not page aligned");
+    assert_msg(!va_offset(end), "not page aligned");
     struct mm_region* region = valloc(sizeof(struct mm_region));
     *region =
       (struct mm_region){ .attr = attr, .start = start, .end = end - 1 };
@@ -22,8 +21,8 @@ region_create(ptr_t start, ptr_t end, u32_t attr)
 struct mm_region*
 region_create_range(ptr_t start, size_t length, u32_t attr)
 {
-    assert_msg(PG_ALIGNED(start), "not page aligned");
-    assert_msg(PG_ALIGNED(length), "not page aligned");
+    assert_msg(!va_offset(start), "not page aligned");
+    assert_msg(!va_offset(length), "not page aligned");
     struct mm_region* region = valloc(sizeof(struct mm_region));
     *region = (struct mm_region){ .attr = attr,
                                   .start = start,
@@ -131,7 +130,7 @@ region_get(vm_regions_t* lead, unsigned long vaddr)
 
     struct mm_region *pos, *n;
 
-    vaddr = PG_ALIGN(vaddr);
+    vaddr = va_align(vaddr);
 
     llist_for_each(pos, n, lead, head)
     {

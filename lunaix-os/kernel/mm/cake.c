@@ -32,7 +32,7 @@ __alloc_cake(unsigned int cake_pg)
     if (!pa) {
         return NULL;
     }
-    return vmap(pa, cake_pg * PG_SIZE, PG_PREM_RW, 0);
+    return (void*)vmap(pa, cake_pg * PAGE_SIZE, KERNEL_DATA);
 }
 
 struct cake_s*
@@ -86,7 +86,7 @@ __init_pile(struct cake_pile* pile,
     *pile = (struct cake_pile){ .piece_size = piece_size,
                                 .cakes_count = 0,
                                 .pieces_per_cake =
-                                  (pg_per_cake * PG_SIZE) /
+                                  (pg_per_cake * PAGE_SIZE) /
                                   (piece_size + sizeof(piece_index_t)),
                                 .pg_per_cake = pg_per_cake };
 

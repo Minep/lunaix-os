@@ -7,7 +7,7 @@
 #include <sys/cpu.h>
 #include <sys/mm/mm_defs.h>
 
-LOG_MODULE("VMM")
+LOG_MODULE("VM")
 
 void
 vmm_init()
@@ -15,217 +15,138 @@ vmm_init()
     // XXX: something here?
 }
 
-x86_page_table*
-vmm_init_pd()
+pte_t 
+vmm_alloc_page(pte_t* ptep, pte_t pte)
 {
-    x86_page_table* dir =
-      (x86_page_table*)pmm_alloc_page(PP_FGPERSIST);
-    for (size_t i = 0; i < PG_MAX_ENTRIES; i++) {
-        dir->entry[i] = PTE_NULL;
+    ptr_t pa = pmm_alloc_page(PP_FGPERSIST);
+    if (!pa) {
+        return null_pte;
     }
 
-    // 递归映射，方便我们在软件层面进行查表地址转换
-    dir->entry[PG_MAX_ENTRIES - 1] = NEW_L1_ENTRY(T_SELF_REF_PERM, dir);
+    pte = pte_setpaddr(pte, pa);
+    pte = pte_mkloaded(pte);
+    set_pte(ptep, pte);
 
-    return dir;
+    mount_page(PG_MOUNT_1, pa);
+    memset((void*)PG_MOUNT_1, 0, LFT_SIZE);
+    unmount_page(PG_MOUNT_1);
+
+    cpu_flush_page((ptr_t)ptep);
+
+    return pte;
 }
 
 int
-vmm_set_mapping(ptr_t mnt, ptr_t va, ptr_t pa, pt_attr attr, int options)
+vmm_set_mapping(ptr_t mnt, ptr_t va, ptr_t pa, pte_attr_t prot)
 {
-    assert((ptr_t)va % PG_SIZE == 0);
+    assert(!va_offset(va));
 
-    ptr_t l1_inx = L1_INDEX(va);
-    ptr_t l2_inx = L2_INDEX(va);
-    x86_page_table* l1pt = (x86_page_table*)(mnt | (1023 << 12));
-    x86_page_table* l2pt = (x86_page_table*)(mnt | (l1_inx << 12));
+    pte_t* ptep = mkptep_va(mnt, va);
+    pte_t  pte  = mkpte(pa, prot);
 
-    // See if attr make sense
-    assert(attr <= 128);
+    set_pte(ptep, pte);
 
-    x86_pte_t* l1pte = &l1pt->entry[l1_inx];
-    if (!*l1pte) {
-        x86_page_table* new_l1pt_pa =
-          (x86_page_table*)pmm_alloc_page(PP_FGPERSIST);
-
-        // 物理内存已满！
-        if (!new_l1pt_pa) {
-            return 0;
-        }
-
-        // This must be writable
-        *l1pte = NEW_L1_ENTRY(attr | PG_WRITE | PG_PRESENT, new_l1pt_pa);
-
-        // make sure our new l2 table is visible to CPU
-        cpu_flush_page((ptr_t)l2pt);
-
-        memset((void*)l2pt, 0, PG_SIZE);
-    } else {
-        if ((attr & PG_ALLOW_USER) && !(*l1pte & PG_ALLOW_USER)) {
-            *l1pte |= PG_ALLOW_USER;
-        }
-
-        x86_pte_t pte = l2pt->entry[l2_inx];
-        if (pte && (options & VMAP_IGNORE)) {
-            return 1;
-        }
-    }
-
-    if (mnt == VMS_SELF) {
-        cpu_flush_page(va);
-    }
-
-    if ((options & VMAP_NOMAP)) {
-        return 1;
-    }
-
-    if (!(options & VMAP_GUARDPAGE)) {
-        l2pt->entry[l2_inx] = NEW_L2_ENTRY(attr, pa);
-    } else {
-        l2pt->entry[l2_inx] = MEMGUARD;
-    }
-    
     return 1;
 }
 
 ptr_t
 vmm_del_mapping(ptr_t mnt, ptr_t va)
 {
-    assert(((ptr_t)va & 0xFFFU) == 0);
+    assert(!va_offset(va));
 
-    u32_t l1_index = L1_INDEX(va);
-    u32_t l2_index = L2_INDEX(va);
+    pte_t* ptep = mkptep_va(mnt, va);
 
-    // prevent unmap of recursive mapping region
-    if (l1_index == 1023) {
-        return 0;
-    }
+    pte_t old = *ptep;
 
-    x86_page_table* l1pt = (x86_page_table*)(mnt | (1023 << 12));
+    set_pte(ptep, null_pte);
 
-    x86_pte_t l1pte = l1pt->entry[l1_index];
-
-    if (l1pte) {
-        x86_page_table* l2pt = (x86_page_table*)(mnt | (l1_index << 12));
-        x86_pte_t l2pte = l2pt->entry[l2_index];
-
-        cpu_flush_page(va);
-        l2pt->entry[l2_index] = PTE_NULL;
-
-        return PG_ENTRY_ADDR(l2pte);
-    }
-
-    return 0;
+    return pte_paddr(old);
 }
 
-int
-vmm_lookup(ptr_t va, v_mapping* mapping)
+pte_t
+vmm_tryptep(pte_t* ptep, size_t lvl_size)
 {
-    return vmm_lookupat(VMS_SELF, va, mapping);
-}
+    ptr_t va = ptep_va(ptep, lvl_size);
+    pte_t* _ptep = mkl0tep(ptep);
+    pte_t pte;
 
-int
-vmm_lookupat(ptr_t mnt, ptr_t va, v_mapping* mapping)
-{
-    u32_t l1_index = L1_INDEX(va);
-    u32_t l2_index = L2_INDEX(va);
+    if (pte_isnull(pte = *_ptep) || _ptep == ptep) 
+        return pte;
 
-    x86_page_table* l1pt = (x86_page_table*)(mnt | 1023 << 12);
-    x86_pte_t l1pte = l1pt->entry[l1_index];
-
-    if (l1pte) {
-        x86_pte_t* l2pte =
-          &((x86_page_table*)(mnt | (l1_index << 12)))->entry[l2_index];
-
-        if (l2pte) {
-            mapping->flags = PG_ENTRY_FLAGS(*l2pte);
-            mapping->pa = PG_ENTRY_ADDR(*l2pte);
-            mapping->pn = mapping->pa >> PG_SIZE_BITS;
-            mapping->pte = l2pte;
-            mapping->va = va;
-            return 1;
-        }
-    }
-
-    return 0;
-}
-
-ptr_t
-vmm_v2p(ptr_t va)
-{
-    u32_t l1_index = L1_INDEX(va);
-    u32_t l2_index = L2_INDEX(va);
-
-    x86_page_table* l1pt = (x86_page_table*)L1_BASE_VADDR;
-    x86_pte_t l1pte = l1pt->entry[l1_index];
-
-    if (l1pte) {
-        x86_pte_t* l2pte =
-          &((x86_page_table*)L2_VADDR(l1_index))->entry[l2_index];
-
-        if (l2pte) {
-            return PG_ENTRY_ADDR(*l2pte) | ((ptr_t)va & 0xfff);
-        }
-    }
-    return 0;
+#if LnT_ENABLED(1)
+    _ptep = getl1tep(_ptep, va);
+    if (_ptep == ptep || pte_isnull(pte = *_ptep)) 
+        return pte;
+#endif
+#if LnT_ENABLED(2)
+    _ptep = getl2tep(_ptep, va);
+    if (_ptep == ptep || pte_isnull(pte = *_ptep)) 
+        return pte;
+#endif
+#if LnT_ENABLED(3)
+    _ptep = getl3tep(_ptep, va);
+    if (_ptep == ptep || pte_isnull(pte = *_ptep)) 
+        return pte;
+#endif
+    _ptep = getlftep(_ptep, va);
+    return *_ptep;
 }
 
 ptr_t
 vmm_v2pat(ptr_t mnt, ptr_t va)
 {
-    u32_t l1_index = L1_INDEX(va);
-    u32_t l2_index = L2_INDEX(va);
+    ptr_t  va_off = va_offset(va);
+    pte_t* ptep   = mkptep_va(mnt, va);
 
-    x86_page_table* l1pt = (x86_page_table*)(mnt | 1023 << 12);
-    x86_pte_t l1pte = l1pt->entry[l1_index];
+    return pte_paddr(pte_at(ptep)) + va_off;
+}
 
-    if (l1pte) {
-        x86_pte_t* l2pte =
-          &((x86_page_table*)(mnt | (l1_index << 12)))->entry[l2_index];
+ptr_t
+vms_mount(ptr_t mnt, ptr_t vms_root)
+{
+    assert(vms_root);
 
-        if (l2pte) {
-            return PG_ENTRY_ADDR(*l2pte) | ((ptr_t)va & 0xfff);
-        }
+    pte_t* ptep = mkl0tep_va(VMS_SELF, mnt);
+    set_pte(ptep, mkpte(vms_root, KERNEL_DATA));
+    cpu_flush_page(mnt);
+    return mnt;
+}
+
+ptr_t
+vms_unmount(ptr_t mnt)
+{
+    pte_t* ptep = mkl0tep_va(VMS_SELF, mnt);
+    set_pte(ptep, null_pte);
+    cpu_flush_page(mnt);
+    return mnt;
+}
+
+
+void
+ptep_alloc_hierarchy(pte_t* ptep, ptr_t va, pte_attr_t prot)
+{
+    pte_t* _ptep;
+    
+    _ptep = mkl0tep(ptep);
+    if (_ptep == ptep) {
+        return;
     }
-    return 0;
-}
 
-ptr_t
-vmm_mount_pd(ptr_t mnt, ptr_t pde)
-{
-    assert(pde);
+    _ptep = mkl1t(_ptep, va, prot);
+    if (_ptep == ptep) {
+        return;
+    }
 
-    x86_page_table* l1pt = (x86_page_table*)L1_BASE_VADDR;
-    l1pt->entry[(mnt >> 22)] = NEW_L1_ENTRY(T_SELF_REF_PERM, pde);
-    cpu_flush_page(mnt);
-    return mnt;
-}
+    _ptep = mkl2t(_ptep, va, prot);
+    if (_ptep == ptep) {
+        return;
+    }
 
-ptr_t
-vmm_unmount_pd(ptr_t mnt)
-{
-    x86_page_table* l1pt = (x86_page_table*)L1_BASE_VADDR;
-    l1pt->entry[(mnt >> 22)] = 0;
-    cpu_flush_page(mnt);
-    return mnt;
-}
+    _ptep = mkl3t(_ptep, va, prot);
+    if (_ptep == ptep) {
+        return;
+    }
 
-ptr_t
-vmm_dup_page(ptr_t pa)
-{
-    ptr_t new_ppg = pmm_alloc_page(0);
-    vmm_set_mapping(VMS_SELF, PG_MOUNT_3, new_ppg, PG_PREM_RW, VMAP_NULL);
-    vmm_set_mapping(VMS_SELF, PG_MOUNT_4, pa, PG_PREM_RW, VMAP_NULL);
-
-    asm volatile("movl %1, %%edi\n"
-                 "movl %2, %%esi\n"
-                 "rep movsl\n" ::"c"(1024),
-                 "r"(PG_MOUNT_3),
-                 "r"(PG_MOUNT_4)
-                 : "memory", "%edi", "%esi");
-
-    vmm_del_mapping(VMS_SELF, PG_MOUNT_3);
-    vmm_del_mapping(VMS_SELF, PG_MOUNT_4);
-
-    return new_ppg;
+    _ptep = mklft(_ptep, va, prot);
+    assert(_ptep == ptep);
 }

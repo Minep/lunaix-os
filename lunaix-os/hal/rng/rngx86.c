@@ -1,5 +1,5 @@
 #include <lunaix/device.h>
-#include <lunaix/mm/page.h>
+#include <lunaix/mm/pagetable.h>
 
 #include <klibc/string.h>
 
@@ -19,8 +19,8 @@ rng_fill(void* data, size_t len)
 static int
 __rand_rd_pg(struct device* dev, void* buf, size_t offset)
 {
-    rng_fill(buf, PG_SIZE);
-    return PG_SIZE;
+    rng_fill(buf, PAGE_SIZE);
+    return PAGE_SIZE;
 }
 
 static int

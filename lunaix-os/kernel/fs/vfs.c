@@ -47,7 +47,6 @@
 #include <lunaix/foptions.h>
 #include <lunaix/fs.h>
 #include <lunaix/mm/cake.h>
-#include <lunaix/mm/page.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
@@ -1454,7 +1453,7 @@ __DEFINE_LXSYSCALL2(int, fstat, int, fd, struct file_stat*, stat)
                                .st_blocks = vino->lb_usage,
                                .st_size = vino->fsize,
                                .mode = vino->itype,
-                               .st_ioblksize = PG_SIZE,
+                               .st_ioblksize = PAGE_SIZE,
                                .st_blksize = vino->sb->blksize};
 
     if (VFS_DEVFILE(vino->itype)) {
