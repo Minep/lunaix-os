@@ -1,3 +1,14 @@
+/**
+ * @file pagetable.h
+ * @author Lunaixsky (lunaxisky@qq.com)
+ * @brief Generic (skeleton) definition for pagetable.h
+ * @version 0.1
+ * @date 2024-02-18
+ * 
+ * @copyright Copyright (c) 2024
+ * 
+ */
+
 #ifndef __LUNAIX_ARCH_PAGETABLE_H
 #define __LUNAIX_ARCH_PAGETABLE_H
 
@@ -76,16 +87,11 @@ typedef struct __pte pte_t;
 typedef unsigned int pfn_t;
 typedef unsigned int pte_attr_t;
 
-#define _PTE_P                  (1 << 0)
-#define _PTE_W                  (1 << 1)
-#define _PTE_U                  (1 << 2)
-#define _PTE_WT                 (1 << 3)
-#define _PTE_CD                 (1 << 4)
-#define _PTE_A                  (1 << 5)
-#define _PTE_D                  (1 << 6)
-#define _PTE_PS                 (1 << 7)
-#define _PTE_PAT                (1 << 7)
-#define _PTE_G                  (1 << 8)
+#define _PTE_P                  (0)
+#define _PTE_W                  (0)
+#define _PTE_U                  (0)
+#define _PTE_A                  (0)
+#define _PTE_D                  (0)
 #define _PTE_X                  (0)
 #define _PTE_R                  (0)
 
@@ -120,52 +126,49 @@ pte_isguardian(pte_t pte)
 static inline pte_t
 mkpte_prot(pte_attr_t prot)
 {
-    pte_attr_t attrs = (prot & _PTE_PROT_MASK) | _PTE_P;
-    return __mkpte_from(attrs);
+    return null_pte;
 }
 
 static inline pte_t
 mkpte(ptr_t paddr, pte_attr_t prot)
 {
-    pte_attr_t attrs = (prot & _PTE_PROT_MASK) | _PTE_P;
-    return __mkpte_from((paddr & ~_PAGE_BASE_MASK) | attrs);
+    return null_pte;
 }
 
 static inline pte_t
 mkpte_root(ptr_t paddr, pte_attr_t prot)
 {
-    pte_attr_t attrs = (prot & _PTE_PROT_MASK) | _PTE_P;
-    return __mkpte_from((paddr & ~_PAGE_BASE_MASK) | attrs);
+    return null_pte;
 }
 
 static inline pte_t
 mkpte_raw(unsigned long pte_val)
 {
-    return __mkpte_from(pte_val);
+    return null_pte;
 }
 
 static inline pte_t
 pte_setpaddr(pte_t pte, ptr_t paddr)
 {
-    return __mkpte_from((pte.val & _PAGE_BASE_MASK) | (paddr & ~_PAGE_BASE_MASK));
+    return pte;
 }
 
 static inline ptr_t
 pte_paddr(pte_t pte)
 {
-    return pte.val & ~_PAGE_BASE_MASK;
+    return 0;
 }
 
 static inline pte_t
 pte_setprot(pte_t pte, ptr_t prot)
 {
-    return __mkpte_from((pte.val & ~_PTE_PROT_MASK) | (prot & _PTE_PROT_MASK));
+    return pte;
 }
 
 static inline pte_attr_t
 pte_prot(pte_t pte)
 {
-    return (pte.val & _PTE_PROT_MASK);
+    return 0;
 }
 
 static inline bool
@@ -177,127 +180,127 @@ pte_isnull(pte_t pte)
 static inline pte_t
 pte_mkhuge(pte_t pte) 
 {
-    return __mkpte_from(pte.val | _PTE_PS);
+    return pte;
 }
 
 static inline pte_t
 pte_mkvolatile(pte_t pte) 
 {
-    return __mkpte_from(pte.val | _PTE_WT | _PTE_CD);
+    return pte;
 }
 
 static inline pte_t
 pte_mkroot(pte_t pte) 
 {
-    return __mkpte_from(pte.val & ~_PTE_PS);
+    return pte;
 }
 
 static inline pte_t
 pte_usepat(pte_t pte) 
 {
-    return __mkpte_from(pte.val | _PTE_PAT);
+    return pte;
 }
 
 static inline bool
 pte_huge(pte_t pte) 
 {
-    return !!(pte.val & _PTE_PS);
+    return false;
 }
 
 static inline pte_t
 pte_mkloaded(pte_t pte) 
 {
-    return __mkpte_from(pte.val | _PTE_P);
+    return pte;
 }
 
 static inline pte_t
 pte_mkunloaded(pte_t pte) 
 {
-    return __mkpte_from(pte.val & ~_PTE_P);
+    return pte;
 }
 
 static inline bool
 pte_isloaded(pte_t pte) 
 {
-    return !!(pte.val & _PTE_P);
+    return false;
 }
 
 static inline pte_t
 pte_mkwprotect(pte_t pte) 
 {
-    return __mkpte_from(pte.val & ~_PTE_W);
+    return pte;
 }
 
 static inline pte_t
 pte_mkwritable(pte_t pte) 
 {
-    return __mkpte_from(pte.val | _PTE_W);
+    return pte;
 }
 
 static inline bool
 pte_iswprotect(pte_t pte) 
 {
-    return !(pte.val & _PTE_W);
+    return false;
 }
 
 static inline pte_t
 pte_mkuser(pte_t pte) 
 {
-    return __mkpte_from(pte.val | _PTE_U);
+    return pte;
 }
 
 static inline pte_t
 pte_mkkernel(pte_t pte) 
 {
-    return __mkpte_from(pte.val & ~_PTE_U);
+    return pte;
 }
 
 static inline bool
 pte_allow_user(pte_t pte) 
 {
-    return !!(pte.val & _PTE_U);
+    return false;
 }
 
 static inline pte_t
 pte_mkexec(pte_t pte)
 {
-    return __mkpte_from(pte.val | _PTE_X);
+    return pte;
 }
 
 static inline pte_t
 pte_mknonexec(pte_t pte)
 {
-    return __mkpte_from(pte.val & ~_PTE_X);
+    return pte;
 }
 
 static inline bool
 pte_isexec(pte_t pte)
 {
-    return !!(pte.val & _PTE_X);
+    return false;
 }
 
 static inline pte_t
 pte_mkuntouch(pte_t pte) 
 {
-    return __mkpte_from(pte.val & ~_PTE_A);
+    return pte;
 }
 
 static inline bool
 pte_istouched(pte_t pte) 
 {
-    return !!(pte.val & _PTE_A);
+    return false;
 }
 
 static inline pte_t
 pte_mkclean(pte_t pte) 
 {
-    return __mkpte_from(pte.val & ~_PTE_D);
+    return pte;
 }
 
 static inline bool
 pte_dirty(pte_t pte) 
 {
-    return !!(pte.val & _PTE_D);
+    return false;
 }
 
 static inline void
