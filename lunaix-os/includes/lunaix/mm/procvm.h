@@ -5,41 +5,17 @@
 #include <lunaix/ds/mutex.h>
 #include <lunaix/fs.h>
 #include <lunaix/types.h>
+#include <lunaix/mm/mm.h>
 
 struct proc_mm;
 struct proc_info;
-
-struct mm_region
-{
-    struct llist_header head; // must be first field!
-    struct proc_mm* proc_vms;
-
-    // file mapped to this region
-    struct v_file* mfile;
-    // mapped file offset
-    off_t foff;
-    // mapped file length
-    u32_t flen; // XXX it seems that we don't need this actually..
-
-    ptr_t start;
-    ptr_t end;
-    u32_t attr;
-
-    void** index; // fast reference, to accelerate access to this very region.
-
-    void* data;
-    // when a region is copied
-    void (*region_copied)(struct mm_region*);
-    // when a region is unmapped
-    void (*destruct_region)(struct mm_region*);
-};
 
 struct remote_vmctx
 {
     ptr_t vms_mnt;
     ptr_t local_mnt;
     ptr_t remote;
-    size_t page_cnt;
+    pfn_t page_cnt;
 };
 
 
@@ -55,10 +31,13 @@ typedef struct llist_header vm_regions_t;
 struct proc_mm
 {
     // virtual memory root (i.e. root page table)
-    ptr_t vmroot;
-    vm_regions_t regions;
+    ptr_t             vmroot;
+    ptr_t             vm_mnt;       // current mount point
+    vm_regions_t      regions;
+
     struct mm_region* heap;
     struct proc_info* proc;
+    struct proc_mm*   guest_mm;     // vmspace mounted by this vmspace
 };
 
 /**
@@ -71,26 +50,45 @@ struct proc_mm*
 procvm_create(struct proc_info* proc);
 
 /**
- * @brief Initialize the vm of `proc` to duplication of current process
+ * @brief Initialize and mount the vm of `proc` to duplication of current process
  * 
  * @param proc 
  * @return struct proc_mm* 
  */
 void
-procvm_dup(struct proc_info* proc);
+procvm_dupvms_mount(struct proc_mm* proc);
 
 void
-procvm_cleanup(ptr_t vm_mnt, struct proc_info* proc);
+procvm_unmount_release(struct proc_mm* proc);
 
+void
+procvm_mount(struct proc_mm* mm);
+
+void
+procvm_unmount(struct proc_mm* mm);
 
 /**
- * @brief Initialize the vm of `proc` as a clean slate which contains
+ * @brief Initialize and mount the vms of `proc` as a clean slate which contains
  * nothing but shared global mapping of kernel image.
  * 
  * @param proc 
  */
 void
-procvm_init_clean(struct proc_info* proc);
+procvm_initvms_mount(struct proc_mm* mm);
+
+
+/*
+    Mount and unmount from VMS_SELF.
+    Although every vms is mounted to that spot by default,
+    this just serve the purpose to ensure the scheduled
+    vms does not dangling in some other's vms.
+*/
+
+void
+procvm_mount_self(struct proc_mm* mm);
+
+void
+procvm_unmount_self(struct proc_mm* mm);
 
 
 /*
@@ -101,13 +99,13 @@ procvm_init_clean(struct proc_info* proc);
 
 ptr_t
 procvm_enter_remote_transaction(struct remote_vmctx* rvmctx, struct proc_mm* mm,
-                    ptr_t vm_mnt, ptr_t remote_base, size_t size);
+                    ptr_t remote_base, size_t size);
 
 int
 procvm_copy_remote(struct remote_vmctx* rvmctx, 
                    ptr_t remote_dest, void* local_src, size_t sz);
 
 void
-procvm_exit_remote_transaction(struct remote_vmctx* rvmctx);
+procvm_exit_remote(struct remote_vmctx* rvmctx);
 
 #endif /* __LUNAIX_PROCVM_H */

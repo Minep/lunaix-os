@@ -84,7 +84,7 @@
 #define must_success(statement)                                                \
     do {                                                                       \
         int err = (statement);                                                 \
-        if (err) panickf(#statement "failed with errcode=%d", err);           \
+        if (err) fail(#statement " failed");                                   \
     } while(0)
 
 #define fail(msg) __assert_fail(msg, __FILE__, __LINE__);
@@ -100,9 +100,6 @@ __assert_fail(const char* expr, const char* file, unsigned int line)
 
 void noret
 panick(const char* msg);
-
-void noret
-panickf(const char* fmt, ...);
 
 #define wait_until(cond)                                                       \
     while (!(cond))                                                            \

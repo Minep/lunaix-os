@@ -7,7 +7,6 @@
 #include <lunaix/input.h>
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/mmio.h>
-#include <lunaix/mm/page.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
@@ -23,7 +22,7 @@
 #include <hal/intc.h>
 
 #include <sys/abi.h>
-#include <sys/mm/mempart.h>
+#include <sys/mm/mm_defs.h>
 
 #include <klibc/strfmt.h>
 #include <klibc/string.h>
@@ -56,7 +55,7 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     invoke_init_function(on_earlyboot);
 
     // FIXME this goes to hal/gfxa
-    tty_init(ioremap(0xB8000, PG_SIZE));
+    tty_init(ioremap(0xB8000, PAGE_SIZE));
     tty_set_theme(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
 
     device_sysconf_load();
@@ -94,6 +93,7 @@ kernel_bootstrap(struct boot_handoff* bhctx)
      * and start geting into uspace
      */
     boot_end(bhctx);
+    boot_cleanup();
 
     spawn_lunad();
 }
@@ -124,13 +124,23 @@ kmem_init(struct boot_handoff* bhctx)
 {
     extern u8_t __kexec_end;
     // 将内核占据的页，包括前1MB，hhk_init 设为已占用
-    size_t pg_count = ((ptr_t)&__kexec_end - KERNEL_EXEC) >> PG_SIZE_BITS;
+    size_t pg_count = leaf_count((ptr_t)&__kexec_end - KERNEL_RESIDENT);
     pmm_mark_chunk_occupied(0, pg_count, PP_FGLOCKED);
 
-    // reserve higher half
-    for (size_t i = L1_INDEX(KERNEL_EXEC); i < 1023; i++) {
-        assert(vmm_set_mapping(VMS_SELF, i << 22, 0, 0, VMAP_NOMAP));
-    }
+    pte_t* ptep = mkptep_va(VMS_SELF, KERNEL_RESIDENT);
+    ptep = mkl0tep(ptep);
+
+    do {
+#if   LnT_ENABLED(1)
+        assert(mkl1t(ptep++, 0, KERNEL_DATA));
+#elif LnT_ENABLED(2)
+        assert(mkl2t(ptep++, 0, KERNEL_DATA));
+#elif LnT_ENABLED(3)
+        assert(mkl3t(ptep++, 0, KERNEL_DATA));
+#else
+        assert(mklft(ptep++, 0, KERNEL_DATA));
+#endif
+    } while (ptep_vfn(ptep) < MAX_PTEN - 2);
 
     // allocators
     cake_init();

@@ -9,7 +9,7 @@
 #include <lunaix/block.h>
 #include <lunaix/fs/twifs.h>
 #include <lunaix/mm/cake.h>
-#include <lunaix/mm/page.h>
+#include <lunaix/mm/pagetable.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
@@ -156,7 +156,7 @@ __block_read_page(struct device* dev, void* buf, size_t offset)
     struct block_dev* bdev = (struct block_dev*)dev->underlay;
 
     u32_t lba = offset / bdev->blk_size + bdev->start_lba;
-    u32_t rd_lba = MIN(lba + PG_SIZE / bdev->blk_size, bdev->end_lba);
+    u32_t rd_lba = MIN(lba + PAGE_SIZE / bdev->blk_size, bdev->end_lba);
 
     if (rd_lba <= lba) {
         return 0;
@@ -183,7 +183,7 @@ __block_write_page(struct device* dev, void* buf, size_t offset)
     struct block_dev* bdev = (struct block_dev*)dev->underlay;
 
     u32_t lba = offset / bdev->blk_size + bdev->start_lba;
-    u32_t wr_lba = MIN(lba + PG_SIZE / bdev->blk_size, bdev->end_lba);
+    u32_t wr_lba = MIN(lba + PAGE_SIZE / bdev->blk_size, bdev->end_lba);
 
     if (wr_lba <= lba) {
         return 0;

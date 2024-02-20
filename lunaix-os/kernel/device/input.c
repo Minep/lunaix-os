@@ -1,6 +1,6 @@
 #include <lunaix/clock.h>
 #include <lunaix/input.h>
-#include <lunaix/mm/page.h>
+#include <lunaix/mm/pagetable.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 #include <lunaix/status.h>
@@ -66,7 +66,7 @@ __input_dev_read(struct device* dev, void* buf, size_t offset, size_t len)
 int
 __input_dev_read_pg(struct device* dev, void* buf, size_t offset)
 {
-    return __input_dev_read(dev, buf, offset, PG_SIZE);
+    return __input_dev_read(dev, buf, offset, PAGE_SIZE);
 }
 
 struct input_device*

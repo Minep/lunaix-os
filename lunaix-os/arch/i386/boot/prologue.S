@@ -3,12 +3,24 @@
 #define __ASM__
 #include <sys/abi.h>
 
+.section .bss
+    .align 16
+    .skip 2048, 0
+    __kinit_stack_top:
+    # TODO 
+    # This stack was too small that corrupt the ambient kernel structures.
+    #  (took me days to figure this out!)
+    # We should spent more time to implement a good strategy to detect such
+    #  run-over (we can check these invariants when we trapped in some non-recoverable
+    #  state and provide good feedback to user)
+
 .section .text
     .global hhk_entry_
     hhk_entry_:
         /*
             欢迎来到虚拟内存的世界！ :D
          */
+        movl $__kinit_stack_top, %esp
         andl $stack_alignment, %esp
         subl $16, %esp
         /* 

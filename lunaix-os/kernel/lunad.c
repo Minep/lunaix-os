@@ -74,12 +74,6 @@ lunad_do_usr() {
 void _preemptible
 lunad_main()
 {
-    /*
-     * We must defer boot code/data cleaning to here, after we successfully
-     * escape that area
-     */
-    boot_cleanup();
-
     spawn_kthread((ptr_t)init_platform);
 
     /*

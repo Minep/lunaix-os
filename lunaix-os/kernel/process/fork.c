@@ -25,24 +25,21 @@ region_maybe_cow(struct mm_region* region)
         return;
     }
 
-    ptr_t start_vpn = PN(region->start);
-    ptr_t end_vpn = PN(region->end);
-    for (size_t i = start_vpn; i <= end_vpn; i++) {
-        x86_pte_t* curproc = &PTE_MOUNTED(VMS_SELF, i);
-        x86_pte_t* newproc = &PTE_MOUNTED(VMS_MOUNT_1, i);
+    pfn_t start_pn = pfn(region->start);
+    pfn_t end_pn = pfn(region->end);
+    
+    for (size_t i = start_pn; i <= end_pn; i++) {
+        pte_t* self = mkptep_pn(VMS_SELF, i);
+        pte_t* guest = mkptep_pn(VMS_MOUNT_1, i);
 
-        cpu_flush_page((ptr_t)newproc);
+        cpu_flush_page(page_addr(ptep_pfn(self)));
 
         if ((attr & REGION_MODE_MASK) == REGION_RSHARED) {
-            // 如果读共享，则将两者的都标注为只读，那么任何写入都将会应用COW策略。
-            cpu_flush_page((ptr_t)curproc);
-            cpu_flush_page((ptr_t)(i << 12));
-
-            *curproc = *curproc & ~PG_WRITE;
-            *newproc = *newproc & ~PG_WRITE;
+            set_pte(self, pte_mkwprotect(*self));
+            set_pte(guest, pte_mkwprotect(*guest));
         } else {
             // 如果是私有页，则将该页从新进程中移除。
-            *newproc = 0;
+            set_pte(guest, null_pte);
         }
     }
 }
@@ -62,22 +59,24 @@ __dup_fdtable(struct proc_info* pcb)
 static void
 __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
 {
-    ptr_t kstack_pn = PN(current_thread->kstack);
+    ptr_t kstack_pn = pfn(current_thread->kstack);
+    kstack_pn -= pfn(KSTACK_SIZE) - 1;
 
     // copy the kernel stack
-    for (size_t i = 0; i < PN(KSTACK_SIZE); i++) {
-        volatile x86_pte_t* orig_ppte = &PTE_MOUNTED(VMS_SELF, kstack_pn);
-        x86_pte_t p = *orig_ppte;
-        ptr_t kstack = kstack_pn * PG_SIZE;
+    pte_t* src_ptep = mkptep_pn(VMS_SELF, kstack_pn);
+    pte_t* dest_ptep = mkptep_pn(vm_mnt, kstack_pn);
+    for (size_t i = 0; i < pfn(KSTACK_SIZE); i++) {
+        pte_t p = *src_ptep;
 
-        if (guardian_page(p)) {
-            vmm_set_mapping(vm_mnt, kstack, 0, 0, VMAP_GUARDPAGE);
+        if (pte_isguardian(p)) {
+            set_pte(dest_ptep, guard_pte);
         } else {
-            ptr_t ppa = vmm_dup_page(PG_ENTRY_ADDR(p));
-            vmm_set_mapping(vm_mnt, kstack, ppa, p & 0xfff, 0);
+            ptr_t ppa = vmm_dup_page(pte_paddr(p));
+            set_pte(dest_ptep, pte_setpaddr(p, ppa));
         }
 
-        kstack_pn--;
+        src_ptep++;
+        dest_ptep++;
     }
 }
 
@@ -166,14 +165,14 @@ dup_proc()
     }
 
     __dup_fdtable(pcb);
-    procvm_dup(pcb);
 
-    vmm_mount_pd(VMS_MOUNT_1, vmroot(pcb));
+    struct proc_mm* mm = vmspace(pcb);
+    procvm_dupvms_mount(mm);
 
     struct thread* main_thread = dup_active_thread(VMS_MOUNT_1, pcb);
     if (!main_thread) {
         syscall_result(ENOMEM);
-        vmm_unmount_pd(VMS_MOUNT_1);
+        procvm_unmount(mm);
         delete_process(pcb);
         return -1;
     }
@@ -185,7 +184,7 @@ dup_proc()
         region_maybe_cow(pos);
     }
 
-    vmm_unmount_pd(VMS_MOUNT_1);
+    procvm_unmount(mm);
 
     commit_process(pcb);
     commit_thread(main_thread);

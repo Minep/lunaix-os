@@ -1,7 +1,7 @@
 from .commands import LunadbgCommand
 from .pp import MyPrettyPrinter
 from .profiling.pmstat import PhysicalMemProfile
-from .structs.pagetable import PageTable, PageTableEntry
+from .structs.pagetable import PageTable
 
 class MMStats(LunadbgCommand):
     def __init__(self) -> None:
@@ -27,16 +27,17 @@ class MMStats(LunadbgCommand):
         pmem.rescan_pmem(optn.granule)
 
         pp.printf("Total: %dKiB (%d@4K)", 
-                  pmem.max_mem_sz, pmem.max_mem_pg)
+                  pmem.max_mem_sz / 1024, pmem.max_mem_pg)
         
         pp.printf("Used:  %dKiB (%d@4K) ~%.2f%%", 
-                  pmem.consumed_pg * 4096, 
+                  pmem.consumed_pg * 4096 / 1024, 
                   pmem.consumed_pg, pmem.utilisation * 100)
         
         pp.printf("Fragmentations: %d ~%.2f%%", pmem.discontig, pmem.fragmentation * 100)
         pp.print()
         
         pp.print("Distribution")
+        pp.print("( . = empty, * = full, [0-9]0% full )")
         pp2 = pp.next_level(2)
         row = []
         for i in range(0, len(pmem.mem_distr)):
@@ -45,7 +46,7 @@ class MMStats(LunadbgCommand):
             if ratio == 0:
                 row.append('.')
             elif ratio == 1:
-                row.append('F')
+                row.append('*')
             else:
                 row.append(str(cat))
                 
@@ -79,8 +80,7 @@ class MMStats(LunadbgCommand):
         else:
             print("unknow mem type:", optn.state_type)
 
-    def invoke(self, argument: str, from_tty: bool) -> None:
-        optn = self._parse_args(argument)
+    def on_execute(self, optn, gdb_args, from_tty) -> None:
         pp = MyPrettyPrinter()
 
         if optn.cmd == 'stats':
