@@ -11,7 +11,7 @@ ioremap(ptr_t paddr, u32_t size)
     void* ptr = (void*)vmap(paddr, size, KERNEL_DATA);
 
     if (ptr) {
-        pmm_mark_chunk_occupied(pfn(paddr), leaf_count(size), PP_FGLOCKED);
+        pmm_reserve_range(pfn(paddr), leaf_count(size), PP_FGLOCKED);
     }
 
     return ptr;

@@ -156,7 +156,7 @@ __handle_named_region(struct fault_context* fault)
     struct v_file* file = vmr->mfile;
 
     pte_t pte       = fault->resolving;
-    ptr_t fault_va  = va_align(fault->fault_va);
+    ptr_t fault_va  = page_aligned(fault->fault_va);
 
     u32_t mseg_off  = (fault_va - vmr->start);
     u32_t mfile_off = mseg_off + vmr->foff;

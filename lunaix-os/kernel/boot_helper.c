@@ -30,7 +30,7 @@ boot_begin(struct boot_handoff* bhctx)
         pfn_t start_pfn = pfn(mmapent->start);
 
         if (mmapent->type == BOOT_MMAP_FREE) {
-            pmm_mark_chunk_free(start_pfn, size_pg);
+            pmm_unreserve_range(start_pfn, size_pg);
             continue;
         }
     }
@@ -40,7 +40,7 @@ boot_begin(struct boot_handoff* bhctx)
         struct boot_modent* mod = &bhctx->mods.entries[i];
         unsigned int counts = leaf_count(mod->end - mod->start);
 
-        pmm_mark_chunk_occupied(pfn(mod->start), counts, PP_FGLOCKED);
+        pmm_reserve_range(pfn(mod->start), counts);
     }
 }
 
@@ -60,7 +60,7 @@ boot_end(struct boot_handoff* bhctx)
         size_t size_pg = leaf_count(mmapent->size);
 
         if (mmapent->type == BOOT_MMAP_RCLM) {
-            pmm_mark_chunk_free(pfn(mmapent->start), size_pg);
+            pmm_unreserve_range(pfn(mmapent->start), size_pg);
         }
 
         if (mmapent->type == BOOT_MMAP_FREE) {

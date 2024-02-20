@@ -130,7 +130,7 @@ region_get(vm_regions_t* lead, unsigned long vaddr)
 
     struct mm_region *pos, *n;
 
-    vaddr = va_align(vaddr);
+    vaddr = page_aligned(vaddr);
 
     llist_for_each(pos, n, lead, head)
     {

@@ -272,7 +272,7 @@ procvm_enter_remote(struct remote_vmctx* rvmctx, struct proc_mm* mm,
     rvmctx->vms_mnt = vm_mnt;
     rvmctx->page_cnt = size_pn;
 
-    remote_base = va_align(remote_base);
+    remote_base = page_aligned(remote_base);
     rvmctx->remote = remote_base;
     rvmctx->local_mnt = PG_MOUNT_4_END + 1;
 

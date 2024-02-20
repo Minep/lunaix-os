@@ -36,7 +36,7 @@ kmem_init(struct boot_handoff* bhctx);
 void
 kernel_bootstrap(struct boot_handoff* bhctx)
 {
-    pmm_init(bhctx->mem.size);
+    pmm_init(bhctx);
     vmm_init();
 
     /* Begin kernel bootstrapping sequence */
@@ -125,7 +125,7 @@ kmem_init(struct boot_handoff* bhctx)
     extern u8_t __kexec_end;
     // 将内核占据的页，包括前1MB，hhk_init 设为已占用
     size_t pg_count = leaf_count((ptr_t)&__kexec_end - KERNEL_RESIDENT);
-    pmm_mark_chunk_occupied(0, pg_count, PP_FGLOCKED);
+    pmm_reserve_range(0, pg_count);
 
     pte_t* ptep = mkptep_va(VMS_SELF, KERNEL_RESIDENT);
     ptep = mkl0tep(ptep);

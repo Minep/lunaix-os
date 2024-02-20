@@ -432,13 +432,23 @@ page_addr(ptr_t pfn) {
 }
 
 static inline ptr_t
-va_align(ptr_t va) {
+page_aligned(ptr_t va) {
     return va & ~PAGE_MASK;
 }
 
 static inline ptr_t
-va_alignup(ptr_t va) {
+page_upaligned(ptr_t va) {
     return (va + PAGE_MASK) & ~PAGE_MASK;
+}
+
+static inline ptr_t
+napot_aligned(ptr_t va, size_t napot_sz) {
+    return va & ~napot_sz;
+}
+
+static inline ptr_t
+napot_upaligned(ptr_t va, size_t napot_sz) {
+    return (va + napot_sz) & ~napot_sz;
 }
 
 static inline pte_t*

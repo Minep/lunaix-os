@@ -32,17 +32,17 @@ elf32_smap(struct load_context* ldctx,
     struct mmap_param param = { .vms_mnt = container->vms_mnt,
                                 .pvms = vmspace(container->proc),
                                 .proct = proct,
-                                .offset = va_align(phdre->p_offset),
-                                .mlen = va_alignup(phdre->p_memsz),
+                                .offset = page_aligned(phdre->p_offset),
+                                .mlen = page_upaligned(phdre->p_memsz),
                                 .flags = MAP_FIXED | MAP_PRIVATE,
                                 .type = REGION_TYPE_CODE };
 
     struct mm_region* seg_reg;
-    int status = mmap_user(NULL, &seg_reg, va_align(va), elfile, &param);
+    int status = mmap_user(NULL, &seg_reg, page_aligned(va), elfile, &param);
 
     if (!status) {
         size_t next_addr = phdre->p_memsz + va;
-        ldctx->end = MAX(ldctx->end, va_alignup(next_addr));
+        ldctx->end = MAX(ldctx->end, page_upaligned(next_addr));
         ldctx->mem_sz += phdre->p_memsz;
     } else {
         // we probably fucked up our process

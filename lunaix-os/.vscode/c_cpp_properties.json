@@ -12,7 +12,8 @@
                 "-ffreestanding",
                 "-D__ARCH__=i386",
                 "-D__LUNAIXOS_DEBUG__",
-                "-include flags.h"
+                "-include flags.h",
+                "-include config.h"
             ],
             "defines": [],
             "compilerPath": "${HOME}/opt/i686-gcc-12/bin/i686-elf-gcc",

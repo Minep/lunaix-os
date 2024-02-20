@@ -9,6 +9,11 @@
 static ptr_t start = VMAP;
 static volatile ptr_t prev_va = 0;
 
+void
+vmap_set_start(ptr_t start_addr) {
+    start = start_addr;
+}
+
 static pte_t*
 __alloc_contig_ptes(pte_t* ptep, size_t base_sz, int n)
 {

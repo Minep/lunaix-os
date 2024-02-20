@@ -224,4 +224,7 @@ vmap(ptr_t paddr, size_t size, pte_attr_t prot)
     return vmap_ptes_at(_pte, LFT_SIZE, leaf_count(size));
 }
 
+void
+vmap_set_start(ptr_t start_addr);
+
 #endif /* __LUNAIX_VMM_H */

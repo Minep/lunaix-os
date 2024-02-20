@@ -168,7 +168,7 @@ mem_map(void** addr_out,
 {
     assert_msg(addr, "addr can not be NULL");
 
-    ptr_t last_end = USR_EXEC, found_loc = va_align(addr);
+    ptr_t last_end = USR_EXEC, found_loc = page_aligned(addr);
     struct mm_region *pos, *n;
 
     vm_regions_t* vm_regions = &param->pvms->regions;
@@ -253,7 +253,7 @@ mem_sync_pages(ptr_t mnt,
     }
     
     pte_t* ptep = mkptep_va(mnt, start);
-    ptr_t va    = va_align(start);
+    ptr_t va    = page_aligned(start);
 
     for (; va < start + length; va += PAGE_SIZE, ptep++) {
         pte_t pte = vmm_tryptep(ptep, LFT_SIZE);
@@ -431,7 +431,7 @@ int
 mem_unmap(ptr_t mnt, vm_regions_t* regions, ptr_t addr, size_t length)
 {
     length = ROUNDUP(length, PAGE_SIZE);
-    ptr_t cur_addr = va_align(addr);
+    ptr_t cur_addr = page_aligned(addr);
     struct mm_region *pos, *n;
 
     llist_for_each(pos, n, regions, head)
