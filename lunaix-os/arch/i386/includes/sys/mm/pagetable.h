@@ -150,6 +150,12 @@ pte_setpaddr(pte_t pte, ptr_t paddr)
     return __mkpte_from((pte.val & _PAGE_BASE_MASK) | (paddr & ~_PAGE_BASE_MASK));
 }
 
+static inline pte_t
+pte_setppfn(pte_t pte, pfn_t ppfn)
+{
+    return __mkpte_from((pte.val & _PAGE_BASE_MASK) | (ppfn * PAGE_SIZE));
+}
+
 static inline ptr_t
 pte_paddr(pte_t pte)
 {

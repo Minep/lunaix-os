@@ -12,8 +12,7 @@
 
 #include <klibc/string.h>
 #include <lunaix/mm/cake.h>
-#include <lunaix/mm/pmm.h>
-#include <lunaix/mm/vmm.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 
@@ -28,11 +27,12 @@ struct llist_header piles = { .next = &piles, .prev = &piles };
 void*
 __alloc_cake(unsigned int cake_pg)
 {
-    ptr_t pa = (ptr_t)pmm_alloc_cpage(cake_pg, 0);
-    if (!pa) {
+    struct leaflet* leaflet = alloc_leaflet(count_order(cake_pg));
+    if (!leaflet) {
         return NULL;
     }
-    return (void*)vmap(pa, cake_pg * PAGE_SIZE, KERNEL_DATA);
+    
+    return (void*)vmap(leaflet, KERNEL_DATA);
 }
 
 struct cake_s*

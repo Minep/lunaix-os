@@ -112,16 +112,6 @@ vmm_lookupat(ptr_t mnt, ptr_t va, pte_t* pte_out)
     return !pte_isnull(pte);
 }
 
-
-/**
- * @brief (COW) 为虚拟页创建副本。
- *
- * @return void* 包含虚拟页副本的物理页地址。
- *
- */
-ptr_t
-vmm_dup_page(ptr_t pa);
-
 /**
  * @brief 挂载另一个虚拟地址空间至当前虚拟地址空间
  *
@@ -180,48 +170,6 @@ static inline ptr_t
 vmm_v2p(ptr_t va)
 {
     return vmm_v2pat(VMS_SELF, va);
-}
-
-/**
- * @brief Maps a number of contiguous ptes in kernel 
- *        address space
- * 
- * @param pte the pte to be mapped
- * @param lvl_size size of the page pointed by the given pte
- * @param n number of ptes
- * @return ptr_t 
- */
-ptr_t
-vmap_ptes_at(pte_t pte, size_t lvl_size, int n);
-
-/**
- * @brief Maps a number of contiguous ptes in kernel 
- *        address space (leaf page size)
- * 
- * @param pte the pte to be mapped
- * @param n number of ptes
- * @return ptr_t 
- */
-static inline ptr_t
-vmap_leaf_ptes(pte_t pte, int n)
-{
-    return vmap_ptes_at(pte, LFT_SIZE, n);
-}
-
-/**
- * @brief Maps a contiguous range of physical address 
- *        into kernel address space (leaf page size)
- * 
- * @param paddr start of the physical address range
- * @param size size of the physical range
- * @param prot default protection to be applied
- * @return ptr_t 
- */
-static inline ptr_t
-vmap(ptr_t paddr, size_t size, pte_attr_t prot)
-{
-    pte_t _pte = mkpte(paddr, prot);
-    return vmap_ptes_at(_pte, LFT_SIZE, leaf_count(size));
 }
 
 void

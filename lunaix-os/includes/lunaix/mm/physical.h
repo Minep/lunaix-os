@@ -29,9 +29,17 @@ struct ppage
     unsigned int refs;
     union {
         struct {
-            unsigned short flags:8;
-            unsigned short pool:4;
-            unsigned short type:4;
+            union {
+                struct {
+                    unsigned char flags:2;
+                    unsigned char order:6;
+                };
+                unsigned char top_flags;
+            };
+            struct {
+                unsigned char pool:4;
+                unsigned char type:4;
+            };
         };
         unsigned short attr;
     };

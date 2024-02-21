@@ -25,7 +25,7 @@ pmm_init_begin(struct boot_handoff* bctx)
 }
 
 void
-pmm_init_freeze_range(ptr_t start, size_t n) {
+pmm_init_freeze_range(pfn_t start, size_t n) {
     assert(memory.state == PMM_IN_INIT);
     
     struct llist_header* rsvd = &memory.reserved;
@@ -34,7 +34,7 @@ pmm_init_freeze_range(ptr_t start, size_t n) {
         companion_off = MIN(MAX_GROUP_PAGE_SIZE, n);
 
         // reserve
-        struct ppage* page = __ppage(start);
+        struct ppage* page = ppage(start);
         for(size_t i = 0; i < companion_off; i++) {
             page[i] = (struct ppage) {
                 .type = PP_RESERVED,
@@ -81,7 +81,7 @@ pmm_init_end() {
         struct pmem_pool* pool;
         for (int i = 0; i < POOL_COUNT || (pool = NULL); i++)
         {
-            pool = &memory.pool[0];
+            pool = &memory.pool[i];
             if (pool->pool_start <= __ppfn(start) 
                 && __ppfn(start) <= pool->pool_end) 
             {
@@ -97,6 +97,34 @@ pmm_init_end() {
         start = rsvd_tailpage + 1;
     }
     
+}
+
+bool
+pmm_onhold_range(pfn_t start, size_t npages)
+{
+    
+    struct ppage *_start, *_end, 
+                 *_mark_start, *_mark_end;
+
+    _start = ppage(start);
+    _end = ppage(start + npages);
+    
+    struct pmem_pool* pool;
+    for (int i = 0; i < POOL_COUNT; i++) {
+        pool = &memory.pool[i];
+        if (pool->pool_start > _start && _end > pool->pool_end) {
+            continue;
+        }
+
+        _mark_start = MAX(pool->pool_start, _start);
+        _mark_end   = MIN(pool->pool_end, _end);
+        if (pmm_allocator_trymark_onhold(pool, _mark_start, _mark_end))
+        {
+            npages -= ((ptr_t)_mark_end - (ptr_t)_mark_start) + 1;
+        }
+    }
+
+    return !npages;
 }
 
 struct pmem_pool*

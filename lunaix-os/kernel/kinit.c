@@ -36,11 +36,16 @@ kmem_init(struct boot_handoff* bhctx);
 void
 kernel_bootstrap(struct boot_handoff* bhctx)
 {
-    pmm_init(bhctx);
     vmm_init();
+
+    pmm_init_begin(bhctx);
+    // now we can start reserving physical space
 
     /* Begin kernel bootstrapping sequence */
     boot_begin(bhctx);
+
+    pmm_init_end();
+    // can't reserve after this point
 
     /* Setup kernel memory layout and services */
     kmem_init(bhctx);
@@ -122,11 +127,6 @@ spawn_lunad()
 void
 kmem_init(struct boot_handoff* bhctx)
 {
-    extern u8_t __kexec_end;
-    // 将内核占据的页，包括前1MB，hhk_init 设为已占用
-    size_t pg_count = leaf_count((ptr_t)&__kexec_end - KERNEL_RESIDENT);
-    pmm_reserve_range(0, pg_count);
-
     pte_t* ptep = mkptep_va(VMS_SELF, KERNEL_RESIDENT);
     ptep = mkl0tep(ptep);
 

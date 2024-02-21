@@ -60,23 +60,49 @@ struct pmem
 
 
 static inline struct ppage*
-ppage(pfn_t pfn) {
+ppage(pfn_t pfn) 
+{
     return (struct ppage*)(PPLIST_STARTVM + pfn);
 }
 
 static inline struct ppage*
-ppage_of(struct pmem_pool* pool, pfn_t pfn) {
+ppage_of(struct pmem_pool* pool, pfn_t pfn) 
+{
     return pool->pool_start + pfn;
 }
 
 static inline pfn_t
-ppfn(struct ppage* page) {
+ppfn(struct ppage* page) 
+{
     return (pfn_t)((ptr_t)page - PPLIST_STARTVM);
 }
 
 static inline pfn_t
-ppfn_of(struct pmem_pool* pool, struct ppage* page) {
+ppfn_of(struct pmem_pool* pool, struct ppage* page) 
+{
     return (pfn_t)((ptr_t)page - (ptr_t)pool->pool_start);
+}
+
+static inline ptr_t
+ppage_addr(struct ppage* page) {
+    return ppfn(page) * PAGE_SIZE;
+}
+
+static inline unsigned int
+count_order(size_t page_count) {
+    unsigned int po = ILOG2(page_count);
+    assert(!(page_count % (1 << po)));
+    return po;
+}
+
+static inline unsigned int
+size_order(size_t page_size) {
+    return count_order(page_size / PAGE_SIZE);
+}
+
+static inline unsigned int
+ppage_order(struct ppage* page) {
+    return page->order;
 }
 
 /**
@@ -88,7 +114,7 @@ void
 pmm_init_begin(struct boot_handoff* bctx);
 
 void
-pmm_init_freeze_range(ptr_t start, size_t n);
+pmm_init_freeze_range(pfn_t start, size_t n);
 
 void
 pmm_init_end();
@@ -130,14 +156,10 @@ change_page_type(struct ppage* page, pp_attr_t type)
     page->type = type;
 }
 
+bool
+pmm_onhold_range(pfn_t start, size_t npages);
 
 // ---- allocator specific ----
-
-void
-pmm_allocator_init(struct pmem* memory);
-
-void
-pmm_build_free_list(struct pmem_pool* pool);
 
 void
 pmm_free_one(struct ppage* page, int type_mask);
@@ -152,93 +174,17 @@ leading_page(struct ppage* page) {
 
 // ---- 
 
-
-/**
- * @brief 标注物理页为可使用
- *
- * @param ppn page number
- */
-void
-pmm_reclaim_range(ptr_t ppn, pp_attr_t attr);
-
-/**
- * @brief 标注物理页为已占用
- *
- * @param ppn
- */
-void
-pmm_acclaim_range(ptr_t ppn, pp_attr_t attr);
-
-/**
- * @brief 标注多个连续的物理页为可用
- *
- * @param start_ppn 起始PPN
- * @param page_count 数量
- */
-void
-pmm_unreserve_range(ptr_t start_ppn, size_t page_count);
-
-/**
- * @brief 标注多个连续的物理页为已占用
- *
- * @param start_ppn 起始PPN
- * @param page_count 数量
- */
-void
-pmm_reserve_range(u32_t start_ppn, size_t page_count);
-
-/**
- * @brief 分配一个可用的物理页
- *
- * @return void* 可用的页地址，否则为 NULL
- */
-ptr_t
-pmm_alloc_page(pp_attr_t attr);
-
-/**
- * @brief 分配一个连续的物理内存区域
- *
- * @param owner
- * @param num_pages 区域大小，单位为页
- * @param attr
- * @return ptr_t
- */
-ptr_t
-pmm_alloc_cpage(size_t num_pages, pp_attr_t attr);
-
-
-
-struct pp_struct*
-pmm_query(ptr_t pa);
-
-/**
- * @brief Free a normal physical page
- *
- * @param page 页地址
- * @return 是否成功
- */
-static inline int
-pmm_free_page(ptr_t page)
+static inline struct ppage*
+pmm_alloc_normal(size_t order)
 {
-    return pmm_free_one(page, 0);
+    return pmm_alloc_napot_type(POOL_UNIFIED, order, 0);
 }
 
-/**
- * @brief Free physical page regardless of it's attribute
- * 
- * @param page 
- * @return int 
- */
-static inline int
-pmm_free_any(ptr_t page)
+static inline struct ppage*
+pmm_alloc_locked(size_t order)
 {
-    return pmm_free_one(page, -1);
+    return pmm_alloc_napot_type(POOL_UNIFIED, order, PP_FGLOCKED);
 }
 
-int
-pmm_ref_page(ptr_t page);
-
-void
-pmm_set_attr(ptr_t page, pp_attr_t attr);
 
 #endif /* __LUNAIX_PMM_H */

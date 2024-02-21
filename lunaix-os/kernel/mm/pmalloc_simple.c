@@ -39,18 +39,6 @@ __set_page_uninitialized(struct ppage* page)
     page->flags &= ~INIT_FLAG;
 }
 
-static inline void
-__set_page_order(struct ppage* page, int order)
-{
-    page->flags = page->flags & ~PO_FLAGS | order & PO_FLAGS;
-}
-
-static inline int
-__page_order(struct ppage* page)
-{
-    return page->flags & PO_FLAGS;
-}
-
 void
 pmm_allocator_init(struct pmem* memory)
 {
@@ -70,7 +58,7 @@ pmm_free_one(struct ppage* page, int type_mask)
         return;
     }
 
-    int order = __page_order(page);
+    int order = page->order;
     assert(order <= MAX_PAGE_ORDERS);
 
     struct llist_header* bucket = &pool->idle_order[order];
@@ -165,6 +153,33 @@ pmm_allocator_add_freehole(struct pmem_pool* pool, struct ppage* start, struct p
     for (; start <= end; start++) {
         *start = (struct ppage){ };
     }
+}
+
+bool
+pmm_allocator_trymark_onhold(struct pmem_pool* pool, struct ppage* start, struct ppage* end)
+{
+    while (start <= end) {
+        if (__uninitialized_page(start)) {
+            set_reserved(start);
+        }
+        else if (!start->refs) {
+            struct ppage* lead = leading_page(start);
+            llist_delete(lead);
+
+            for (int i = 0; i < (1 << lead->order); i++) {
+                __set_page_uninitialized(&lead[i]);
+            }
+            
+            continue;
+        }
+        else {
+            return false;
+        }
+
+        start++;
+    }
+
+    return true;
 }
 
 #endif

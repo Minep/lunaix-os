@@ -1,23 +1,26 @@
-#include <lunaix/mm/vmm.h>
-#include <lunaix/mm/pmm.h>
+#include <lunaix/mm/page.h>
 #include <sys/mm/mm_defs.h>
 
-ptr_t
-vmm_dup_page(ptr_t pa)
+struct leaflet*
+dup_leaflet(struct leaflet* leaflet)
 {
-    ptr_t new_ppg = pmm_alloc_page(0);
-    mount_page(PG_MOUNT_3, new_ppg);
-    mount_page(PG_MOUNT_4, pa);
+    ptr_t dest_va, src_va;
+    struct leaflet* new_leaflet;
+    
+    new_leaflet = alloc_leaflet(leaflet_order(leaflet));
+
+    src_va = leaflet_mount(leaflet);
+    dest_va = vmap(new_leaflet, KERNEL_DATA);
 
     asm volatile("movl %1, %%edi\n"
                  "movl %2, %%esi\n"
                  "rep movsl\n" ::"c"(1024),
-                 "r"(PG_MOUNT_3),
-                 "r"(PG_MOUNT_4)
+                 "r"(dest_va),
+                 "r"(src_va)
                  : "memory", "%edi", "%esi");
 
-    unmount_page(PG_MOUNT_3);
-    unmount_page(PG_MOUNT_4);
+    leaflet_unmount(leaflet);
+    vunmap(dest_va, new_leaflet);
 
-    return new_ppg;
+    return new_leaflet;
 }

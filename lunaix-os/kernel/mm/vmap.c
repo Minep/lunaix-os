@@ -1,6 +1,5 @@
-#include <lunaix/mm/pmm.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/mm/valloc.h>
-#include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 
@@ -72,5 +71,21 @@ vmap_ptes_at(pte_t pte, size_t lvl_size, int n)
 
     vmm_set_ptes_contig(ptep, pte, lvl_size, n);
 
-    return page_addr(ptep_pfn(ptep));
+    ptr_t va = page_addr(ptep_pfn(ptep));
+
+    // FIXME flush range
+    cpu_flush_page(va);
+    return va;
+}
+
+void
+vunmap(ptr_t ptr, struct leaflet* leaflet)
+{
+    assert(start <= ptr && ptr <= VMAP_END);
+
+    pte_t* ptep = mkl0tep_va(VMS_SELF, ptr);
+    vmm_unset_ptes(ptep, leaflet_nfold(leaflet));
+
+    // FIXME flush range
+    cpu_flush_page(ptr);
 }

@@ -1,6 +1,5 @@
 #include <klibc/string.h>
-#include <lunaix/mm/pmm.h>
-#include <lunaix/mm/vmm.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 
@@ -16,22 +15,20 @@ vmm_init()
 }
 
 pte_t 
-vmm_alloc_page(pte_t* ptep, pte_t pte)
+alloc_page_at(pte_t* ptep, pte_t pte, int order)
 {
-    ptr_t pa = pmm_alloc_page(PP_FGPERSIST);
-    if (!pa) {
+    ptr_t mnt;
+    struct leaflet* leaflet = alloc_leaflet_pinned(order);
+
+    if (!leaflet) {
         return null_pte;
     }
 
-    pte = pte_setpaddr(pte, pa);
-    pte = pte_mkloaded(pte);
-    set_pte(ptep, pte);
+    ptep_map_leaflet(ptep, pte, leaflet);
 
-    mount_page(PG_MOUNT_1, pa);
-    memset((void*)PG_MOUNT_1, 0, LFT_SIZE);
-    unmount_page(PG_MOUNT_1);
-
-    cpu_flush_page((ptr_t)ptep);
+    mnt = leaflet_mount(leaflet);
+    memset(mnt, 0, LFT_SIZE);
+    leaflet_unmount(leaflet);
 
     return pte;
 }

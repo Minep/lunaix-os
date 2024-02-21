@@ -1,7 +1,6 @@
 #include <lunaix/mm/region.h>
 #include <lunaix/mm/valloc.h>
-#include <lunaix/mm/vmm.h>
-#include <lunaix/mm/pmm.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/mm/mmap.h>
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
@@ -59,6 +58,8 @@ __dup_fdtable(struct proc_info* pcb)
 static void
 __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
 {
+    struct leaflet* leaflet;
+
     ptr_t kstack_pn = pfn(current_thread->kstack);
     kstack_pn -= pfn(KSTACK_SIZE) - 1;
 
@@ -71,8 +72,8 @@ __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
         if (pte_isguardian(p)) {
             set_pte(dest_ptep, guard_pte);
         } else {
-            ptr_t ppa = vmm_dup_page(pte_paddr(p));
-            set_pte(dest_ptep, pte_setpaddr(p, ppa));
+            leaflet = dup_leaflet(pte_paddr(p));
+            ptep_map_leaflet(dest_ptep, p, leaflet);
         }
 
         src_ptep++;

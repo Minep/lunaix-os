@@ -1,8 +1,7 @@
 #include <lunaix/mm/procvm.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/region.h>
-#include <lunaix/mm/pmm.h>
-#include <lunaix/mm/vmm.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/mm/mmap.h>
 #include <lunaix/process.h>
 
@@ -23,6 +22,12 @@ procvm_create(struct proc_info* proc) {
     return mm;
 }
 
+static unsigned int
+__ptep_advancement(struct leaflet* leaflet, int level)
+{
+    return (1 << (leaflet_order(leaflet) % (level * LEVEL_SHIFT))) - 1;
+}
+
 static ptr_t
 vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
 {
@@ -36,7 +41,7 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
     pte_t* ptep_ssm     = mkptep_va(VMS_SELF, (ptr_t)ptep_sms);
     pte_t  pte_sms      = mkpte_prot(KERNEL_DATA);
 
-    pte_sms = vmm_alloc_page(ptep_ssm, pte_sms);
+    pte_sms = alloc_page_at(ptep_ssm, pte_sms, 0);
     set_pte(ptep_sms, pte_sms);    
     
     cpu_flush_page((ptr_t)dest_mnt);
@@ -50,10 +55,11 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
     }
 
     int level = 0;
+    struct leaflet* leaflet;
+
     while (ptep < ptep_kernel)
     {
         pte_t pte = *ptep;
-        ptr_t pa  = pte_paddr(pte);
 
         if (pte_isnull(pte)) {
             goto cont;
@@ -62,11 +68,18 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
         if (pt_last_level(level) || pte_huge(pte)) {
             set_pte(ptep_dest, pte);
             
-            if (pte_isloaded(pte))
-                pmm_ref_page(pa);
+            if (pte_isloaded(pte)) {
+                // ensure no leaflet is partially mapped.
+                leaflet = pte_leaflet_aligned(pte);
+
+                leaflet_borrow(leaflet);
+                
+                // (contig pte mappings) skipped the un-aligned orders of entries
+                ptep += __ptep_advancement(leaflet, level);
+            }
         }
         else if (!pt_last_level(level)) {
-            vmm_alloc_page(ptep_dest, pte);
+            alloc_page_at(ptep_dest, pte, 0);
 
             ptep = ptep_step_into(ptep);
             ptep_dest = ptep_step_into(ptep_dest);
@@ -96,8 +109,14 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
         pte_t pte = *ptep;
         assert(!pte_isnull(pte));
 
+        // Ensure it is a next level pagetable,
+        //  we MAY relax this later allow kernel
+        //  to have huge leaflet mapped at L0T
+        leaflet = pte_leaflet_aligned(pte);
+        assert(leaflet_order(leaflet) == 0);
+
         set_pte(ptep_dest, pte);
-        pmm_ref_page(pte_paddr(pte));
+        leaflet_borrow(leaflet);
         
         ptep++;
         ptep_dest++;
@@ -109,6 +128,7 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
 static void
 vmsfree(ptr_t vm_mnt)
 {
+    struct leaflet* leaflet;
     pte_t* ptep_head    = mkl0tep(mkptep_va(vm_mnt, 0));
     pte_t* ptep_kernel  = mkl0tep(mkptep_va(vm_mnt, KERNEL_RESIDENT));
 
@@ -130,21 +150,29 @@ vmsfree(ptr_t vm_mnt)
             continue;
         }
 
-        if (pte_isloaded(pte))
-            pmm_free_any(pa);
+        if (pte_isloaded(pte)) {
+            leaflet = pte_leaflet_aligned(pte);
+            leaflet_return(leaflet);
+
+            ptep += __ptep_advancement(leaflet, level);
+        }
 
     cont:
         if (ptep_vfn(ptep) == MAX_PTEN - 1) {
             ptep = ptep_step_out(ptep);
-            pmm_free_any(pte_paddr(pte_at(ptep)));
+            leaflet = pte_leaflet_aligned(pte_at(ptep));
+            
+            assert(leaflet_order(leaflet) == 0);
+            leaflet_return(leaflet);
+            
             level--;
         }
 
         ptep++;
     }
 
-    ptr_t self_pa = pte_paddr(ptep_head[MAX_PTEN - 1]);
-    pmm_free_any(self_pa);
+    leaflet = pte_leaflet_aligned(ptep_head[MAX_PTEN - 1]);
+    leaflet_return(leaflet);
 }
 
 static inline void
@@ -274,7 +302,7 @@ procvm_enter_remote(struct remote_vmctx* rvmctx, struct proc_mm* mm,
 
     remote_base = page_aligned(remote_base);
     rvmctx->remote = remote_base;
-    rvmctx->local_mnt = PG_MOUNT_4_END + 1;
+    rvmctx->local_mnt = PG_MOUNT_VAR;
 
     pte_t* rptep = mkptep_va(vm_mnt, remote_base);
     pte_t* lptep = mkptep_va(VMS_SELF, rvmctx->local_mnt);
@@ -288,7 +316,7 @@ procvm_enter_remote(struct remote_vmctx* rvmctx, struct proc_mm* mm,
             continue;
         }
 
-        ptr_t pa = pmm_alloc_page(0);
+        ptr_t pa = ppage_addr(pmm_alloc_normal(0));
         set_pte(lptep, mkpte(pa, KERNEL_DATA));
         set_pte(rptep, mkpte(pa, pattr));
     }

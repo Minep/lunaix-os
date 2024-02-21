@@ -135,7 +135,7 @@ typedef struct __pte pte_t;
     })
 
 pte_t 
-vmm_alloc_page(pte_t* ptep, pte_t pte);
+alloc_page_at(pte_t* ptep, pte_t pte, int order);
 
 /**
  * @brief Try page walk to the pte pointed by ptep and 
@@ -155,7 +155,7 @@ __alloc_level(pte_t* ptep, pte_t pte, pte_attr_t prot)
     }
 
     pte = pte_setprot(pte, prot);
-    return !pte_isnull(vmm_alloc_page(ptep, pte));
+    return !pte_isnull(alloc_page_at(ptep, pte, 0));
 }
 
 /**
