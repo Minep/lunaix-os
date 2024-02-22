@@ -6,6 +6,7 @@
 .section .bss
     .align 16
     .skip 2048, 0
+    .global __kinit_stack_top
     __kinit_stack_top:
     # TODO 
     # This stack was too small that corrupt the ambient kernel structures.

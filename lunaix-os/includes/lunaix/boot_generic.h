@@ -73,13 +73,19 @@ boot_cleanup();
 static inline bool
 free_memregion(struct boot_mmapent* mmapent)
 {
-    return !!(mmapent->type & BOOT_MMAP_FREE);
+    return !mmapent->type;
 }
 
 static inline bool
 reserved_memregion(struct boot_mmapent* mmapent)
 {
     return !!(mmapent->type & BOOT_MMAP_RSVD);
+}
+
+static inline bool
+reclaimable_memregion(struct boot_mmapent* mmapent)
+{
+    return !!(mmapent->type & BOOT_MMAP_RCLM);
 }
 
 #endif

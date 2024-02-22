@@ -105,6 +105,7 @@ __prepare_fault_context(struct fault_context* fault)
         fault->resolving = pte_setprot(fault_pte, KERNEL_DATA);
     }
 
+    fault->resolving = pte_mkloaded(fault->resolving);
     fault->kernel_vmfault = kernel_vmfault;
     fault->kernel_access  = kernel_context(fault->ictx);
 

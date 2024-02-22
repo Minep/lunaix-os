@@ -9,7 +9,7 @@ ioremap(ptr_t paddr, u32_t size)
     //       arch-dependent caching behaviour
 
     pfn_t start = pfn(paddr);
-    size_t npages = leaf_count(paddr);
+    size_t npages = leaf_count(size);
     
     // Ensure the range is reservable (not already in use)
     assert(pmm_onhold_range(start, npages));

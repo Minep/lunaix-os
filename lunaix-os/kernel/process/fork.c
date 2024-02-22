@@ -72,7 +72,7 @@ __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
         if (pte_isguardian(p)) {
             set_pte(dest_ptep, guard_pte);
         } else {
-            leaflet = dup_leaflet(pte_paddr(p));
+            leaflet = dup_leaflet(pte_leaflet(p));
             ptep_map_leaflet(dest_ptep, p, leaflet);
         }
 

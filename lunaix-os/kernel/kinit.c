@@ -38,14 +38,11 @@ kernel_bootstrap(struct boot_handoff* bhctx)
 {
     vmm_init();
 
-    pmm_init_begin(bhctx);
+    pmm_init(bhctx);
     // now we can start reserving physical space
 
     /* Begin kernel bootstrapping sequence */
     boot_begin(bhctx);
-
-    pmm_init_end();
-    // can't reserve after this point
 
     /* Setup kernel memory layout and services */
     kmem_init(bhctx);

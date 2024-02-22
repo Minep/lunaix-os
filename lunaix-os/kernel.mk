@@ -29,6 +29,7 @@ kinc_opts := $(addprefix -I,$(kinc_dirs))
 
 
 CFLAGS += -include flags.h
+CFLAGS += -include config.h
 
 %.S.o: %.S
 	$(call status_,AS,$<)

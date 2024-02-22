@@ -1,4 +1,4 @@
-#include <lunaix/mm/vmm.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
@@ -79,7 +79,12 @@ ksym_getstr(struct ksym_entry* sym)
 
 static inline bool valid_fp(ptr_t ptr) {
     ptr_t start = ROUNDUP(current_thread->kstack - KSTACK_SIZE, MEM_PAGE);
-    return start < ptr && ptr < current_thread->kstack;
+
+    // FIXME temporary hard-wired here, just to get trace recognise boot stack
+    //       need better abstraction!
+    extern int __kinit_stack_top[];
+    return (start < ptr && ptr < current_thread->kstack) ||
+           ((ptr_t)__kinit_stack_top - 2048 <= ptr && ptr <= (ptr_t)__kinit_stack_top);
 }
 
 int

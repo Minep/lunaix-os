@@ -117,6 +117,9 @@ cake_new_pile(char* name,
 {
     struct cake_pile* pile = (struct cake_pile*)cake_grab(&master_pile);
 
+    // must aligned to napot order!
+    assert(is_pot(pg_per_cake));
+
     __init_pile(pile, name, piece_size, pg_per_cake, options);
 
     return pile;

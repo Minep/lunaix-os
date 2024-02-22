@@ -20,7 +20,7 @@ __pcache_try_evict(struct lru_node* obj)
 static void
 pcache_free_page(void* va)
 {
-    pte_t* ptep = mkptep_va(VMS_SELF, va);
+    pte_t* ptep = mkptep_va(VMS_SELF, (ptr_t)va);
     pte_t pte = pte_at(ptep);
     leaflet_return(pte_leaflet(pte));
 }

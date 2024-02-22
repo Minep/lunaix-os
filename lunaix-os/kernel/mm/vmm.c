@@ -27,7 +27,7 @@ alloc_page_at(pte_t* ptep, pte_t pte, int order)
     ptep_map_leaflet(ptep, pte, leaflet);
 
     mnt = leaflet_mount(leaflet);
-    memset(mnt, 0, LFT_SIZE);
+    memset((void*)mnt, 0, leaflet_size(leaflet));
     leaflet_unmount(leaflet);
 
     return pte;

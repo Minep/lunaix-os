@@ -2,28 +2,23 @@
 #include <lunaix/mm/vmm.h>
 #include <lunaix/mm/pagetable.h>
 
+extern unsigned int __kexec_end[];
+
 void
 pmm_arch_init_pool(struct pmem* memory)
 {
-    struct pmem_pool* pool = &memory->pool[POOL_UNIFIED];
-
-    pool->type = POOL_UNIFIED;
-    pool->pool_end = &memory->pplist[memory->size - 1];
-    pool->pool_start = &memory->pplist[1];   // skip first page
-
-    pmm_build_free_list(pool);
+    pmm_declare_pool(POOL_UNIFIED, 1, memory->list_len);
 }
 
-void
-pmm_arch_init_begin(struct pmem* memory, struct boot_handoff* bctx)
+ptr_t
+pmm_arch_init_remap(struct pmem* memory, struct boot_handoff* bctx)
 {
-    memory->state = PMM_IN_INIT;
-
     size_t ppfn_total = pfn(bctx->mem.size) + 1;
     size_t pool_size  = ppfn_total * sizeof(struct ppage);
     
+    size_t i = 0;
     struct boot_mmapent* ent;
-    for (int i = 0; i < bctx->mem.mmap_len; i++) {
+    for (; i < bctx->mem.mmap_len; i++) {
         ent = &bctx->mem.mmap[i];
         if (free_memregion(ent) && ent->size > pool_size) {
             goto found;
@@ -31,10 +26,24 @@ pmm_arch_init_begin(struct pmem* memory, struct boot_handoff* bctx)
     }
 
     // fail to find a viable free region to host pplist
-    spin();
+    return 0;
 
 found:;
-    ptr_t aligned_pplist = page_upaligned(ent->start);
+    ptr_t kexec_end = to_kphysical(__kexec_end);
+    ptr_t aligned_pplist = MAX(ent->start, kexec_end);
+
+    // FIXME this is a temporary hack, we need a better way to convey
+    //       the mem-map for us to settle the pplist safely
+
+    for (i = 0; i <bctx->mods.mods_num; i++) {
+        aligned_pplist = MAX(aligned_pplist, bctx->mods.entries[i].end);
+    }
+
+    aligned_pplist = napot_upaligned(aligned_pplist, L0T_SIZE);
+
+    if (aligned_pplist + pool_size > ent->start + ent->size) {
+        return 0;
+    }
 
     // for x86_32, the upper bound of memory requirement for pplist
     //  is sizeof(struct ppage) * 1MiB. For simplicity (as well as 
@@ -42,16 +51,19 @@ found:;
     //  it will take away at least 4M worth of vm address resource 
     //  regardless the actual physical memory size
 
+    // anchor the pplist at vmap location (right after kernel)
+    memory->pplist = (struct ppage*)VMAP;
+    memory->list_len = ppfn_total;
+
     pfn_t nhuge = page_count(pool_size, L0T_SIZE);
     pte_t* ptep = mkl0tep_va(VMS_SELF, VMAP);
     pte_t pte   = mkpte(aligned_pplist, KERNEL_DATA);
     
     vmm_set_ptes_contig(ptep, pte_mkhuge(pte), L0T_SIZE, nhuge);
+    cpu_flush_page(VMAP);
 
-    memory->pplist = aligned_pplist;
-    memory->size = ppfn_total;
-
-    pmm_init_freeze_range(aligned_pplist, leaf_count(pool_size));
-
+    // shift the actual vmap start address
     vmap_set_start(VMAP + nhuge * L0T_SIZE);
+
+    return aligned_pplist;
 }

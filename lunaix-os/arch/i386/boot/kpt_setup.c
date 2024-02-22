@@ -17,6 +17,7 @@ extern u8_t __kboot_end[];
 // define the initial page table layout
 struct kernel_map {
     pte_t l0t[_PAGE_LEVEL_SIZE];
+    pte_t pg_mnt[_PAGE_LEVEL_SIZE];
 
     struct {
         pte_t _lft[_PAGE_LEVEL_SIZE];
@@ -85,6 +86,10 @@ _init_page()
     }
 
     // XXX: Mapping the kernel .rodata section?
+
+    // set mount point
+    pte_t* kmntep = (pte_t*) &kpt_pa->l0t[pfn_at(PG_MOUNT_1, L0T_SIZE)];
+    set_pte(kmntep, mkpte((ptr_t)kpt_pa->pg_mnt, KERNEL_DATA));
 
     // Build up self-reference
     pte = mkpte_root((ptr_t)kpt_pa, KERNEL_DATA);

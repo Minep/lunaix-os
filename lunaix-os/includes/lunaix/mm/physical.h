@@ -48,7 +48,7 @@ struct ppage
     struct llist_header sibs;
 
     struct ppage_arch arch;
-} cacheline_align;
+} align(16);
 
 
 #endif /* __LUNAIX_PHYSICAL_H */

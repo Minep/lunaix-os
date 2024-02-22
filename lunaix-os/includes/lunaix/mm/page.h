@@ -140,6 +140,7 @@ ptep_map_leaflet(pte_t* ptep, pte_t pte, struct leaflet* leaflet)
     assert(leaflet_order(leaflet) < LEVEL_SHIFT);
 
     pte = pte_setppfn(pte, leaflet_ppfn(leaflet));
+    pte = pte_mkloaded(pte);
 
     int n = leaflet_nfold(leaflet);
     vmm_set_ptes_contig(ptep, pte, LFT_SIZE, n);

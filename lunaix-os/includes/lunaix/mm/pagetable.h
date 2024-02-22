@@ -443,12 +443,12 @@ page_upaligned(ptr_t va) {
 
 static inline ptr_t
 napot_aligned(ptr_t va, size_t napot_sz) {
-    return va & ~napot_sz;
+    return va & ~(napot_sz - 1);
 }
 
 static inline ptr_t
 napot_upaligned(ptr_t va, size_t napot_sz) {
-    return (va + napot_sz) & ~napot_sz;
+    return (va + napot_sz - 1) & ~(napot_sz - 1);
 }
 
 static inline pte_t*
