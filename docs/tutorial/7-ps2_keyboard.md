@@ -252,8 +252,8 @@ state完整位图布局如下
 5 右SHIFT
 4 左SHIFT
 3 CAPSLOCK
-2 不知道什么键
-1 鼠标滚轮
+2 NUMLOCK
+1 SCREENLOCK
 0 此位为1（KBD_KEY_FPRESSED）表示按下，为0表示抬起
 ```
 
