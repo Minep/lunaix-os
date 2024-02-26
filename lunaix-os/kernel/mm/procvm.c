@@ -22,10 +22,11 @@ procvm_create(struct proc_info* proc) {
     return mm;
 }
 
-static unsigned int
+static inline unsigned int
 __ptep_advancement(struct leaflet* leaflet, int level)
 {
-    return (1 << (leaflet_order(leaflet) % (level * LEVEL_SHIFT))) - 1;
+    size_t shifts = MAX(MAX_LEVEL - level - 1, 1) * LEVEL_SHIFT;
+    return (1 << (leaflet_order(leaflet) % shifts)) - 1;
 }
 
 static ptr_t
@@ -67,15 +68,13 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
         
         if (pt_last_level(level) || pte_huge(pte)) {
             set_pte(ptep_dest, pte);
-            
-            if (pte_isloaded(pte)) {
-                // ensure no leaflet is partially mapped.
-                leaflet = pte_leaflet_aligned(pte);
 
-                leaflet_borrow(leaflet);
+            if (pte_isloaded(pte)) {
+                leaflet = pte_leaflet(pte);
                 
-                // (contig pte mappings) skipped the un-aligned orders of entries
-                ptep += __ptep_advancement(leaflet, level);
+                if (leaflet_ppfn(leaflet) == pte_ppfn(pte)) {
+                    leaflet_borrow(leaflet);
+                }
             }
         }
         else if (!pt_last_level(level)) {

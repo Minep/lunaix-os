@@ -44,8 +44,13 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     /* Begin kernel bootstrapping sequence */
     boot_begin(bhctx);
 
+    tty_init(ioremap(0xB8000, PAGE_SIZE));
+    
     /* Setup kernel memory layout and services */
     kmem_init(bhctx);
+
+    // FIXME this goes to hal/gfxa
+    tty_set_theme(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
 
     boot_parse_cmdline(bhctx);
 
@@ -55,10 +60,6 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     device_scan_drivers();
 
     invoke_init_function(on_earlyboot);
-
-    // FIXME this goes to hal/gfxa
-    tty_init(ioremap(0xB8000, PAGE_SIZE));
-    tty_set_theme(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
 
     device_sysconf_load();
 

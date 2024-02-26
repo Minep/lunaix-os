@@ -17,6 +17,8 @@ typedef unsigned int ppage_type_t;
 // Maximum non-huge page order.
 #define MAX_PAGE_ORDERS ( LEVEL_SHIFT - 1 )
 
+#define RESERVE_MARKER 0xf0f0f0f0
+
 struct pmem_pool
 {
     int type;
@@ -94,6 +96,14 @@ static inline unsigned int
 ppage_order(struct ppage* page) {
     return page->order;
 }
+
+
+static inline bool
+reserved_page(struct ppage* page)
+{
+    return page->refs == RESERVE_MARKER && page->type == PP_RESERVED;
+}
+
 
 /**
  * @brief 初始化物理内存管理器

@@ -65,17 +65,17 @@ void
 pmm_free_one(struct ppage* page, int type_mask)
 {
     page = leading_page(page);
-    struct pmem_pool* pool = pmm_pool_lookup(page);
 
     assert(page->refs);
 
-    if (--page->refs) {
+    if (reserved_page(page) || --page->refs) {
         return;
     }
 
     int order = page->order;
     assert(order <= MAX_PAGE_ORDERS);
 
+    struct pmem_pool* pool = pmm_pool_lookup(page);
     struct llist_header* bucket = &pool->idle_order[order];
 
     if (pool->count[order] < po_limit[order]) {
@@ -126,6 +126,7 @@ pmm_looknext(struct pmem_pool* pool, size_t order)
         page->companion = i;
         page->pool = pool->type;
         llist_init_head(&page->sibs);
+        __set_page_initialized(page);
     }
 
     return lead;

@@ -17,7 +17,6 @@ vmm_init()
 pte_t 
 alloc_page_at(pte_t* ptep, pte_t pte, int order)
 {
-    ptr_t mnt;
     struct leaflet* leaflet = alloc_leaflet_pinned(order);
 
     if (!leaflet) {
@@ -26,11 +25,9 @@ alloc_page_at(pte_t* ptep, pte_t pte, int order)
 
     ptep_map_leaflet(ptep, pte, leaflet);
 
-    mnt = leaflet_mount(leaflet);
-    memset((void*)mnt, 0, leaflet_size(leaflet));
-    leaflet_unmount(leaflet);
+    leaflet_wipe(leaflet);
 
-    return pte;
+    return pte_at(ptep);
 }
 
 int

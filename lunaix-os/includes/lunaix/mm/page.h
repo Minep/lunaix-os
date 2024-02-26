@@ -4,6 +4,8 @@
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
 
+#include <klibc/string.h>
+
 /**
  * @brief A leaflet represent a bunch 4k ppage
  *        as single multi-ordered page, as such
@@ -56,6 +58,10 @@ leaflet_borrow(struct leaflet* leaflet)
 {
     struct ppage* const page = get_ppage(leaflet);
     assert(page->refs);
+    if (reserved_page(page)) {
+        return;
+    }
+    
     page->refs++;
 }
 
@@ -64,7 +70,7 @@ leaflet_return(struct leaflet* leaflet)
 {
     struct ppage* const page = get_ppage(leaflet);
     assert(page->refs);
-    --page->refs ?: pmm_free_one(page, 0);
+    pmm_free_one(page, 0);
 }
 
 static inline int
@@ -112,6 +118,12 @@ static inline pfn_t
 leaflet_ppfn(struct leaflet* leaflet)
 {
     return ppfn(get_ppage(leaflet));
+}
+
+static inline ptr_t
+leaflet_addr(struct leaflet* leaflet)
+{
+    return page_addr(ppfn(get_ppage(leaflet)));
 }
 
 static inline void
@@ -191,6 +203,22 @@ leaflet_unmount(struct leaflet* leaflet)
     vmm_unset_ptes(ptep, leaflet_nfold(leaflet));
 
     cpu_flush_page(PG_MOUNT_VAR);
+}
+
+static inline void
+leaflet_fill(struct leaflet* leaflet, unsigned char val)
+{
+    ptr_t mnt;
+    
+    mnt = leaflet_mount(leaflet);
+    memset((void*)mnt, val, leaflet_size(leaflet));
+    leaflet_unmount(leaflet);
+}
+
+static inline void
+leaflet_wipe(struct leaflet* leaflet)
+{
+    leaflet_fill(leaflet, 0);
 }
 
 /**

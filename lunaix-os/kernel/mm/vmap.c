@@ -53,7 +53,6 @@ __alloc_contig_ptes(pte_t* ptep, size_t base_sz, int n)
     }
 
     va -= base_sz * _n;
-    assert(prev_va < va);
     
     prev_va = va;
     return mkptep_va(ptep_vm_mnt(ptep), va);
@@ -83,7 +82,7 @@ vunmap(ptr_t ptr, struct leaflet* leaflet)
 {
     assert(start <= ptr && ptr <= VMAP_END);
 
-    pte_t* ptep = mkl0tep_va(VMS_SELF, ptr);
+    pte_t* ptep = mkptep_va(VMS_SELF, ptr);
     vmm_unset_ptes(ptep, leaflet_nfold(leaflet));
 
     // FIXME flush range

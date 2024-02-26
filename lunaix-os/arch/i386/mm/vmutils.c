@@ -12,9 +12,11 @@ dup_leaflet(struct leaflet* leaflet)
     src_va = leaflet_mount(leaflet);
     dest_va = vmap(new_leaflet, KERNEL_DATA);
 
+    size_t cnt_wordsz = leaflet_size(new_leaflet) / sizeof(ptr_t);
+
     asm volatile("movl %1, %%edi\n"
                  "movl %2, %%esi\n"
-                 "rep movsl\n" ::"c"(1024),
+                 "rep movsl\n" ::"c"(cnt_wordsz),
                  "r"(dest_va),
                  "r"(src_va)
                  : "memory", "%edi", "%esi");

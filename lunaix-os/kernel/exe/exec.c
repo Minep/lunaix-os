@@ -137,6 +137,9 @@ exec_load(struct exec_container* container, struct v_file* executable)
 
             memcpy((void*)ustack, (const void*)envp, envp_len);
             ustack = copy_to_ustack(ustack, (ptr_t*)ustack);
+        } else {
+            ustack -= sizeof(ptr_t);
+            *((ptr_t*)ustack) = 0;
         }
 
         if (argv) {            
@@ -144,6 +147,9 @@ exec_load(struct exec_container* container, struct v_file* executable)
             ustack -= argv_len;
 
             memcpy((void*)ustack, (const void**)argv, argv_len);
+        } else {
+            ustack -= sizeof(ptr_t);
+            *((ptr_t*)ustack) = 0;
         }
 
         for (size_t i = 0; i < 2 && argv_extra[i]; i++) {

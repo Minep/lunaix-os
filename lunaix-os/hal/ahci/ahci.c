@@ -21,9 +21,8 @@
 #include <lunaix/block.h>
 #include <lunaix/isrm.h>
 #include <lunaix/mm/mmio.h>
-#include <lunaix/mm/pmm.h>
 #include <lunaix/mm/valloc.h>
-#include <lunaix/mm/vmm.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 
@@ -128,16 +127,19 @@ ahci_driver_init(struct ahci_driver_param* param)
         __hba_reset_port(port_regs);
 #endif
 
+        struct leaflet* leaflet;
         if (!clbp) {
             // 每页最多4个命令队列
-            clb_pa = ppage_addr(pmm_alloc_locked(0));
-            clb_pg_addr = (ptr_t)ioremap(clb_pa, 0x1000);
+            leaflet = alloc_leaflet(0);
+            clb_pa = leaflet_addr(leaflet);
+            clb_pg_addr = vmap(leaflet, KERNEL_DATA);
             memset((void*)clb_pg_addr, 0, 0x1000);
         }
         if (!fisp) {
             // 每页最多16个FIS
-            fis_pa = ppage_addr(pmm_alloc_locked(0));
-            fis_pg_addr = (ptr_t)ioremap(fis_pa, 0x1000);
+            leaflet = alloc_leaflet(0);
+            fis_pa = leaflet_addr(leaflet);
+            fis_pg_addr = vmap(leaflet, KERNEL_DATA);
             memset((void*)fis_pg_addr, 0, 0x1000);
         }
 

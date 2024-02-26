@@ -132,7 +132,7 @@ __handle_conflict_pte(struct fault_context* fault)
         duped_leaflet = dup_leaflet(fault_leaflet);
 
         // FIXME This assume a 
-        pte = pte_mkwritable(fault->resolving);
+        pte = pte_mkwritable(pte);
         ptep_map_leaflet(fault->fault_ptep, pte, duped_leaflet);
 
         leaflet_return(fault_leaflet);
@@ -196,11 +196,14 @@ __handle_kernel_page(struct fault_context* fault)
     if (fault->fault_va < VMS_MOUNT_1) {
         return;
     }
+    
+    struct leaflet* leaflet = fault->prealloc;
 
-    pin_leaflet(fault->prealloc);
+    pin_leaflet(leaflet);
+    leaflet_wipe(leaflet);
     
     pte_t pte = fault->resolving;
-    ptep_map_leaflet(fault->fault_ptep, pte, fault->prealloc);
+    ptep_map_leaflet(fault->fault_ptep, pte, leaflet);
 
     fault_resolved(fault, 0);
 }

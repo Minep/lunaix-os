@@ -73,7 +73,7 @@ __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
             set_pte(dest_ptep, guard_pte);
         } else {
             leaflet = dup_leaflet(pte_leaflet(p));
-            ptep_map_leaflet(dest_ptep, p, leaflet);
+            i += ptep_map_leaflet(dest_ptep, p, leaflet);
         }
 
         src_ptep++;
@@ -145,6 +145,9 @@ done:
 pid_t
 dup_proc()
 {
+    // FIXME need investigate: issue with fork, as well as pthread
+    //       especially when involving frequent alloc and dealloc ops
+    //       (could be issue in allocator's segregated free list)
     struct proc_info* pcb = alloc_process();
     if (!pcb) {
         syscall_result(ENOMEM);
@@ -170,7 +173,7 @@ dup_proc()
     struct proc_mm* mm = vmspace(pcb);
     procvm_dupvms_mount(mm);
 
-    struct thread* main_thread = dup_active_thread(VMS_MOUNT_1, pcb);
+    struct thread* main_thread = dup_active_thread(mm->vm_mnt, pcb);
     if (!main_thread) {
         syscall_result(ENOMEM);
         procvm_unmount(mm);

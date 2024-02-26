@@ -3,14 +3,6 @@
 
 #include <lunaix/mm/pmm.h>
 
-#define RESERVE_MARKER 0xf0f0f0f0
-
-static inline bool
-reserved_page(struct ppage* page)
-{
-    return page->refs == RESERVE_MARKER && page->type == PP_RESERVED;
-}
-
 static inline void
 set_reserved(struct ppage* page)
 {
