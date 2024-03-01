@@ -14,33 +14,6 @@ vmm_init()
     // XXX: something here?
 }
 
-int
-vmm_set_mapping(ptr_t mnt, ptr_t va, ptr_t pa, pte_attr_t prot)
-{
-    assert(!va_offset(va));
-
-    pte_t* ptep = mkptep_va(mnt, va);
-    pte_t  pte  = mkpte(pa, prot);
-
-    set_pte(ptep, pte);
-
-    return 1;
-}
-
-ptr_t
-vmm_del_mapping(ptr_t mnt, ptr_t va)
-{
-    assert(!va_offset(va));
-
-    pte_t* ptep = mkptep_va(mnt, va);
-
-    pte_t old = *ptep;
-
-    set_pte(ptep, null_pte);
-
-    return pte_paddr(old);
-}
-
 pte_t
 vmm_tryptep(pte_t* ptep, size_t lvl_size)
 {
@@ -68,15 +41,6 @@ vmm_tryptep(pte_t* ptep, size_t lvl_size)
 #endif
     _ptep = getlftep(_ptep, va);
     return *_ptep;
-}
-
-ptr_t
-vmm_v2pat(ptr_t mnt, ptr_t va)
-{
-    ptr_t  va_off = va_offset(va);
-    pte_t* ptep   = mkptep_va(mnt, va);
-
-    return pte_paddr(pte_at(ptep)) + va_off;
 }
 
 ptr_t
