@@ -42,10 +42,10 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
     pte_t* ptep_ssm     = mkptep_va(VMS_SELF, (ptr_t)ptep_sms);
     pte_t  pte_sms      = mkpte_prot(KERNEL_DATA);
 
-    pte_sms = alloc_page_at(ptep_ssm, pte_sms, 0);
+    pte_sms = alloc_kpage_at(ptep_ssm, pte_sms, 0);
     set_pte(ptep_sms, pte_sms);    
     
-    cpu_flush_page((ptr_t)dest_mnt);
+    tlb_flush_kernel((ptr_t)dest_mnt);
 
     if (only_kernel) {
         ptep = ptep_kernel;
@@ -79,7 +79,7 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
             }
         }
         else if (!pt_last_level(level)) {
-            alloc_page_at(ptep_dest, pte, 0);
+            alloc_kpage_at(ptep_dest, pte, 0);
 
             ptep = ptep_step_into(ptep);
             ptep_dest = ptep_step_into(ptep_dest);

@@ -289,7 +289,8 @@ mem_sync_pages(ptr_t mnt,
             region->mfile->ops->write_page(inode, (void*)va, offset);
 
             set_pte(ptep, pte_mkclean(pte));
-            cpu_flush_page(va);
+            tlb_flush_vmr(region, va);
+            
         } else if ((options & MS_INVALIDATE)) {
             goto invalidate;
         }
@@ -305,7 +306,7 @@ mem_sync_pages(ptr_t mnt,
     invalidate:
         set_pte(ptep, null_pte);
         leaflet_return(pte_leaflet(pte));
-        cpu_flush_page(va);
+        tlb_flush_vmr(region, va);
     }
 }
 
@@ -349,6 +350,8 @@ mem_unmap_region(ptr_t mnt, struct mm_region* region)
 
     pte_t* ptep = mkptep_va(mnt, region->start);
     __remove_ranged_mappings(ptep, pglen);
+
+    tlb_flush_vmr_all(region);
     
     llist_delete(&region->head);
     region_release(region);
@@ -422,6 +425,8 @@ __unmap_overlapped_cases(ptr_t mnt,
 
     pte_t *ptep = mkptep_va(mnt, vmr->start);
     __remove_ranged_mappings(ptep, leaf_count(umps_len));
+
+    tlb_flush_vmr_range(vmr, vmr->start, umps_len);
 
     vmr->start += displ;
     vmr->end -= shrink;

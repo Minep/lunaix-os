@@ -72,23 +72,23 @@ vmap_ptes_at(pte_t pte, size_t lvl_size, int n)
 
     ptr_t va = page_addr(ptep_pfn(ptep));
 
-    // FIXME flush range
-    for (int i = 0; i < n; i++)
-    {
-        cpu_flush_page(va + lvl_size * i);
-    }
+    tlb_flush_kernel_ranged(va, n);
     
     return va;
 }
 
 void
 vunmap(ptr_t ptr, struct leaflet* leaflet)
-{
+{    
+    pte_t* ptep;
+    unsigned int npages;
+ 
     assert(start <= ptr && ptr <= VMAP_END);
+    
+    npages = leaflet_nfold(leaflet);
+    ptep = mkptep_va(VMS_SELF, ptr);
 
-    pte_t* ptep = mkptep_va(VMS_SELF, ptr);
-    vmm_unset_ptes(ptep, leaflet_nfold(leaflet));
+    vmm_unset_ptes(ptep, npages);
 
-    // FIXME flush range
-    cpu_flush_page(ptr);
+    tlb_flush_kernel_ranged(ptr, npages);
 }

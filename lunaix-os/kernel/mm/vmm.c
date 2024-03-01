@@ -14,22 +14,6 @@ vmm_init()
     // XXX: something here?
 }
 
-pte_t 
-alloc_page_at(pte_t* ptep, pte_t pte, int order)
-{
-    struct leaflet* leaflet = alloc_leaflet_pinned(order);
-
-    if (!leaflet) {
-        return null_pte;
-    }
-
-    leaflet_wipe(leaflet);
-
-    ptep_map_leaflet(ptep, pte, leaflet);
-
-    return pte_at(ptep);
-}
-
 int
 vmm_set_mapping(ptr_t mnt, ptr_t va, ptr_t pa, pte_attr_t prot)
 {
@@ -102,7 +86,7 @@ vms_mount(ptr_t mnt, ptr_t vms_root)
 
     pte_t* ptep = mkl0tep_va(VMS_SELF, mnt);
     set_pte(ptep, mkpte(vms_root, KERNEL_DATA));
-    cpu_flush_page(mnt);
+    tlb_flush_kernel(mnt);
     return mnt;
 }
 
@@ -111,7 +95,7 @@ vms_unmount(ptr_t mnt)
 {
     pte_t* ptep = mkl0tep_va(VMS_SELF, mnt);
     set_pte(ptep, null_pte);
-    cpu_flush_page(mnt);
+    tlb_flush_kernel(mnt);
     return mnt;
 }
 

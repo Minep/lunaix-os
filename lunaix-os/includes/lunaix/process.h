@@ -182,6 +182,13 @@ vmregions(struct proc_info* proc)
     return proc ? &proc->mm->regions : NULL;
 }
 
+
+static inline unsigned int
+procvm_asid(struct proc_mm* mm)
+{
+    return mm->proc->pid;
+}
+
 static inline void
 block_current_thread()
 {

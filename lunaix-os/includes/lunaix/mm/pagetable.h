@@ -134,8 +134,8 @@ typedef struct __pte pte_t;
         ((ptr_t)(ptep) & __p) == __p;                   \
     })
 
-pte_t 
-alloc_page_at(pte_t* ptep, pte_t pte, int order);
+extern pte_t 
+alloc_kpage_at(pte_t* ptep, pte_t pte, int order);
 
 /**
  * @brief Try page walk to the pte pointed by ptep and 
@@ -155,7 +155,7 @@ __alloc_level(pte_t* ptep, pte_t pte, pte_attr_t prot)
     }
 
     pte = pte_setprot(pte, prot);
-    return !pte_isnull(alloc_page_at(ptep, pte, 0));
+    return !pte_isnull(alloc_kpage_at(ptep, pte, 0));
 }
 
 /**
@@ -512,6 +512,18 @@ static inline bool
 pt_last_level(int level)
 {
     return level == _PTW_LEVEL - 1;
+}
+
+static inline ptr_t
+va_mntpoint(ptr_t va)
+{
+    return _VM_OF(va);
+}
+
+static inline ptr_t
+va_actual(ptr_t va)
+{
+    return page_addr(_VM_OF(va) ^ va);
 }
 
 #endif /* __LUNAIX_PAGETABLE_H */

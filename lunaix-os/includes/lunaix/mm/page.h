@@ -3,6 +3,7 @@
 
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
+#include <lunaix/mm/vmtlb.h>
 
 #include <klibc/string.h>
 
@@ -163,13 +164,6 @@ ptep_map_leaflet(pte_t* ptep, pte_t pte, struct leaflet* leaflet)
     int n = leaflet_nfold(leaflet);
     vmm_set_ptes_contig(ptep, pte, LFT_SIZE, n);
 
-    // FIXME flush range
-    ptr_t va = ptep_va(ptep, LFT_SIZE);
-    for (int i = 0; i < n; i++)
-    {
-        cpu_flush_page(va + i * LFT_SIZE);
-    }
-
     return n;
 }
 
@@ -189,13 +183,6 @@ ptep_unmap_leaflet(pte_t* ptep, struct leaflet* leaflet)
     int n = leaflet_nfold(leaflet);
     vmm_unset_ptes(ptep, n);
 
-    // FIXME flush range
-    ptr_t va = ptep_va(ptep, LFT_SIZE);
-    for (int i = 0; i < n; i++)
-    {
-        cpu_flush_page(va + i * LFT_SIZE);
-    }
-
     return n;
 }
 
@@ -204,6 +191,8 @@ leaflet_mount(struct leaflet* leaflet)
 {
     pte_t* ptep = mkptep_va(VMS_SELF, PG_MOUNT_VAR);    
     ptep_map_leaflet(ptep, mkpte_prot(KERNEL_DATA), leaflet);
+
+    tlb_flush_kernel_ranged(PG_MOUNT_VAR, leaflet_nfold(leaflet));
 
     return PG_MOUNT_VAR;
 }
@@ -214,7 +203,7 @@ leaflet_unmount(struct leaflet* leaflet)
     pte_t* ptep = mkptep_va(VMS_SELF, PG_MOUNT_VAR);    
     vmm_unset_ptes(ptep, leaflet_nfold(leaflet));
 
-    cpu_flush_page(PG_MOUNT_VAR);
+    tlb_flush_kernel_ranged(PG_MOUNT_VAR, leaflet_nfold(leaflet));
 }
 
 static inline void
@@ -294,5 +283,17 @@ vmap_range(pfn_t start, size_t npages, pte_attr_t prot)
     pte_t _pte = mkpte(page_addr(start), prot);
     return vmap_ptes_at(_pte, LFT_SIZE, npages);
 }
+
+
+/**
+ * @brief Allocate a page in kernel space.
+ * 
+ * @param ptep 
+ * @param pte 
+ * @param order 
+ * @return pte_t 
+ */
+pte_t 
+alloc_kpage_at(pte_t* ptep, pte_t pte, int order);
 
 #endif /* __LUNAIX_PAGE_H */

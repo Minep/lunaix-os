@@ -1,5 +1,4 @@
-#include <lunaix/mm/pmm.h>
-#include <lunaix/mm/vmm.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/mm/pagetable.h>
 
 extern unsigned int __kexec_end[];
@@ -60,7 +59,7 @@ found:;
     pte_t pte   = mkpte(aligned_pplist, KERNEL_DATA);
     
     vmm_set_ptes_contig(ptep, pte_mkhuge(pte), L0T_SIZE, nhuge);
-    cpu_flush_page(VMAP);
+    tlb_flush_kernel(VMAP);
 
     // shift the actual vmap start address
     vmap_set_start(VMAP + nhuge * L0T_SIZE);

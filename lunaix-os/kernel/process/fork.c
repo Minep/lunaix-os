@@ -30,8 +30,7 @@ region_maybe_cow(struct mm_region* region)
     for (size_t i = start_pn; i <= end_pn; i++) {
         pte_t* self = mkptep_pn(VMS_SELF, i);
         pte_t* guest = mkptep_pn(VMS_MOUNT_1, i);
-
-        cpu_flush_page(page_addr(ptep_pfn(self)));
+        ptr_t va = page_addr(ptep_pfn(self));
 
         if ((attr & REGION_MODE_MASK) == REGION_RSHARED) {
             set_pte(self, pte_mkwprotect(*self));
@@ -41,6 +40,8 @@ region_maybe_cow(struct mm_region* region)
             set_pte(guest, null_pte);
         }
     }
+
+    tlb_flush_vmr_all(region);
 }
 
 static inline void
@@ -79,6 +80,9 @@ __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
         src_ptep++;
         dest_ptep++;
     }
+
+    struct proc_mm* mm = vmspace(thread->process);
+    tlb_flush_mm_range(mm, kstack_pn, leaf_count(KSTACK_SIZE));
 }
 
 /*

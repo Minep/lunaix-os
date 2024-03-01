@@ -2,8 +2,11 @@
 #define __LUNAIX_VMM_H
 
 #include <lunaix/mm/pagetable.h>
+#include <lunaix/mm/vmtlb.h>
 #include <lunaix/process.h>
 #include <lunaix/types.h>
+
+
 // Virtual memory manager
 
 #define VMAP_NULL 0
@@ -133,7 +136,8 @@ mount_page(ptr_t mnt, ptr_t pa) {
     assert(pa);
     pte_t* ptep = mkptep_va(VMS_SELF, mnt);
     set_pte(ptep, mkpte(pa, KERNEL_DATA));
-    cpu_flush_page(mnt);
+
+    tlb_flush_kernel(mnt);
     return mnt;
 }
 
@@ -141,6 +145,8 @@ static inline ptr_t
 unmount_page(ptr_t mnt) {
     pte_t* ptep = mkptep_va(VMS_SELF, mnt);
     set_pte(ptep, null_pte);
+
+    tlb_flush_kernel(mnt);
     return mnt;
 }
 

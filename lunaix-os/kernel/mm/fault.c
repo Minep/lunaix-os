@@ -112,6 +112,12 @@ __prepare_fault_context(struct fault_context* fault)
     return true;
 }
 
+static inline void
+__flush_staled_tlb(struct fault_context* fault, struct leaflet* leaflet)
+{
+    tlb_flush_mm_range(fault->mm, fault->fault_va, leaflet_nfold(leaflet));
+}
+
 static void
 __handle_conflict_pte(struct fault_context* fault) 
 {
@@ -134,7 +140,9 @@ __handle_conflict_pte(struct fault_context* fault)
         pte = pte_mkwritable(pte);
         pte = pte_mkuntouch(pte);
         pte = pte_mkclean(pte);
+
         ptep_map_leaflet(fault->fault_ptep, pte, duped_leaflet);
+        __flush_staled_tlb(fault, duped_leaflet);
 
         leaflet_return(fault_leaflet);
 
@@ -154,7 +162,9 @@ __handle_anon_region(struct fault_context* fault)
 
     // TODO Potentially we can get different order of leaflet here
     struct leaflet* region_part = alloc_leaflet(0);
+    
     ptep_map_leaflet(fault->fault_ptep, pte, region_part);
+    __flush_staled_tlb(fault, region_part);
 
     fault_resolved(fault, NO_PREALLOC);
 }
@@ -188,6 +198,8 @@ __handle_named_region(struct fault_context* fault)
         return;
     }
 
+    __flush_staled_tlb(fault, region_part);
+
     fault_resolved(fault, NO_PREALLOC);
 }
 
@@ -206,6 +218,8 @@ __handle_kernel_page(struct fault_context* fault)
     
     pte_t pte = fault->resolving;
     ptep_map_leaflet(fault->fault_ptep, pte, leaflet);
+
+    tlb_flush_kernel_ranged(fault->fault_va, leaflet_nfold(leaflet));
 
     fault_resolved(fault, 0);
 }
@@ -325,7 +339,4 @@ intr_routine_page_fault(const isr_param* param)
             leaflet_return(fault.prealloc);
         }
     }
-
-    cpu_flush_page(fault.fault_va);
-    cpu_flush_page((ptr_t)fault.fault_ptep);
 }
