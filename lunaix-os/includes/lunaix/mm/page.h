@@ -73,6 +73,12 @@ leaflet_return(struct leaflet* leaflet)
     pmm_free_one(page, 0);
 }
 
+static inline unsigned int
+leaflet_refcount(struct leaflet* leaflet)
+{
+    return get_ppage(leaflet)->refs;
+}
+
 static inline int
 leaflet_order(struct leaflet* leaflet)
 {
@@ -158,7 +164,11 @@ ptep_map_leaflet(pte_t* ptep, pte_t pte, struct leaflet* leaflet)
     vmm_set_ptes_contig(ptep, pte, LFT_SIZE, n);
 
     // FIXME flush range
-    cpu_flush_page(ptep_va(ptep, LFT_SIZE));
+    ptr_t va = ptep_va(ptep, LFT_SIZE);
+    for (int i = 0; i < n; i++)
+    {
+        cpu_flush_page(va + i * LFT_SIZE);
+    }
 
     return n;
 }
@@ -180,7 +190,11 @@ ptep_unmap_leaflet(pte_t* ptep, struct leaflet* leaflet)
     vmm_unset_ptes(ptep, n);
 
     // FIXME flush range
-    cpu_flush_page(ptep_va(ptep, LFT_SIZE));
+    ptr_t va = ptep_va(ptep, LFT_SIZE);
+    for (int i = 0; i < n; i++)
+    {
+        cpu_flush_page(va + i * LFT_SIZE);
+    }
 
     return n;
 }
@@ -190,8 +204,6 @@ leaflet_mount(struct leaflet* leaflet)
 {
     pte_t* ptep = mkptep_va(VMS_SELF, PG_MOUNT_VAR);    
     ptep_map_leaflet(ptep, mkpte_prot(KERNEL_DATA), leaflet);
-    
-    cpu_flush_page(PG_MOUNT_VAR);
 
     return PG_MOUNT_VAR;
 }
@@ -206,7 +218,7 @@ leaflet_unmount(struct leaflet* leaflet)
 }
 
 static inline void
-leaflet_fill(struct leaflet* leaflet, unsigned char val)
+leaflet_fill(struct leaflet* leaflet, unsigned int val)
 {
     ptr_t mnt;
     

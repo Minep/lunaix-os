@@ -131,11 +131,13 @@ __handle_conflict_pte(struct fault_context* fault)
         // normal page fault, do COW
         duped_leaflet = dup_leaflet(fault_leaflet);
 
-        // FIXME This assume a 
         pte = pte_mkwritable(pte);
+        pte = pte_mkuntouch(pte);
+        pte = pte_mkclean(pte);
         ptep_map_leaflet(fault->fault_ptep, pte, duped_leaflet);
 
         leaflet_return(fault_leaflet);
+
         fault_resolved(fault, NO_PREALLOC);
     }
 

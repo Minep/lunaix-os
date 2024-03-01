@@ -26,9 +26,8 @@ boot_begin(struct boot_handoff* bhctx)
     vmm_set_ptes_contig(ptep, pte_mkhuge(pte), L0T_SIZE, count);
 
     // 将内核占据的页，包括前1MB，hhk_init 设为已占用
-    pfn_t  kstart = pfn(to_kphysical(__kexec_start));
-    size_t pg_count = leaf_count(to_kphysical(__kexec_end)) - kstart;
-    pmm_onhold_range(kstart, pg_count);
+    size_t pg_count = leaf_count(to_kphysical(__kexec_end));
+    pmm_onhold_range(0, pg_count);
 
     size_t i;
     struct boot_mmapent* ent;

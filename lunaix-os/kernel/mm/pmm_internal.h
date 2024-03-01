@@ -8,6 +8,7 @@ set_reserved(struct ppage* page)
 {
     page->refs = RESERVE_MARKER;
     page->type = PP_RESERVED;
+    page->order = 0;
 }
 
 void

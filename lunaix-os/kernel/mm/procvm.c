@@ -71,6 +71,7 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
 
             if (pte_isloaded(pte)) {
                 leaflet = pte_leaflet(pte);
+                assert(leaflet_refcount(leaflet));
                 
                 if (leaflet_ppfn(leaflet) == pte_ppfn(pte)) {
                     leaflet_borrow(leaflet);

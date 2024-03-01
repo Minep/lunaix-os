@@ -81,6 +81,7 @@ found:;
 void
 thread_release_mem(struct thread* thread)
 {
+    struct leaflet* leaflet;
     struct proc_mm* mm = vmspace(thread->process);
     ptr_t vm_mnt = mm->vm_mnt;
 
@@ -88,9 +89,13 @@ thread_release_mem(struct thread* thread)
     assert(vm_mnt);
 
     pte_t* ptep = mkptep_va(vm_mnt, thread->kstack);
+    leaflet = pte_leaflet(*ptep);
     
     ptep -= KSTACK_PAGES - 1;
-    vmm_unset_ptes(ptep, KSTACK_PAGES);
+    set_pte(ptep, null_pte);
+    ptep_unmap_leaflet(ptep + 1, leaflet);
+
+    leaflet_return(leaflet);
     
     if (thread->ustack) {
         if ((thread->ustack->start & 0xfff)) {

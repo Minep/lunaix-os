@@ -33,7 +33,7 @@ __set_page_initialized(struct ppage* page)
 }
 
 static inline void
-__set_page_uninitialized(struct ppage* lead)
+__set_pages_uninitialized(struct ppage* lead)
 {
     for (size_t i = 0; i < (1UL << lead->order); i++)
     {
@@ -67,8 +67,10 @@ pmm_free_one(struct ppage* page, int type_mask)
     page = leading_page(page);
 
     assert(page->refs);
+    assert(!reserved_page(page));
+    assert(!__uninitialized_page(page));
 
-    if (reserved_page(page) || --page->refs) {
+    if (--page->refs) {
         return;
     }
 
@@ -84,7 +86,7 @@ pmm_free_one(struct ppage* page, int type_mask)
         return;
     }
 
-    __set_page_uninitialized(page);
+    __set_pages_uninitialized(page);
 }
 
 static pfn_t index = 0;
@@ -151,6 +153,8 @@ pmm_alloc_napot_type(int pool, size_t order, ppage_type_t type)
     }
 
     assert(good_page);
+    assert(!good_page->refs);
+    
     good_page->refs = 1;
     good_page->type = type;
 
@@ -169,7 +173,7 @@ pmm_allocator_trymark_onhold(struct pmem_pool* pool, struct ppage* start, struct
             struct ppage* lead = leading_page(start);
             llist_delete(&lead->sibs);
 
-            __set_page_uninitialized(lead);
+            __set_pages_uninitialized(lead);
             
             continue;
         }
@@ -188,7 +192,7 @@ pmm_allocator_trymark_unhold(struct pmem_pool* pool, struct ppage* start, struct
 {
     while (start <= end) {
         if (!__uninitialized_page(start) && reserved_page(start)) {
-            __set_page_uninitialized(start);
+            __set_pages_uninitialized(start);
         }
 
         start++;

@@ -73,7 +73,11 @@ vmap_ptes_at(pte_t pte, size_t lvl_size, int n)
     ptr_t va = page_addr(ptep_pfn(ptep));
 
     // FIXME flush range
-    cpu_flush_page(va);
+    for (int i = 0; i < n; i++)
+    {
+        cpu_flush_page(va + lvl_size * i);
+    }
+    
     return va;
 }
 

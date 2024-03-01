@@ -23,9 +23,9 @@ alloc_page_at(pte_t* ptep, pte_t pte, int order)
         return null_pte;
     }
 
-    ptep_map_leaflet(ptep, pte, leaflet);
-
     leaflet_wipe(leaflet);
+
+    ptep_map_leaflet(ptep, pte, leaflet);
 
     return pte_at(ptep);
 }

@@ -155,22 +155,6 @@ pmm_alloc_locked(size_t order)
 }
 
 static inline void
-take_page(struct ppage* page)
-{
-    page = leading_page(page);
-    assert(page->refs);
-    page->refs++;
-}
-
-static inline void
-return_page(struct ppage* page)
-{
-    page = leading_page(page);
-    assert(page->refs);
-    --page->refs ?: pmm_free_one(page, 0);
-}
-
-static inline void
 change_page_type(struct ppage* page, ppage_type_t type)
 {
     page->type = type;
