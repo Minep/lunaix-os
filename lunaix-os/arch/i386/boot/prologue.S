@@ -2,11 +2,14 @@
 
 #define __ASM__
 #include <sys/abi.h>
+#include <sys/failsafe.h>
 
-.section .bss
+.section .bss.kstack
+    .global __kinit_stack_end
+    
     .align 16
-    .skip 2048, 0
-    .global __kinit_stack_top
+    __kinit_stack_end:
+        .skip 2048, 0
     __kinit_stack_top:
     # TODO 
     # This stack was too small that corrupt the ambient kernel structures.
@@ -23,11 +26,15 @@
          */
         movl $__kinit_stack_top, %esp
         andl $stack_alignment, %esp
+
+        movl $__kinit_stack_end, %eax
+        movl $STACK_SANITY, (%eax)
+        movl $STACK_SANITY, 4(%eax)
+        movl $STACK_SANITY, 8(%eax)
+        movl $STACK_SANITY, 12(%eax)
+
         subl $16, %esp
-        /* 
-            最终还是决定将IDT&GDT的初始化和安装放在这里
-            注意：由于已开启分页，GDTR与IDTR里面放的不是物理地址，是线性地址！ 
-        */
+
         /* 
             加载 GDT 
             P.s. 虽然GDT在分页后已变得不重要，甚至可以忽略不作。但为了保持完整性，还是选择加载他

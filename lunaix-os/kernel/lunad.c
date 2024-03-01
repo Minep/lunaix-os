@@ -57,7 +57,7 @@ static void
 lunad_do_usr() {
     // No, these are not preemptive
     cpu_disable_interrupt();
-    
+
     if (!mount_bootmedium() || !exec_initd()) {
         fail("failed to initd");
     }

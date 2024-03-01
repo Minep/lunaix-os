@@ -8,6 +8,7 @@
 #include <lunaix/syslog.h>
 #include <lunaix/trace.h>
 #include <lunaix/pcontext.h>
+#include <lunaix/failsafe.h>
 
 #include <sys/mm/mm_defs.h>
 
@@ -256,15 +257,16 @@ __fail_to_resolve(struct fault_context* fault)
           fault->fault_instn,
           fault->fault_data);
 
-    trace_printstack_isr(fault->ictx);
 
     if (fault->kernel_access) {
         // if a page fault from kernel is not resolvable, then
         //  something must be went south
         FATAL("unresolvable page fault");
-        unreachable;
+        failsafe_diagnostic();
     }
 
+    trace_printstack_isr(fault->ictx);
+    
     thread_setsignal(current_thread, _SIGSEGV);
 
     schedule();

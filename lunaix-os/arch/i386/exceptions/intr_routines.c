@@ -6,6 +6,7 @@
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 #include <lunaix/trace.h>
+#include <lunaix/failsafe.h>
 
 #include <klibc/strfmt.h>
 
@@ -23,39 +24,31 @@ void
 __print_panic_msg(const char* msg, const isr_param* param)
 {
     ERROR("panic: %s", msg);
-    trace_printstack_isr(param);
+    failsafe_diagnostic();
 }
 
 void
 intr_routine_divide_zero(const isr_param* param)
 {
     __print_panic_msg("div zero", param);
-
-    spin();
 }
 
 void
 intr_routine_general_protection(const isr_param* param)
 {
     __print_panic_msg("general protection", param);
-
-    spin();
 }
 
 void
 intr_routine_sys_panic(const isr_param* param)
 {
     __print_panic_msg((char*)(param->registers.edi), param);
-
-    spin();
 }
 
 void
 intr_routine_fallback(const isr_param* param)
 {
     __print_panic_msg("unknown interrupt", param);
-
-    spin();
 }
 
 /**
@@ -76,9 +69,7 @@ intr_routine_apic_error(const isr_param* param)
     char buf[32];
     ksprintf(buf, "APIC error, ESR=0x%x", error_reg);
 
-    __print_panic_msg(buf, param);
-
-    spin();
+    failsafe_diagnostic();
 }
 
 void
