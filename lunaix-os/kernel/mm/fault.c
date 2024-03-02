@@ -8,6 +8,7 @@
 #include <lunaix/syslog.h>
 #include <lunaix/trace.h>
 #include <lunaix/pcontext.h>
+#include <lunaix/failsafe.h>
 
 #include <sys/mm/mm_defs.h>
 
@@ -105,17 +106,28 @@ __prepare_fault_context(struct fault_context* fault)
         fault->resolving = pte_setprot(fault_pte, KERNEL_DATA);
     }
 
+    fault->resolving = pte_mkloaded(fault->resolving);
     fault->kernel_vmfault = kernel_vmfault;
     fault->kernel_access  = kernel_context(fault->ictx);
 
     return true;
 }
 
+static inline void
+__flush_staled_tlb(struct fault_context* fault, struct leaflet* leaflet)
+{
+    tlb_flush_mm_range(fault->mm, fault->fault_va, leaflet_nfold(leaflet));
+}
+
 static void
 __handle_conflict_pte(struct fault_context* fault) 
 {
-    pte_t pte = fault->fault_pte;
-    ptr_t fault_pa  = pte_paddr(pte);
+    pte_t pte;
+    struct leaflet *fault_leaflet, *duped_leaflet;
+
+    pte = fault->fault_pte;
+    fault_leaflet = pte_leaflet(pte);
+    
     if (!pte_allow_user(pte)) {
         return;
     }
@@ -124,14 +136,18 @@ __handle_conflict_pte(struct fault_context* fault)
 
     if (writable_region(fault->vmr)) {
         // normal page fault, do COW
-        // TODO makes `vmm_dup_page` arch-independent
-        ptr_t pa = (ptr_t)vmm_dup_page(fault_pa);
+        duped_leaflet = dup_leaflet(fault_leaflet);
 
-        pmm_free_page(fault_pa);
-        pte_t new_pte = pte_setpaddr(pte, pa);
-        new_pte = pte_mkwritable(new_pte);
+        pte = pte_mkwritable(pte);
+        pte = pte_mkuntouch(pte);
+        pte = pte_mkclean(pte);
 
-        fault_resolved(fault, new_pte, NO_PREALLOC);
+        ptep_map_leaflet(fault->fault_ptep, pte, duped_leaflet);
+        __flush_staled_tlb(fault, duped_leaflet);
+
+        leaflet_return(fault_leaflet);
+
+        fault_resolved(fault, NO_PREALLOC);
     }
 
     return;
@@ -145,7 +161,13 @@ __handle_anon_region(struct fault_context* fault)
     pte_attr_t prot = region_pteprot(fault->vmr);
     pte = pte_setprot(pte, prot);
 
-    fault_resolved(fault, pte, 0);
+    // TODO Potentially we can get different order of leaflet here
+    struct leaflet* region_part = alloc_leaflet(0);
+    
+    ptep_map_leaflet(fault->fault_ptep, pte, region_part);
+    __flush_staled_tlb(fault, region_part);
+
+    fault_resolved(fault, NO_PREALLOC);
 }
 
 
@@ -156,21 +178,30 @@ __handle_named_region(struct fault_context* fault)
     struct v_file* file = vmr->mfile;
 
     pte_t pte       = fault->resolving;
-    ptr_t fault_va  = va_align(fault->fault_va);
+    ptr_t fault_va  = page_aligned(fault->fault_va);
 
     u32_t mseg_off  = (fault_va - vmr->start);
     u32_t mfile_off = mseg_off + vmr->foff;
 
+    // TODO Potentially we can get different order of leaflet here
+    struct leaflet* region_part = alloc_leaflet(0);
+
+    pte = pte_setprot(pte, region_pteprot(vmr));
+    ptep_map_leaflet(fault->fault_ptep, pte, region_part);
+
     int errno = file->ops->read_page(file->inode, (void*)fault_va, mfile_off);
     if (errno < 0) {
         ERROR("fail to populate page (%d)", errno);
+
+        ptep_unmap_leaflet(fault->fault_ptep, region_part);
+        leaflet_return(region_part);
+
         return;
     }
 
-    pte_attr_t prot = region_pteprot(vmr);
-    pte = pte_setprot(pte, prot);
+    __flush_staled_tlb(fault, region_part);
 
-    fault_resolved(fault, pte, 0);
+    fault_resolved(fault, NO_PREALLOC);
 }
 
 static void
@@ -181,8 +212,17 @@ __handle_kernel_page(struct fault_context* fault)
         return;
     }
     
-    fault_resolved(fault, fault->resolving, 0);
-    pmm_set_attr(fault->prealloc_pa, PP_FGPERSIST);
+    struct leaflet* leaflet = fault->prealloc;
+
+    pin_leaflet(leaflet);
+    leaflet_wipe(leaflet);
+    
+    pte_t pte = fault->resolving;
+    ptep_map_leaflet(fault->fault_ptep, pte, leaflet);
+
+    tlb_flush_kernel_ranged(fault->fault_va, leaflet_nfold(leaflet));
+
+    fault_resolved(fault, 0);
 }
 
 
@@ -195,24 +235,20 @@ fault_prealloc_page(struct fault_context* fault)
 
     pte_t pte;
     
-    pte = vmm_alloc_page(fault->fault_ptep, fault->resolving);
-    if (pte_isnull(pte)) {
+    struct leaflet* leaflet = alloc_leaflet(0);
+    if (!leaflet) {
         return;
     }
 
-    fault->resolving = pte;
-    fault->prealloc_pa = pte_paddr(fault->resolving);
-
-    pmm_set_attr(fault->prealloc_pa, 0);
-    cpu_flush_page(fault->fault_va);
+    fault->prealloc = leaflet;
 }
 
 
 static void noret
 __fail_to_resolve(struct fault_context* fault)
 {
-    if (fault->prealloc_pa) {
-        pmm_free_page(fault->prealloc_pa);
+    if (fault->prealloc) {
+        leaflet_return(fault->prealloc);
     }
 
     ERROR("(pid: %d) Segmentation fault on %p (%p,e=0x%x)",
@@ -221,15 +257,16 @@ __fail_to_resolve(struct fault_context* fault)
           fault->fault_instn,
           fault->fault_data);
 
-    trace_printstack_isr(fault->ictx);
 
     if (fault->kernel_access) {
         // if a page fault from kernel is not resolvable, then
         //  something must be went south
         FATAL("unresolvable page fault");
-        unreachable;
+        failsafe_diagnostic();
     }
 
+    trace_printstack_isr(fault->ictx);
+    
     thread_setsignal(current_thread, _SIGSEGV);
 
     schedule();
@@ -300,13 +337,8 @@ intr_routine_page_fault(const isr_param* param)
     }
 
     if ((fault.resolve_type & NO_PREALLOC)) {
-        if (fault.prealloc_pa) {
-            pmm_free_page(fault.prealloc_pa);
+        if (fault.prealloc) {
+            leaflet_return(fault.prealloc);
         }
     }
-
-    set_pte(fault.fault_ptep, fault.resolving);
-
-    cpu_flush_page(fault.fault_va);
-    cpu_flush_page((ptr_t)fault.fault_ptep);
 }

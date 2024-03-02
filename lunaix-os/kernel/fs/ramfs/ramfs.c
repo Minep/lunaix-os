@@ -153,7 +153,7 @@ ramfs_mksymlink(struct v_inode* this, const char* target)
 
     assert(!(rinode->flags & RAMF_SYMLINK));
 
-    size_t len = strlen(target);
+    size_t len = strlen(target) + 1;
     char* symlink = valloc(len);
 
     if (!symlink) {

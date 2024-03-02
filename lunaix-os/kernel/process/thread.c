@@ -3,8 +3,7 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syscall_utils.h>
 #include <lunaix/mm/mmap.h>
-#include <lunaix/mm/vmm.h>
-#include <lunaix/mm/pmm.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/syslog.h>
 
 #include <usr/lunaix/threads.h>
@@ -64,17 +63,16 @@ __alloc_kernel_thread_stack(struct proc_info* proc, ptr_t vm_mnt)
     return 0;
 
 found:;
-    ptr_t pa = pmm_alloc_cpage(KSTACK_PAGES - 1, 0);
+    // KSTACK_PAGES = 3, removal one guardian pte, give order 1 page
+    struct leaflet* leaflet = alloc_leaflet(1);
 
-    if (!pa) {
+    if (!leaflet) {
         WARN("failed to create kernel stack: nomem\n");
         return 0;
     }
 
     set_pte(ptep, guard_pte);
-
-    pte_t pte = mkpte(pa, KERNEL_DATA);
-    vmm_set_ptes_contig(ptep + 1, pte, LFT_SIZE, KSTACK_PAGES - 1);
+    ptep_map_leaflet(ptep + 1, mkpte_prot(KERNEL_DATA), leaflet);
 
     ptep += KSTACK_PAGES;
     return align_stack(ptep_va(ptep, LFT_SIZE) - 1);
@@ -83,6 +81,7 @@ found:;
 void
 thread_release_mem(struct thread* thread)
 {
+    struct leaflet* leaflet;
     struct proc_mm* mm = vmspace(thread->process);
     ptr_t vm_mnt = mm->vm_mnt;
 
@@ -90,9 +89,13 @@ thread_release_mem(struct thread* thread)
     assert(vm_mnt);
 
     pte_t* ptep = mkptep_va(vm_mnt, thread->kstack);
+    leaflet = pte_leaflet(*ptep);
     
     ptep -= KSTACK_PAGES - 1;
-    vmm_unset_ptes(ptep, KSTACK_PAGES);
+    set_pte(ptep, null_pte);
+    ptep_unmap_leaflet(ptep + 1, leaflet);
+
+    leaflet_return(leaflet);
     
     if (thread->ustack) {
         if ((thread->ustack->start & 0xfff)) {

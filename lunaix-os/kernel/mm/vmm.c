@@ -1,6 +1,5 @@
 #include <klibc/string.h>
-#include <lunaix/mm/pmm.h>
-#include <lunaix/mm/vmm.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 
@@ -13,54 +12,6 @@ void
 vmm_init()
 {
     // XXX: something here?
-}
-
-pte_t 
-vmm_alloc_page(pte_t* ptep, pte_t pte)
-{
-    ptr_t pa = pmm_alloc_page(PP_FGPERSIST);
-    if (!pa) {
-        return null_pte;
-    }
-
-    pte = pte_setpaddr(pte, pa);
-    pte = pte_mkloaded(pte);
-    set_pte(ptep, pte);
-
-    mount_page(PG_MOUNT_1, pa);
-    memset((void*)PG_MOUNT_1, 0, LFT_SIZE);
-    unmount_page(PG_MOUNT_1);
-
-    cpu_flush_page((ptr_t)ptep);
-
-    return pte;
-}
-
-int
-vmm_set_mapping(ptr_t mnt, ptr_t va, ptr_t pa, pte_attr_t prot)
-{
-    assert(!va_offset(va));
-
-    pte_t* ptep = mkptep_va(mnt, va);
-    pte_t  pte  = mkpte(pa, prot);
-
-    set_pte(ptep, pte);
-
-    return 1;
-}
-
-ptr_t
-vmm_del_mapping(ptr_t mnt, ptr_t va)
-{
-    assert(!va_offset(va));
-
-    pte_t* ptep = mkptep_va(mnt, va);
-
-    pte_t old = *ptep;
-
-    set_pte(ptep, null_pte);
-
-    return pte_paddr(old);
 }
 
 pte_t
@@ -93,22 +44,13 @@ vmm_tryptep(pte_t* ptep, size_t lvl_size)
 }
 
 ptr_t
-vmm_v2pat(ptr_t mnt, ptr_t va)
-{
-    ptr_t  va_off = va_offset(va);
-    pte_t* ptep   = mkptep_va(mnt, va);
-
-    return pte_paddr(pte_at(ptep)) + va_off;
-}
-
-ptr_t
 vms_mount(ptr_t mnt, ptr_t vms_root)
 {
     assert(vms_root);
 
     pte_t* ptep = mkl0tep_va(VMS_SELF, mnt);
     set_pte(ptep, mkpte(vms_root, KERNEL_DATA));
-    cpu_flush_page(mnt);
+    tlb_flush_kernel(mnt);
     return mnt;
 }
 
@@ -117,7 +59,7 @@ vms_unmount(ptr_t mnt)
 {
     pte_t* ptep = mkl0tep_va(VMS_SELF, mnt);
     set_pte(ptep, null_pte);
-    cpu_flush_page(mnt);
+    tlb_flush_kernel(mnt);
     return mnt;
 }
 

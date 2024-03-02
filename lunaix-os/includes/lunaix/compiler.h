@@ -28,6 +28,9 @@
 #define compact                 __attribute__((packed))
 #define align(v)                __attribute__((aligned (v)))
 
+#define cacheline_size          64
+#define cacheline_align         align(cacheline_size)
+
 #define export_symbol(domain, namespace, symbol)\
     typeof(symbol)* must_emit __SYMEXPORT_Z##domain##_N##namespace##_S##symbol = &(symbol)
 

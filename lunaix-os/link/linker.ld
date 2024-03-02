@@ -185,5 +185,14 @@ SECTIONS {
         *(.bss)
     }
 
+    .bss.kstack BLOCK(4K) : AT ( ADDR(.bss.kstack) - 0xC0000000)
+    {
+        PROVIDE(__bsskstack_start = .);
+
+        *(.bss.kstack)
+
+        PROVIDE(__bsskstack_end = .);
+    }
+
     __kexec_end = ALIGN(4K);
 }

@@ -84,6 +84,9 @@
                 "name": "pg_mount_{index}"
             },
             {
+                "name": "pg_mount_var"
+            },
+            {
                 "name": "vmap",
                 "block": "1@huge"
             },

@@ -1,7 +1,6 @@
 #include <lunaix/mm/region.h>
 #include <lunaix/mm/valloc.h>
-#include <lunaix/mm/vmm.h>
-#include <lunaix/mm/pmm.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/mm/mmap.h>
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
@@ -31,8 +30,7 @@ region_maybe_cow(struct mm_region* region)
     for (size_t i = start_pn; i <= end_pn; i++) {
         pte_t* self = mkptep_pn(VMS_SELF, i);
         pte_t* guest = mkptep_pn(VMS_MOUNT_1, i);
-
-        cpu_flush_page(page_addr(ptep_pfn(self)));
+        ptr_t va = page_addr(ptep_pfn(self));
 
         if ((attr & REGION_MODE_MASK) == REGION_RSHARED) {
             set_pte(self, pte_mkwprotect(*self));
@@ -42,6 +40,8 @@ region_maybe_cow(struct mm_region* region)
             set_pte(guest, null_pte);
         }
     }
+
+    tlb_flush_vmr_all(region);
 }
 
 static inline void
@@ -59,6 +59,8 @@ __dup_fdtable(struct proc_info* pcb)
 static void
 __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
 {
+    struct leaflet* leaflet;
+
     ptr_t kstack_pn = pfn(current_thread->kstack);
     kstack_pn -= pfn(KSTACK_SIZE) - 1;
 
@@ -71,13 +73,16 @@ __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
         if (pte_isguardian(p)) {
             set_pte(dest_ptep, guard_pte);
         } else {
-            ptr_t ppa = vmm_dup_page(pte_paddr(p));
-            set_pte(dest_ptep, pte_setpaddr(p, ppa));
+            leaflet = dup_leaflet(pte_leaflet(p));
+            i += ptep_map_leaflet(dest_ptep, p, leaflet);
         }
 
         src_ptep++;
         dest_ptep++;
     }
+
+    struct proc_mm* mm = vmspace(thread->process);
+    tlb_flush_mm_range(mm, kstack_pn, leaf_count(KSTACK_SIZE));
 }
 
 /*
@@ -144,6 +149,9 @@ done:
 pid_t
 dup_proc()
 {
+    // FIXME need investigate: issue with fork, as well as pthread
+    //       especially when involving frequent alloc and dealloc ops
+    //       (could be issue in allocator's segregated free list)
     struct proc_info* pcb = alloc_process();
     if (!pcb) {
         syscall_result(ENOMEM);
@@ -169,7 +177,7 @@ dup_proc()
     struct proc_mm* mm = vmspace(pcb);
     procvm_dupvms_mount(mm);
 
-    struct thread* main_thread = dup_active_thread(VMS_MOUNT_1, pcb);
+    struct thread* main_thread = dup_active_thread(mm->vm_mnt, pcb);
     if (!main_thread) {
         syscall_result(ENOMEM);
         procvm_unmount(mm);

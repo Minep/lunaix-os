@@ -120,7 +120,7 @@ exec_load(struct exec_container* container, struct v_file* executable)
     if (!argv_extra[1]) {
         // If loading a statically linked file, then heap remapping we can do,
         // otherwise delayed.
-        create_heap(vmspace(proc), va_align(container->exe.end));
+        create_heap(vmspace(proc), page_aligned(container->exe.end));
     }
 
     if (container->vms_mnt == VMS_SELF) {
@@ -137,6 +137,9 @@ exec_load(struct exec_container* container, struct v_file* executable)
 
             memcpy((void*)ustack, (const void*)envp, envp_len);
             ustack = copy_to_ustack(ustack, (ptr_t*)ustack);
+        } else {
+            ustack -= sizeof(ptr_t);
+            *((ptr_t*)ustack) = 0;
         }
 
         if (argv) {            
@@ -144,6 +147,9 @@ exec_load(struct exec_container* container, struct v_file* executable)
             ustack -= argv_len;
 
             memcpy((void*)ustack, (const void**)argv, argv_len);
+        } else {
+            ustack -= sizeof(ptr_t);
+            *((ptr_t*)ustack) = 0;
         }
 
         for (size_t i = 0; i < 2 && argv_extra[i]; i++) {
