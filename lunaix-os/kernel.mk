@@ -27,6 +27,8 @@ ksrc_deps := $(addsuffix .d,$(ksrc_files))
 
 kinc_opts := $(addprefix -I,$(kinc_dirs))
 
+tmp_kbin  := $(BUILD_DIR)/tmpk.bin
+ksymtable := lunaix_ksyms.o
 
 CFLAGS += -include flags.h
 CFLAGS += -include config.h
@@ -39,18 +41,25 @@ CFLAGS += -include config.h
 	$(call status_,CC,$<)
 	@$(CC) $(CFLAGS) $(kinc_opts) -c $< -o $@
 
-$(kbin_dir)/modksyms: $(kbin)
-	$(call status_,MOD,$@)
-	@$(PY) scripts/syms_export.py --bits=32 --order=little -o "$@"  "$<" 
+$(tmp_kbin): $(ksrc_objs)
+	$(call status_,LD,$@)
+	@$(CC) -T link/linker.ld $(LDFLAGS) -o $@ $^
+
+$(ksymtable): $(tmp_kbin)
+	$(call status_,KSYM,$@)
+	@scripts/gen_ksymtable.sh DdRrTtAGg $< > .lunaix_ksymtable.S
+	@$(CC) $(CFLAGS) -c .lunaix_ksymtable.S -o $@
 
 .PHONY: __do_relink
-__do_relink: $(ksrc_objs)
+__do_relink: $(ksrc_objs) $(ksymtable)
 	$(call status_,LD,$(kbin))
-	@$(CC) -T link/linker.ld -o $(kbin) $(ksrc_objs) $(LDFLAGS)
+	@$(CC) -T link/linker.ld $(LDFLAGS) -o $(kbin) $^
+	@rm $(tmp_kbin)
 
 .PHONY: all
-all: __do_relink $(kbin_dir)/modksyms
+all: __do_relink
 
 clean:
 	@rm -f $(ksrc_objs)
 	@rm -f $(ksrc_deps)
+	@rm -f .lunaix_ksymtable.S $(ksymtable)

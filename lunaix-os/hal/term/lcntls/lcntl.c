@@ -17,7 +17,7 @@
 static inline void
 raise_sig(struct term* at_term, struct linebuffer* lbuf, int sig)
 {
-    term_sendsig(at_term, SIGINT);
+    term_sendsig(at_term, sig);
     lbuf->sflags |= LSTATE_SIGRAISE;
 }
 

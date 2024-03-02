@@ -18,6 +18,8 @@ pwait(waitq_t* queue)
     block_current_thread();
     sched_pass();
 
+    // In case of SIGINT-forced awaken
+    llist_delete(&current_wq->waiters);
     cpu_enable_interrupt();
 }
 

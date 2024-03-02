@@ -2,7 +2,6 @@ CC := $(CX_PREFIX)gcc
 CC := $(CX_PREFIX)gcc
 AS := $(CX_PREFIX)as
 AR := $(CX_PREFIX)ar
-PY := python3
 
 STRIP_OSDEP_CC := -ffreestanding -fno-pie
 STRIP_OSDEP_LD := -nostdlib -nolibc -z noexecstack -no-pie -Wl,--build-id=none

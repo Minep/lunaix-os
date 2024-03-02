@@ -180,6 +180,11 @@ SECTIONS {
 
     }
 
+    .ksymtable BLOCK(4K) : AT ( ADDR(.ksymtable) - 0xC0000000 )
+    {
+        *(.ksymtable)
+    }
+
     .bss BLOCK(4K) : AT ( ADDR(.bss) - 0xC0000000 ) 
     {
         *(.bss)

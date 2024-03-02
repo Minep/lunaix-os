@@ -31,13 +31,6 @@ found:;
     ptr_t kexec_end = to_kphysical(__kexec_end);
     ptr_t aligned_pplist = MAX(ent->start, kexec_end);
 
-    // FIXME this is a temporary hack, we need a better way to convey
-    //       the mem-map for us to settle the pplist safely
-
-    for (i = 0; i <bctx->mods.mods_num; i++) {
-        aligned_pplist = MAX(aligned_pplist, bctx->mods.entries[i].end);
-    }
-
     aligned_pplist = napot_upaligned(aligned_pplist, L0T_SIZE);
 
     if (aligned_pplist + pool_size > ent->start + ent->size) {
