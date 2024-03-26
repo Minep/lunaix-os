@@ -45,6 +45,10 @@
 #define PG_MOUNT_4_SIZE 0x1000UL
 #define PG_MOUNT_4_END 0xc4003fffUL
 
+#define PG_MOUNT_VAR 0xc4004000UL
+#define PG_MOUNT_VAR_SIZE 0x3fc000UL
+#define PG_MOUNT_VAR_END 0xc43fffffUL
+
 #define VMAP 0xc4400000UL
 #define VMAP_SIZE 0x3b400000UL
 #define VMAP_END 0xff7fffffUL

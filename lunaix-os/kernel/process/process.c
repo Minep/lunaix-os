@@ -64,7 +64,7 @@ spawn_process(struct thread** created, ptr_t entry, bool with_ustack)
     struct proc_mm* mm = vmspace(kproc);
 
     procvm_initvms_mount(mm);
-    
+
     struct thread* kthread = create_thread(kproc, with_ustack);
 
     if (!kthread) {

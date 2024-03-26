@@ -1,4 +1,4 @@
-#include <lunaix/mm/vmm.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
@@ -6,6 +6,7 @@
 
 #include <sys/abi.h>
 #include <sys/mm/mm_defs.h>
+#include <sys/trace.h>
 
 #include <klibc/string.h>
 
@@ -13,32 +14,21 @@
 
 LOG_MODULE("TRACE")
 
+weak struct ksyms __lunaix_ksymtable[] = { };
+extern struct ksyms __lunaix_ksymtable[];
+
 static struct trace_context trace_ctx;
 
 void
 trace_modksyms_init(struct boot_handoff* bhctx)
 {
-    struct boot_modent* modents = bhctx->mods.entries;
-    for (size_t i = 0; i < bhctx->mods.mods_num; i++) {
-        struct boot_modent* mod = &bhctx->mods.entries[i];
-        if (streq(mod->str, "modksyms")) {
-            assert(!va_offset(mod->start));
-
-            pte_t pte = mkpte(mod->start, KERNEL_DATA);
-            size_t n = pfn(mod->end) - pfn(mod->start);
-            
-            ptr_t ksym_va = vmap_leaf_ptes(pte, n);
-
-            assert(ksym_va);
-            trace_ctx.ksym_table = (struct ksyms*)ksym_va;
-        }
-    }
+    trace_ctx.ksym_table = __lunaix_ksymtable;
 }
 
 struct ksym_entry*
 trace_sym_lookup(ptr_t addr)
 {
-    int c = trace_ctx.ksym_table->ksym_count;
+    unsigned long c = trace_ctx.ksym_table->ksym_count;
     struct ksym_entry* ksent = trace_ctx.ksym_table->syms;
 
     int i = c - 1, j = 0, m = 0;
@@ -73,13 +63,14 @@ ksym_getstr(struct ksym_entry* sym)
         return "???";
     }
 
-    return (char*)((ptr_t)trace_ctx.ksym_table +
-                   trace_ctx.ksym_table->ksym_label_off + sym->label_off);
+    return sym->label;
 }
 
 static inline bool valid_fp(ptr_t ptr) {
     ptr_t start = ROUNDUP(current_thread->kstack - KSTACK_SIZE, MEM_PAGE);
-    return start < ptr && ptr < current_thread->kstack;
+
+    return (start < ptr && ptr < current_thread->kstack) 
+           || arch_valid_fp(ptr);
 }
 
 int
@@ -120,9 +111,9 @@ static inline void
 trace_print_code_entry(ptr_t sym_pc, ptr_t inst_pc, char* sym)
 {
     if (sym_pc) {
-        DEBUG("%p+%p: %s", sym_pc, inst_pc - sym_pc, sym);
+        DEBUG("%s+%p", sym, inst_pc - sym_pc);
     } else {
-        DEBUG("%p+%p: %s", inst_pc, sym_pc, sym);
+        DEBUG("%s [%p]", sym, sym_pc);
     }
 }
 
@@ -205,4 +196,6 @@ trace_printstack_isr(const isr_param* isrm)
 
         p = p->execp->saved_prev_ctx;
     }
+
+    DEBUG("----- [trace end] -----\n");
 }

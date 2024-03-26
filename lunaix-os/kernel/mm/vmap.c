@@ -1,6 +1,5 @@
-#include <lunaix/mm/pmm.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/mm/valloc.h>
-#include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 
@@ -8,6 +7,11 @@
 
 static ptr_t start = VMAP;
 static volatile ptr_t prev_va = 0;
+
+void
+vmap_set_start(ptr_t start_addr) {
+    start = start_addr;
+}
 
 static pte_t*
 __alloc_contig_ptes(pte_t* ptep, size_t base_sz, int n)
@@ -49,7 +53,6 @@ __alloc_contig_ptes(pte_t* ptep, size_t base_sz, int n)
     }
 
     va -= base_sz * _n;
-    assert(prev_va < va);
     
     prev_va = va;
     return mkptep_va(ptep_vm_mnt(ptep), va);
@@ -67,5 +70,25 @@ vmap_ptes_at(pte_t pte, size_t lvl_size, int n)
 
     vmm_set_ptes_contig(ptep, pte, lvl_size, n);
 
-    return page_addr(ptep_pfn(ptep));
+    ptr_t va = page_addr(ptep_pfn(ptep));
+
+    tlb_flush_kernel_ranged(va, n);
+    
+    return va;
+}
+
+void
+vunmap(ptr_t ptr, struct leaflet* leaflet)
+{    
+    pte_t* ptep;
+    unsigned int npages;
+ 
+    assert(start <= ptr && ptr <= VMAP_END);
+    
+    npages = leaflet_nfold(leaflet);
+    ptep = mkptep_va(VMS_SELF, ptr);
+
+    vmm_unset_ptes(ptep, npages);
+
+    tlb_flush_kernel_ranged(ptr, npages);
 }

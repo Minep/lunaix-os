@@ -1,9 +1,8 @@
 #include <klibc/string.h>
 #include <lunaix/ds/btrie.h>
 #include <lunaix/fs.h>
-#include <lunaix/mm/pmm.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/mm/valloc.h>
-#include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
 
 #define PCACHE_DIRTY 0x1
@@ -21,22 +20,24 @@ __pcache_try_evict(struct lru_node* obj)
 static void
 pcache_free_page(void* va)
 {
-    ptr_t pa = vmm_del_mapping(VMS_SELF, (ptr_t)va);
-    pmm_free_page(pa);
+    pte_t* ptep = mkptep_va(VMS_SELF, (ptr_t)va);
+    pte_t pte = pte_at(ptep);
+    leaflet_return(pte_leaflet(pte));
 }
 
 static void*
 pcache_alloc_page()
 {
     int i = 0;
-    ptr_t pp = pmm_alloc_page(0), va = 0;
+    ptr_t va = 0;
+    struct leaflet* leaflet = alloc_leaflet(0);
 
-    if (!pp) {
+    if (!leaflet) {
         return NULL;
     }
 
-    if (!(va = (ptr_t)vmap(pp, PAGE_SIZE, KERNEL_DATA))) {
-        pmm_free_page(pp);
+    if (!(va = (ptr_t)vmap(leaflet, KERNEL_DATA))) {
+        leaflet_return(leaflet);
         return NULL;
     }
 

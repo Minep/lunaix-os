@@ -6,6 +6,8 @@
 #include <lunaix/kcmd.h>
 #include <sys/mm/mm_defs.h>
 
+extern unsigned char __kexec_end[], __kexec_start[];
+
 /**
  * @brief Reserve memory for kernel bootstrapping initialization
  *
@@ -23,24 +25,27 @@ boot_begin(struct boot_handoff* bhctx)
 
     vmm_set_ptes_contig(ptep, pte_mkhuge(pte), L0T_SIZE, count);
 
-    struct boot_mmapent *mmap = bhctx->mem.mmap, *mmapent;
-    for (size_t i = 0; i < bhctx->mem.mmap_len; i++) {
-        mmapent = &mmap[i];
-        size_t size_pg = leaf_count(mmapent->size);
-        pfn_t start_pfn = pfn(mmapent->start);
+    // 将内核占据的页，包括前1MB，hhk_init 设为已占用
+    size_t pg_count = leaf_count(to_kphysical(__kexec_end));
+    pmm_onhold_range(0, pg_count);
 
-        if (mmapent->type == BOOT_MMAP_FREE) {
-            pmm_mark_chunk_free(start_pfn, size_pg);
-            continue;
+    size_t i;
+    struct boot_mmapent* ent;
+    for (i = 0; i < bhctx->mem.mmap_len; i++) {
+        ent = &bhctx->mem.mmap[i];
+
+        if (reserved_memregion(ent) || reclaimable_memregion(ent)) {
+            unsigned int counts = leaf_count(ent->size);
+            pmm_onhold_range(pfn(ent->start), counts);
         }
     }
 
     /* Reserve region for all loaded modules */
-    for (size_t i = 0; i < bhctx->mods.mods_num; i++) {
+    for (i = 0; i < bhctx->mods.mods_num; i++) {
         struct boot_modent* mod = &bhctx->mods.entries[i];
         unsigned int counts = leaf_count(mod->end - mod->start);
 
-        pmm_mark_chunk_occupied(pfn(mod->start), counts, PP_FGLOCKED);
+        pmm_onhold_range(pfn(mod->start), counts);
     }
 }
 
@@ -54,17 +59,13 @@ extern u8_t __kboot_end; /* link/linker.ld */
 void
 boot_end(struct boot_handoff* bhctx)
 {
-    struct boot_mmapent *mmap = bhctx->mem.mmap, *mmapent;
+    struct boot_mmapent* ent;
     for (size_t i = 0; i < bhctx->mem.mmap_len; i++) {
-        mmapent = &mmap[i];
-        size_t size_pg = leaf_count(mmapent->size);
+        ent = &bhctx->mem.mmap[i];
 
-        if (mmapent->type == BOOT_MMAP_RCLM) {
-            pmm_mark_chunk_free(pfn(mmapent->start), size_pg);
-        }
-
-        if (mmapent->type == BOOT_MMAP_FREE) {
-            continue;
+        if (reclaimable_memregion(ent)) {
+            unsigned int counts = leaf_count(ent->size);
+            pmm_unhold_range(pfn(ent->start), counts);
         }
     }
 

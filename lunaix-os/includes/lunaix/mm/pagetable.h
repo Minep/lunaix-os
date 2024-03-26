@@ -134,8 +134,8 @@ typedef struct __pte pte_t;
         ((ptr_t)(ptep) & __p) == __p;                   \
     })
 
-pte_t 
-vmm_alloc_page(pte_t* ptep, pte_t pte);
+extern pte_t 
+alloc_kpage_at(pte_t* ptep, pte_t pte, int order);
 
 /**
  * @brief Try page walk to the pte pointed by ptep and 
@@ -155,7 +155,7 @@ __alloc_level(pte_t* ptep, pte_t pte, pte_attr_t prot)
     }
 
     pte = pte_setprot(pte, prot);
-    return !pte_isnull(vmm_alloc_page(ptep, pte));
+    return !pte_isnull(alloc_kpage_at(ptep, pte, 0));
 }
 
 /**
@@ -432,13 +432,23 @@ page_addr(ptr_t pfn) {
 }
 
 static inline ptr_t
-va_align(ptr_t va) {
+page_aligned(ptr_t va) {
     return va & ~PAGE_MASK;
 }
 
 static inline ptr_t
-va_alignup(ptr_t va) {
+page_upaligned(ptr_t va) {
     return (va + PAGE_MASK) & ~PAGE_MASK;
+}
+
+static inline ptr_t
+napot_aligned(ptr_t va, size_t napot_sz) {
+    return va & ~(napot_sz - 1);
+}
+
+static inline ptr_t
+napot_upaligned(ptr_t va, size_t napot_sz) {
+    return (va + napot_sz - 1) & ~(napot_sz - 1);
 }
 
 static inline pte_t*
@@ -502,6 +512,18 @@ static inline bool
 pt_last_level(int level)
 {
     return level == _PTW_LEVEL - 1;
+}
+
+static inline ptr_t
+va_mntpoint(ptr_t va)
+{
+    return _VM_OF(va);
+}
+
+static inline ptr_t
+va_actual(ptr_t va)
+{
+    return page_addr(_VM_OF(va) ^ va);
 }
 
 #endif /* __LUNAIX_PAGETABLE_H */

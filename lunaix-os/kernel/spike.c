@@ -3,6 +3,7 @@
 #include <lunaix/pcontext.h>
 #include <lunaix/syslog.h>
 #include <lunaix/trace.h>
+#include <lunaix/failsafe.h>
 
 LOG_MODULE("spike")
 
@@ -13,9 +14,8 @@ __assert_fail(const char* expr, const char* file, unsigned int line)
     //  the stack context being preserved
     cpu_disable_interrupt();
     ERROR("assertion fail (%s:%u)\n\t%s", file, line, expr);
-    trace_printstack();
-
-    spin(); // never reach
+    
+    failsafe_diagnostic();
 }
 
 void noret

@@ -36,14 +36,21 @@ kmem_init(struct boot_handoff* bhctx);
 void
 kernel_bootstrap(struct boot_handoff* bhctx)
 {
-    pmm_init(bhctx->mem.size);
     vmm_init();
+
+    pmm_init(bhctx);
+    // now we can start reserving physical space
 
     /* Begin kernel bootstrapping sequence */
     boot_begin(bhctx);
 
+    tty_init(ioremap(0xB8000, PAGE_SIZE));
+    
     /* Setup kernel memory layout and services */
     kmem_init(bhctx);
+
+    // FIXME this goes to hal/gfxa
+    tty_set_theme(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
 
     boot_parse_cmdline(bhctx);
 
@@ -53,10 +60,6 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     device_scan_drivers();
 
     invoke_init_function(on_earlyboot);
-
-    // FIXME this goes to hal/gfxa
-    tty_init(ioremap(0xB8000, PAGE_SIZE));
-    tty_set_theme(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
 
     device_sysconf_load();
 
@@ -122,11 +125,6 @@ spawn_lunad()
 void
 kmem_init(struct boot_handoff* bhctx)
 {
-    extern u8_t __kexec_end;
-    // 将内核占据的页，包括前1MB，hhk_init 设为已占用
-    size_t pg_count = leaf_count((ptr_t)&__kexec_end - KERNEL_RESIDENT);
-    pmm_mark_chunk_occupied(0, pg_count, PP_FGLOCKED);
-
     pte_t* ptep = mkptep_va(VMS_SELF, KERNEL_RESIDENT);
     ptep = mkl0tep(ptep);
 

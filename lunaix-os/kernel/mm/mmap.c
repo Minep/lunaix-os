@@ -1,7 +1,6 @@
 #include <lunaix/mm/mmap.h>
-#include <lunaix/mm/pmm.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/mm/valloc.h>
-#include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
 #include <lunaix/syscall.h>
 #include <lunaix/syscall_utils.h>
@@ -69,6 +68,28 @@ mmap_user(void** addr_out,
     param->range_start = USR_EXEC;
 
     return mem_map(addr_out, created, addr, file, param);
+}
+
+static void
+__remove_ranged_mappings(pte_t* ptep, size_t npages)
+{
+    struct leaflet* leaflet;
+    pte_t pte; 
+    for (size_t i = 0, n = 0; i < npages; i++, ptep++) {
+        pte = pte_at(ptep);
+
+        set_pte(ptep, null_pte);
+        if (!pte_isloaded(pte)) {
+            continue;
+        }
+
+        leaflet = pte_leaflet_aligned(pte);
+        leaflet_return(leaflet);
+
+        n = ptep_unmap_leaflet(ptep, leaflet) - 1;
+        i += n;
+        ptep += n;
+    }
 }
 
 static ptr_t
@@ -168,7 +189,7 @@ mem_map(void** addr_out,
 {
     assert_msg(addr, "addr can not be NULL");
 
-    ptr_t last_end = USR_EXEC, found_loc = va_align(addr);
+    ptr_t last_end = USR_EXEC, found_loc = page_aligned(addr);
     struct mm_region *pos, *n;
 
     vm_regions_t* vm_regions = &param->pvms->regions;
@@ -253,7 +274,7 @@ mem_sync_pages(ptr_t mnt,
     }
     
     pte_t* ptep = mkptep_va(mnt, start);
-    ptr_t va    = va_align(start);
+    ptr_t va    = page_aligned(start);
 
     for (; va < start + length; va += PAGE_SIZE, ptep++) {
         pte_t pte = vmm_tryptep(ptep, LFT_SIZE);
@@ -268,7 +289,8 @@ mem_sync_pages(ptr_t mnt,
             region->mfile->ops->write_page(inode, (void*)va, offset);
 
             set_pte(ptep, pte_mkclean(pte));
-            cpu_flush_page(va);
+            tlb_flush_vmr(region, va);
+            
         } else if ((options & MS_INVALIDATE)) {
             goto invalidate;
         }
@@ -279,10 +301,12 @@ mem_sync_pages(ptr_t mnt,
 
         continue;
 
+        // FIXME what if mem_sync range does not aligned with
+        //       a leaflet with order > 1
     invalidate:
         set_pte(ptep, null_pte);
-        pmm_free_page(pte_paddr(pte));
-        cpu_flush_page(va);
+        leaflet_return(pte_leaflet(pte));
+        tlb_flush_vmr(region, va);
     }
 }
 
@@ -325,15 +349,9 @@ mem_unmap_region(ptr_t mnt, struct mm_region* region)
     mem_sync_pages(mnt, region, region->start, pglen * PAGE_SIZE, 0);
 
     pte_t* ptep = mkptep_va(mnt, region->start);
-    for (size_t i = 0; i < pglen; i++, ptep++) {
-        pte_t pte = pte_at(ptep);
-        ptr_t pa  = pte_paddr(pte);
+    __remove_ranged_mappings(ptep, pglen);
 
-        set_pte(ptep, null_pte);
-        if (pte_isloaded(pte)) {
-            pmm_free_page(pte_paddr(pte));
-        }
-    }
+    tlb_flush_vmr_all(region);
     
     llist_delete(&region->head);
     region_release(region);
@@ -404,12 +422,11 @@ __unmap_overlapped_cases(ptr_t mnt,
     }
 
     mem_sync_pages(mnt, vmr, vmr->start, umps_len, 0);
-    for (size_t i = 0; i < umps_len; i += PAGE_SIZE) {
-        ptr_t pa = vmm_del_mapping(mnt, vmr->start + i);
-        if (pa) {
-            pmm_free_page(pa);
-        }
-    }
+
+    pte_t *ptep = mkptep_va(mnt, vmr->start);
+    __remove_ranged_mappings(ptep, leaf_count(umps_len));
+
+    tlb_flush_vmr_range(vmr, vmr->start, umps_len);
 
     vmr->start += displ;
     vmr->end -= shrink;
@@ -431,7 +448,7 @@ int
 mem_unmap(ptr_t mnt, vm_regions_t* regions, ptr_t addr, size_t length)
 {
     length = ROUNDUP(length, PAGE_SIZE);
-    ptr_t cur_addr = va_align(addr);
+    ptr_t cur_addr = page_aligned(addr);
     struct mm_region *pos, *n;
 
     llist_for_each(pos, n, regions, head)

@@ -7,8 +7,8 @@
 struct ksym_entry
 {
     ptr_t pc;
-    u32_t label_off;
-};
+    char* label;
+} align(8);
 
 struct trace_record
 {
@@ -19,8 +19,7 @@ struct trace_record
 
 struct ksyms
 {
-    u32_t ksym_count;
-    u32_t ksym_label_off;
+    unsigned long ksym_count;
     struct ksym_entry syms[0];
 };
 

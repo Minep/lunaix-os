@@ -180,9 +180,23 @@ SECTIONS {
 
     }
 
+    .ksymtable BLOCK(4K) : AT ( ADDR(.ksymtable) - 0xC0000000 )
+    {
+        *(.ksymtable)
+    }
+
     .bss BLOCK(4K) : AT ( ADDR(.bss) - 0xC0000000 ) 
     {
         *(.bss)
+    }
+
+    .bss.kstack BLOCK(4K) : AT ( ADDR(.bss.kstack) - 0xC0000000)
+    {
+        PROVIDE(__bsskstack_start = .);
+
+        *(.bss.kstack)
+
+        PROVIDE(__bsskstack_end = .);
     }
 
     __kexec_end = ALIGN(4K);

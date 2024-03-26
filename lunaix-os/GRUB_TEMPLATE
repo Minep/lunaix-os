@@ -3,5 +3,4 @@ timeout=0
 
 menuentry "$_OS_NAME" {
 	multiboot /boot/kernel.bin $KCMD
-	module --nounzip /boot/modksyms modksyms
 }

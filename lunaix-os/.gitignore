@@ -17,3 +17,5 @@ __pycache__/
 **.d
 
 *.log
+
+.lunaix_ksymtable.S

@@ -58,19 +58,6 @@ cpu_chconfig(u32_t val)
 }
 
 /**
- * @brief Load current virtual memory space
- *
- * @return u32_t
- */
-static inline u32_t
-cpu_ldvmspace()
-{
-    ptr_t val;
-    asm volatile("movl %%cr3,%0" : "=r"(val));
-    return val;
-}
-
-/**
  * @brief Change current virtual memory space
  *
  * @return u32_t
@@ -79,29 +66,6 @@ static inline void
 cpu_chvmspace(u32_t val)
 {
     asm("mov %0, %%cr3" ::"r"(val));
-}
-
-/**
- * @brief Flush a certain TLB record
- *
- * @return u32_t
- */
-static inline void
-cpu_flush_page(ptr_t va)
-{
-    asm volatile("invlpg (%0)" ::"r"(va) : "memory");
-}
-
-/**
- * @brief Flush entire TLB
- *
- */
-static inline void
-cpu_flush_vmspace()
-{
-    asm("movl %%cr3, %%eax\n"
-        "movl %%eax, %%cr3" ::
-          : "eax");
 }
 
 static inline void

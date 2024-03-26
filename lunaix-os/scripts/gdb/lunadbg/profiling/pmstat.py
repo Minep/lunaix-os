@@ -1,14 +1,15 @@
 from ..symbols import LunaixSymbols
 from ..structs.page import PageStruct
+from ..structs.pmem import PMem
 from ..pp import MyPrettyPrinter
 import math
 
 class PhysicalMemProfile:
     def __init__(self) -> None:
         super().__init__()
-        self._pm_list = LunaixSymbols.debug_sym("pmm", "pm_table")
+        self._pmem    = PMem(LunaixSymbols.debug_sym("pmm", "memory").value().address)
 
-        self.max_mem_pg = int(LunaixSymbols.debug_sym("pmm", "max_pg").value())
+        self.max_mem_pg = self._pmem.list_len()
         self.max_mem_sz = self.max_mem_pg * 4096
         self.mem_distr = []
 
@@ -16,20 +17,22 @@ class PhysicalMemProfile:
         self.__mem_distr_granule = distr_granule
         self.mem_distr.clear()
 
+        pplist = self._pmem.pplist()
         page_per_granule = self.max_mem_pg / self.__mem_distr_granule
         page_per_granule = math.ceil(page_per_granule)
         remainder = self.max_mem_pg % self.__mem_distr_granule
         bucket = 0
         non_contig = 0
         last_contig = False
+
         for i in range(self.max_mem_pg):
-            element = PageStruct(self._pm_list[i].address)
-            bucket += int(element.ref > 0)
+            element = PageStruct(pplist[i].address)
+            bucket += int(element.busy())
             if last_contig:
-                last_contig = element.ref > 0
+                last_contig = element.busy()
                 non_contig += int(not last_contig)
             else:
-                last_contig = element.ref > 0
+                last_contig = element.busy()
 
             if (i + 1) % page_per_granule == 0:
                 self.mem_distr.append(bucket)
