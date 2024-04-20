@@ -24,7 +24,7 @@ struct cake_pile
     u32_t alloced_pieces;
     u32_t pieces_per_cake;
     u32_t pg_per_cake;
-    char pile_name[PILE_NAME_MAXLEN];
+    char pile_name[PILE_NAME_MAXLEN+1];
 
     pile_cb ctor;
 };
