@@ -125,7 +125,13 @@ hlist_delete(struct hlist_node* node)
 {
     if (!node->pprev)
         return;
+
+    if (node->next) {
+        node->next->pprev = node->pprev;
+    }
+    
     *node->pprev = node->next;
+
     node->next = 0;
     node->pprev = 0;
 }
