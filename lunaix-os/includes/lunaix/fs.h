@@ -11,6 +11,7 @@
 #include <lunaix/ds/lru.h>
 #include <lunaix/ds/mutex.h>
 #include <lunaix/status.h>
+#include <lunaix/spike.h>
 
 #include <stdatomic.h>
 
@@ -76,6 +77,8 @@
         mutex_lock(&dnode->lock);                                              \
         lru_use_one(dnode_lru, &dnode->lru);                                   \
     })
+
+#define assert_fs(cond) assert_p(cond, "FS")
 
 typedef u32_t inode_t;
 

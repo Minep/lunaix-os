@@ -1,6 +1,6 @@
 #include <lunaix/block.h>
 #include <lunaix/fs.h>
-#include <lunaix/fs/iso9660.h>
+#include "iso9660.h"
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 

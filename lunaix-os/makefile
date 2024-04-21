@@ -91,7 +91,7 @@ run: $(BUILD_DIR)/$(OS_ISO)
 
 debug-qemu: all-debug
 	@i686-elf-objcopy --only-keep-debug $(kbin) $(kbuild_dir)/kernel.dbg
-	@qemu-system-i386 $(call get_qemu_options,$(kimg))
+	@scripts/debug_qemu.sh -m 1G --cd-rom "$(kimg)" --hdd "$(PART_DISK)" --hmp $(QEMU_MON_PORT) &
 	@sleep 1
 	@QMPORT=$(QEMU_MON_PORT) gdb $(kbin) -ex "target remote localhost:1234"
 
