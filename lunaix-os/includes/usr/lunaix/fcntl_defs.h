@@ -24,7 +24,11 @@
 #define O_RDONLY FO_RDONLY
 #define O_RDWR FO_RDWR
 
-#define MNT_RO 0x1
+/* Mount with read-only flag */
+#define MNT_RO (1 << 0)
+
+/* Mount with block-cache-disabled flag */
+#define MNT_NC (1 << 1)
 
 struct file_stat
 {

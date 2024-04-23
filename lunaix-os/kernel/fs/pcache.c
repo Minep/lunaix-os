@@ -51,7 +51,7 @@ pcache_init(struct pcache* pcache)
     llist_init_head(&pcache->dirty);
     llist_init_head(&pcache->pages);
 
-    pcache_zone = lru_new_zone(__pcache_try_evict);
+    pcache_zone = lru_new_zone('pcache', __pcache_try_evict);
 }
 
 void

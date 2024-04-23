@@ -1,10 +1,12 @@
 #include <lunaix/ds/lru.h>
 #include <lunaix/mm/valloc.h>
 
+#include <klibc/string.h>
+
 struct llist_header zone_lead = { .next = &zone_lead, .prev = &zone_lead };
 
 struct lru_zone*
-lru_new_zone(evict_cb try_evict_cb)
+lru_new_zone(const char* name, evict_cb try_evict_cb)
 {
     struct lru_zone* zone = vzalloc(sizeof(struct lru_zone));
     if (!zone) {
@@ -13,6 +15,7 @@ lru_new_zone(evict_cb try_evict_cb)
 
     zone->try_evict = try_evict_cb;
 
+    strncpy(zone->name, name, sizeof(zone->name) - 1);
     llist_init_head(&zone->lead_node);
     llist_append(&zone_lead, &zone->zones);
 
@@ -35,7 +38,10 @@ __do_evict(struct lru_zone* zone, struct llist_header* elem)
 {
     llist_delete(elem);
     if (!zone->try_evict(container_of(elem, struct lru_node, lru_nodes))) {
-        llist_append(&zone->lead_node, elem);
+        // if the node is unable to evict, raise it's rank by one, so
+        // others can have chance in the next round
+        struct llist_header* new_tail = zone->lead_node.prev;
+        llist_prepend(new_tail, elem);
     } else {
         zone->objects--;
     }
@@ -61,6 +67,16 @@ lru_evict_half(struct lru_zone* zone)
         __do_evict(zone, tail);
         tail = tail->prev;
         target--;
+    }
+}
+
+void
+lru_evict_all(struct lru_zone* zone)
+{
+    struct llist_header* tail = zone->lead_node.prev;
+    while (tail != &zone->lead_node) {
+        __do_evict(zone, tail);
+        tail = tail->prev;
     }
 }
 
