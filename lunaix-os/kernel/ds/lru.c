@@ -1,5 +1,6 @@
 #include <lunaix/ds/lru.h>
 #include <lunaix/mm/valloc.h>
+#include <lunaix/spike.h>
 
 #include <klibc/string.h>
 
@@ -23,8 +24,31 @@ lru_new_zone(const char* name, evict_cb try_evict_cb)
 }
 
 void
+lru_free_zone(struct lru_zone* zone)
+{
+    lru_evict_all(zone);
+
+    if (llist_empty(&zone->lead_node)) {
+        llist_delete(&zone->zones);
+        vfree(zone);
+        return;
+    }
+
+    /*
+        We are unable to free it at this moment,
+        (probably due to tricky things happened
+        to some cached object). Thus mark it and
+        let the daemon try to free it asynchronously
+    */
+    zone->delayed_free = true;
+    zone->attempts++;
+}
+
+void
 lru_use_one(struct lru_zone* zone, struct lru_node* node)
 {
+    assert(!zone->delayed_free);
+
     if (node->lru_nodes.next && node->lru_nodes.prev) {
         llist_delete(&node->lru_nodes);
     }

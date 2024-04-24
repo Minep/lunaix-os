@@ -9,7 +9,7 @@
 struct btrie
 {
     struct btrie_node* btrie_root;
-    int truncated;
+    unsigned int order;
 };
 
 struct btrie_node

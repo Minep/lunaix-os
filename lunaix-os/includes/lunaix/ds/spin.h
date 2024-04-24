@@ -16,6 +16,12 @@ struct spinlock
          happened here.
 */
 
+static inline void
+spinlock_init(struct spinlock* lock)
+{
+    lock->flag = false;
+}
+
 static inline bool spin_try_lock(struct spinlock* lock)
 {
     if (lock->flag){
@@ -34,6 +40,13 @@ static inline void spin_lock(struct spinlock* lock)
 static inline void spin_unlock(struct spinlock* lock)
 {
     lock->flag = false;
+}
+
+static inline void spinlock_destory(struct spinlock* lock)
+{
+    // TODO figure a good way to destory the lock
+    //      so other lock attempt after this point
+    //      will cause immediately fail
 }
 
 #endif /* __LUNAIX_SPIN_H */

@@ -19,9 +19,8 @@
 struct btrie_node*
 __btrie_traversal(struct btrie* root, unsigned long index, int options)
 {
-    index = index >> root->truncated;
-    unsigned long lz = index ? ROUNDDOWN(BITS - clz(index), BTRIE_BITS) : 0;
-    unsigned long bitmask = ((1 << BTRIE_BITS) - 1) << lz;
+    unsigned long lz = index ? ROUNDDOWN(BITS - clz(index), root->order) : 0;
+    unsigned long bitmask = ((1 << root->order) - 1) << lz;
     unsigned long i = 0;
     struct btrie_node* tree = root->btrie_root;
 
@@ -50,20 +49,20 @@ __btrie_traversal(struct btrie* root, unsigned long index, int options)
         } else {
             tree = subtree;
         }
-        bitmask = bitmask >> BTRIE_BITS;
-        lz -= BTRIE_BITS;
+        bitmask = bitmask >> root->order;
+        lz -= root->order;
     }
 
     return tree;
 }
 
 void
-btrie_init(struct btrie* btrie, u32_t trunc_bits)
+btrie_init(struct btrie* btrie, unsigned int order)
 {
     btrie->btrie_root = vzalloc(sizeof(struct btrie_node));
     llist_init_head(&btrie->btrie_root->nodes);
     llist_init_head(&btrie->btrie_root->children);
-    btrie->truncated = trunc_bits;
+    btrie->order = order;
 }
 
 void*

@@ -18,6 +18,14 @@ struct lru_zone
     char name[32];
     u32_t objects;
     evict_cb try_evict;
+
+    union {
+        struct {
+            bool delayed_free:1;
+            unsigned char attempts;
+        };
+        unsigned int flags;
+    };
 };
 
 struct lru_zone*
@@ -37,5 +45,8 @@ lru_evict_half(struct lru_zone* zone);
 
 void
 lru_evict_all(struct lru_zone* zone);
+
+void
+lru_free_zone(struct lru_zone* zone);
 
 #endif /* __LUNAIX_LRU_H */
