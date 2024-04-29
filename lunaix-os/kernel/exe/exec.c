@@ -201,6 +201,11 @@ exec_load_byname(struct exec_container* container, const char* filename)
         goto done;
     }
 
+    if (!check_itype_any(dnode->inode, F_FILE)) {
+        errno = EISDIR;
+        goto done;
+    }
+
     errno = exec_load(container, file);
 
     // It shouldn't matter which pid we passed. As the only reader is 
