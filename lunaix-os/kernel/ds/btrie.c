@@ -14,14 +14,14 @@
 #include <lunaix/spike.h>
 
 #define BTRIE_INSERT 1
+#define BITS (sizeof(unsigned long) * 8 - 1)
 
 struct btrie_node*
-__btrie_traversal(struct btrie* root, u32_t index, int options)
+__btrie_traversal(struct btrie* root, unsigned long index, int options)
 {
-    index = index >> root->truncated;
-    u32_t lz = index ? ROUNDDOWN(31 - clz(index), BTRIE_BITS) : 0;
-    u32_t bitmask = ((1 << BTRIE_BITS) - 1) << lz;
-    u32_t i = 0;
+    unsigned long lz = index ? ROUNDDOWN(BITS - clz(index), root->order) : 0;
+    unsigned long bitmask = ((1 << root->order) - 1) << lz;
+    unsigned long i = 0;
     struct btrie_node* tree = root->btrie_root;
 
     // Time complexity: O(log_2(log_2(N))) where N is the index to lookup
@@ -49,24 +49,24 @@ __btrie_traversal(struct btrie* root, u32_t index, int options)
         } else {
             tree = subtree;
         }
-        bitmask = bitmask >> BTRIE_BITS;
-        lz -= BTRIE_BITS;
+        bitmask = bitmask >> root->order;
+        lz -= root->order;
     }
 
     return tree;
 }
 
 void
-btrie_init(struct btrie* btrie, u32_t trunc_bits)
+btrie_init(struct btrie* btrie, unsigned int order)
 {
     btrie->btrie_root = vzalloc(sizeof(struct btrie_node));
     llist_init_head(&btrie->btrie_root->nodes);
     llist_init_head(&btrie->btrie_root->children);
-    btrie->truncated = trunc_bits;
+    btrie->order = order;
 }
 
 void*
-btrie_get(struct btrie* root, u32_t index)
+btrie_get(struct btrie* root, unsigned long index)
 {
     struct btrie_node* node = __btrie_traversal(root, index, 0);
     if (!node) {
@@ -76,7 +76,7 @@ btrie_get(struct btrie* root, u32_t index)
 }
 
 void
-btrie_set(struct btrie* root, u32_t index, void* data)
+btrie_set(struct btrie* root, unsigned long index, void* data)
 {
     struct btrie_node* node = __btrie_traversal(root, index, BTRIE_INSERT);
     node->data = data;
@@ -98,7 +98,7 @@ __btrie_rm_recursive(struct btrie_node* node)
 }
 
 void*
-btrie_remove(struct btrie* root, u32_t index)
+btrie_remove(struct btrie* root, unsigned long index)
 {
     struct btrie_node* node = __btrie_traversal(root, index, 0);
     if (!node) {

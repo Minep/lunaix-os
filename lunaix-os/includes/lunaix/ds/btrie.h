@@ -9,7 +9,7 @@
 struct btrie
 {
     struct btrie_node* btrie_root;
-    int truncated;
+    unsigned int order;
 };
 
 struct btrie_node
@@ -18,7 +18,7 @@ struct btrie_node
     struct llist_header siblings;
     struct llist_header nodes;
     struct btrie_node* parent;
-    u32_t index;
+    unsigned long index;
     void* data;
 };
 
@@ -26,13 +26,13 @@ void
 btrie_init(struct btrie* btrie, u32_t trunc_bits);
 
 void*
-btrie_get(struct btrie* root, u32_t index);
+btrie_get(struct btrie* root, unsigned long index);
 
 void
-btrie_set(struct btrie* root, u32_t index, void* data);
+btrie_set(struct btrie* root, unsigned long index, void* data);
 
 void*
-btrie_remove(struct btrie* root, u32_t index);
+btrie_remove(struct btrie* root, unsigned long index);
 
 void
 btrie_release(struct btrie* tree);
