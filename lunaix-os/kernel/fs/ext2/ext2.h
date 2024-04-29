@@ -48,7 +48,6 @@ struct ext2b_super {
         u32_t s_optional_feat;
         u32_t s_required_feat;
         u32_t s_ro_feat;
-        u32_t s_uuid;
         u8_t s_uuid[16];
         u8_t s_volname[16];
         u8_t s_last_mnt[64];
@@ -125,7 +124,7 @@ struct ext2_dirent
     u8_t file_type;
     u8_t name[256];
 } align(4) compact;
-#define EXT2_SB(v_dnode) (fsapi_impl_data(v_dnode, struct ext2_dirent))
+#define EXT2_DRE(v_dnode) (fsapi_impl_data(v_dnode, struct ext2_dirent))
 
 struct ext2_sbinfo 
 {

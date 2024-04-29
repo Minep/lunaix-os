@@ -2,6 +2,7 @@
 #define __LUNAIX_LRU_H
 
 #include <lunaix/ds/llist.h>
+#include <lunaix/ds/spinlock.h>
 #include <lunaix/types.h>
 
 struct lru_node
@@ -16,8 +17,16 @@ struct lru_zone
     struct llist_header lead_node;
     struct llist_header zones;
     char name[32];
-    u32_t objects;
     evict_cb try_evict;
+    spinlock_t lock;
+
+    unsigned int objects;
+    unsigned int hotness;
+    struct {
+        unsigned int n_single;
+        unsigned int n_half;
+        unsigned int n_full;
+    } evict_stats;
 
     union {
         struct {

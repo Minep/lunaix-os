@@ -437,15 +437,6 @@ vfs_get_path(struct v_dnode* dnode, char* buf, size_t size, int depth);
 void
 pcache_init(struct pcache* pcache);
 
-void
-pcache_release_page(struct pcache* pcache, struct pcache_pg* page);
-
-struct pcache_pg*
-pcache_new_page(struct pcache* pcache, u32_t index);
-
-void
-pcache_set_dirty(struct pcache* pcache, struct pcache_pg* pg);
-
 int
 pcache_write(struct v_inode* inode, void* data, u32_t len, u32_t fpos);
 

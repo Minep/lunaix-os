@@ -97,8 +97,8 @@ vfs_init()
 
     dnode_cache = vzalloc(VFS_HASHTABLE_SIZE * sizeof(struct hbucket));
 
-    dnode_lru = lru_new_zone(__vfs_try_evict_dnode);
-    inode_lru = lru_new_zone(__vfs_try_evict_inode);
+    dnode_lru = lru_new_zone("vfs_dnode", __vfs_try_evict_dnode);
+    inode_lru = lru_new_zone("vfs_inode", __vfs_try_evict_inode);
 
     hstr_rehash(&vfs_ddot, HSTR_FULL_HASH);
     hstr_rehash(&vfs_dot, HSTR_FULL_HASH);

@@ -8,6 +8,8 @@ struct spinlock
     volatile bool flag;
 };
 
+typedef struct spinlock spinlock_t;
+
 /*
     TODO we might use our own construct for atomic ops
          But we will do itlater, currently this whole 
@@ -17,12 +19,12 @@ struct spinlock
 */
 
 static inline void
-spinlock_init(struct spinlock* lock)
+spinlock_init(spinlock_t* lock)
 {
     lock->flag = false;
 }
 
-static inline bool spin_try_lock(struct spinlock* lock)
+static inline bool spinlock_try_acquire(spinlock_t* lock)
 {
     if (lock->flag){
         return false;
@@ -31,22 +33,19 @@ static inline bool spin_try_lock(struct spinlock* lock)
     return (lock->flag = true);
 }
 
-static inline void spin_lock(struct spinlock* lock)
+static inline void spinlock_acquire(spinlock_t* lock)
 {
     while (lock->flag);
     lock->flag = true;
 }
 
-static inline void spin_unlock(struct spinlock* lock)
+static inline void spinlock_release(spinlock_t* lock)
 {
     lock->flag = false;
 }
 
-static inline void spinlock_destory(struct spinlock* lock)
-{
-    // TODO figure a good way to destory the lock
-    //      so other lock attempt after this point
-    //      will cause immediately fail
-}
+#define DEFINE_SPINLOCK_OPS(type, lock_accessor)                            \
+    static inline void lock(type obj) { spinlock_acquire(&obj->lock_accessor); }    \
+    static inline void unlock(type obj) { spinlock_release(&obj->lock_accessor); }    
 
 #endif /* __LUNAIX_SPIN_H */

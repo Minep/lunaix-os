@@ -3,7 +3,7 @@
 
 #include <lunaix/ds/btrie.h>
 #include <lunaix/ds/lru.h>
-#include <lunaix/ds/spin.h>
+#include <lunaix/ds/spinlock.h>
 #include <lunaix/ds/llist.h>
 
 /*
@@ -24,6 +24,7 @@
    bcache.
 */
 
+struct bcache;
 struct bcache_ops
 {
     void (*release_on_evict)(struct bcache*, void* data);
@@ -47,7 +48,7 @@ struct bcache_node
     unsigned long tag;
     
     struct bcache* holder;
-    struct spinlock lock;
+    spinlock_t lock;
     struct lru_node lru_node;
     struct llist_header objs;
 };
@@ -60,6 +61,23 @@ bcached_data(bcobj_t obj)
 {
     return ((struct bcache_node*)obj)->data;
 }
+
+/**
+ * @brief Create a block cache with shared bcache zone
+ * 
+ * @param cache to be initialized
+ * @param name name of this cache
+ * @param log_ways ways-associative of this cache
+ * @param cap capacity of this cache, -1 for 'infinity' cache
+ * @param blk_size size of each cached object
+ * @param ops block cache operation
+ */
+void
+bcache_init_zone(struct bcache* cache, bcache_zone_t zone, unsigned int log_ways, 
+                   int cap, size_t blk_size, struct bcache_ops* ops);
+
+bcache_zone_t
+bcache_create_zone(char* name);
 
 /**
  * @brief Create a block cache
@@ -78,24 +96,6 @@ bcache_init(struct bcache* cache, char* name, unsigned int log_ways,
     bcache_init_zone(cache, bcache_create_zone(name), 
                      log_ways, cap, blk_size, ops);
 }
-
-/**
- * @brief Create a block cache with shared bcache zone
- * 
- * @param cache to be initialized
- * @param name name of this cache
- * @param log_ways ways-associative of this cache
- * @param cap capacity of this cache, -1 for 'infinity' cache
- * @param blk_size size of each cached object
- * @param ops block cache operation
- */
-void
-bcache_init_zone(struct bcache* cache, bcache_zone_t zone, unsigned int log_ways, 
-                   int cap, size_t blk_size, struct bcache_ops* ops);
-
-
-bcache_zone_t
-bcache_create_zone(char* name);
 
 bool
 bcache_put(struct bcache* cache, unsigned long tag, void* block);

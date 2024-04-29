@@ -3,8 +3,8 @@
 
 static struct lru_zone* bcache_global_lru;
 
-#define __lock(bc)  spin_lock(&((bc)->lock))
-#define __unlock(bc)  spin_unlock(&((bc)->lock))
+#define lock(bc)  spinlock_acquire(&((bc)->lock))
+#define unlock(bc)  spinlock_release(&((bc)->lock))
 
 static void 
 __evict_internal_locked(struct bcache_node* node)
@@ -24,11 +24,12 @@ __try_evict_bcache(struct lru_node* node)
     struct bcache* cache;
     
     bnode = container_of(node, struct bcache_node, lru_node);
+    cache = bnode->holder;
+    
+    lock(cache);
 
-    __lock(cache);
-
-    if (!spin_try_lock(&bnode->lock)) {
-        __unlock(cache);
+    if (!spinlock_try_acquire(&bnode->lock)) {
+        unlock(cache);
         return false;
     }
     
@@ -36,8 +37,9 @@ __try_evict_bcache(struct lru_node* node)
     btrie_remove(&cache->root, bnode->tag);
     llist_delete(&bnode->objs);
 
-    spinlock_destory(&bnode->lock);
     vfree(bnode);
+
+    unlock(cache);
 
     return true;
 }
@@ -52,6 +54,8 @@ void
 bcache_init_zone(struct bcache* cache, struct lru_zone* lru, unsigned int log_ways, 
                    int cap, size_t blk_size, struct bcache_ops* ops)
 {
+    // TODO handle cap
+    
     *cache = (struct bcache) {
         .lru = lru,
         .ops = *ops,
@@ -68,15 +72,12 @@ bcache_put(struct bcache* cache, unsigned long tag, void* block)
 {
     struct bcache_node* node;
 
-    __lock(cache);
+    lock(cache);
 
     node = (struct bcache_node*)btrie_get(&cache->root, tag);
 
     if (node != NULL) {
-        if (!__try_evict_bcache_locked(&node->lru_node)) {
-            return false;
-        }
-
+        __evict_internal_locked(node);
         // Now the node is ready to be reused.
     }
     else {
@@ -94,7 +95,7 @@ bcache_put(struct bcache* cache, unsigned long tag, void* block)
     lru_use_one(cache->lru, &node->lru_node);
     llist_append(&cache->objs, &node->objs);
 
-    __unlock(cache);
+    unlock(cache);
 
     return true;
 }
@@ -104,19 +105,21 @@ bcache_tryhit_and_lock(struct bcache* cache, unsigned long tag, bcobj_t* result)
 {
     struct bcache_node* node;
 
-    __lock(cache);
+    lock(cache);
 
     node = (struct bcache_node*)btrie_get(&cache->root, tag);
     if (!node) {
+        unlock(cache);
+        *result = NULL;
+
         return false;
     }
 
-    __lock(node);
+    lock(node);
 
-    lru_remove(cache->lru, &node->lru_node);
     *result = (bcobj_t)node;
 
-    __unlock(cache);
+    unlock(cache);
     
     return true;
 }
@@ -133,7 +136,7 @@ bcache_unlock(bcobj_t obj)
     */
 
     lru_use_one(node->holder->lru, &node->lru_node);
-    __unlock(node);
+    unlock(node);
 }
 
 void
@@ -141,27 +144,26 @@ bcache_evict(struct bcache* cache, unsigned long tag)
 {
     struct bcache_node* node;
 
-    __lock(cache);
+    lock(cache);
 
     node = (struct bcache_node*)btrie_get(&cache->root, tag);
     
     if (!node) {
+        unlock(cache);
         return;
     }
 
-    __lock(node);
+    lock(node);
 
-    __evict_internal_locked(&node->lru_node);
+    __evict_internal_locked(node);
 
     btrie_remove(&cache->root, tag);
     lru_remove(cache->lru, &node->lru_node);
     llist_delete(&node->objs);
 
-    spinlock_destory(&node->lock);
-
     vfree(node);
 
-    __unlock(cache);
+    unlock(cache);
 }
 
 static void
@@ -169,36 +171,36 @@ bcache_flush_locked(struct bcache* cache)
 {
     struct bcache_node *pos, *n;
     llist_for_each(pos, n, &cache->objs, objs) {
-        __lock(pos);
+        lock(pos);
 
-        __evict_internal_locked(&pos->lru_node);
+        __evict_internal_locked(pos);
         btrie_remove(&cache->root, pos->tag);
         lru_remove(cache->lru, &pos->lru_node);
         llist_delete(&pos->objs);
 
-        __unlock(pos);
+        unlock(pos);
     }
 }
 
 void
 bcache_flush(struct bcache* cache)
 {
-    __lock(cache);
+    lock(cache);
     
     bcache_flush_locked(cache);
 
-    __unlock(cache);
+    unlock(cache);
 }
 
 void
 bcache_free(struct bcache* cache)
 {
-    __lock(cache);
+    lock(cache);
     
     bcache_flush_locked(cache);
-    btrie_release(cache);
+    btrie_release(&cache->root);
 
-    __unlock(cache);
+    unlock(cache);
 
     vfree(cache);
 }
