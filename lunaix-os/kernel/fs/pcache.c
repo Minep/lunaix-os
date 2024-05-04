@@ -122,7 +122,7 @@ __getpage_and_lock(struct pcache* pcache, unsigned int tag,
     bcobj_t cobj;
     struct pcache_pg* pg;
 
-    if (bcache_tryhit_and_lock(&pcache->cache, tag, &cobj))
+    if (bcache_tryget(&pcache->cache, tag, &cobj))
     {
         *page = (struct pcache_pg*)bcached_data(cobj);
         return cobj;
@@ -180,7 +180,7 @@ pcache_write(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
         pcache_set_dirty(pcache, pg);
 
         if (obj) {
-            bcache_unlock(obj);
+            bcache_return(obj);
         } else {
             bcache_put(&pcache->cache, tag, pg);
         }
@@ -224,7 +224,7 @@ pcache_read(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
         memcpy(data, pg->data + off, rd_cnt);
 
         if (obj) {
-            bcache_unlock(obj);
+            bcache_return(obj);
         } else {
             bcache_put(&pcache->cache, tag, pg);
         }

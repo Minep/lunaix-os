@@ -1,5 +1,6 @@
 #include <lunaix/bcache.h>
 #include <lunaix/mm/valloc.h>
+#include <lunaix/spike.h>
 
 static struct lru_zone* bcache_global_lru;
 
@@ -28,7 +29,7 @@ __try_evict_bcache(struct lru_node* node)
     
     lock(cache);
 
-    if (!spinlock_try_acquire(&bnode->lock)) {
+    if (bnode->refs) {
         unlock(cache);
         return false;
     }
@@ -51,7 +52,7 @@ bcache_create_zone(char* name)
 }
 
 void
-bcache_init_zone(struct bcache* cache, struct lru_zone* lru, unsigned int log_ways, 
+bcache_init_zone(struct bcache* cache, bcache_zone_t lru, unsigned int log_ways, 
                    int cap, size_t blk_size, struct bcache_ops* ops)
 {
     // TODO handle cap
@@ -67,7 +68,7 @@ bcache_init_zone(struct bcache* cache, struct lru_zone* lru, unsigned int log_wa
     spinlock_init(&cache->lock);
 }
 
-bool
+bcobj_t
 bcache_put(struct bcache* cache, unsigned long tag, void* block)
 {
     struct bcache_node* node;
@@ -77,19 +78,20 @@ bcache_put(struct bcache* cache, unsigned long tag, void* block)
     node = (struct bcache_node*)btrie_get(&cache->root, tag);
 
     if (node != NULL) {
+        assert(!node->refs);
         __evict_internal_locked(node);
         // Now the node is ready to be reused.
     }
     else {
-        node = valloc(sizeof(*node));
-        spinlock_init(&node->lock);
+        node = vzalloc(sizeof(*node));
         btrie_set(&cache->root, tag, node);
     }
     
     *node = (struct bcache_node) {
         .data = block,
         .holder = cache,
-        .tag = tag
+        .tag = tag,
+        .refs = 1
     };
 
     lru_use_one(cache->lru, &node->lru_node);
@@ -97,11 +99,11 @@ bcache_put(struct bcache* cache, unsigned long tag, void* block)
 
     unlock(cache);
 
-    return true;
+    return (bcobj_t)node;
 }
 
 bool
-bcache_tryhit_and_lock(struct bcache* cache, unsigned long tag, bcobj_t* result)
+bcache_tryget(struct bcache* cache, unsigned long tag, bcobj_t* result)
 {
     struct bcache_node* node;
 
@@ -115,7 +117,7 @@ bcache_tryhit_and_lock(struct bcache* cache, unsigned long tag, bcobj_t* result)
         return false;
     }
 
-    lock(node);
+    node->refs++;
 
     *result = (bcobj_t)node;
 
@@ -125,18 +127,25 @@ bcache_tryhit_and_lock(struct bcache* cache, unsigned long tag, bcobj_t* result)
 }
 
 void
-bcache_unlock(bcobj_t obj)
+bcache_return(bcobj_t obj)
 {
     struct bcache_node* node = (struct bcache_node*) obj;
 
-    /*
-        We must not lock the cache here.
-        Deadlock could happened with `bcache_tryhit_and_lock`
-        and `bcache_evict`
-    */
+    assert(node->refs);
 
+    // non bisogno bloccare il cache, perche il lru ha la serratura propria.
     lru_use_one(node->holder->lru, &node->lru_node);
-    unlock(node);
+    node->refs--;
+}
+
+void
+bcache_promote(bcobj_t obj)
+{
+    struct bcache_node* node;
+    
+    node = (struct bcache_node*) obj;
+    assert(node->refs);
+    lru_use_one(node->holder->lru, &node->lru_node);
 }
 
 void
@@ -148,12 +157,10 @@ bcache_evict(struct bcache* cache, unsigned long tag)
 
     node = (struct bcache_node*)btrie_get(&cache->root, tag);
     
-    if (!node) {
+    if (!node || node->refs) {
         unlock(cache);
         return;
     }
-
-    lock(node);
 
     __evict_internal_locked(node);
 
@@ -171,14 +178,10 @@ bcache_flush_locked(struct bcache* cache)
 {
     struct bcache_node *pos, *n;
     llist_for_each(pos, n, &cache->objs, objs) {
-        lock(pos);
-
         __evict_internal_locked(pos);
         btrie_remove(&cache->root, pos->tag);
         lru_remove(cache->lru, &pos->lru_node);
         llist_delete(&pos->objs);
-
-        unlock(pos);
     }
 }
 

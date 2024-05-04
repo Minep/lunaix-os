@@ -117,6 +117,7 @@ struct v_superblock
     struct device* dev;
     struct v_dnode* root;
     struct filesystem* fs;
+    struct blkbuf_cache* blks;
     struct hbucket* i_cache;
     void* data;
     size_t blksize;

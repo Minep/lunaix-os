@@ -51,7 +51,9 @@ static int
 __block_commit(struct blkio_context* blkio, struct blkio_req* req, int flags)
 {
     int errno;
-    blkio_commit(blkio, req, flags);
+    
+    blkio_bindctx(req, blkio);
+    blkio_commit(req, flags);
 
     if ((errno = req->errcode)) {
         errno = -errno;
@@ -67,7 +69,8 @@ __block_read(struct device* dev, void* buf, size_t offset, size_t len)
 {
     int errno;
     struct block_dev* bdev = (struct block_dev*)dev->underlay;
-    size_t bsize = bdev->blk_size, rd_block = offset / bsize + bdev->start_lba,
+    size_t bsize = bdev->blk_size, 
+           rd_block = offset / bsize + bdev->start_lba,
            r = offset % bsize, rd_size = 0;
 
     if (!(len = MIN(len, ((size_t)bdev->end_lba - rd_block + 1) * bsize))) {

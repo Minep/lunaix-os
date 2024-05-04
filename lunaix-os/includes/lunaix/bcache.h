@@ -33,12 +33,15 @@ struct bcache_ops
 
 struct bcache
 {
+    struct {
+        unsigned int blksz;
+    };
+    
     struct btrie root;
     struct lru_zone* lru;
     struct bcache_ops ops;
     struct llist_header objs;
     struct spinlock lock;
-    size_t blksz;
 };  // block cache
 
 struct bcache_node
@@ -48,7 +51,7 @@ struct bcache_node
     unsigned long tag;
     
     struct bcache* holder;
-    spinlock_t lock;
+    unsigned int refs;
     struct lru_node lru_node;
     struct llist_header objs;
 };
@@ -62,6 +65,9 @@ bcached_data(bcobj_t obj)
     return ((struct bcache_node*)obj)->data;
 }
 
+#define bcache_holder_embed(cobj, type, member)   \
+    container_of(((struct bcache_node*)(cobj))->holder, type, member)
+
 /**
  * @brief Create a block cache with shared bcache zone
  * 
@@ -73,8 +79,9 @@ bcached_data(bcobj_t obj)
  * @param ops block cache operation
  */
 void
-bcache_init_zone(struct bcache* cache, bcache_zone_t zone, unsigned int log_ways, 
-                   int cap, size_t blk_size, struct bcache_ops* ops);
+bcache_init_zone(struct bcache* cache, bcache_zone_t zone, 
+                 unsigned int log_ways, int cap, 
+                 unsigned int blk_size, struct bcache_ops* ops);
 
 bcache_zone_t
 bcache_create_zone(char* name);
@@ -91,14 +98,20 @@ bcache_create_zone(char* name);
  */
 static inline void
 bcache_init(struct bcache* cache, char* name, unsigned int log_ways, 
-            int cap, size_t blk_size, struct bcache_ops* ops)
+            int cap, unsigned int blk_size, struct bcache_ops* ops)
 {
     bcache_init_zone(cache, bcache_create_zone(name), 
                      log_ways, cap, blk_size, ops);
 }
 
-bool
-bcache_put(struct bcache* cache, unsigned long tag, void* block);
+bcobj_t
+bcache_put_and_ref(struct bcache* cache, unsigned long tag, void* block);
+
+static inline void
+bcache_put(struct bcache* cache, unsigned long tag, void* block)
+{
+    bcache_return(bcache_put_and_ref(cache, tag, block));
+}
 
 /**
  * @brief Try look for a hit and return the reference to block.
@@ -113,7 +126,7 @@ bcache_put(struct bcache* cache, unsigned long tag, void* block);
  * @return false 
  */
 bool
-bcache_tryhit_and_lock(struct bcache* cache, unsigned long tag, bcobj_t* result);
+bcache_tryget(struct bcache* cache, unsigned long tag, bcobj_t* result);
 
 /**
  * @brief Unreference a cached block that is returned 
@@ -126,7 +139,10 @@ bcache_tryhit_and_lock(struct bcache* cache, unsigned long tag, bcobj_t* result)
  * @return false 
  */
 void
-bcache_unlock(bcobj_t obj);
+bcache_return(bcobj_t obj);
+
+void
+bcache_promote(bcobj_t obj);
 
 void
 bcache_evict(struct bcache* cache, unsigned long tag);
