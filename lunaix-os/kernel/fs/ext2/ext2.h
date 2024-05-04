@@ -116,7 +116,7 @@ struct ext2b_inode
     u8_t i_osd2[12];
 } compact;
 
-struct ext2_dirent 
+struct ext2b_dirent 
 {
     u32_t inode;
     u16_t rec_len;
@@ -124,7 +124,7 @@ struct ext2_dirent
     u8_t file_type;
     u8_t name[256];
 } align(4) compact;
-#define EXT2_DRE(v_dnode) (fsapi_impl_data(v_dnode, struct ext2_dirent))
+#define EXT2_DRE(v_dnode) (fsapi_impl_data(v_dnode, struct ext2b_dirent))
 
 struct ext2_sbinfo 
 {
@@ -133,15 +133,26 @@ struct ext2_sbinfo
      * offset to inode table (in terms of blocks) within each block group.
      * to account the difference of backup presence between rev 0/1
      */
-    int ino_tab_off;
+    int ino_tab_len;
 
     bool read_only;
-    size_t block_size;
+    unsigned int block_size;
+    unsigned int nr_gdesc_pb;
+    unsigned int nr_gdesc;
+
     struct device* bdev;
     struct v_superblock* vsb;
+    
     struct ext2b_super raw;
+    bbuf_t* gdt_frag;
 };
 #define EXT2_SB(vsb) (fsapi_impl_data(vsb, struct ext2_sbinfo))
+
+struct ext2_inode
+{
+    bbuf_t inotab;
+    struct ext2b_inode* ino;
+};
 
 struct ext2_ino
 {
@@ -149,8 +160,52 @@ struct ext2_ino
 };
 #define EXT2_INO(v_inode) (fsapi_impl_data(v_inode, struct ext2_ino))
 
+static inline unsigned int
+ext2_datablock(struct ext2_sbinfo* sb, unsigned int id)
+{
+    return sb->raw.s_first_data_cnt + id;
+}
+
+
+/* ************   Inodes   ************ */
 
 void
 ext2_init_inode(struct v_superblock* vsb, struct v_inode* inode);
+
+struct ext2_inode*
+ext2_get_inode(struct v_superblock* vsb, unsigned int ino_num);
+
+
+/* ************ Block Group ************ */
+
+void
+ext2gd_prepare_gdt(struct v_superblock* vsb);
+
+void
+ext2gd_release_gdt(struct v_superblock* vsb);
+
+struct ext2b_gdesc*
+ext2gd_desc_at(struct v_superblock* vsb, unsigned int index);
+
+
+/* ************ Directory ************ */
+
+int
+ext2_dir_lookup(struct v_inode* this, struct v_dnode* dnode);
+
+int
+ext2_dir_read(struct v_file *file, struct dir_context *dctx);
+
+
+/* ************   Files   ************ */
+
+int
+ext2_open_inode(struct v_inode* this, struct v_file* file);
+
+int
+ext2_close_inode(struct v_file* file);
+
+int
+ext2_sync_inode(struct v_file* file);
 
 #endif /* __LUNAIX_EXT2_H */

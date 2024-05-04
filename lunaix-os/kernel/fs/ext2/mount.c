@@ -51,7 +51,8 @@ struct fsapi_vsb_ops vsb_ops = {
     .init_inode = ext2_init_inode
 };
 
-static int ext2_mount(struct v_superblock* vsb, struct v_dnode* dnode)
+static int 
+ext2_mount(struct v_superblock* vsb, struct v_dnode* dnode)
 {
     struct device* bdev = fsapi_blockdev(vsb);
     struct ext2_sbinfo* ext2sb = vzalloc(sizeof(*ext2sb));
@@ -90,15 +91,13 @@ static int ext2_mount(struct v_superblock* vsb, struct v_dnode* dnode)
     ext2sb->vsb = vsb;
     ext2sb->read_only = fsapi_readonly_mount(vsb);
 
-    if (rawsb->s_rev) {
-        ext2sb->ino_tab_off = 2 * block_size;
-    }
-
     fsapi_set_block_size(vsb, block_size);
     fsapi_set_vsb_ops(vsb, &vsb_ops);
     fsapi_complete_vsb(vsb, ext2sb);
 
     // TODO prepare the mount root
+
+    ext2gd_prepare_gdt(vsb);
 
     return 0;
 
