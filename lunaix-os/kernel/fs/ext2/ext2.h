@@ -82,7 +82,7 @@ struct ext2b_inode
     u32_t i_dtime;
 
     u16_t i_gid;
-    u16_t i_linl_cnt;
+    u16_t i_lnk_cnt;
 
     u32_t i_blocks;
     u32_t i_flags;
@@ -168,8 +168,33 @@ struct ext2_inode
     // prefetched block for 1st order of indirection
     bbuf_t ind_ord1;
 };
-
 #define EXT2_INO(v_inode) (fsapi_impl_data(v_inode, struct ext2_inode))
+
+/**
+ * @brief General purpose iterator for ext2 objects
+ * 
+ */
+struct ext2_iterator
+{
+    struct v_inode* inode;
+    
+    union {
+        struct ext2b_dirent* dirent;
+        void* data;
+    };
+
+    unsigned int pos;
+    unsigned int blk_pos;
+    unsigned int block_end;
+    bbuf_t sel_buf;
+};
+
+struct ext2_file
+{
+    struct ext2_iterator iter;
+    struct ext2_inode* b_ino;
+};
+#define EXT2_FILE(v_file) (fsapi_impl_data(v_file, struct ext2_file))
 
 static inline unsigned int
 ext2_datablock(struct ext2_sbinfo* sb, unsigned int id)
@@ -186,6 +211,11 @@ ext2_init_inode(struct v_superblock* vsb, struct v_inode* inode);
 struct ext2_inode*
 ext2_get_inode(struct v_superblock* vsb, unsigned int ino_num);
 
+bbuf_t
+ext2_get_data_block(struct v_inode* inode, unsigned int data_pos);
+
+void
+ext2_fill_inode(struct v_inode* inode, ino_t ino_id);
 
 /* ************ Block Group ************ */
 
@@ -202,10 +232,31 @@ ext2gd_desc_at(struct v_superblock* vsb, unsigned int index);
 /* ************ Directory ************ */
 
 int
-ext2_dir_lookup(struct v_inode* this, struct v_dnode* dnode);
+ext2dr_lookup(struct v_inode* this, struct v_dnode* dnode);
 
 int
-ext2_dir_read(struct v_file *file, struct dir_context *dctx);
+ext2dr_read(struct v_file *file, struct dir_context *dctx);
+
+void
+ext2dr_itbegin(struct ext2_iterator* iter, struct v_inode* inode);
+
+void
+ext2dr_itend(struct ext2_iterator* iter);
+
+bool
+ext2dr_itnext(struct ext2_iterator* iter);
+
+int
+ext2dr_itffw(struct ext2_iterator* iter, int count);
+
+void
+ext2dr_itreset(struct ext2_iterator* iter);
+
+int
+ext2dr_open(struct v_inode* this, struct v_file* file);
+
+int
+ext2dr_seek(struct v_file* file, size_t offset);
 
 
 /* ************   Files   ************ */

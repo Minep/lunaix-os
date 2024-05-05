@@ -133,6 +133,13 @@ fsapi_inode_settime(struct v_inode* inode,
     inode->atime = atime;
 }
 
+static inline void
+fsapi_dir_report(struct dir_context *dctx, 
+                 const char *name, const int len, const int dtype)
+{
+    dctx->read_complete_callback(dctx, name, len, dtype);
+}
+
 static inline bbuf_t
 fsblock_take(struct v_superblock* vsb, unsigned int block_id)
 {

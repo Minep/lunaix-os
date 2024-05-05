@@ -5,6 +5,7 @@
 #include <lunaix/ds/lru.h>
 #include <lunaix/ds/spinlock.h>
 #include <lunaix/ds/llist.h>
+#include <lunaix/spike.h>
 
 /*
    Block cache. A cache built on top of
@@ -65,8 +66,11 @@ bcached_data(bcobj_t obj)
     return ((struct bcache_node*)obj)->data;
 }
 
+#define to_bcache_node(cobj) \
+    ((struct bcache_node*)(cobj))
+
 #define bcache_holder_embed(cobj, type, member)   \
-    container_of(((struct bcache_node*)(cobj))->holder, type, member)
+    container_of(to_bcache_node(cobj)->holder, type, member)
 
 /**
  * @brief Create a block cache with shared bcache zone
@@ -144,7 +148,11 @@ bcache_return(bcobj_t obj);
 static inline void
 bcache_refonce(bcobj_t obj)
 {
-    ((struct bcache_node*)obj)->refs++;
+    struct bcache_node* b_node;
+    b_node = to_bcache_node(obj);
+
+    assert(b_node->refs);
+    b_node->refs++;
 }
 
 void

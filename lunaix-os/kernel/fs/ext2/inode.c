@@ -40,8 +40,13 @@ ext2_inode_write_page(struct v_inode *inode, void *buffer, size_t fpos)
 }
 
 static struct v_inode_ops ext2_inode_ops = {
-    .dir_lookup = ext2_dir_lookup,
-    .open = ext2_open_inode,
+    .dir_lookup = ext2dr_lookup,
+    .open  = ext2_open_inode,
+    .mkdir = NULL,
+    .rmdir = NULL,
+    .read_symlink = NULL,
+    .set_symlink  = NULL,
+    .rename = NULL
 };
 
 static struct v_file_ops ext2_file_ops = {
@@ -53,7 +58,7 @@ static struct v_file_ops ext2_file_ops = {
     .write = ext2_inode_write,
     .write_page = ext2_inode_write_page,
     
-    .readdir = ext2_dir_read,
+    .readdir = ext2dr_read,
     .seek = NULL,
     .sync = ext2_sync_inode
 };
@@ -169,13 +174,15 @@ ext2_destruct_inode(struct v_inode* inode)
 }
 
 void
-ext2_fill_inode(struct v_superblock* vsb, struct v_inode* inode, ino_t ino_id)
+ext2_fill_inode(struct v_inode* inode, ino_t ino_id)
 {
     struct ext2_sbinfo* sb;
     struct ext2_inode* ext2inode;
     struct ext2b_inode* b_ino;
+    struct v_superblock* vsb;
     unsigned int type;
 
+    vsb = inode->sb;
     sb = EXT2_SB(vsb);
     ext2inode = ext2_get_inode(vsb, ino_id);
     b_ino = &ext2inode->ino;
@@ -274,7 +281,7 @@ __get_datablock_at(struct v_inode* inode,
     unsigned int ind_block, lg_ents;
     bbuf_t indirect;
 
-    e_inode = EXT2_SB(inode);
+    e_inode = EXT2_INO(inode);
     lg_ents = e_inode->inds_lgents;
 
     if (ind_order == 1) {

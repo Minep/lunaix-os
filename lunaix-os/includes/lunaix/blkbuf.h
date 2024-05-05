@@ -51,6 +51,8 @@ blkbuf_data(bbuf_t buf)
 {
     return ((struct blk_buf*)buf)->raw;
 }
+#define block_buffer(buf, type) \
+    ((type*)blkbuf_data(buf))
 
 static inline void
 blkbuf_mark_dirty(bbuf_t buf)
