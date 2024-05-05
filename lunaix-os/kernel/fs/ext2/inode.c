@@ -58,10 +58,114 @@ static struct v_file_ops ext2_file_ops = {
     .sync = ext2_sync_inode
 };
 
+static void
+__btlb_insert(struct v_inode* inode, unsigned int blkid, bbuf_t buf)
+{
+    struct ext2_inode* e_inode;
+    struct ext2_btlb* btlb;
+    struct ext2_btlb_entry* btlbe = NULL;
+    unsigned int cap_sel;
+ 
+    if (unlikely(!blkid)) {
+        return;
+    }
+
+    e_inode = EXT2_INO(inode);
+    btlb = e_inode->btlb;
+
+    for (int i = 0; i < BTLB_SETS; i++)
+    {
+        if (btlb->buffer[i].tag) {
+            continue;
+        }
+
+        btlbe = &btlb->buffer[i];
+        goto found;
+    }
+
+    /*
+        we have triggered the capacity miss.
+        since most file operation is heavily linear and strong
+        locality, we place our bet on it and avoid go through
+        the whole overhead of LRU eviction stuff. Just a trival
+        random eviction will do the fine job
+    */
+    cap_sel = hash_32(blkid, ILOG2(BTLB_SETS));
+    btlbe = &btlb->buffer[cap_sel];
+
+    fsblock_put(inode->sb, btlbe->block);
+
+found:
+    btlbe->tag = blkid & ~((1 << e_inode->inds_lgents) - 1);
+    btlbe->block = buf;
+}
+
+static bbuf_t
+__btlb_hit(struct v_inode* inode, unsigned int blkid)
+{
+    struct ext2_inode* e_inode;
+    struct ext2_btlb* btlb;
+    struct ext2_btlb_entry* btlbe = NULL;
+    unsigned int in_tag;
+
+    e_inode = EXT2_INO(inode);
+    btlb = e_inode->btlb;
+    in_tag = blkid & ~((1 << e_inode->inds_lgents) - 1);
+
+    for (int i = 0; i < BTLB_SETS; i++)
+    {
+        btlbe = &btlb->buffer[i];
+        if (btlbe->tag == in_tag) {
+            return blkbuf_refonce(btlbe->block);
+        }
+    }
+
+    return NULL;
+}
+
+static void
+__btlb_flushall(struct v_inode* inode)
+{
+    struct ext2_inode* e_inode;
+    struct ext2_btlb* btlb;
+    struct ext2_btlb_entry* btlbe = NULL;
+
+    e_inode = EXT2_INO(inode);
+    btlb = e_inode->btlb;
+
+    for (int i = 0; i < BTLB_SETS; i++)
+    {
+        btlbe = &btlb->buffer[i];
+        if (btlbe->tag) {
+            continue;
+        }
+
+        btlbe->tag = 0;
+        fsblock_put(inode->sb, btlbe->block);
+    }
+}
+
 void
 ext2_init_inode(struct v_superblock* vsb, struct v_inode* inode)
 {
     // Perhaps we dont need this at all...
+}
+
+void
+ext2_destruct_inode(struct v_inode* inode)
+{
+    struct ext2_inode* e_inode;
+    struct v_superblock* sb;
+
+    e_inode = EXT2_INO(inode);
+    sb = inode->sb;
+
+    __btlb_flushall(inode);
+    fsblock_put(sb, e_inode->ind_ord1);
+    fsblock_put(sb, e_inode->inotab);
+
+    vfree(e_inode->btlb);
+    vfree(e_inode);
 }
 
 void
@@ -83,8 +187,9 @@ ext2_fill_inode(struct v_superblock* vsb, struct v_inode* inode, ino_t ino_id)
                                b_ino->i_mtime, 
                                b_ino->i_atime);
     
-    fsapi_inode_setfops(ino_id, &ext2_file_ops);
-    fsapi_inode_setops(ino_id, &ext2_inode_ops);
+    fsapi_inode_setfops(inode, &ext2_file_ops);
+    fsapi_inode_setops(inode, &ext2_inode_ops);
+    fsapi_inode_setdector(inode, ext2_destruct_inode);
 
     if (b_ino->i_mode & IMODE_IFLNK) {
         type = VFS_IFSYMLINK;
@@ -109,7 +214,7 @@ ext2_fill_inode(struct v_superblock* vsb, struct v_inode* inode, ino_t ino_id)
 }
 
 struct ext2_inode*
-ext2_get_inode(struct v_superblock* vsb, unsigned int ino_num)
+ext2_get_inode(struct v_superblock* vsb, unsigned int ino)
 {
     struct ext2_sbinfo* sb;
     struct ext2_inode* inode;
@@ -117,23 +222,112 @@ ext2_get_inode(struct v_superblock* vsb, unsigned int ino_num)
     struct ext2b_gdesc* gd;
     unsigned int blkgrp_id, ino_rel_id;
     unsigned int ino_tab_sel, ino_tab_off, tab_partlen;
+    unsigned int ind_ents;
     bbuf_t ino_tab;
 
     sb = EXT2_SB(vsb);
-    blkgrp_id   = ino_num / sb->raw.s_ino_per_grp;
-    ino_rel_id  = ino_num % sb->raw.s_ino_per_grp;
+    blkgrp_id   = ino / sb->raw.s_ino_per_grp;
+    ino_rel_id  = ino % sb->raw.s_ino_per_grp;
 
     tab_partlen = sb->block_size / sb->raw.s_ino_size;
     ino_tab_sel = ino_rel_id / tab_partlen;
     ino_tab_off = ino_rel_id % tab_partlen;
 
     gd      = ext2gd_desc_at(vsb, blkgrp_id);
-    ino_tab = fsapi_getblk_at(vsb, gd->bg_ino_tab + ino_tab_sel);
+    ino_tab = fsblock_take(vsb, gd->bg_ino_tab + ino_tab_sel);
     b_inode = (struct ext2b_inode*)blkbuf_data(ino_tab);
     
     inode         = valloc(sizeof(*inode));
+    inode->btlb   = valloc(sizeof(struct ext2_btlb));
     inode->inotab = ino_tab;
     inode->ino    = &b_inode[ino_tab_off];
+    inode->nr_blocks    = b_inode->i_blocks / (sb->block_size / 512);
+
+    ind_ents = sb->block_size / sizeof(int);
+    assert(is_pot(ind_ents));
+
+    inode->inds_lgents = ILOG2(ind_ents);
+
+    if (b_inode->i_block.ind1) {
+        inode->ind_ord1 = fsblock_take(vsb, b_inode->i_block.ind1);
+    }
     
     return inode;
+}
+
+static inline bbuf_t
+__follow_indrect(struct v_inode* inode, bbuf_t buf, unsigned int blkid)
+{
+    blkid = blkid % (1 << EXT2_INO(inode)->inds_lgents);
+
+    unsigned int i = ((unsigned int*)buf)[blkid];
+    fsblock_put(inode->sb, buf);
+
+    return fsblock_take(inode->sb, i);
+}
+
+static bbuf_t
+__get_datablock_at(struct v_inode* inode,
+                   unsigned int blkid, int ind_order)
+{
+    struct ext2_inode* e_inode;
+    unsigned int ind_block, lg_ents;
+    bbuf_t indirect;
+
+    e_inode = EXT2_SB(inode);
+    lg_ents = e_inode->inds_lgents;
+
+    if (ind_order == 1) {
+        indirect = e_inode->ind_ord1;
+        goto done;
+    }
+
+    if ((indirect = __btlb_hit(inode, blkid))) {
+        goto done;
+    }
+
+    ind_order -= 2;
+
+    ind_block = e_inode->ino->i_block.ind23[ind_order];
+    indirect = fsblock_take(inode->sb, ind_block);
+
+    if (ind_order)
+    {
+        blkid >>= lg_ents;
+        indirect = __follow_indrect(inode, indirect, blkid);
+    }
+
+    __btlb_insert(inode, blkid, indirect);
+    
+done:
+    return __follow_indrect(inode, indirect, blkid);
+}
+
+bbuf_t
+ext2_get_data_block(struct v_inode* inode, unsigned int data_pos)
+{
+    struct ext2_inode* e_inode;
+    struct ext2b_inode* b_inode;
+    unsigned int blkid;
+    unsigned int lg_ents = e_inode->inds_lgents;
+
+    e_inode = EXT2_INO(inode);
+    b_inode = e_inode->ino;
+
+    assert(data_pos);
+    assert(data_pos < e_inode->nr_blocks);
+
+    if (data_pos < 13) {
+        return fsblock_take(inode, b_inode->i_block.directs);
+    }
+    
+    blkid = data_pos - 12;
+
+    int i = 0;
+    while (blkid) {
+        blkid >>= lg_ents;
+        i++;
+    }
+
+    return __get_datablock_at(inode, data_pos, i);
 }

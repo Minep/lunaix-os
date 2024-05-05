@@ -7,6 +7,8 @@
 #include <lunaix/ds/hashtable.h>
 #include <lunaix/ds/lru.h>
 
+typedef unsigned int ext2_bno_t;
+
 struct ext2b_super {
     u32_t s_ino_cnt;
     u32_t s_blk_cnt;
@@ -86,26 +88,11 @@ struct ext2b_inode
     u32_t i_flags;
     u32_t i_osd1;
 
-    struct {
-        union 
-        {
-            u32_t directs[12];
-            u32_t ind1;
-            u32_t ind2;
-            u32_t ind3;
-        } ind_ord0;             // directum
-        union 
-        {
-            u32_t directs[15];
-        } ind_ord1;             // first order indirection (prima indirecta)
-        union 
-        {
-            u32_t reford_1[15];
-        } ind_ord2;             // second order indirection (duplex indirectum)
-        union 
-        {
-            u32_t reford_2[15];
-        } ind_ord3;             // third order indirection (trina indirecta)
+    struct 
+    {
+        u32_t directs[12];  // directum
+        u32_t ind1;         // prima indirecta
+        u32_t ind23[2];     // secunda et tertia indirecta
     } i_block;
 
     u32_t i_gen;
@@ -148,17 +135,41 @@ struct ext2_sbinfo
 };
 #define EXT2_SB(vsb) (fsapi_impl_data(vsb, struct ext2_sbinfo))
 
+/*
+    Indriection Block Translation Look-aside Buffer
+    
+    Provide a look-aside buffer for all last-level indirect block 
+    that is at least two indirection away.
+
+    For 4KiB block size:
+        16 sets, 256 ways, capacity 4096 blocks
+*/
+
+#define BTLB_SETS        16
+struct ext2_btlb_entry
+{
+    unsigned int tag;
+    bbuf_t block;
+};
+
+struct ext2_btlb
+{
+    struct ext2_btlb_entry buffer[BTLB_SETS];
+};
+
 struct ext2_inode
 {
     bbuf_t inotab;
+    unsigned int inds_lgents;
+    unsigned int nr_blocks;
     struct ext2b_inode* ino;
+    struct ext2_btlb* btlb;
+
+    // prefetched block for 1st order of indirection
+    bbuf_t ind_ord1;
 };
 
-struct ext2_ino
-{
-    struct ext2b_inode* raw;
-};
-#define EXT2_INO(v_inode) (fsapi_impl_data(v_inode, struct ext2_ino))
+#define EXT2_INO(v_inode) (fsapi_impl_data(v_inode, struct ext2_inode))
 
 static inline unsigned int
 ext2_datablock(struct ext2_sbinfo* sb, unsigned int id)

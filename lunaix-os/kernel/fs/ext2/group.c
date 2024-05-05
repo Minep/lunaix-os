@@ -34,7 +34,7 @@ ext2gd_release_gdt(struct v_superblock* vsb)
             continue;
         }
 
-        fsapi_putblk(vsb, ext2sb->gdt_frag[i]);
+        fsblock_put(vsb, ext2sb->gdt_frag[i]);
         ext2sb->gdt_frag[i] = NULL;
     }
 }
@@ -56,7 +56,7 @@ ext2gd_desc_at(struct v_superblock* vsb, unsigned int index)
     part = ext2sb->gdt_frag[blk_id];
     if (!part) {
         blk_id = ext2_datablock(ext2sb, blk_id) + 1;
-        part   = fsapi_getblk_at(vsb, blk_id);
+        part   = fsblock_take(vsb, blk_id);
         ext2sb->gdt_frag[blk_id] = part;
     }
 

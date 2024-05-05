@@ -141,6 +141,12 @@ bcache_tryget(struct bcache* cache, unsigned long tag, bcobj_t* result);
 void
 bcache_return(bcobj_t obj);
 
+static inline void
+bcache_refonce(bcobj_t obj)
+{
+    ((struct bcache_node*)obj)->refs++;
+}
+
 void
 bcache_promote(bcobj_t obj);
 

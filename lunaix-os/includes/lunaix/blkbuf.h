@@ -39,6 +39,13 @@ blkbuf_create(struct block_dev* blkdev, unsigned int blk_size);
 bbuf_t
 blkbuf_take(struct blkbuf_cache* bc, unsigned int block_id);
 
+static inline bbuf_t
+blkbuf_refonce(bbuf_t buf)
+{
+    bcache_refonce(((struct blk_buf*)buf)->cobj);
+    return buf;
+}
+
 static inline void*
 blkbuf_data(bbuf_t buf) 
 {

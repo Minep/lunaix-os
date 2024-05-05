@@ -1,9 +1,9 @@
+#include <lunaix/mm/valloc.h>
 #include "ext2.h"
 
 int
 ext2_open_inode(struct v_inode* this, struct v_file* file)
 {
-    // TODO
     return 0;
 }
 

@@ -134,13 +134,13 @@ fsapi_inode_settime(struct v_inode* inode,
 }
 
 static inline bbuf_t
-fsapi_getblk_at(struct v_superblock* vsb, unsigned int block_id)
+fsblock_take(struct v_superblock* vsb, unsigned int block_id)
 {
     return blkbuf_take(vsb->blks, block_id);
 }
 
 static inline void
-fsapi_putblk(struct v_superblock* vsb, bbuf_t blkbuf)
+fsblock_put(struct v_superblock* vsb, bbuf_t blkbuf)
 {
     return blkbuf_put(blkbuf);
 }
