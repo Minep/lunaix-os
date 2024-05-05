@@ -154,7 +154,7 @@ struct v_file_ops
     int (*read_page)(struct v_inode* inode, void* pg, size_t fpos);
 
     int (*readdir)(struct v_file* file, struct dir_context* dctx);
-    int (*seek)(struct v_inode* inode, size_t offset); // optional
+    int (*seek)(struct v_file* file, size_t offset);
     int (*close)(struct v_file* file);
     int (*sync)(struct v_file* file);
 };
@@ -197,6 +197,7 @@ struct v_file
     struct llist_header* f_list;
     u32_t f_pos;
     atomic_ulong ref_count;
+    void* data;
     struct v_file_ops* ops; // for caching
 };
 

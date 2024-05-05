@@ -101,8 +101,8 @@ iso9660_write_page(struct v_inode* inode, void* buffer, size_t fpos)
 }
 
 int
-iso9660_seek(struct v_inode* inode, size_t offset)
+iso9660_seek(struct v_file* file, size_t offset)
 {
-    // TODO
+    file->f_pos = offset;
     return 0;
 }

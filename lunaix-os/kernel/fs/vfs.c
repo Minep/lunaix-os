@@ -601,9 +601,14 @@ vfs_do_open(const char* path, int options)
         memset(fd_s, 0, sizeof(*fd_s));
 
         ofile->f_pos = ofile->inode->fsize & -((options & FO_APPEND) != 0);
+        if (vfs_get_dtype(dentry) == DT_DIR) {
+            ofile->f_pos = 0;
+        }
+        
         fd_s->file = ofile;
         fd_s->flags = options;
         __current->fdtable->fds[fd] = fd_s;
+        
         return fd;
     }
 
@@ -784,6 +789,11 @@ __DEFINE_LXSYSCALL3(int, lseek, int, fd, int, offset, int, options)
 
     int overflow = 0;
     int fpos = file->f_pos;
+
+    if (vfs_get_dtype(file->dnode) == DT_DIR) {
+        options = (options != FSEEK_END) ? options : FSEEK_SET;
+    }
+    
     switch (options) {
         case FSEEK_CUR:
             overflow = sadd_overflow((int)file->f_pos, offset, &fpos);
@@ -795,10 +805,12 @@ __DEFINE_LXSYSCALL3(int, lseek, int, fd, int, offset, int, options)
             fpos = offset;
             break;
     }
+
     if (overflow) {
         errno = EOVERFLOW;
-    } else if (!(errno = file->ops->seek(file->inode, fpos))) {
-        file->f_pos = fpos;
+    }
+    else {
+        errno = file->ops->seek(file, fpos);
     }
 
     unlock_inode(file->inode);

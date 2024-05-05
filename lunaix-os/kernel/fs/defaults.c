@@ -7,8 +7,9 @@ default_file_close(struct v_file* file)
 }
 
 int
-default_file_seek(struct v_inode* inode, size_t offset)
+default_file_seek(struct v_file* file, size_t offset)
 {
+    file->f_pos = offset;
     return 0;
 }
 

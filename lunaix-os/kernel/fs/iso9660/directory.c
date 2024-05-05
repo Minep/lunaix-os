@@ -167,6 +167,8 @@ __get_dtype(struct iso_drecache* pos)
 int
 iso9660_readdir(struct v_file* file, struct dir_context* dctx)
 {
+    // FIXME rework this with newly added lseek support on dir
+    
     struct llist_header* lead = file->dnode->data;
     struct iso_drecache *pos, *n;
     u32_t counter = dctx->index - 1;
