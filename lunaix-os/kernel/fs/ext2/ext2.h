@@ -217,6 +217,21 @@ ext2_get_data_block(struct v_inode* inode, unsigned int data_pos);
 void
 ext2_fill_inode(struct v_inode* inode, ino_t ino_id);
 
+void
+ext2db_itbegin(struct ext2_iterator* iter, struct v_inode* inode);
+
+void
+ext2db_itend(struct ext2_iterator* iter);
+
+bool
+ext2db_itnext(struct ext2_iterator* iter);
+
+int
+ext2db_itffw(struct ext2_iterator* iter, int count);
+
+void
+ext2db_itreset(struct ext2_iterator* iter);
+
 /* ************ Block Group ************ */
 
 void
@@ -269,5 +284,17 @@ ext2_close_inode(struct v_file* file);
 
 int
 ext2_sync_inode(struct v_file* file);
+
+int
+ext2_inode_read(struct v_inode *inode, void *buffer, size_t len, size_t fpos);
+
+int
+ext2_inode_read_page(struct v_inode *inode, void *buffer, size_t fpos);
+
+int
+ext2_inode_write(struct v_inode *inode, void *buffer, size_t len, size_t fpos);
+
+int
+ext2_inode_write_page(struct v_inode *inode, void *buffer, size_t fpos);
 
 #endif /* __LUNAIX_EXT2_H */

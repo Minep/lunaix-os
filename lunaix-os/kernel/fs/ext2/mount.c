@@ -24,6 +24,8 @@ LOG_MODULE("EXT2")
 #define EXT2_IMPL_REQFEAT (EXT2_REQFEAT_FILETYPE)
 #define EXT2_IMPL_ROFEAT (EXT2_ROFEAT_SPARSESB)
 
+#define EXT2_ROOT_INO 1
+
 #define compatible_mount(feat) \
         (((feat) | EXT2_IMPL_REQFEAT) == EXT2_IMPL_REQFEAT)
 
@@ -52,13 +54,17 @@ struct fsapi_vsb_ops vsb_ops = {
 };
 
 static int 
-ext2_mount(struct v_superblock* vsb, struct v_dnode* dnode)
+ext2_mount(struct v_superblock* vsb, struct v_dnode* mnt)
 {
-    struct device* bdev = fsapi_blockdev(vsb);
-    struct ext2_sbinfo* ext2sb = vzalloc(sizeof(*ext2sb));
-    struct ext2b_super* rawsb = &ext2sb->raw;
-
+    struct device* bdev;
+    struct ext2_sbinfo* ext2sb;
+    struct ext2b_super* rawsb;
+    struct v_inode* root_inode;
     int errno = 0;
+
+    bdev = fsapi_blockdev(vsb);
+    ext2sb = vzalloc(sizeof(*ext2sb));
+    rawsb = &ext2sb->raw;
 
     errno = bdev->ops.read(bdev, rawsb, EXT2_PRIME_SB_OFF, sizeof(*rawsb));
     if (errno < 0) {
@@ -75,7 +81,7 @@ ext2_mount(struct v_superblock* vsb, struct v_dnode* dnode)
     }
 
     if (readonly_mount(rawsb->s_required_feat)) {
-        WARN("unsupported feature, mount as readonly");
+        WARN("unsupported feature, mounted as readonly");
         fsapi_set_readonly_mount(vsb);
     }
 
@@ -95,14 +101,17 @@ ext2_mount(struct v_superblock* vsb, struct v_dnode* dnode)
     fsapi_set_vsb_ops(vsb, &vsb_ops);
     fsapi_complete_vsb(vsb, ext2sb);
 
-    // TODO prepare the mount root
-
     ext2gd_prepare_gdt(vsb);
+    
+    root_inode = vfs_i_alloc(vsb);
+    ext2_fill_inode(root_inode, EXT2_ROOT_INO);
+    vfs_assign_inode(mnt, root_inode);
 
     return 0;
 
 unsupported:
     errno = ENOTSUP;
+
 failed:
     return errno;
 }

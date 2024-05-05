@@ -11,33 +11,6 @@
 #define IMODE_IFCHR     0x2000
 #define IMODE_IFFIFO    0x1000
 
-static int
-ext2_inode_read(struct v_inode *inode, void *buffer, size_t len, size_t fpos)
-{
-    // TODO
-    return 0;
-}
-
-static int
-ext2_inode_read_page(struct v_inode *inode, void *buffer, size_t fpos)
-{
-    // TODO
-    return 0;
-}
-
-static int
-ext2_inode_write(struct v_inode *inode, void *buffer, size_t len, size_t fpos)
-{
-    // TODO
-    return 0;
-}
-
-static int
-ext2_inode_write_page(struct v_inode *inode, void *buffer, size_t fpos)
-{
-    // TODO
-    return 0;
-}
 
 static struct v_inode_ops ext2_inode_ops = {
     .dir_lookup = ext2dr_lookup,
@@ -148,6 +121,64 @@ __btlb_flushall(struct v_inode* inode)
         btlbe->tag = 0;
         fsblock_put(inode->sb, btlbe->block);
     }
+}
+
+void
+ext2db_itbegin(struct ext2_iterator* iter, struct v_inode* inode)
+{
+    *iter = (struct ext2_iterator){
+        .pos = 0,
+        .blk_pos = 0,
+        .inode = inode,
+        .block_end = inode->sb->blksize
+    };
+}
+
+void
+ext2db_itreset(struct ext2_iterator* iter)
+{
+    if (likely(iter->sel_buf)) {
+        fsblock_put(iter->inode->sb, iter->sel_buf);
+    }
+
+    iter->blk_pos = 0;
+}
+
+int
+ext2db_itffw(struct ext2_iterator* iter, int count)
+{
+    iter->blk_pos += count;
+    return count;
+}
+
+void
+ext2db_itend(struct ext2_iterator* iter)
+{
+    if (likely(iter->sel_buf)) {
+        fsblock_put(iter->inode->sb, iter->sel_buf);
+    }
+}
+
+bool
+ext2db_itnext(struct ext2_iterator* iter, struct v_inode* inode)
+{
+    bbuf_t buf;
+
+    if (likely(iter->sel_buf)) {
+        fsblock_put(inode->sb, iter->sel_buf);
+    }
+
+    buf = ext2_get_data_block(inode, iter->blk_pos);
+    iter->sel_buf = buf;
+    
+    if (!buf) {
+        return false;
+    }
+
+    iter->blk_pos++;
+    iter->data = blkbuf_data(buf);
+
+    return true;
 }
 
 void
