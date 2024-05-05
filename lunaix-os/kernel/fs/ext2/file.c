@@ -61,7 +61,7 @@ ext2_inode_read(struct v_inode *inode, void *buffer, size_t len, size_t fpos)
     struct ext2_iterator iter;
     unsigned int off;
     unsigned int end;
-    unsigned int sz, blksz, movsz;
+    unsigned int sz = 0, blksz, movsz;
     
     e_sb = EXT2_SB(inode->sb);
     blksz = e_sb->block_size;
@@ -82,7 +82,7 @@ ext2_inode_read(struct v_inode *inode, void *buffer, size_t len, size_t fpos)
     }
 
     ext2db_itend(&iter);
-    return sz;
+    return itstate_sel(&iter, sz);
 }
 
 int
@@ -112,7 +112,7 @@ ext2_inode_read_page(struct v_inode *inode, void *buffer, size_t fpos)
     }
     
     ext2db_itend(&iter);
-    return total_sz;
+    return itstate_sel(&iter, total_sz);
 }
 
 int

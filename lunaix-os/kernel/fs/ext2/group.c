@@ -39,8 +39,9 @@ ext2gd_release_gdt(struct v_superblock* vsb)
     }
 }
 
-struct ext2b_gdesc*
-ext2gd_desc_at(struct v_superblock* vsb, unsigned int index)
+int
+ext2gd_desc_at(struct v_superblock* vsb, 
+               unsigned int index, struct ext2b_gdesc** out)
 {
     bbuf_t part;
     struct ext2_sbinfo* ext2sb;
@@ -49,7 +50,10 @@ ext2gd_desc_at(struct v_superblock* vsb, unsigned int index)
 
     ext2sb = EXT2_SB(vsb);
 
-    assert_fs(index < ext2sb->nr_gdesc);
+    if (index >= ext2sb->nr_gdesc) {
+        return ENOENT;
+    }
+
     blk_id  = index / ext2sb->nr_gdesc_pb;
     blk_off = index % ext2sb->nr_gdesc_pb;
     
@@ -57,10 +61,15 @@ ext2gd_desc_at(struct v_superblock* vsb, unsigned int index)
     if (!part) {
         blk_id = ext2_datablock(ext2sb, blk_id) + 1;
         part   = fsblock_take(vsb, blk_id);
+        if (blkbuf_errbuf(part)) {
+            return EIO;
+        }
+        
         ext2sb->gdt_frag[blk_id] = part;
     }
 
     descs_part = (struct ext2b_gdesc*)blkbuf_data(part);
-    
-    return &descs_part[blk_off];
+    *out = &descs_part[blk_off];
+
+    return 0;
 }

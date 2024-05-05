@@ -2,6 +2,9 @@
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/owloysius.h>
+#include <lunaix/syslog.h>
+
+LOG_MODULE("blkbuf")  
 
 #define bb_cache_obj(bcache) \
             container_of(bcache, struct blkbuf_cache, cached)
@@ -29,6 +32,10 @@ __blkbuf_evict_callback(struct blkio_req* req)
     struct blk_buf* buf;
 
     buf = (struct blk_buf*)req->evt_args;
+
+    if (req->errcode) {
+        ERROR("sync on evict failed (io error, 0x%x)", req->errcode);
+    }
     
     vfree(buf->raw);
     vbuf_free(req->vbuf);
@@ -66,7 +73,7 @@ static bbuf_t
 __blkbuf_take_slow(struct blkbuf_cache* bc, unsigned int block_id)
 {
     struct blk_buf* buf;
-    struct blk_req* req;
+    struct blkio_req* req;
     struct vecbuf* vbuf;
     void* data;
 
@@ -75,14 +82,19 @@ __blkbuf_take_slow(struct blkbuf_cache* bc, unsigned int block_id)
     vbuf = vbuf_alloc(NULL, data, bc->blksize);
     req = blkio_vreq(vbuf, __tolba(bc, block_id), NULL, buf, 0);
 
+    blkio_setread(req);
+    blkio_bindctx(req, bc->blkdev->blkio);
+    blkio_commit(req, BLKIO_WAIT);
+
+    if (req->errcode) {
+        ERROR("block io error (0x%x)", req->errcode);
+        return (bbuf_t)INVL_BUFFER;
+    }
+
     buf = (struct blk_buf*)cake_grab(bb_pile);
     buf->raw = data;
     buf->cobj = bcache_put_and_ref(&bc->cached, block_id, buf);
     buf->breq = req;
-
-    blkio_setread(req);
-    blkio_bindctx(req, bc->blkdev->blkio);
-    blkio_commit(req, BLKIO_WAIT);
 
     return buf;
 }
@@ -115,6 +127,10 @@ blkbuf_take(struct blkbuf_cache* bc, unsigned int block_id)
 void
 blkbuf_put(bbuf_t buf)
 {
+    if (unlikely(blkbuf_errbuf(buf))) {
+        return;
+    }
+
     struct blk_buf* bbuf;
     bbuf = to_blkbuf(buf);
 

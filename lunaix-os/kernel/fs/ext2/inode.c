@@ -139,6 +139,7 @@ ext2db_itreset(struct ext2_iterator* iter)
 {
     if (likely(iter->sel_buf)) {
         fsblock_put(iter->inode->sb, iter->sel_buf);
+        iter->sel_buf = NULL;
     }
 
     iter->blk_pos = 0;
@@ -156,6 +157,7 @@ ext2db_itend(struct ext2_iterator* iter)
 {
     if (likely(iter->sel_buf)) {
         fsblock_put(iter->inode->sb, iter->sel_buf);
+        iter->sel_buf = NULL;
     }
 }
 
@@ -164,14 +166,18 @@ ext2db_itnext(struct ext2_iterator* iter, struct v_inode* inode)
 {
     bbuf_t buf;
 
+    if (unlikely(iter->has_error)) {
+        return false;
+    }
+
     if (likely(iter->sel_buf)) {
         fsblock_put(inode->sb, iter->sel_buf);
     }
 
     buf = ext2_get_data_block(inode, iter->blk_pos);
     iter->sel_buf = buf;
-    
-    if (!buf) {
+
+    if (!buf || !ext2_itcheckbuf(iter)) {
         return false;
     }
 
@@ -204,7 +210,7 @@ ext2_destruct_inode(struct v_inode* inode)
     vfree(e_inode);
 }
 
-void
+int
 ext2_fill_inode(struct v_inode* inode, ino_t ino_id)
 {
     struct ext2_sbinfo* sb;
@@ -212,10 +218,14 @@ ext2_fill_inode(struct v_inode* inode, ino_t ino_id)
     struct ext2b_inode* b_ino;
     struct v_superblock* vsb;
     unsigned int type;
+    int errno = 0;
 
     vsb = inode->sb;
     sb = EXT2_SB(vsb);
-    ext2inode = ext2_get_inode(vsb, ino_id);
+
+    if ((errno = ext2_get_inode(vsb, ino_id, &ext2inode))) {
+        return errno;
+    }
     b_ino = &ext2inode->ino;
     
     fsapi_inode_setid(inode, ino_id, ino_id);
@@ -249,10 +259,13 @@ ext2_fill_inode(struct v_inode* inode, ino_t ino_id)
     fsapi_inode_settype(inode, type);
 
     fsapi_inode_complete(inode, ext2inode);
+
+    return errno;
 }
 
-struct ext2_inode*
-ext2_get_inode(struct v_superblock* vsb, unsigned int ino)
+int
+ext2_get_inode(struct v_superblock* vsb, 
+               unsigned int ino, struct ext2_inode** out)
 {
     struct ext2_sbinfo* sb;
     struct ext2_inode* inode;
@@ -261,6 +274,7 @@ ext2_get_inode(struct v_superblock* vsb, unsigned int ino)
     unsigned int blkgrp_id, ino_rel_id;
     unsigned int ino_tab_sel, ino_tab_off, tab_partlen;
     unsigned int ind_ents;
+    int errno = 0;
     bbuf_t ino_tab;
 
     sb = EXT2_SB(vsb);
@@ -271,8 +285,15 @@ ext2_get_inode(struct v_superblock* vsb, unsigned int ino)
     ino_tab_sel = ino_rel_id / tab_partlen;
     ino_tab_off = ino_rel_id % tab_partlen;
 
-    gd      = ext2gd_desc_at(vsb, blkgrp_id);
+    if (!(errno = ext2gd_desc_at(vsb, blkgrp_id, &gd))) {
+        return errno;
+    }
+
     ino_tab = fsblock_take(vsb, gd->bg_ino_tab + ino_tab_sel);
+    if (blkbuf_errbuf(ino_tab)) {
+        return EIO;
+    }
+
     b_inode = (struct ext2b_inode*)blkbuf_data(ino_tab);
     
     inode         = valloc(sizeof(*inode));
@@ -288,20 +309,35 @@ ext2_get_inode(struct v_superblock* vsb, unsigned int ino)
 
     if (b_inode->i_block.ind1) {
         inode->ind_ord1 = fsblock_take(vsb, b_inode->i_block.ind1);
+        
+        if (blkbuf_errbuf(inode->ind_ord1)) {
+            vfree(inode->btlb);
+            vfree(inode);
+            return EIO;
+        }
     }
-    
-    return inode;
+
+    *out = inode;
+    return errno;
 }
 
 static inline bbuf_t
 __follow_indrect(struct v_inode* inode, bbuf_t buf, unsigned int blkid)
 {
+    if (unlikely(!buf)) {
+        return NULL;
+    }
+
+    if (unlikely(blkbuf_errbuf(buf))) {
+        return buf;
+    }
+
     blkid = blkid % (1 << EXT2_INO(inode)->inds_lgents);
 
     unsigned int i = ((unsigned int*)buf)[blkid];
     fsblock_put(inode->sb, buf);
 
-    return fsblock_take(inode->sb, i);
+    return i ? fsblock_take(inode->sb, i) : NULL;
 }
 
 static bbuf_t
@@ -325,8 +361,11 @@ __get_datablock_at(struct v_inode* inode,
     }
 
     ind_order -= 2;
-
     ind_block = e_inode->ino->i_block.ind23[ind_order];
+    if (!ind_block) {
+        return NULL;
+    }
+
     indirect = fsblock_take(inode->sb, ind_block);
 
     if (ind_order)
@@ -335,7 +374,9 @@ __get_datablock_at(struct v_inode* inode,
         indirect = __follow_indrect(inode, indirect, blkid);
     }
 
-    __btlb_insert(inode, blkid, indirect);
+    if (indirect) {
+        __btlb_insert(inode, blkid, indirect);
+    }
     
 done:
     return __follow_indrect(inode, indirect, blkid);
@@ -353,7 +394,6 @@ ext2_get_data_block(struct v_inode* inode, unsigned int data_pos)
     b_inode = e_inode->ino;
 
     assert(data_pos);
-    assert(data_pos < e_inode->nr_blocks);
 
     if (data_pos < 13) {
         return fsblock_take(inode, b_inode->i_block.directs);

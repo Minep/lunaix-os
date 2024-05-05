@@ -32,6 +32,13 @@ typedef void* bbuf_t;
         bbuf_t bb_##name;             \
     }
 
+#define INVL_BUFFER      0xdeadc0de;
+
+static inline bool
+blkbuf_errbuf(bbuf_t buf) {
+    return (ptr_t)buf == INVL_BUFFER;
+}
+
 
 struct blkbuf_cache*
 blkbuf_create(struct block_dev* blkdev, unsigned int blk_size);
@@ -42,13 +49,17 @@ blkbuf_take(struct blkbuf_cache* bc, unsigned int block_id);
 static inline bbuf_t
 blkbuf_refonce(bbuf_t buf)
 {
-    bcache_refonce(((struct blk_buf*)buf)->cobj);
+    if (likely(!blkbuf_errbuf(buf))) {
+        bcache_refonce(((struct blk_buf*)buf)->cobj);
+    }
+
     return buf;
 }
 
 static inline void*
 blkbuf_data(bbuf_t buf) 
 {
+    assert(!blkbuf_errbuf(buf));
     return ((struct blk_buf*)buf)->raw;
 }
 #define block_buffer(buf, type) \

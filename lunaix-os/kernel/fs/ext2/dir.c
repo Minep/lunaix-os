@@ -13,6 +13,7 @@ ext2dr_itbegin(struct ext2_iterator* iter, struct v_inode* inode)
     };
 
     iter->sel_buf = ext2_get_data_block(inode, 0);
+    ext2_itcheckbuf(iter);
 }
 
 void
@@ -20,6 +21,7 @@ ext2dr_itreset(struct ext2_iterator* iter)
 {
     fsblock_put(iter->inode->sb, iter->sel_buf);
     iter->sel_buf = ext2_get_data_block(iter->inode, 0);
+    ext2_itcheckbuf(iter);
 
     iter->blk_pos = 0;
     iter->pos = 0;
@@ -52,6 +54,10 @@ ext2dr_itnext(struct ext2_iterator* iter)
     
     buf = iter->sel_buf;
 
+    if (iter->has_error) {
+        return false;
+    }
+
     if (likely(iter->dirent)) {
         d = iter->dirent;
         iter->pos += d->rec_len;
@@ -70,7 +76,7 @@ ext2dr_itnext(struct ext2_iterator* iter)
         buf = ext2_get_data_block(iter->inode, iter->blk_pos);
         iter->sel_buf = buf;
 
-        if (!buf) {
+        if (!buf || !ext2_itcheckbuf(iter)) {
             return false;
         }
     }
@@ -90,7 +96,7 @@ ext2dr_open(struct v_inode* this, struct v_file* file)
 
     ext2dr_itbegin(&e_file->iter, this);
 
-    return 0;
+    return itstate_sel(&e_file->iter, 0);
 }
 
 int
@@ -115,7 +121,7 @@ ext2dr_lookup(struct v_inode* inode, struct v_dnode* dnode)
     }
 
     ext2dr_itend(&iter);
-    return ENOENT;
+    return itstate_sel(&iter, ENOENT);
 
 done:
     struct v_inode* dir_inode;
@@ -165,11 +171,13 @@ ext2dr_read(struct v_file *file, struct dir_context *dctx)
 {
     struct ext2_file* e_file;
     struct ext2b_dirent* dir;
+    struct ext2_iterator* iter;
 
     e_file = EXT2_FILE(file);
+    iter   = &e_file->iter;
 
     if (!ext2dr_itnext(&e_file->iter)) {
-        return 0;
+        return itstate_sel(iter, 0);
     }
 
     dir = e_file->iter.dirent;
@@ -204,5 +212,5 @@ ext2dr_seek(struct v_file* file, size_t offset)
 
     fpos = ext2dr_itffw(iter, offset);
 
-    return 0;
+    return itstate_sel(&iter, 0);
 }

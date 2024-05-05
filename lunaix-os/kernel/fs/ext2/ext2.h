@@ -183,6 +183,13 @@ struct ext2_iterator
         void* data;
     };
 
+    union {
+        struct {
+            bool has_error:1;
+        };
+        unsigned int flags;
+    };
+
     unsigned int pos;
     unsigned int blk_pos;
     unsigned int block_end;
@@ -208,13 +215,14 @@ ext2_datablock(struct ext2_sbinfo* sb, unsigned int id)
 void
 ext2_init_inode(struct v_superblock* vsb, struct v_inode* inode);
 
-struct ext2_inode*
-ext2_get_inode(struct v_superblock* vsb, unsigned int ino_num);
+int
+ext2_get_inode(struct v_superblock* vsb, 
+               unsigned int ino, struct ext2_inode** out);
 
 bbuf_t
 ext2_get_data_block(struct v_inode* inode, unsigned int data_pos);
 
-void
+int
 ext2_fill_inode(struct v_inode* inode, ino_t ino_id);
 
 void
@@ -232,6 +240,23 @@ ext2db_itffw(struct ext2_iterator* iter, int count);
 void
 ext2db_itreset(struct ext2_iterator* iter);
 
+
+/* ************* Iterator ************* */
+
+static inline bool
+ext2_iterror(struct ext2_iterator* iter) {
+    return iter->has_error;
+}
+
+static inline bool
+ext2_itcheckbuf(struct ext2_iterator* iter) {
+    return !(iter->has_error = blkbuf_errbuf(iter->sel_buf));
+}
+
+#define itstate_sel(iter, value)    \
+    (ext2_iterror(iter) ? EIO : (value))
+
+
 /* ************ Block Group ************ */
 
 void
@@ -240,8 +265,9 @@ ext2gd_prepare_gdt(struct v_superblock* vsb);
 void
 ext2gd_release_gdt(struct v_superblock* vsb);
 
-struct ext2b_gdesc*
-ext2gd_desc_at(struct v_superblock* vsb, unsigned int index);
+int
+ext2gd_desc_at(struct v_superblock* vsb, 
+               unsigned int index, struct ext2b_gdesc** out);
 
 
 /* ************ Directory ************ */

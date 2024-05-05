@@ -1,10 +1,13 @@
 #include <lunaix/blkio.h>
+#include <lunaix/syslog.h>
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/valloc.h>
 
 #include <sys/cpu.h>
 
 static struct cake_pile* blkio_reqpile;
+
+LOG_MODULE("blkio")
 
 void
 blkio_init()
@@ -133,6 +136,11 @@ blkio_complete(struct blkio_req* req)
     // Wake all blocked processes on completion,
     //  albeit should be no more than one process in everycase (by design)
     pwake_all(&req->wait);
+
+    if (req->errcode) {
+        WARN("request completed with error. (errno=0x%x, ctx=%p)",
+                req->errcode, (ptr_t)ctx);
+    }
 
     if (req->completed) {
         req->completed(req);
