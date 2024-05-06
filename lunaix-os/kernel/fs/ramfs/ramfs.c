@@ -9,7 +9,7 @@
  *
  */
 #include <klibc/string.h>
-#include <lunaix/fs.h>
+#include <lunaix/fs/api.h>
 #include <lunaix/fs/ramfs.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
@@ -86,11 +86,16 @@ __ramfs_mknod(struct v_dnode* dnode, struct v_inode** nod_out, u32_t flags)
 int
 ramfs_readdir(struct v_file* file, struct dir_context* dctx)
 {
-    int i = 0;
+    int i = 2;
     struct v_dnode *pos, *n;
+
+    if (fsapi_handle_pseudo_dirent(file, dctx)) {
+        return 1;
+    }
+
     llist_for_each(pos, n, &file->dnode->children, siblings)
     {
-        if (i++ >= dctx->index) {
+        if (i++ >= file->f_pos) {
             dctx->read_complete_callback(dctx,
                                          pos->name.value,
                                          pos->name.len,

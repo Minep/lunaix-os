@@ -10,6 +10,7 @@ struct fsapi_vsb_ops
     u32_t (*read_capacity)(struct v_superblock* vsb);
     u32_t (*read_usage)(struct v_superblock* vsb);
     void (*init_inode)(struct v_superblock* vsb, struct v_inode* inode);
+    void (*release)(struct v_superblock* vsb);
 };
 
 static inline struct device* 
@@ -45,6 +46,7 @@ fsapi_set_vsb_ops(struct v_superblock* vsb, struct fsapi_vsb_ops* basic_ops)
 {
     vsb->ops.read_capacity = basic_ops->read_capacity;
     vsb->ops.read_usage = basic_ops->read_usage;
+    vsb->ops.release = basic_ops->release;
 }
 
 static inline void
@@ -147,10 +149,25 @@ fsblock_take(struct v_superblock* vsb, unsigned int block_id)
 }
 
 static inline void
-fsblock_put(struct v_superblock* vsb, bbuf_t blkbuf)
+fsblock_put(bbuf_t blkbuf)
 {
     return blkbuf_put(blkbuf);
 }
 
+static inline bool
+fsapi_handle_pseudo_dirent(struct v_file* file, struct dir_context* dctx) 
+{
+    if (file->f_pos == 0) {
+        fsapi_dir_report(dctx, ".", 1, vfs_get_dtype(VFS_IFDIR));
+        return true;
+    }
+
+    if (file->f_pos == 1) {
+        fsapi_dir_report(dctx, "..", 2, vfs_get_dtype(VFS_IFDIR));
+        return true;
+    }
+    
+    return false;
+}
 
 #endif /* __LUNAIX_FSAPI_H */

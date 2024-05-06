@@ -11,11 +11,17 @@ struct cake_pile* drec_cache_pile;
 extern void
 iso9660_init_inode(struct v_superblock* vsb, struct v_inode* inode);
 
-u32_t
-iso9660_rd_capacity(struct v_superblock* vsb)
+static u32_t
+__iso9660_rd_capacity(struct v_superblock* vsb)
 {
     struct iso_superblock* isovsb = (struct iso_superblock*)vsb->data;
     return isovsb->volume_size;
+}
+
+static void
+__vsb_release(struct v_superblock* vsb)
+{
+    vfree(vsb->data);
 }
 
 int
@@ -54,7 +60,8 @@ iso9660_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
 
     vsb->data = isovsb;
     vsb->ops.init_inode = iso9660_init_inode;
-    vsb->ops.read_capacity = iso9660_rd_capacity;
+    vsb->ops.read_capacity = __iso9660_rd_capacity;
+    vsb->ops.release = __vsb_release;
     vsb->blksize = ISO9660_BLKSZ;
 
     struct v_inode* rootino = vfs_i_alloc(vsb);
@@ -90,11 +97,11 @@ done:
     return errno;
 }
 
+
+
 int
 iso9660_unmount(struct v_superblock* vsb)
 {
-    vfree(vsb->data);
-
     return 0;
 }
 

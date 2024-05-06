@@ -44,4 +44,6 @@ typedef int bool;
         ((ptr_t)ptr != 0UL) ? (type*)((char*)__mptr - offsetof(type, member)) : 0;           \
     })
 
+#define offset(data, off)   \
+            ((void*)&((unsigned char*)data)[off])
 #endif /* __LUNAIX_TYPES_H */

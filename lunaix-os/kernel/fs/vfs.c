@@ -72,12 +72,6 @@ struct hstr vfs_ddot = HSTR("..", 2);
 struct hstr vfs_dot = HSTR(".", 1);
 struct hstr vfs_empty = HSTR("", 0);
 
-struct v_superblock*
-vfs_sb_alloc();
-
-void
-vfs_sb_free(struct v_superblock* sb);
-
 static int
 __vfs_try_evict_dnode(struct lru_node* obj);
 
@@ -137,7 +131,7 @@ vfs_dcache_lookup(struct v_dnode* parent, struct hstr* str)
     struct v_dnode *pos, *n;
     hashtable_bucket_foreach(slot, pos, n, hash_list)
     {
-        if (pos->name.hash == hash) {
+        if (pos->name.hash == hash && pos->parent == parent) {
             return pos;
         }
     }
@@ -230,6 +224,7 @@ vfs_assign_inode(struct v_dnode* assign_to, struct v_inode* inode)
         llist_delete(&assign_to->aka_list);
         assign_to->inode->link_count--;
     }
+
     llist_append(&inode->aka_dnodes, &assign_to->aka_list);
     assign_to->inode = inode;
     inode->link_count++;
@@ -348,12 +343,30 @@ vfs_sb_alloc()
     memset(sb, 0, sizeof(*sb));
     llist_init_head(&sb->sb_list);
     sb->i_cache = vzalloc(VFS_HASHTABLE_SIZE * sizeof(struct hbucket));
+    sb->ref_count = 1;
     return sb;
+}
+
+void
+vfs_sb_ref(struct v_superblock* sb)
+{
+    sb->ref_count++;
 }
 
 void
 vfs_sb_free(struct v_superblock* sb)
 {
+    assert(sb->ref_count);
+
+    sb->ref_count--;
+    if (sb->ref_count) {
+        return;
+    }
+
+    if (sb->ops.release) {
+        sb->ops.release(sb);
+    }
+
     vfree(sb->i_cache);
     cake_release(superblock_pile, sb);
 }
@@ -406,7 +419,7 @@ vfs_d_alloc(struct v_dnode* parent, struct hstr* name)
     hstrcpy(&dnode->name, name);
 
     if (parent) {
-        dnode->super_block = parent->super_block;
+        vfs_i_assign_sb(dnode, parent->super_block);
         dnode->mnt = parent->mnt;
     }
 
@@ -435,6 +448,7 @@ vfs_d_free(struct v_dnode* dnode)
         vfs_dcache_remove(pos);
     }
 
+    vfs_sb_free(dnode->super_block);
     vfree((void*)dnode->name.value);
     cake_release(dnode_pile, dnode);
 }
@@ -484,11 +498,11 @@ vfs_i_alloc(struct v_superblock* sb)
 
     sb->ops.init_inode(sb, inode);
 
-    inode->sb = sb;
     inode->ctime = clock_unixtime();
     inode->atime = inode->ctime;
     inode->mtime = inode->ctime;
 
+    vfs_i_assign_sb(inode, sb);
     lru_use_one(inode_lru, &inode->lru);
     return inode;
 }
@@ -506,6 +520,8 @@ vfs_i_free(struct v_inode* inode)
     if (inode->destruct) {
         inode->destruct(inode);
     }
+
+    vfs_sb_free(inode->sb);
     hlist_delete(&inode->hash_list);
     cake_release(inode_pile, inode);
 }
@@ -667,26 +683,21 @@ __DEFINE_LXSYSCALL2(int, sys_readdir, int, fd, struct lx_dirent*, dent)
 
     if ((inode->itype & F_FILE)) {
         errno = ENOTDIR;
-    } else {
-        struct dir_context dctx = (struct dir_context){
-          .cb_data = dent,
-          .index = dent->d_offset,
-          .read_complete_callback = __vfs_readdir_callback};
-        errno = 1;
-        if (dent->d_offset == 0) {
-            __vfs_readdir_callback(&dctx, vfs_dot.value, vfs_dot.len, DT_DIR);
-        } else if (dent->d_offset == 1) {
-            __vfs_readdir_callback(&dctx, vfs_ddot.value, vfs_ddot.len, DT_DIR);
-        } else {
-            dctx.index -= 2;
-            if ((errno = fd_s->file->ops->readdir(fd_s->file, &dctx)) != 1) {
-                unlock_inode(inode);
-                goto done;
-            }
-        }
-        dent->d_offset++;
+        goto unlock;
     }
 
+    struct dir_context dctx = (struct dir_context) {
+        .cb_data = dent,
+        .read_complete_callback = __vfs_readdir_callback
+    };
+
+    if ((errno = fd_s->file->ops->readdir(fd_s->file, &dctx)) != 1) {
+        goto unlock;
+    }
+    dent->d_offset++;
+    fd_s->file->f_pos++;
+
+unlock:
     unlock_inode(inode);
 
 done:

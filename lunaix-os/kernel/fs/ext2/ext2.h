@@ -191,8 +191,7 @@ struct ext2_iterator
     };
 
     unsigned int pos;
-    unsigned int blk_pos;
-    unsigned int block_end;
+    unsigned int blksz;
     bbuf_t sel_buf;
 };
 
@@ -219,11 +218,11 @@ int
 ext2_get_inode(struct v_superblock* vsb, 
                unsigned int ino, struct ext2_inode** out);
 
-bbuf_t
-ext2_get_data_block(struct v_inode* inode, unsigned int data_pos);
-
 int
 ext2_fill_inode(struct v_inode* inode, ino_t ino_id);
+
+bbuf_t
+ext2db_get(struct v_inode* inode, unsigned int data_pos);
 
 void
 ext2db_itbegin(struct ext2_iterator* iter, struct v_inode* inode);

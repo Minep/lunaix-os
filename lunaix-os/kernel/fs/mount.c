@@ -25,7 +25,7 @@ vfs_create_mount(struct v_mount* parent, struct v_dnode* mnt_point)
 
     mnt->parent = parent;
     mnt->mnt_point = mnt_point;
-    mnt->super_block = mnt_point->super_block;
+    vfs_vmnt_assign_sb(mnt, mnt_point->super_block);
 
     if (parent) {
         mnt_mkbusy(parent);
@@ -154,9 +154,10 @@ vfs_mount_at(const char* fs_name,
 
     char* dev_name = "sys";
     struct v_mount* parent_mnt = mnt_point->mnt;
-    struct v_superblock *sb = vfs_sb_alloc(), *old_sb = mnt_point->super_block;
+    struct v_superblock *sb = vfs_sb_alloc(), 
+                        *old_sb = mnt_point->super_block;
     sb->dev = device;
-    mnt_point->super_block = sb;
+    vfs_d_assign_sb(mnt_point, sb);
 
     if (device) {
         dev_name = device->name_val;
@@ -179,6 +180,7 @@ vfs_mount_at(const char* fs_name,
         goto cleanup;
     }
 
+    vfs_sb_free(old_sb);
     return errno;
 
 cleanup:
@@ -187,7 +189,7 @@ cleanup:
           fs_name,
           options,
           errno);
-    mnt_point->super_block = old_sb;
+    vfs_d_assign_sb(mnt_point, old_sb);
     vfs_sb_free(sb);
     return errno;
 }

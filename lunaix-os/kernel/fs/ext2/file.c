@@ -51,9 +51,6 @@ ext2_seek_inode(struct v_file* file, size_t offset)
     return 0;
 }
 
-#define offset(data, off)   \
-            ((void*)&((unsigned char*)data)[off])
-
 int
 ext2_inode_read(struct v_inode *inode, void *buffer, size_t len, size_t fpos)
 {

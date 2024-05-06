@@ -7,23 +7,21 @@ ext2dr_itbegin(struct ext2_iterator* iter, struct v_inode* inode)
 {
     *iter = (struct ext2_iterator){
         .pos = 0,
-        .blk_pos = 0,
         .inode = inode,
-        .block_end = inode->sb->blksize
+        .blksz = inode->sb->blksize
     };
 
-    iter->sel_buf = ext2_get_data_block(inode, 0);
+    iter->sel_buf = ext2db_get(inode, 0);
     ext2_itcheckbuf(iter);
 }
 
 void
 ext2dr_itreset(struct ext2_iterator* iter)
 {
-    fsblock_put(iter->inode->sb, iter->sel_buf);
-    iter->sel_buf = ext2_get_data_block(iter->inode, 0);
+    fsblock_put(iter->sel_buf);
+    iter->sel_buf = ext2db_get(iter->inode, 0);
     ext2_itcheckbuf(iter);
 
-    iter->blk_pos = 0;
     iter->pos = 0;
 }
 
@@ -42,7 +40,7 @@ void
 ext2dr_itend(struct ext2_iterator* iter)
 {
     if (iter->sel_buf) {
-        fsblock_put(iter->inode->sb, iter->sel_buf);
+        fsblock_put(iter->sel_buf);
     }
 }
 
@@ -50,6 +48,7 @@ bool
 ext2dr_itnext(struct ext2_iterator* iter)
 {
     struct ext2b_dirent* d;
+    unsigned int blkpos, db_index;
     bbuf_t buf;
     
     buf = iter->sel_buf;
@@ -66,14 +65,14 @@ ext2dr_itnext(struct ext2_iterator* iter)
             return false;
         }
     }
+
+    blkpos = iter->pos % iter->blksz;
+    db_index = iter->pos / iter->blksz;
     
-    if (unlikely(iter->pos >= iter->block_end)) {
-        iter->blk_pos++;
-        iter->pos %= iter->block_end;
+    if (unlikely(iter->pos >= iter->blksz)) {
+        fsblock_put(buf);
 
-        fsblock_put(iter->inode->sb, buf);
-
-        buf = ext2_get_data_block(iter->inode, iter->blk_pos);
+        buf = ext2db_get(iter->inode, db_index);
         iter->sel_buf = buf;
 
         if (!buf || !ext2_itcheckbuf(iter)) {
@@ -81,7 +80,7 @@ ext2dr_itnext(struct ext2_iterator* iter)
         }
     }
 
-    d = &block_buffer(buf, struct ext2b_dirent)[iter->pos];
+    d = (struct ext2b_dirent*)offset(blkbuf_data(buf), blkpos);
     iter->dirent = d;
 
     return true;
@@ -115,7 +114,7 @@ ext2dr_lookup(struct v_inode* inode, struct v_dnode* dnode)
             continue;
         }
 
-        if (streq(dir->name, name->value)) {
+        if (strneq(dir->name, name->value, name->len)) {
             goto done;
         }
     }

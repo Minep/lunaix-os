@@ -39,6 +39,13 @@ ext2_rd_capacity(struct v_superblock* vsb)
     return sb->raw.s_blk_cnt * fsapi_block_size(vsb);
 }
 
+static void
+__vsb_release(struct v_superblock* vsb)
+{
+    ext2gd_release_gdt(vsb);
+    vfree(vsb->data);
+}
+
 static size_t
 ext2_rd_usage(struct v_superblock* vsb)
 {
@@ -50,7 +57,8 @@ ext2_rd_usage(struct v_superblock* vsb)
 struct fsapi_vsb_ops vsb_ops = {
     .read_capacity = ext2_rd_capacity,
     .read_usage = ext2_rd_usage,
-    .init_inode = ext2_init_inode
+    .init_inode = ext2_init_inode,
+    .release = __vsb_release
 };
 
 static int 
@@ -115,3 +123,22 @@ unsupported:
 failed:
     return errno;
 }
+
+static int 
+ext2_umount(struct v_superblock* vsb, struct v_dnode* mnt)
+{
+    // TODO
+    return 0;
+}
+
+static void
+ext2_init()
+{
+    struct filesystem* fs = fsm_new_fs("ext2", -1);
+    fs->types |= FSTYPE_ROFS;
+    fs->mount = ext2_mount;
+    fs->unmount = ext2_umount;
+
+    fsm_register(fs);
+}
+EXPORT_FILE_SYSTEM(ext2fs, ext2_init);

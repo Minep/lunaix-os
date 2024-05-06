@@ -1,5 +1,5 @@
 #include <lunaix/device.h>
-#include <lunaix/fs.h>
+#include <lunaix/fs/api.h>
 #include <lunaix/fs/devfs.h>
 #include <lunaix/spike.h>
 
@@ -147,8 +147,12 @@ devfs_readdir(struct v_file* file, struct dir_context* dctx)
         return ENOTDIR;
     }
 
+    if (fsapi_handle_pseudo_dirent(file, dctx)) {
+        return 1;
+    }
+
     struct device_meta* dev =
-      device_getbyoffset(rootdev, dctx->index);
+      device_getbyoffset(rootdev, file->f_pos);
     
     if (!dev) {
         return 0;

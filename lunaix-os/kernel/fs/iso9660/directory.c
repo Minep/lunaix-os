@@ -104,16 +104,11 @@ iso9660_setup_dnode(struct v_dnode* dnode, struct v_inode* inode)
             break;
         }
 
-        // ignore the '.', '..' as we have built-in support
-        if (drec->name.len == 1) {
-            goto cont;
-        }
-
         struct iso_drecache* cache = cake_grab(drec_cache_pile);
 
         iso9660_fill_drecache(cache, drec, mdu->len);
         llist_append(&isoino->drecaches, &cache->caches);
-    cont:
+
         blk_offset += mdu->len;
     } while (current_pos + blk_offset < max_pos);
 
@@ -166,21 +161,20 @@ __get_dtype(struct iso_drecache* pos)
 
 int
 iso9660_readdir(struct v_file* file, struct dir_context* dctx)
-{
-    // FIXME rework this with newly added lseek support on dir
-    
+{    
     struct llist_header* lead = file->dnode->data;
     struct iso_drecache *pos, *n;
-    u32_t counter = dctx->index - 1;
+    u32_t counter = 0;
 
     llist_for_each(pos, n, lead, caches)
     {
-        if (counter == (u32_t)-1 && !(pos->flags & ISO_FHIDDEN)) {
+        if (counter == file->f_pos && !(pos->flags & ISO_FHIDDEN)) {
             dctx->read_complete_callback(
               dctx, pos->name_val, pos->name.len, __get_dtype(pos));
             return 1;
         }
-        counter--;
+        counter++;
     }
+
     return 0;
 }

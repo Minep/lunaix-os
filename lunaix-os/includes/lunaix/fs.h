@@ -120,18 +120,19 @@ struct v_superblock
     struct blkbuf_cache* blks;
     struct hbucket* i_cache;
     void* data;
+    unsigned int ref_count;
     size_t blksize;
     struct
     {
         u32_t (*read_capacity)(struct v_superblock* vsb);
         u32_t (*read_usage)(struct v_superblock* vsb);
         void (*init_inode)(struct v_superblock* vsb, struct v_inode* inode);
+        void (*release)(struct v_superblock* vsb);
     } ops;
 };
 
 struct dir_context
 {
-    int index;
     void* cb_data;
     void (*read_complete_callback)(struct dir_context* dctx,
                                    const char* name,
@@ -393,6 +394,35 @@ vfs_assign_inode(struct v_dnode* assign_to, struct v_inode* inode);
 
 struct v_superblock*
 vfs_sb_alloc();
+
+void
+vfs_sb_ref(struct v_superblock* sb);
+
+#define vfs_assign_sb(sb_accessor, sb)      \
+    ({                                      \
+        if (sb_accessor) {                \
+            vfs_sb_free(sb_accessor);       \
+        }                                   \
+        vfs_sb_ref(((sb_accessor) = (sb))); \
+    })
+
+static inline void
+vfs_i_assign_sb(struct v_inode* inode, struct v_superblock* sb)
+{
+    vfs_assign_sb(inode->sb, sb);
+}
+
+static inline void
+vfs_d_assign_sb(struct v_dnode* dnode, struct v_superblock* sb)
+{
+    vfs_assign_sb(dnode->super_block, sb);
+}
+
+static inline void
+vfs_vmnt_assign_sb(struct v_mount* vmnt, struct v_superblock* sb)
+{
+    vfs_assign_sb(vmnt->super_block, sb);
+}
 
 void
 vfs_sb_free(struct v_superblock* sb);
