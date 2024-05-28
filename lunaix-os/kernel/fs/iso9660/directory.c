@@ -81,7 +81,7 @@ done:
 int
 iso9660_setup_dnode(struct v_dnode* dnode, struct v_inode* inode)
 {
-    if ((inode->itype & F_FILE)) {
+    if (!check_directory_node(inode)) {
         vfs_assign_inode(dnode, inode);
         return 0;
     }

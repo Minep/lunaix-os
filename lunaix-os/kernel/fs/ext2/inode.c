@@ -252,10 +252,6 @@ ext2_fill_inode(struct v_inode* inode, ino_t ino_id)
         type = VFS_IFVOLDEV;
     }
 
-    if ((b_ino->i_mode & IMODE_IFREG)) {
-        type |= VFS_IFFILE;
-    }
-
     fsapi_inode_settype(inode, type);
 
     fsapi_inode_complete(inode, ext2inode);

@@ -194,7 +194,7 @@ vfs_open(struct v_dnode* dnode, struct v_file** file)
     vfile->ref_count = ATOMIC_VAR_INIT(1);
     vfile->ops = inode->default_fops;
 
-    if ((inode->itype & F_MFILE) && !inode->pg_cache) {
+    if (check_file_node(inode) && !inode->pg_cache) {
         struct pcache* pcache = vzalloc(sizeof(struct pcache));
         pcache_init(pcache);
         pcache->master = inode;
@@ -681,7 +681,7 @@ __DEFINE_LXSYSCALL2(int, sys_readdir, int, fd, struct lx_dirent*, dent)
 
     lock_inode(inode);
 
-    if ((inode->itype & F_FILE)) {
+    if (!check_directory_node(inode)) {
         errno = ENOTDIR;
         goto unlock;
     }
@@ -713,7 +713,7 @@ __DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
     }
 
     struct v_file* file = fd_s->file;
-    if (!(file->inode->itype & F_FILE)) {
+    if (check_directory_node(file->inode)) {
         errno = EISDIR;
         goto done;
     }
@@ -722,7 +722,7 @@ __DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
 
     file->inode->atime = clock_unixtime();
 
-    if ((file->inode->itype & VFS_IFSEQDEV) || (fd_s->flags & FO_DIRECT)) {
+    if (check_seqdev_node(file->inode) || (fd_s->flags & FO_DIRECT)) {
         errno = file->ops->read(file->inode, buf, count, file->f_pos);
     } else {
         errno = pcache_read(file->inode, buf, count, file->f_pos);
@@ -754,7 +754,7 @@ __DEFINE_LXSYSCALL3(int, write, int, fd, void*, buf, size_t, count)
         goto done;
     }
 
-    if (!(file->inode->itype & F_FILE)) {
+    if (check_directory_node(file->inode)) {
         errno = EISDIR;
         goto done;
     }
@@ -763,7 +763,7 @@ __DEFINE_LXSYSCALL3(int, write, int, fd, void*, buf, size_t, count)
 
     file->inode->mtime = clock_unixtime();
 
-    if ((file->inode->itype & VFS_IFSEQDEV) || (fd_s->flags & FO_DIRECT)) {
+    if (check_seqdev_node(file->inode) || (fd_s->flags & FO_DIRECT)) {
         errno = file->ops->write(file->inode, buf, count, file->f_pos);
     } else {
         errno = pcache_write(file->inode, buf, count, file->f_pos);
@@ -883,13 +883,19 @@ vfs_readlink(struct v_dnode* dnode, char* buf, size_t size)
 int
 vfs_get_dtype(int itype)
 {
-    if ((itype & VFS_IFSYMLINK) == VFS_IFSYMLINK) {
-        return DT_SYMLINK;
-    } else if (!(itype & VFS_IFFILE)) {
-        return DT_DIR;
-    } else {
-        return DT_FILE;
+    int dtype = DT_FILE;
+    if (check_itype(itype, VFS_IFSYMLINK)) {
+        dtype |= DT_SYMLINK;
     }
+    
+    if (check_itype(itype, VFS_IFDIR)) {
+        dtype |= DT_DIR;
+        return dtype;
+    }
+
+    // TODO other types
+    
+    return dtype;
 }
 
 __DEFINE_LXSYSCALL3(int, realpathat, int, fd, char*, buf, size_t, size)
@@ -998,7 +1004,7 @@ __DEFINE_LXSYSCALL1(int, rmdir, const char*, pathname)
     lock_dnode(parent);
     lock_inode(parent->inode);
 
-    if (!(dnode->inode->itype & F_MFILE)) {
+    if (check_directory_node(dnode->inode)) {
         errno = parent->inode->ops->rmdir(parent->inode, dnode);
         if (!errno) {
             vfs_dcache_remove(dnode);
@@ -1040,16 +1046,18 @@ __DEFINE_LXSYSCALL1(int, mkdir, const char*, path)
         goto done;
     }
 
+    struct v_inode* inode = parent->inode;
+
     lock_dnode(parent);
-    lock_inode(parent->inode);
+    lock_inode(inode);
 
     if ((parent->super_block->fs->types & FSTYPE_ROFS)) {
         errno = ENOTSUP;
-    } else if (!parent->inode->ops->mkdir) {
+    } else if (!inode->ops->mkdir) {
         errno = ENOTSUP;
-    } else if ((parent->inode->itype & F_FILE)) {
+    } else if (!check_directory_node(inode)) {
         errno = ENOTDIR;
-    } else if (!(errno = parent->inode->ops->mkdir(parent->inode, dir))) {
+    } else if (!(errno = inode->ops->mkdir(inode, dir))) {
         vfs_dcache_add(parent, dir);
         goto cleanup;
     }
@@ -1057,7 +1065,7 @@ __DEFINE_LXSYSCALL1(int, mkdir, const char*, path)
     vfs_d_free(dir);
 
 cleanup:
-    unlock_inode(parent->inode);
+    unlock_inode(inode);
     unlock_dnode(parent);
 done:
     return DO_STATUS(errno);
@@ -1081,7 +1089,7 @@ __vfs_do_unlink(struct v_dnode* dnode)
 
     if (inode->open_count) {
         errno = EBUSY;
-    } else if ((inode->itype & F_MFILE)) {
+    } else if (!check_directory_node(inode)) {
         errno = inode->ops->unlink(inode);
         if (!errno) {
             vfs_d_free(dnode);
@@ -1285,7 +1293,7 @@ vfs_do_chdir(struct proc_info* proc, struct v_dnode* dnode)
 
     lock_dnode(dnode);
 
-    if ((dnode->inode->itype & F_FILE)) {
+    if (!check_directory_node(dnode->inode)) {
         errno = ENOTDIR;
         goto done;
     }
@@ -1480,7 +1488,7 @@ __DEFINE_LXSYSCALL2(int, fstat, int, fd, struct file_stat*, stat)
                                .st_ioblksize = PAGE_SIZE,
                                .st_blksize = vino->sb->blksize};
 
-    if (VFS_DEVFILE(vino->itype)) {
+    if (check_device_node(vino)) {
         struct device* rdev = resolve_device(vino->data);
         if (!rdev || rdev->magic != DEV_STRUCT_MAGIC) {
             errno = EINVAL;

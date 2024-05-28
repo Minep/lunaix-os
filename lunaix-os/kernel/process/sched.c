@@ -326,7 +326,7 @@ repeat:
 
 done:
     if (status) {
-        *status = proc->exit_code | status_flags;
+        *status = PEXITNUM(status_flags, proc->exit_code);
     }
     return destroy_process(proc->pid);
 }

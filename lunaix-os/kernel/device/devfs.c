@@ -67,7 +67,7 @@ devfs_write_page(struct v_inode* inode, void* buffer, size_t fpos)
 int
 devfs_get_itype(struct device_meta* dm)
 {
-    int itype = VFS_IFFILE;
+    int itype = VFS_IFDEV;
 
     if (valid_device_subtype_ref(dm, DEV_CAT)) {
         return VFS_IFDIR;
@@ -78,11 +78,9 @@ devfs_get_itype(struct device_meta* dm)
     
     if (dev_if == DEV_IFVOL) {
         itype |= VFS_IFVOLDEV;
-    } else if (dev_if == DEV_IFSEQ) {
-        itype |= VFS_IFSEQDEV;
-    } else {
-        itype |= VFS_IFDEV;
     }
+
+    // otherwise, the mapping is considered to be generic seq dev.
     return itype;
 }
 

@@ -45,6 +45,10 @@ readdir(DIR* dir)
     struct lx_dirent* _lxd = &dir->_lxd;
 
     int more = sys_readdir(dir->dirfd, _lxd);
+    
+    if (more < 0) {
+        return NULL;
+    }
 
     _dirent.d_type = _lxd->d_type;
     strncpy(_dirent.d_name, _lxd->d_name, 256);

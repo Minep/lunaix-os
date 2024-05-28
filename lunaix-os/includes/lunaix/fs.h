@@ -21,15 +21,12 @@
 #define VFS_NAME_MAXLEN 128
 #define VFS_MAX_FD 32
 
-#define VFS_IFDIR F_DIR
-#define VFS_IFFILE F_FILE
-#define VFS_IFDEV (F_DEV | F_FILE)
-#define VFS_IFSEQDEV (F_SEQDEV | F_FILE)
-#define VFS_IFVOLDEV (F_VOLDEV | F_FILE)
-#define VFS_IFSYMLINK (F_SYMLINK | F_FILE)
-
-#define VFS_DEVFILE(type) ((type) & F_DEV)
-#define VFS_DEVTYPE(type) ((type) & ((F_SEQDEV | F_VOLDEV) ^ F_DEV))
+#define VFS_IFFILE       F_FILE
+#define VFS_IFDIR       (F_FILE | F_DIR    )
+#define VFS_IFDEV       (F_FILE | F_DEV    )
+#define VFS_IFSYMLINK   (F_FILE | F_SYMLINK)
+#define VFS_IFVOLDEV    (F_FILE | F_SVDEV  )
+#define VFS_IFSEQDEV    VFS_IFDEV
 
 // Walk, mkdir if component encountered is non-exists.
 #define VFS_WALK_MKPARENT 0x1
@@ -561,5 +558,68 @@ xattr_getcache(struct v_inode* inode, struct hstr* name);
 
 void
 xattr_addcache(struct v_inode* inode, struct v_xattr_entry* xattr);
+
+
+/* --- misc stuff --- */
+
+#define check_itype(to_check, itype)    \
+    (((to_check) & (itype)) == (itype))
+
+/**
+ * @brief Check if node represent a regular file (nothing but a file)
+ * 
+ * @param inode 
+ * @return true 
+ * @return false 
+ */
+static inline bool
+check_regfile_node(struct v_inode* inode)
+{
+    return inode->itype == VFS_IFFILE;
+}
+
+/**
+ * @brief Check if node represent a file.
+ *        This is basically everything within file system (dir, dev, etc.)
+ * 
+ * @param inode 
+ * @return true 
+ * @return false 
+ */
+static inline bool
+check_file_node(struct v_inode* inode)
+{
+    return check_itype(inode->itype, VFS_IFFILE);
+}
+
+static inline bool
+check_directory_node(struct v_inode* inode)
+{
+    return check_itype(inode->itype, VFS_IFDIR);
+}
+
+static inline bool
+check_device_node(struct v_inode* inode)
+{
+    return check_itype(inode->itype, VFS_IFDEV);
+}
+
+static inline bool
+check_seqdev_node(struct v_inode* inode)
+{
+    return check_device_node(inode);
+}
+
+static inline bool
+check_voldev_node(struct v_inode* inode)
+{
+    return check_itype(inode->itype, VFS_IFVOLDEV);
+}
+
+static inline bool
+check_symlink_node(struct v_inode* inode)
+{
+    return check_itype(inode->itype, VFS_IFSYMLINK);
+}
 
 #endif /* __LUNAIX_VFS_H */

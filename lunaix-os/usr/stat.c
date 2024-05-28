@@ -29,22 +29,21 @@ main(int argc, char* argv[])
 
     char* ftype = "directory";
     int mode = stat.mode;
-    if ((mode & F_MDEV)) {
-        if (!((mode & F_SEQDEV) ^ F_SEQDEV)) {
-            ftype = "sequential device";
-        } else if (!((mode & F_VOLDEV) ^ F_VOLDEV)) {
+    if ((mode & F_DEV)) {
+        ftype = "mappable (sequential) device";
+
+        if (!((mode & F_SVDEV) ^ F_SVDEV)) {
             ftype = "volumetric device";
-        } else {
-            ftype = "regular device";
         }
-    } else if ((mode & F_MSLNK)) {
+
+    } else if ((mode & F_SYMLINK)) {
         if (readlinkat(fd, NULL, buf, 256) < 0) {
             printf("fail to readlink %d\n", errno);
         } else {
             printf("-> %s", buf);
         }
         ftype = "symbolic link";
-    } else if ((mode & F_MFILE)) {
+    } else if (mode == F_FILE) {
         ftype = "regular file";
     }
 
@@ -57,7 +56,7 @@ main(int argc, char* argv[])
     printf("Inode: %d;  ", stat.st_ino);
 
     dev_t* dev;
-    if (!(stat.mode & F_MDEV)) {
+    if (!(stat.mode & F_DEV)) {
         dev = &stat.st_dev;
     } else {
         dev = &stat.st_rdev;

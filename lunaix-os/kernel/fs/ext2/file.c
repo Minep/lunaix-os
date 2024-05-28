@@ -3,16 +3,16 @@
 #include "ext2.h"
 
 int
-ext2_open_inode(struct v_inode* this, struct v_file* file)
+ext2_open_inode(struct v_inode* inode, struct v_file* file)
 {
     int errno = 0;
     struct ext2_file* e_file;
 
     e_file = valloc(sizeof(*e_file));
-    e_file->b_ino = EXT2_INO(this);
+    e_file->b_ino = EXT2_INO(inode);
 
-    if (this->itype == VFS_IFDIR) {
-        errno = ext2dr_open(this, file);
+    if (check_directory_node(inode)) {
+        errno = ext2dr_open(inode, file);
         goto done;
     }
 
@@ -45,7 +45,7 @@ ext2_sync_inode(struct v_file* file)
 int
 ext2_seek_inode(struct v_file* file, size_t offset)
 {
-    if (file->inode->itype == VFS_IFDIR) {
+    if (check_directory_node(file->inode)) {
         return ext2dr_seek(file, offset);
     }
 

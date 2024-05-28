@@ -64,9 +64,10 @@ __ramfs_mknod(struct v_dnode* dnode, struct v_inode** nod_out, u32_t flags)
 
     rinode->flags = flags;
     inode->data = rinode;
+    inode->itype = VFS_IFFILE;
 
-    if (!(flags & RAMF_DIR)) {
-        inode->itype = VFS_IFFILE;
+    if ((flags & RAMF_DIR)) {
+        inode->itype |= VFS_IFDIR;
     }
 
     if ((flags & RAMF_SYMLINK)) {
@@ -167,7 +168,7 @@ ramfs_mksymlink(struct v_inode* this, const char* target)
 
     memcpy(symlink, target, len);
 
-    this->itype |= VFS_IFSYMLINK;
+    this->itype = VFS_IFSYMLINK;
     rinode->flags |= RAMF_SYMLINK;
     rinode->symlink = symlink;
 
@@ -195,7 +196,7 @@ ramfs_unlink(struct v_inode* this)
 
     if ((rinode->flags & RAMF_SYMLINK)) {
         rinode->flags &= ~RAMF_SYMLINK;
-        this->itype &= ~VFS_IFSYMLINK;
+        this->itype &= ~F_SYMLINK;
 
         vfree(rinode->symlink);
 

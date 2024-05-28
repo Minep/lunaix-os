@@ -139,7 +139,7 @@ vfs_mount_at(const char* fs_name,
         return ENOTBLK;
     }
 
-    if (mnt_point->inode && (mnt_point->inode->itype & F_MFILE)) {
+    if (mnt_point->inode && !check_directory_node(mnt_point->inode)) {
         return ENOTDIR;
     }
 
@@ -263,7 +263,7 @@ __DEFINE_LXSYSCALL4(int,
     struct device* device = NULL;
 
     if (dev) {
-        if (!(dev->inode->itype & VFS_IFVOLDEV)) {
+        if (!check_voldev_node(dev->inode)) {
             errno = ENOTDEV;
             goto done;
         }

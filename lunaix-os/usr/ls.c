@@ -28,7 +28,12 @@ main(int argc, const char* argv[])
         }
     }
 
+    int err = errno;
+    if (err) {
+        printf("failed: %d\n",err);
+    }
+
     closedir(dir);
 
-    return 0;
+    return err;
 }
