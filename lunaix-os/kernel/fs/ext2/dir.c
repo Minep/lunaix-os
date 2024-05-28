@@ -149,16 +149,20 @@ __dir_filetype(struct ext2b_dirent* dir)
     if (dir->file_type == FT_REG) {
         return VFS_IFFILE;
     }
-    else if (dir->file_type == FT_DIR) {
+    
+    if (dir->file_type == FT_DIR) {
         return VFS_IFDIR;
     }
-    else if (dir->file_type == FT_BLK) {
+    
+    if (dir->file_type == FT_BLK) {
         return VFS_IFVOLDEV;
     }
-    else if (dir->file_type == FT_CHR) {
+    
+    if (dir->file_type == FT_CHR) {
         return VFS_IFSEQDEV;
     }
-    else if (dir->file_type == FT_SYM) {
+    
+    if (dir->file_type == FT_SYM) {
         return VFS_IFSYMLINK;
     }
 

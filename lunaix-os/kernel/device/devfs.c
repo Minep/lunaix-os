@@ -150,7 +150,7 @@ devfs_readdir(struct v_file* file, struct dir_context* dctx)
     }
 
     struct device_meta* dev =
-      device_getbyoffset(rootdev, file->f_pos);
+      device_getbyoffset(rootdev, file->f_pos - 2);
     
     if (!dev) {
         return 0;

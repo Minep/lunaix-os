@@ -39,6 +39,21 @@ vfs_create_mount(struct v_mount* parent, struct v_dnode* mnt_point)
     return mnt;
 }
 
+void
+__vfs_release_vmnt(struct v_mount* mnt)
+{
+    assert(llist_empty(&mnt->submnts));
+
+    if (mnt->parent) {
+        mnt_chillax(mnt->parent);
+    }
+
+    llist_delete(&mnt->sibmnts);
+    llist_delete(&mnt->list);
+    atomic_fetch_sub(&mnt->mnt_point->ref_count, 1);
+    vfree(mnt);
+}
+
 int
 __vfs_do_unmount(struct v_mount* mnt)
 {
@@ -49,9 +64,6 @@ __vfs_do_unmount(struct v_mount* mnt)
         return errno;
     }
 
-    llist_delete(&mnt->list);
-    llist_delete(&mnt->sibmnts);
-
     // detached the inodes from cache, and let lru policy to recycle them
     for (size_t i = 0; i < VFS_HASHTABLE_SIZE; i++) {
         struct hbucket* bucket = &sb->i_cache[i];
@@ -61,13 +73,10 @@ __vfs_do_unmount(struct v_mount* mnt)
         bucket->head->pprev = 0;
     }
 
-    mnt_chillax(mnt->parent);
-
     mnt->mnt_point->mnt = mnt->parent;
 
     vfs_sb_free(sb);
-    atomic_fetch_sub(&mnt->mnt_point->ref_count, 1);
-    vfree(mnt);
+    __vfs_release_vmnt(mnt);
 
     return errno;
 }
@@ -152,30 +161,30 @@ vfs_mount_at(const char* fs_name,
         options |= MNT_RO;
     }
 
+    int errno = 0;
     char* dev_name = "sys";
     struct v_mount* parent_mnt = mnt_point->mnt;
     struct v_superblock *sb = vfs_sb_alloc(), 
                         *old_sb = mnt_point->super_block;
-    sb->dev = device;
-    vfs_d_assign_sb(mnt_point, sb);
 
     if (device) {
         dev_name = device->name_val;
     }
 
-    int errno = 0;
+    // prepare v_superblock for fs::mount invoke
+    sb->dev = device;
+    sb->fs = fs;
+    sb->root = mnt_point;
+    vfs_d_assign_sb(mnt_point, sb);
+
+    if (!(mnt_point->mnt = vfs_create_mount(parent_mnt, mnt_point))) {
+        errno = ENOMEM;
+        goto cleanup;
+    }
+
+    mnt_point->mnt->flags = options;
     if (!(errno = fs->mount(sb, mnt_point))) {
-        sb->fs = fs;
-        sb->root = mnt_point;
-
-        if (!(mnt_point->mnt = vfs_create_mount(parent_mnt, mnt_point))) {
-            errno = ENOMEM;
-            goto cleanup;
-        }
-
         kprintf("mount: dev=%s, fs=%s, mode=%d", dev_name, fs_name, options);
-
-        mnt_point->mnt->flags = options;
     } else {
         goto cleanup;
     }
@@ -184,13 +193,15 @@ vfs_mount_at(const char* fs_name,
     return errno;
 
 cleanup:
-    ERROR("mount: dev=%s, fs=%s, mode=%d, err=%d",
+    ERROR("failed mount: dev=%s, fs=%s, mode=%d, err=%d",
           dev_name,
           fs_name,
           options,
           errno);
     vfs_d_assign_sb(mnt_point, old_sb);
     vfs_sb_free(sb);
+    __vfs_release_vmnt(mnt_point->mnt);
+
     return errno;
 }
 

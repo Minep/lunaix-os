@@ -19,10 +19,14 @@
 struct btrie_node*
 __btrie_traversal(struct btrie* root, unsigned long index, int options)
 {
-    unsigned long lz = index ? ROUNDDOWN(BITS - clz(index), root->order) : 0;
-    unsigned long bitmask = ((1 << root->order) - 1) << lz;
+    unsigned long lz;
+    unsigned long bitmask;
     unsigned long i = 0;
     struct btrie_node* tree = root->btrie_root;
+
+    lz = index ? ICEIL(BITS - clz(index), root->order) : 0;
+    lz = lz * root->order;
+    bitmask = ((1 << root->order) - 1) << lz;
 
     // Time complexity: O(log_2(log_2(N))) where N is the index to lookup
     while (bitmask && tree) {

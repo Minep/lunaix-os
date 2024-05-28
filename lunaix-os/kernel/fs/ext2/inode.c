@@ -239,16 +239,16 @@ ext2_fill_inode(struct v_inode* inode, ino_t ino_id)
     fsapi_inode_setops(inode, &ext2_inode_ops);
     fsapi_inode_setdector(inode, ext2_destruct_inode);
 
-    if (b_ino->i_mode & IMODE_IFLNK) {
+    if (check_itype(b_ino->i_mode, IMODE_IFLNK)) {
         type = VFS_IFSYMLINK;
     }
-    else if (b_ino->i_mode & IMODE_IFDIR) {
+    else if (check_itype(b_ino->i_mode, IMODE_IFDIR)) {
         type = VFS_IFDIR;
     }
-    else if (b_ino->i_mode & IMODE_IFCHR) {
+    else if (check_itype(b_ino->i_mode, IMODE_IFCHR)) {
         type = VFS_IFSEQDEV;
     }
-    else if (b_ino->i_mode & IMODE_IFBLK) {
+    else if (check_itype(b_ino->i_mode, IMODE_IFBLK)) {
         type = VFS_IFVOLDEV;
     }
 
@@ -272,8 +272,10 @@ ext2_get_inode(struct v_superblock* vsb,
     unsigned int ind_ents;
     int errno = 0;
     bbuf_t ino_tab;
-
+    
     sb = EXT2_SB(vsb);
+
+    ino -= 1;
     blkgrp_id   = ino / sb->raw.s_ino_per_grp;
     ino_rel_id  = ino % sb->raw.s_ino_per_grp;
 
@@ -281,7 +283,7 @@ ext2_get_inode(struct v_superblock* vsb,
     ino_tab_sel = ino_rel_id / tab_partlen;
     ino_tab_off = ino_rel_id % tab_partlen;
 
-    if (!(errno = ext2gd_desc_at(vsb, blkgrp_id, &gd))) {
+    if ((errno = ext2gd_desc_at(vsb, blkgrp_id, &gd))) {
         return errno;
     }
 
@@ -390,7 +392,7 @@ ext2db_get(struct v_inode* inode, unsigned int data_pos)
     b_inode = e_inode->ino;
     lg_ents = e_inode->inds_lgents;
 
-    assert(data_pos);
+    assert(data_pos < 15);
 
     if (data_pos < 13) {
         return fsblock_take(inode->sb, b_inode->i_block.directs[data_pos]);

@@ -663,7 +663,7 @@ __vfs_readdir_callback(struct dir_context* dctx,
                        const int dtype)
 {
     struct lx_dirent* dent = (struct lx_dirent*)dctx->cb_data;
-    strncpy(dent->d_name, name, DIRENT_NAME_MAX_LEN);
+    strncpy(dent->d_name, name, MIN(len, DIRENT_NAME_MAX_LEN));
     dent->d_nlen = len;
     dent->d_type = dtype;
 }

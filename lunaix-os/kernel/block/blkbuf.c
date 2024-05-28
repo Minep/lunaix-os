@@ -79,7 +79,8 @@ __blkbuf_take_slow(struct blkbuf_cache* bc, unsigned int block_id)
 
     data = valloc(bc->blksize);
 
-    vbuf = vbuf_alloc(NULL, data, bc->blksize);
+    vbuf = NULL;
+    vbuf_alloc(&vbuf, data, bc->blksize);
 
     buf = (struct blk_buf*)cake_grab(bb_pile);
     req = blkio_vreq(vbuf, __tolba(bc, block_id), NULL, buf, 0);

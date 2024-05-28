@@ -24,7 +24,7 @@ LOG_MODULE("EXT2")
 #define EXT2_IMPL_REQFEAT (EXT2_REQFEAT_FILETYPE)
 #define EXT2_IMPL_ROFEAT (EXT2_ROFEAT_SPARSESB)
 
-#define EXT2_ROOT_INO 1
+#define EXT2_ROOT_INO 2
 
 #define compatible_mount(feat) \
         (((feat) | EXT2_IMPL_REQFEAT) == EXT2_IMPL_REQFEAT)
@@ -80,6 +80,7 @@ ext2_mount(struct v_superblock* vsb, struct v_dnode* mnt)
     }
 
     if (rawsb->s_magic != EXT2_SUPER_MAGIC) {
+        ERROR("invalid magic: 0x%x", rawsb->s_magic);
         goto unsupported;
     }
 
@@ -112,6 +113,7 @@ ext2_mount(struct v_superblock* vsb, struct v_dnode* mnt)
     ext2gd_prepare_gdt(vsb);
     
     root_inode = vfs_i_alloc(vsb);
+
     ext2_fill_inode(root_inode, EXT2_ROOT_INO);
     vfs_assign_inode(mnt, root_inode);
 

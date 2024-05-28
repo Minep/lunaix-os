@@ -10,6 +10,8 @@ ext2_open_inode(struct v_inode* inode, struct v_file* file)
 
     e_file = valloc(sizeof(*e_file));
     e_file->b_ino = EXT2_INO(inode);
+    
+    file->data = e_file;
 
     if (check_directory_node(inode)) {
         errno = ext2dr_open(inode, file);
@@ -19,13 +21,13 @@ ext2_open_inode(struct v_inode* inode, struct v_file* file)
     // TODO anything for regular file?
 
 done:
-    if (errno) {
-        vfree(e_file);
-        return errno;
+    if (!errno) {
+        return 0;
     }
 
-    file->data = e_file;
-    return 0;
+    vfree(e_file);
+    file->data = NULL;
+    return errno;
 }
 
 int

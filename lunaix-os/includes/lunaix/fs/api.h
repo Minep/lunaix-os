@@ -47,6 +47,7 @@ fsapi_set_vsb_ops(struct v_superblock* vsb, struct fsapi_vsb_ops* basic_ops)
     vsb->ops.read_capacity = basic_ops->read_capacity;
     vsb->ops.read_usage = basic_ops->read_usage;
     vsb->ops.release = basic_ops->release;
+    vsb->ops.init_inode = basic_ops->init_inode;
 }
 
 static inline void

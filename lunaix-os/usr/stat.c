@@ -15,7 +15,7 @@ main(int argc, char* argv[])
 
     int fd = open(argv[1], FO_RDONLY | FO_NOFOLLOW);
     if (fd < 0) {
-        printf("fail to open %d\n", fd);
+        printf("fail to open %d\n", errno);
         return 1;
     }
 

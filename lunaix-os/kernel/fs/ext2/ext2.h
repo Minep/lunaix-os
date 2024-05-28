@@ -28,6 +28,7 @@ struct ext2b_super {
     u32_t s_wtime;
     
     u16_t s_mnt_cnt;
+    u16_t s_max_mnt_cnt;
     u16_t s_magic;
     u16_t s_state;
     u16_t s_error;
