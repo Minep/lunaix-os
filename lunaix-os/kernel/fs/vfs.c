@@ -419,7 +419,7 @@ vfs_d_alloc(struct v_dnode* parent, struct hstr* name)
     hstrcpy(&dnode->name, name);
 
     if (parent) {
-        vfs_i_assign_sb(dnode, parent->super_block);
+        vfs_d_assign_sb(dnode, parent->super_block);
         dnode->mnt = parent->mnt;
     }
 
@@ -617,7 +617,7 @@ vfs_do_open(const char* path, int options)
         memset(fd_s, 0, sizeof(*fd_s));
 
         ofile->f_pos = ofile->inode->fsize & -((options & FO_APPEND) != 0);
-        if (vfs_get_dtype(dentry) == DT_DIR) {
+        if (vfs_get_dtype(ofile->inode->itype) == DT_DIR) {
             ofile->f_pos = 0;
         }
         
@@ -790,18 +790,19 @@ __DEFINE_LXSYSCALL3(int, lseek, int, fd, int, offset, int, options)
     }
 
     struct v_file* file = fd_s->file;
+    struct v_inode* inode = file->inode;
 
     if (!file->ops->seek) {
         errno = ENOTSUP;
         goto done;
     }
 
-    lock_inode(file->inode);
+    lock_inode(inode);
 
     int overflow = 0;
     int fpos = file->f_pos;
 
-    if (vfs_get_dtype(file->dnode) == DT_DIR) {
+    if (vfs_get_dtype(inode->itype) == DT_DIR) {
         options = (options != FSEEK_END) ? options : FSEEK_SET;
     }
     
@@ -810,7 +811,7 @@ __DEFINE_LXSYSCALL3(int, lseek, int, fd, int, offset, int, options)
             overflow = sadd_overflow((int)file->f_pos, offset, &fpos);
             break;
         case FSEEK_END:
-            overflow = sadd_overflow((int)file->inode->fsize, offset, &fpos);
+            overflow = sadd_overflow((int)inode->fsize, offset, &fpos);
             break;
         case FSEEK_SET:
             fpos = offset;
@@ -824,7 +825,7 @@ __DEFINE_LXSYSCALL3(int, lseek, int, fd, int, offset, int, options)
         errno = file->ops->seek(file, fpos);
     }
 
-    unlock_inode(file->inode);
+    unlock_inode(inode);
 
 done:
     return DO_STATUS(errno);

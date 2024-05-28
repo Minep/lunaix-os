@@ -125,7 +125,7 @@ failed:
 }
 
 static int 
-ext2_umount(struct v_superblock* vsb, struct v_dnode* mnt)
+ext2_umount(struct v_superblock* vsb)
 {
     // TODO
     return 0;

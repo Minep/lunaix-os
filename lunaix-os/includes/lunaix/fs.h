@@ -396,6 +396,9 @@ struct v_superblock*
 vfs_sb_alloc();
 
 void
+vfs_sb_free(struct v_superblock* sb);
+
+void
 vfs_sb_ref(struct v_superblock* sb);
 
 #define vfs_assign_sb(sb_accessor, sb)      \
@@ -423,9 +426,6 @@ vfs_vmnt_assign_sb(struct v_mount* vmnt, struct v_superblock* sb)
 {
     vfs_assign_sb(vmnt->super_block, sb);
 }
-
-void
-vfs_sb_free(struct v_superblock* sb);
 
 struct v_dnode*
 vfs_d_alloc();
@@ -542,7 +542,7 @@ int
 default_file_close(struct v_file* file);
 
 int
-default_file_seek(struct v_inode* inode, size_t offset);
+default_file_seek(struct v_file* file, size_t offset);
 
 int
 default_inode_open(struct v_inode* this, struct v_file* file);

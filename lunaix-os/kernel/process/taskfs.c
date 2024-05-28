@@ -52,7 +52,7 @@ taskfs_readdir(struct v_file* file, struct dir_context* dctx)
 {
     struct v_inode* inode = file->inode;
     pid_t pid = inode->id >> 16;
-    int counter = 0;
+    unsigned int counter = 0;
 
     if ((inode->id & COUNTER_MASK)) {
         return ENOTDIR;

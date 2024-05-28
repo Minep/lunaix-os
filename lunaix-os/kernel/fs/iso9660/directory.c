@@ -47,20 +47,35 @@ iso9660_fill_drecache(struct iso_drecache* cache,
     }
 
 done:
-    if (!cache->name.len) {
-        // Load ISO9660 file id if no NM found.
-        u32_t l = drec->name.len;
-        while (l < (u32_t)-1 && drec->name.content[l--] != ';')
-            ;
-
-        l = (l + 1) ? l : drec->name.len;
-        l = MIN(l, ISO9660_IDLEN - 1);
-
-        strncpy(cache->name_val, (const char*)drec->name.content, l);
-
-        cache->name = HSTR(cache->name_val, l);
-        hstr_rehash(&cache->name, HSTR_FULL_HASH);
+    if (cache->name.len) {
+        return;
     }
+
+    // Load ISO9660 file id if no NM found.
+
+    ;
+    char name_val = drec->name.content[0];
+    u32_t l = drec->name.len;
+
+    if (l == 1 && !name_val) {
+        cache->name = vfs_dot;
+        return;
+    }
+    
+    if(l == 1 && name_val == 1) {
+        cache->name = vfs_ddot;
+        return;
+    }
+    
+    while (l < (u32_t)-1 && drec->name.content[l--] != ';')
+        ;
+
+    l = (l + 1) ? l : drec->name.len;
+    l = MIN(l, ISO9660_IDLEN - 1);
+
+    strncpy(cache->name_val, (const char*)drec->name.content, l);
+    cache->name = HSTR(cache->name_val, l);
+    hstr_rehash(&cache->name, HSTR_FULL_HASH);
 }
 
 int
@@ -170,7 +185,7 @@ iso9660_readdir(struct v_file* file, struct dir_context* dctx)
     {
         if (counter == file->f_pos && !(pos->flags & ISO_FHIDDEN)) {
             dctx->read_complete_callback(
-              dctx, pos->name_val, pos->name.len, __get_dtype(pos));
+              dctx, HSTR_VAL(pos->name), HSTR_LEN(pos->name), __get_dtype(pos));
             return 1;
         }
         counter++;

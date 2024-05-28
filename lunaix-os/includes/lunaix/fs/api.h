@@ -57,7 +57,7 @@ fsapi_complete_vsb(struct v_superblock* vsb, void* cfs_sb)
     assert_fs(vsb->blksize);
 
     vsb->data = cfs_sb;
-    vsb->blks = blkbuf_create(vsb->dev, vsb->blksize);
+    vsb->blks = blkbuf_create(block_dev(vsb->dev), vsb->blksize);
 }
 
 static inline bool

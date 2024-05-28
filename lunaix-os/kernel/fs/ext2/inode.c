@@ -161,7 +161,7 @@ ext2db_itend(struct ext2_iterator* iter)
 }
 
 bool
-ext2db_itnext(struct ext2_iterator* iter, struct v_inode* inode)
+ext2db_itnext(struct ext2_iterator* iter)
 {
     bbuf_t buf;
 
@@ -173,7 +173,7 @@ ext2db_itnext(struct ext2_iterator* iter, struct v_inode* inode)
         fsblock_put(iter->sel_buf);
     }
 
-    buf = ext2db_get(inode, iter->pos);
+    buf = ext2db_get(iter->inode, iter->pos);
     iter->sel_buf = buf;
 
     if (!buf || !ext2_itcheckbuf(iter)) {
@@ -217,7 +217,7 @@ ext2_fill_inode(struct v_inode* inode, ino_t ino_id)
     struct ext2_inode* ext2inode;
     struct ext2b_inode* b_ino;
     struct v_superblock* vsb;
-    unsigned int type;
+    unsigned int type = VFS_IFFILE;
     int errno = 0;
 
     vsb = inode->sb;
@@ -226,7 +226,7 @@ ext2_fill_inode(struct v_inode* inode, ino_t ino_id)
     if ((errno = ext2_get_inode(vsb, ino_id, &ext2inode))) {
         return errno;
     }
-    b_ino = &ext2inode->ino;
+    b_ino = ext2inode->ino;
     
     fsapi_inode_setid(inode, ino_id, ino_id);
     fsapi_inode_setsize(inode, b_ino->i_size);
@@ -388,15 +388,16 @@ ext2db_get(struct v_inode* inode, unsigned int data_pos)
     struct ext2_inode* e_inode;
     struct ext2b_inode* b_inode;
     unsigned int blkid;
-    unsigned int lg_ents = e_inode->inds_lgents;
+    unsigned int lg_ents;
 
     e_inode = EXT2_INO(inode);
     b_inode = e_inode->ino;
+    lg_ents = e_inode->inds_lgents;
 
     assert(data_pos);
 
     if (data_pos < 13) {
-        return fsblock_take(inode, b_inode->i_block.directs);
+        return fsblock_take(inode->sb, b_inode->i_block.directs[data_pos]);
     }
     
     blkid = data_pos - 12;

@@ -347,7 +347,7 @@ int
 iso9660_write_page(struct v_inode* inode, void* buffer, size_t fpos);
 
 int
-iso9660_seek(struct v_inode* inode, size_t offset);
+iso9660_seek(struct v_file* file, size_t offset);
 
 int
 isorr_parse_px(struct iso_drecache* cache, void* px_start);

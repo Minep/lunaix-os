@@ -5,7 +5,7 @@
 int
 ext2_open_inode(struct v_inode* this, struct v_file* file)
 {
-    int errno;
+    int errno = 0;
     struct ext2_file* e_file;
 
     e_file = valloc(sizeof(*e_file));
@@ -15,6 +15,8 @@ ext2_open_inode(struct v_inode* this, struct v_file* file)
         errno = ext2dr_open(this, file);
         goto done;
     }
+
+    // TODO anything for regular file?
 
 done:
     if (errno) {

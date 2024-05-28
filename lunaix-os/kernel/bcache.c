@@ -69,7 +69,7 @@ bcache_init_zone(struct bcache* cache, bcache_zone_t lru, unsigned int log_ways,
 }
 
 bcobj_t
-bcache_put(struct bcache* cache, unsigned long tag, void* block)
+bcache_put_and_ref(struct bcache* cache, unsigned long tag, void* block)
 {
     struct bcache_node* node;
 

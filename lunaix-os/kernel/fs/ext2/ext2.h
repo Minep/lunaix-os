@@ -109,7 +109,7 @@ struct ext2b_dirent
     u16_t rec_len;
     u8_t name_len;
     u8_t file_type;
-    u8_t name[256];
+    char name[256];
 } align(4) compact;
 #define EXT2_DRE(v_dnode) (fsapi_impl_data(v_dnode, struct ext2b_dirent))
 
@@ -145,13 +145,13 @@ struct ext2_sbinfo
         16 sets, 256 ways, capacity 4096 blocks
 */
 
-#define BTLB_SETS        16
 struct ext2_btlb_entry
 {
     unsigned int tag;
     bbuf_t block;
 };
 
+#define BTLB_SETS        16
 struct ext2_btlb
 {
     struct ext2_btlb_entry buffer[BTLB_SETS];
@@ -253,7 +253,7 @@ ext2_itcheckbuf(struct ext2_iterator* iter) {
 }
 
 #define itstate_sel(iter, value)    \
-    (ext2_iterror(iter) ? EIO : (value))
+    (ext2_iterror(iter) ? EIO : (int)(value))
 
 
 /* ************ Block Group ************ */

@@ -165,7 +165,7 @@ int
 __twifs_iterate_dir(struct v_file* file, struct dir_context* dctx)
 {
     struct twifs_node* twi_node = (struct twifs_node*)(file->inode->data);
-    int counter = 2;
+    unsigned int counter = 2;
     struct twifs_node *pos, *n;
 
     if (fsapi_handle_pseudo_dirent(file, dctx)) {

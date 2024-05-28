@@ -211,5 +211,5 @@ ext2dr_seek(struct v_file* file, size_t offset)
 
     fpos = ext2dr_itffw(iter, offset);
 
-    return itstate_sel(&iter, 0);
+    return itstate_sel(iter, 0);
 }

@@ -1,4 +1,4 @@
-#include <lunaix/fs.h>
+#include <lunaix/fs/api.h>
 
 int
 default_file_close(struct v_file* file)
@@ -46,7 +46,7 @@ default_file_write_page(struct v_inode* inode, void* buffer, size_t fpos)
 int
 default_file_readdir(struct v_file* file, struct dir_context* dctx)
 {
-    int i = 0;
+    unsigned int i = 0;
     struct v_dnode *pos, *n;
 
     if (fsapi_handle_pseudo_dirent(file, dctx)) {

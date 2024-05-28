@@ -49,7 +49,7 @@ __blkbuf_do_try_release(struct bcache* bc, void* data)
     struct blk_buf* buf;
 
     buf = (struct blk_buf*)data;
-    req = &buf->breq;
+    req = buf->breq;
 
     if (llist_empty(&buf->dirty)) {
         __blkbuf_evict_callback(req);
@@ -80,6 +80,8 @@ __blkbuf_take_slow(struct blkbuf_cache* bc, unsigned int block_id)
     data = valloc(bc->blksize);
 
     vbuf = vbuf_alloc(NULL, data, bc->blksize);
+
+    buf = (struct blk_buf*)cake_grab(bb_pile);
     req = blkio_vreq(vbuf, __tolba(bc, block_id), NULL, buf, 0);
 
     blkio_setread(req);
@@ -88,10 +90,10 @@ __blkbuf_take_slow(struct blkbuf_cache* bc, unsigned int block_id)
 
     if (req->errcode) {
         ERROR("block io error (0x%x)", req->errcode);
+        cake_release(bb_pile, buf);
         return (bbuf_t)INVL_BUFFER;
     }
 
-    buf = (struct blk_buf*)cake_grab(bb_pile);
     buf->raw = data;
     buf->cobj = bcache_put_and_ref(&bc->cached, block_id, buf);
     buf->breq = req;
@@ -111,6 +113,8 @@ blkbuf_create(struct block_dev* blkdev, unsigned int blk_size)
 
     bcache_init_zone(&bb_cache->cached, bb_zone, 3, -1, blk_size, &cache_ops);
     llist_init_head(&bb_cache->dirty);
+
+    return bb_cache;
 }
 
 bbuf_t

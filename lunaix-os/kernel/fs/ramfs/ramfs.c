@@ -86,7 +86,7 @@ __ramfs_mknod(struct v_dnode* dnode, struct v_inode** nod_out, u32_t flags)
 int
 ramfs_readdir(struct v_file* file, struct dir_context* dctx)
 {
-    int i = 2;
+    unsigned int i = 2;
     struct v_dnode *pos, *n;
 
     if (fsapi_handle_pseudo_dirent(file, dctx)) {

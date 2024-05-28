@@ -90,32 +90,8 @@ bcache_init_zone(struct bcache* cache, bcache_zone_t zone,
 bcache_zone_t
 bcache_create_zone(char* name);
 
-/**
- * @brief Create a block cache
- * 
- * @param cache to be initialized
- * @param name name of this cache
- * @param log_ways ways-associative of this cache
- * @param cap capacity of this cache, -1 for 'infinity' cache
- * @param blk_size size of each cached object
- * @param ops block cache operation
- */
-static inline void
-bcache_init(struct bcache* cache, char* name, unsigned int log_ways, 
-            int cap, unsigned int blk_size, struct bcache_ops* ops)
-{
-    bcache_init_zone(cache, bcache_create_zone(name), 
-                     log_ways, cap, blk_size, ops);
-}
-
 bcobj_t
 bcache_put_and_ref(struct bcache* cache, unsigned long tag, void* block);
-
-static inline void
-bcache_put(struct bcache* cache, unsigned long tag, void* block)
-{
-    bcache_return(bcache_put_and_ref(cache, tag, block));
-}
 
 /**
  * @brief Try look for a hit and return the reference to block.
@@ -175,5 +151,29 @@ bcache_free(struct bcache* cache);
 
 void
 bcache_zone_free(bcache_zone_t zone);
+
+/**
+ * @brief Create a block cache
+ * 
+ * @param cache to be initialized
+ * @param name name of this cache
+ * @param log_ways ways-associative of this cache
+ * @param cap capacity of this cache, -1 for 'infinity' cache
+ * @param blk_size size of each cached object
+ * @param ops block cache operation
+ */
+static inline void
+bcache_init(struct bcache* cache, char* name, unsigned int log_ways, 
+            int cap, unsigned int blk_size, struct bcache_ops* ops)
+{
+    bcache_init_zone(cache, bcache_create_zone(name), 
+                     log_ways, cap, blk_size, ops);
+}
+
+static inline void
+bcache_put(struct bcache* cache, unsigned long tag, void* block)
+{
+    bcache_return(bcache_put_and_ref(cache, tag, block));
+}
 
 #endif /* __LUNAIX_BCACHE_H */

@@ -1,3 +1,5 @@
+#include <lunaix/mm/valloc.h>
+
 #include "ext2.h"
 
 void
