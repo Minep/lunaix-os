@@ -198,7 +198,7 @@ pcache_read(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
 {
     int errno = 0;
     unsigned int tag, off, rd_cnt;
-    unsigned int end = fpos + len;
+    unsigned int end = fpos + len, size = 0;
     struct pcache* pcache;
     struct pcache_pg* pg;
     bcobj_t obj;
@@ -208,7 +208,6 @@ pcache_read(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
     while (fpos < page_upaligned(end)) {
         tag = pfn(fpos);
         off = va_offset(fpos);
-        rd_cnt = MIN(end - fpos, PAGE_SIZE - off);
 
         obj = __getpage_and_lock(pcache, tag, &pg);
 
@@ -221,6 +220,7 @@ pcache_read(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
             end -= (PAGE_SIZE - errno);
         }
 
+        rd_cnt = MIN(end - fpos, PAGE_SIZE - off);
         memcpy(data, pg->data + off, rd_cnt);
 
         if (obj) {
@@ -230,10 +230,11 @@ pcache_read(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
         }
 
         data += rd_cnt;
+        size += rd_cnt;
         fpos = page_aligned(fpos + PAGE_SIZE);
     }
 
-    return errno < 0 ? errno : (int)((fpos + len) - end);
+    return errno < 0 ? errno : (int)size;
 }
 
 void

@@ -33,6 +33,10 @@ main(int argc, const char* argv[])
 
         do {
             size = read(fd, buffer, BUFSIZE);
+            if (size < 0) {
+                printf("error while reading: %d\n", size);
+                break;
+            }
             write(stdout, buffer, size);
         } while (size == BUFSIZE);
 

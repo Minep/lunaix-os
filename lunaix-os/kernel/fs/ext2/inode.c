@@ -126,10 +126,14 @@ __btlb_flushall(struct v_inode* inode)
 void
 ext2db_itbegin(struct ext2_iterator* iter, struct v_inode* inode)
 {
+    struct ext2b_inode* b_ino;
+
+    b_ino = EXT2_INO(inode)->ino;
     *iter = (struct ext2_iterator){
         .pos = 0,
         .inode = inode,
-        .blksz = inode->sb->blksize
+        .blksz = inode->sb->blksize,
+        .end_pos = ICEIL(b_ino->i_size, inode->sb->blksize)
     };
 }
 
@@ -166,6 +170,10 @@ ext2db_itnext(struct ext2_iterator* iter)
     bbuf_t buf;
 
     if (unlikely(iter->has_error)) {
+        return false;
+    }
+
+    if (unlikely(iter->pos > iter->end_pos)) {
         return false;
     }
 

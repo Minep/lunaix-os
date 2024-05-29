@@ -193,6 +193,7 @@ struct ext2_iterator
 
     unsigned int pos;
     unsigned int blksz;
+    unsigned int end_pos;
     bbuf_t sel_buf;
 };
 

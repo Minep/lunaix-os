@@ -60,11 +60,13 @@ ext2_inode_read(struct v_inode *inode, void *buffer, size_t len, size_t fpos)
 {
     struct ext2_sbinfo* e_sb;
     struct ext2_iterator iter;
+    struct ext2b_inode* b_ino;
     unsigned int off;
     unsigned int end;
     unsigned int sz = 0, blksz, movsz;
     
     e_sb = EXT2_SB(inode->sb);
+    b_ino = EXT2_INO(inode)->ino;
     blksz = e_sb->block_size;
     end = fpos + len;
 
@@ -78,12 +80,12 @@ ext2_inode_read(struct v_inode *inode, void *buffer, size_t len, size_t fpos)
         memcpy(buffer, offset(iter.data, off), movsz);
 
         buffer = offset(buffer, movsz);
-        fpos += blksz - off;
+        fpos += movsz;
         sz += movsz;
     }
 
     ext2db_itend(&iter);
-    return itstate_sel(&iter, sz);
+    return itstate_sel(&iter, MIN(sz, b_ino->i_size));
 }
 
 int
@@ -91,16 +93,18 @@ ext2_inode_read_page(struct v_inode *inode, void *buffer, size_t fpos)
 {
     struct ext2_sbinfo* e_sb;
     struct ext2_iterator iter;
+    struct ext2b_inode* b_ino;
     unsigned int blk_start, n, 
-                 transfer_sz, total_sz;
+                 transfer_sz, total_sz = 0;
 
     assert(!va_offset(fpos));
 
     e_sb = EXT2_SB(inode->sb);
+    b_ino = EXT2_INO(inode)->ino;
     
     blk_start = fpos / e_sb->block_size;
-    n = PAGE_SIZE / e_sb->block_size + 1;
-    transfer_sz = MIN(PAGE_SHIFT, e_sb->block_size);
+    n = PAGE_SIZE / e_sb->block_size;
+    transfer_sz = MIN(PAGE_SIZE, e_sb->block_size);
 
     ext2db_itbegin(&iter, inode);
     ext2db_itffw(&iter, blk_start);
@@ -113,7 +117,7 @@ ext2_inode_read_page(struct v_inode *inode, void *buffer, size_t fpos)
     }
     
     ext2db_itend(&iter);
-    return itstate_sel(&iter, total_sz);
+    return itstate_sel(&iter, MIN(total_sz, b_ino->i_size));
 }
 
 int
