@@ -14,6 +14,7 @@
 #define BLKIO_PENDING 0x8
 
 #define BLKIO_WAIT 0x1
+#define BLKIO_NOWAIT 0
 #define BLKIO_NOASYNC 0x2
 
 // Free on complete
@@ -138,6 +139,10 @@ blkio_bindctx(struct blkio_req* req, struct blkio_context* ctx)
 static inline void
 blkio_setread(struct blkio_req* req)
 {
+    if ((req->flags | BLKIO_PENDING)) {
+        return;
+    }
+    
     req->flags &= ~BLKIO_WRITE;
 }
 
@@ -150,6 +155,10 @@ blkio_setread(struct blkio_req* req)
 static inline void
 blkio_setwrite(struct blkio_req* req)
 {
+    if ((req->flags | BLKIO_PENDING)) {
+        return;
+    }
+
     req->flags |= BLKIO_WRITE;
 }
 

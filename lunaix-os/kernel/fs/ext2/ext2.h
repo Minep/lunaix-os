@@ -89,12 +89,20 @@ struct ext2b_inode
     u32_t i_flags;
     u32_t i_osd1;
 
-    struct 
-    {
-        u32_t directs[12];  // directum
-        u32_t ind1;         // prima indirecta
-        u32_t ind23[2];     // secunda et tertia indirecta
-    } i_block;
+    union {
+        struct 
+        {
+            u32_t directs[12];  // directum
+            union {
+                struct {
+                    u32_t ind1;         // prima indirecta
+                    u32_t ind23[2];     // secunda et tertia indirecta
+                };
+                u32_t inds[3];
+            };
+        } i_block;
+        u32_t i_block_arr[15];
+    };
 
     u32_t i_gen;
     u32_t i_file_acl;
@@ -113,6 +121,23 @@ struct ext2b_dirent
     char name[256];
 } align(4) compact;
 #define EXT2_DRE(v_dnode) (fsapi_impl_data(v_dnode, struct ext2b_dirent))
+
+
+#define GDESC_INO_SEL 0
+#define GDESC_BLK_SEL 1
+
+#define GDESC_FREE_LISTS                        \
+    union {                                     \
+        struct {                                \
+            struct llist_header free_grps_ino;  \
+            struct llist_header free_grps_blk;  \
+        };                                      \
+        struct llist_header free_list_sel[2];   \
+    }
+
+#define check_gdesc_type_sel(sel)                               \
+    assert_msg(sel == GDESC_INO_SEL || sel == GDESC_BLK_SEL,    \
+                "invalid type_sel");
 
 struct ext2_sbinfo 
 {
@@ -133,8 +158,44 @@ struct ext2_sbinfo
     
     struct ext2b_super raw;
     bbuf_t* gdt_frag;
+    struct bcache gd_caches;
+
+    struct {
+        struct llist_header gds;
+        GDESC_FREE_LISTS;
+    };
 };
 #define EXT2_SB(vsb) (fsapi_impl_data(vsb, struct ext2_sbinfo))
+
+
+struct ext2_bmp
+{
+    bbuf_t raw;
+    u8_t* bmp;
+    unsigned int nr_bytes;
+    int next_free;
+};
+
+struct ext2_gdesc
+{
+    struct llist_header groups;
+    GDESC_FREE_LISTS;
+
+    union {
+        struct {
+            struct ext2_bmp ino_bmp;
+            struct ext2_bmp blk_bmp;
+        };
+        struct ext2_bmp bmps[2];
+    };
+
+    unsigned int base;
+
+    struct ext2b_gdesc* info;
+    struct ext2_sbinfo* sb;
+    bbuf_t buf;
+    bcobj_t cache_ref;
+};
 
 /*
     Indriection Block Translation Look-aside Buffer
@@ -160,11 +221,22 @@ struct ext2_btlb
 
 struct ext2_inode
 {
-    bbuf_t inotab;
-    unsigned int inds_lgents;
-    unsigned int nr_blocks;
-    struct ext2b_inode* ino;
-    struct ext2_btlb* btlb;
+    bbuf_t buf;                  // partial inotab that holds this inode
+    unsigned int inds_lgents;       // log2(# of block in an indirection level)
+
+    struct ext2b_inode* ino;        // raw ext2 inode
+    struct ext2_btlb* btlb;         // block-TLB
+    struct ext2_gdesc* blk_grp;     // block group
+
+    union {
+        struct {
+            /*
+                dirent fragmentation degree, we will perform
+                full reconstruction on dirent table when this goes too high.
+            */
+            unsigned int dir_fragdeg;
+        }; 
+    };
 
     // prefetched block for 1st order of indirection
     bbuf_t ind_ord1;
@@ -205,23 +277,23 @@ struct ext2_file
 #define EXT2_FILE(v_file) (fsapi_impl_data(v_file, struct ext2_file))
 
 static inline unsigned int
-ext2_datablock(struct ext2_sbinfo* sb, unsigned int id)
+ext2_datablock(struct v_superblock* vsb, unsigned int id)
 {
-    return sb->raw.s_first_data_cnt + id;
+    return EXT2_SB(vsb)->raw.s_first_data_cnt + id;
 }
 
 
 /* ************   Inodes   ************ */
 
 void
-ext2_init_inode(struct v_superblock* vsb, struct v_inode* inode);
+ext2ino_init(struct v_superblock* vsb, struct v_inode* inode);
 
 int
-ext2_get_inode(struct v_superblock* vsb, 
+ext2ino_get(struct v_superblock* vsb, 
                unsigned int ino, struct ext2_inode** out);
 
 int
-ext2_fill_inode(struct v_inode* inode, ino_t ino_id);
+ext2ino_fill(struct v_inode* inode, ino_t ino_id);
 
 bbuf_t
 ext2db_get(struct v_inode* inode, unsigned int data_pos);
@@ -267,8 +339,13 @@ void
 ext2gd_release_gdt(struct v_superblock* vsb);
 
 int
-ext2gd_desc_at(struct v_superblock* vsb, 
-               unsigned int index, struct ext2b_gdesc** out);
+ext2gd_take(struct v_superblock* vsb, 
+               unsigned int index, struct ext2_gdesc** out);
+
+static inline void
+ext2gd_put(struct ext2_gdesc* gd) {
+    bcache_return(gd->cache_ref);
+}
 
 
 /* ************ Directory ************ */
@@ -323,5 +400,115 @@ ext2_inode_write(struct v_inode *inode, void *buffer, size_t len, size_t fpos);
 
 int
 ext2_inode_write_page(struct v_inode *inode, void *buffer, size_t fpos);
+
+/* ***********   Bitmap   *********** */
+
+void
+ext2bmp_init(struct ext2_bmp* e_bmp, bbuf_t bmp_buf, unsigned int nr_bits);
+
+bool
+ext2bmp_check_free(struct ext2_bmp* e_bmp);
+
+int
+ext2bmp_alloc_one(struct ext2_bmp* e_bmp);
+
+void
+ext2bmp_free_one(struct ext2_bmp* e_bmp, unsigned int pos);
+
+void
+ext2bmp_discard(struct ext2_bmp* e_bmp);
+
+/* ***********   Allocations   *********** */
+
+#define ALLOC_FAIL -1
+
+static inline bool
+valid_bmp_slot(int slot)
+{
+    return slot != ALLOC_FAIL;
+}
+
+int
+ext2gd_alloc_slot(struct ext2_gdesc* gd, int type_sel);
+
+void
+ext2gd_free_slot(struct ext2_gdesc* gd, int type_sel, int slot);
+
+static inline int
+ext2gd_alloc_inode(struct ext2_gdesc* gd) 
+{
+    return ext2gd_alloc_slot(gd, GDESC_INO_SEL);
+}
+
+static inline int
+ext2gd_alloc_block(struct ext2_gdesc* gd) 
+{
+    return ext2gd_alloc_slot(gd, GDESC_BLK_SEL);
+}
+
+static inline void
+ext2gd_free_inode(struct ext2_gdesc* gd, int slot) 
+{
+    ext2gd_free_slot(gd, GDESC_INO_SEL, slot);
+}
+
+static inline void
+ext2gd_free_block(struct ext2_gdesc* gd, int slot) 
+{
+    ext2gd_free_slot(gd, GDESC_BLK_SEL, slot);
+}
+
+
+/**
+ * @brief Allocate a free inode
+ * 
+ * @param vsb 
+ * @param hint locality hint
+ * @param out 
+ * @return int 
+ */
+int
+ext2ino_alloc(struct v_superblock* vsb, 
+                 struct ext2_inode* hint, struct ext2_inode** out);
+
+/**
+ * @brief Allocate a free data block
+ * 
+ * @param inode inode where the data block goes, also used as locality hint
+ * @return bbuf_t 
+ */
+int
+ext2db_alloc(struct v_inode* inode, bbuf_t* out);
+
+/**
+ * @brief free an inode
+ * 
+ * @param vsb 
+ * @param hint locality hint
+ * @param out 
+ * @return int 
+ */
+int
+ext2ino_free(struct v_superblock* vsb, 
+                 struct ext2_inode* inode);
+
+/**
+ * @brief Free a data block
+ * 
+ * @param inode inode where the data block goes, also used as locality hint
+ * @return bbuf_t 
+ */
+int
+ext2db_free(struct v_inode* inode, bbuf_t buf);
+
+int
+ext2ino_alloc_slot(struct v_superblock* vsb, struct ext2_gdesc** gd_out);
+
+int
+ext2db_alloc_slot(struct v_superblock* vsb, struct ext2_gdesc** gd_out);
+
+
+
+extern bcache_zone_t gdesc_bcache_zone;
 
 #endif /* __LUNAIX_EXT2_H */

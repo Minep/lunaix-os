@@ -39,6 +39,24 @@ blkbuf_errbuf(bbuf_t buf) {
     return (ptr_t)buf == INVL_BUFFER;
 }
 
+static inline unsigned int
+blkbuf_id(bbuf_t buf) 
+{
+    return to_bcache_node(((struct blk_buf*)buf)->cobj)->tag;
+}
+
+static inline unsigned int
+blkbuf_refcounts(bbuf_t buf) 
+{
+    return to_bcache_node(((struct blk_buf*)buf)->cobj)->refs;
+}
+
+static inline bool
+blkbuf_not_shared(bbuf_t buf)
+{
+    return blkbuf_refcounts(buf) == 1;
+}
+
 
 struct blkbuf_cache*
 blkbuf_create(struct block_dev* blkdev, unsigned int blk_size);
@@ -65,22 +83,11 @@ blkbuf_data(bbuf_t buf)
 #define block_buffer(buf, type) \
     ((type*)blkbuf_data(buf))
 
-static inline void
-blkbuf_mark_dirty(bbuf_t buf)
-{
-    struct blk_buf* bbuf;
-    struct blkbuf_cache* bc;
-    
-    bbuf = ((struct blk_buf*)buf);
-    bc = bcache_holder_embed(bbuf->cobj, struct blkbuf_cache, cached);
-    
-    if (llist_empty(&bbuf->dirty)) {
-        llist_append(&bc->dirty, &bbuf->dirty);
-    }
-}
+void
+blkbuf_dirty(bbuf_t buf);
 
 void
-blkbuf_sync(bbuf_t buf);
+blkbuf_schedule_sync(bbuf_t buf);
 
 void
 blkbuf_release(struct blkbuf_cache* bc);

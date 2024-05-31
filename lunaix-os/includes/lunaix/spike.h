@@ -91,7 +91,7 @@
 #define assert_msg_p(cond, prefix, msg)                                        \
     do {                                                                       \
         if (unlikely(!(cond))) {                                               \
-            __assert_fail(prefix msg, __FILE__, __LINE__);                     \
+            __assert_fail(prefix ":" msg, __FILE__, __LINE__);                     \
         }                                                                      \
     } while(0)
 
@@ -102,6 +102,7 @@
     } while(0)
 
 #define fail(msg) __assert_fail(msg, __FILE__, __LINE__);
+#define fail_p(msg, prefix) fail(prefix msg);
 
 void
 __assert_fail(const char* expr, const char* file, unsigned int line)

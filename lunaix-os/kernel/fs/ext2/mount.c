@@ -57,7 +57,7 @@ ext2_rd_usage(struct v_superblock* vsb)
 struct fsapi_vsb_ops vsb_ops = {
     .read_capacity = ext2_rd_capacity,
     .read_usage = ext2_rd_usage,
-    .init_inode = ext2_init_inode,
+    .init_inode = ext2ino_init,
     .release = __vsb_release
 };
 
@@ -114,7 +114,7 @@ ext2_mount(struct v_superblock* vsb, struct v_dnode* mnt)
     
     root_inode = vfs_i_alloc(vsb);
 
-    ext2_fill_inode(root_inode, EXT2_ROOT_INO);
+    ext2ino_fill(root_inode, EXT2_ROOT_INO);
     vfs_assign_inode(mnt, root_inode);
 
     return 0;
@@ -140,6 +140,8 @@ ext2_init()
     fs->types |= FSTYPE_ROFS;
     fs->mount = ext2_mount;
     fs->unmount = ext2_umount;
+
+    gdesc_bcache_zone = bcache_create_zone("ext2_gdesc");
 
     fsm_register(fs);
 }

@@ -122,10 +122,14 @@ sh_exec(const char* name, const char** argv)
         return;
     }
 
+    char buffer[1024];
+    strcpy(buffer, "/usr/bin/");
+    strcpy(&buffer[9], name);
+
     pid_t p;
     int res;
     if (!(p = fork())) {
-        if (execve(name, argv, NULL)) {
+        if (execve(buffer, argv, NULL)) {
             sh_printerr();
         }
         _exit(1);

@@ -127,7 +127,7 @@ done:
 
     if (!(dir_inode = vfs_i_find(inode->sb, dir->inode))) { 
         dir_inode = vfs_i_alloc(inode->sb);
-        ext2_fill_inode(dir_inode, dir->inode);
+        ext2ino_fill(dir_inode, dir->inode);
     }
 
     vfs_assign_inode(dnode, dir_inode);

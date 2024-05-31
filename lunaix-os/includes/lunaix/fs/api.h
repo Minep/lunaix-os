@@ -143,16 +143,65 @@ fsapi_dir_report(struct dir_context *dctx,
     dctx->read_complete_callback(dctx, name, len, dtype);
 }
 
+/**
+ * @brief Get a block with file-system defined block size
+ *        from underlying storage medium at given block id
+ *        (block address). Depending on the device attribute,
+ *        it may or may not go through the block cache layer.
+ * 
+ * @param vsb super-block
+ * @param block_id block address
+ * @return bbuf_t 
+ */
 static inline bbuf_t
 fsblock_take(struct v_superblock* vsb, unsigned int block_id)
 {
     return blkbuf_take(vsb->blks, block_id);
 }
 
+/**
+ * @brief put the block back into cache, recommend to pair with
+ *        fsblock_take. Properly pairing will allow Lunaix to 
+ *        recycle the dangling fsblock more efficient
+ * 
+ * @param blkbuf 
+ */
 static inline void
 fsblock_put(bbuf_t blkbuf)
 {
     return blkbuf_put(blkbuf);
+}
+
+/**
+ * @brief Mark the block dirty and require scheduling a device 
+ *        write request to sync it with underlying medium. Lunaix
+ *        will do the scheduling when it sees fit.
+ * 
+ * @param blkbuf 
+ */
+static inline void
+fsblock_dirty(bbuf_t blkbuf)
+{
+    return blkbuf_dirty(blkbuf);
+}
+
+/**
+ * @brief Manually trigger a sync cycle, regardless the
+ *        dirty property.
+ * 
+ * @param blkbuf 
+ */
+static inline void
+fsblock_sync(bbuf_t blkbuf)
+{
+    /*
+        XXX delay the sync for better write aggregation
+        scheduled sync event may happened immediately (i.e., blkio queue is
+        empty or nearly empty), any susequent write to the same blkbuf must
+        schedule another write. Which could thrash the disk IO when intensive
+        workload
+    */
+    return blkbuf_schedule_sync(blkbuf);
 }
 
 static inline bool

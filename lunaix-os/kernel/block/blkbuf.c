@@ -143,13 +143,29 @@ blkbuf_put(bbuf_t buf)
 }
 
 void
-blkbuf_sync(bbuf_t buf)
+blkbuf_dirty(bbuf_t buf)
+{
+    assert(!blkbuf_errbuf(buf));
+
+    struct blk_buf* bbuf;
+    struct blkbuf_cache* bc;
+    
+    bbuf = ((struct blk_buf*)buf);
+    bc = bcache_holder_embed(bbuf->cobj, struct blkbuf_cache, cached);
+    
+    if (llist_empty(&bbuf->dirty)) {
+        llist_append(&bc->dirty, &bbuf->dirty);
+    }
+}
+
+void
+blkbuf_schedule_sync(bbuf_t buf)
 {
     struct blk_buf* bbuf;
     bbuf = to_blkbuf(buf);
 
     blkio_setwrite(bbuf->breq);
-    blkio_commit(bbuf->breq, BLKIO_WAIT);
+    blkio_commit(bbuf->breq, BLKIO_NOWAIT);
 }
 
 void

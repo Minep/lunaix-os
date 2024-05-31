@@ -77,6 +77,7 @@
     })
 
 #define assert_fs(cond) assert_p(cond, "FS")
+#define fail_fs(msg) fail_p(msg, "FS")
 
 typedef u32_t inode_t;
 

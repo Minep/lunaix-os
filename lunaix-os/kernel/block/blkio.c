@@ -79,6 +79,11 @@ blkio_commit(struct blkio_req* req, int options)
 {
     struct blkio_context* ctx;
 
+    if ((req->flags & BLKIO_PENDING)) {
+        // prevent double submition
+        return;
+    }
+
     assert(req->io_ctx);
 
     ctx = req->io_ctx;
