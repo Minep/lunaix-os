@@ -11,6 +11,13 @@
 #define IMODE_IFCHR     0x2000
 #define IMODE_IFFIFO    0x1000
 
+struct walk_state
+{
+    unsigned int* slot_ref;
+    bbuf_t table;
+    int indirections;
+    int level;
+};
 
 static struct v_inode_ops ext2_inode_ops = {
     .dir_lookup = ext2dr_lookup,
@@ -97,7 +104,7 @@ __btlb_hit(struct v_inode* inode, unsigned int blkid)
             return blkbuf_refonce(btlbe->block);
         }
     }
-
+ 
     return NULL;
 }
 
@@ -490,94 +497,187 @@ ext2ino_free(struct v_superblock* vsb, struct ext2_inode* inode)
     return errno;
 }
 
-static inline bbuf_t
-__follow_indrect(struct v_inode* inode, bbuf_t buf, unsigned int blkid)
+
+/**
+ * @brief Walk the indrection chain given the position of data block
+ *        relative to the inode. Upon completed, walk_state will be
+ *        populated with result. On error, walk_state is untouched.
+ * 
+ *        Note, the result will always be one above the stopping level. 
+ *        That means, if your pos is pointed directly to file-content block
+ *        (i.e., a leaf block), then the state is the indirect block that
+ *        containing the ID of that leaf block.
+ *        
+ *        If `resolve` is set, it will resolve any absence encountered
+ *        during the walk by allocating and chaining indirect block.
+ *        It require the file system is mounted writable.
+ * 
+ * @param inode 
+ * @param pos 
+ * @param state 
+ * @param resolve 
+ * @return int 
+ */
+static int
+__walk_indirects(struct v_inode* inode, unsigned int pos,
+                 struct walk_state* state, bool resolve)
 {
-    if (unlikely(!buf)) {
-        return NULL;
-    }
-
-    if (unlikely(blkbuf_errbuf(buf))) {
-        return buf;
-    }
-
-    blkid = blkid % (1 << EXT2_INO(inode)->inds_lgents);
-
-    unsigned int i = block_buffer(buf, unsigned int)[blkid];
-    fsblock_put(buf);
-
-    return i ? fsblock_take(inode->sb, i) : NULL;
-}
-
-static bbuf_t
-__get_datablock_at(struct v_inode* inode,
-                   unsigned int blkid, int ind_order)
-{
+    int errno;
+    int inds, stride, shifts, level;
+    unsigned int *slotref, index, next, mask;
     struct ext2_inode* e_inode;
-    unsigned int ind_block, lg_ents;
-    bbuf_t indirect;
+    struct ext2b_inode* b_inode;
+    struct v_superblock* vsb;
+    bbuf_t table, next_table;
 
     e_inode = EXT2_INO(inode);
-    lg_ents = e_inode->inds_lgents;
+    b_inode = e_inode->ino;
+    vsb = inode->sb;
+    level = 0;
+    resolve = resolve && !EXT2_SB(vsb)->read_only;
 
-    if (ind_order == 1) {
-        indirect = e_inode->ind_ord1;
-        goto done;
+    if (pos < 12) {
+        index = pos;
+        slotref = &b_inode->i_block_arr[pos];
+        table = blkbuf_refonce(e_inode->buf);
+        inds = 0;
+        goto _return;
     }
 
-    if ((indirect = __btlb_hit(inode, blkid))) {
-        goto done;
+    pos -= 12;
+    stride = e_inode->inds_lgents;
+    if (!(pos >> stride)) {
+        inds = 1;
+    }
+    else if (!(pos >> (stride * 2))) {
+        inds = 2;
+    }
+    else if (!(pos >> (stride * 3))) {
+        inds = 3;
+    }
+    else {
+        fail("unrealistic block pos");
     }
 
-    ind_order -= 2;
-    ind_block = e_inode->ino->i_block.ind23[ind_order];
-    if (!ind_block) {
-        return NULL;
+    // bTLB cache the last level indirect block
+    if ((table = __btlb_hit(inode, pos))) {
+        level = inds;
+        index = pos & ((1 << stride) - 1);
+        slotref = &block_buffer(table, u32_t)[index];
+        goto _return;
     }
 
-    indirect = fsblock_take(inode->sb, ind_block);
+    shifts = stride * (inds - 1);
+    mask = ((1 << stride) - 1) << shifts;
 
-    if (ind_order)
+    slotref = &b_inode->i_block.inds[inds - 1];
+    table = blkbuf_refonce(e_inode->buf);
+
+    for (; level < inds; level++)
     {
-        blkid >>= lg_ents;
-        indirect = __follow_indrect(inode, indirect, blkid);
+        next = *slotref;
+        if (!next) {
+            if (!resolve) {
+                goto _return;
+            }
+
+            if ((errno = ext2db_alloc(inode, &next_table))) {
+                return errno;
+            }
+
+            *slotref = fsblock_id(next_table);
+            fsblock_dirty(table);
+        }
+        else {
+            next_table = fsblock_take(vsb, next);
+        }
+
+        fsblock_put(table);
+        table = next_table;
+
+        if (blkbuf_errbuf(table)) {
+            return EIO;
+        }
+
+        assert(shifts >= 0);
+
+        index = (pos & mask) >> shifts;
+        slotref = &block_buffer(table, u32_t)[index];
+
+        shifts -= stride;
+        mask  = mask >> stride;
     }
 
-    if (indirect) {
-        __btlb_insert(inode, blkid, indirect);
-    }
-    
-done:
-    return __follow_indrect(inode, indirect, blkid);
+    __btlb_insert(inode, pos, table);
+
+_return:
+    assert_fs(table);
+    assert_fs(slotref);
+
+    state->slot_ref = slotref;
+    state->table = table;
+    state->level = level;
+    state->indirections = inds;
+
+    return 0;
 }
 
 bbuf_t
 ext2db_get(struct v_inode* inode, unsigned int data_pos)
 {
-    struct ext2_inode* e_inode;
-    struct ext2b_inode* b_inode;
+    int errno;
     unsigned int blkid;
-    unsigned int lg_ents;
+    struct walk_state state;
 
-    e_inode = EXT2_INO(inode);
-    b_inode = e_inode->ino;
-    lg_ents = e_inode->inds_lgents;
+    assert_fs(data_pos < 15);
 
-    assert(data_pos < 15);
-
-    if (data_pos < 13) {
-        return fsblock_take(inode->sb, b_inode->i_block.directs[data_pos]);
-    }
-    
-    blkid = data_pos - 12;
-
-    int i = 0;
-    while (blkid) {
-        blkid >>= lg_ents;
-        i++;
+    errno = __walk_indirects(inode, data_pos, &state, false);
+    if (errno) {
+        return (bbuf_t)INVL_BUFFER;
     }
 
-    return __get_datablock_at(inode, data_pos, i);
+    fsblock_put(state.table);
+
+    blkid = *state.slot_ref;
+    if (!blkid) {
+        return NULL;
+    }
+
+    return fsblock_take(inode->sb, blkid);
+}
+
+int
+ext2db_acquire(struct v_inode* inode, unsigned int data_pos, bbuf_t* out)
+{
+    int errno = 0;
+    bbuf_t buf;
+    struct walk_state state;
+
+    errno = __walk_indirects(inode, data_pos, &state, true);
+    if (errno) {
+        return errno;
+    }
+    if (*state.slot_ref) {
+        fsblock_put(state.table);
+        buf = fsblock_take(inode->sb, *state.slot_ref);
+        goto done;
+    }
+
+    errno = ext2db_alloc(inode, &buf);
+    if (errno) {
+        return errno;
+    }
+
+    *state.slot_ref = fsblock_id(buf);
+    fsblock_dirty(state.table);
+
+done:
+    if (blkbuf_errbuf(buf)) {
+        return EIO;
+    }
+
+    *out = buf;
+    return 0;
 }
 
 int

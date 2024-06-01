@@ -132,7 +132,7 @@ blkbuf_take(struct blkbuf_cache* bc, unsigned int block_id)
 void
 blkbuf_put(bbuf_t buf)
 {
-    if (unlikely(blkbuf_errbuf(buf))) {
+    if (unlikely(!buf || blkbuf_errbuf(buf))) {
         return;
     }
 

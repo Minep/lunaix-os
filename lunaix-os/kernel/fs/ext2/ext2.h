@@ -110,7 +110,7 @@ struct ext2b_inode
     u32_t i_faddr;
 
     u8_t i_osd2[12];
-} compact;
+} compact align(4);
 
 struct ext2b_dirent 
 {
@@ -295,9 +295,6 @@ ext2ino_get(struct v_superblock* vsb,
 int
 ext2ino_fill(struct v_inode* inode, ino_t ino_id);
 
-bbuf_t
-ext2db_get(struct v_inode* inode, unsigned int data_pos);
-
 void
 ext2db_itbegin(struct ext2_iterator* iter, struct v_inode* inode);
 
@@ -312,6 +309,29 @@ ext2db_itffw(struct ext2_iterator* iter, int count);
 
 void
 ext2db_itreset(struct ext2_iterator* iter);
+
+/**
+ * @brief Get the data block at given data pos associated with the
+ *        inode, return NULL if not present
+ * 
+ * @param inode 
+ * @param data_pos 
+ * @return bbuf_t 
+ */
+bbuf_t
+ext2db_get(struct v_inode* inode, unsigned int data_pos);
+
+/**
+ * @brief Get the data block at given data pos associated with the
+ *        inode, allocate one if not present.
+ * 
+ * @param inode 
+ * @param data_pos 
+ * @param out 
+ * @return int 
+ */
+int
+ext2db_acquire(struct v_inode* inode, unsigned int data_pos, bbuf_t* out);
 
 
 /* ************* Iterator ************* */

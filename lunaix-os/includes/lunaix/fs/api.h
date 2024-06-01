@@ -172,6 +172,12 @@ fsblock_put(bbuf_t blkbuf)
     return blkbuf_put(blkbuf);
 }
 
+static inline unsigned int
+fsblock_id(bbuf_t blkbuf)
+{
+    return blkbuf_id(blkbuf);
+}
+
 /**
  * @brief Mark the block dirty and require scheduling a device 
  *        write request to sync it with underlying medium. Lunaix
