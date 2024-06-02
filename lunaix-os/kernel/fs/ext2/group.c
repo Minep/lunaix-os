@@ -166,7 +166,8 @@ ext2gd_take(struct v_superblock* vsb,
     *gd = (struct ext2_gdesc) {
         .info = &block_buffer(part, struct ext2b_gdesc)[blk_off],
         .buf  = part,
-        .base = index * ext2sb->raw.s_blk_per_grp
+        .base = index * ext2sb->raw.s_blk_per_grp,
+        .ino_base = index * ext2sb->raw.s_ino_per_grp
     };
 
     *out = gd;
@@ -187,7 +188,7 @@ ext2gd_take(struct v_superblock* vsb,
     cached = bcache_put_and_ref(&ext2sb->gd_caches, index, gd);
     gd->cache_ref = cached;
     gd->sb = ext2sb;
-    
+
     return 0;
 
 cleanup:

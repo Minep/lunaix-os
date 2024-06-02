@@ -67,7 +67,7 @@ blkbuf_take(struct blkbuf_cache* bc, unsigned int block_id);
 static inline bbuf_t
 blkbuf_refonce(bbuf_t buf)
 {
-    if (likely(!blkbuf_errbuf(buf))) {
+    if (likely(buf && !blkbuf_errbuf(buf))) {
         bcache_refonce(((struct blk_buf*)buf)->cobj);
     }
 

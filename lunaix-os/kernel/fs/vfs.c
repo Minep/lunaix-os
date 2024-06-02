@@ -448,6 +448,10 @@ vfs_d_free(struct v_dnode* dnode)
         vfs_dcache_remove(pos);
     }
 
+    if (dnode->destruct) {
+        dnode->destruct(dnode);
+    }
+
     vfs_sb_free(dnode->super_block);
     vfree((void*)dnode->name.value);
     cake_release(dnode_pile, dnode);
@@ -1141,6 +1145,7 @@ __DEFINE_LXSYSCALL2(int, link, const char*, oldpath, const char*, newpath)
 
     errno = __vfs_try_locate_file(oldpath, &dentry, &to_link, 0);
     if (!errno) {
+        // FIXME newpath should be created with no inode 
         errno = __vfs_try_locate_file(
           newpath, &name_dentry, &name_file, FLOCATE_CREATE_ONLY);
         if (!errno) {

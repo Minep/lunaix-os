@@ -164,7 +164,7 @@ struct v_inode_ops
     int (*open)(struct v_inode* this, struct v_file* file);
     int (*sync)(struct v_inode* this);
     int (*mkdir)(struct v_inode* this, struct v_dnode* dnode);
-    int (*rmdir)(struct v_inode* this, struct v_dnode* dir);
+    int (*rmdir)(struct v_inode* this, struct v_dnode* dnode);
     int (*unlink)(struct v_inode* this);
     int (*link)(struct v_inode* this, struct v_dnode* new_name);
     int (*read_symlink)(struct v_inode* this, const char** path_out);
@@ -274,6 +274,8 @@ struct v_dnode
     atomic_ulong ref_count;
 
     void* data;
+
+    void (*destruct)(struct v_dnode* dnode);
 };
 
 struct v_fdtable

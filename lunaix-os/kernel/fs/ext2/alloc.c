@@ -47,10 +47,21 @@ ext2gd_alloc_slot(struct ext2_gdesc* gd, int type_sel)
     
     bmp = &gd->bmps[type_sel];
     alloc = ext2bmp_alloc_one(bmp);
-    if (alloc >= 0 && !ext2bmp_check_free(bmp)) {
+    if (alloc < 0) {
+        return alloc;
+    }
+
+    if (!ext2bmp_check_free(bmp)) {
         llist_delete(&gd->free_list_sel[type_sel]);
     }
 
+    if (type_sel == GDESC_INO_SEL) {
+        gd->info->bg_free_ino_cnt--;
+    } else {
+        gd->info->bg_free_blk_cnt--;
+    }
+
+    fsblock_dirty(gd->buf);
     return alloc;
 }
 
@@ -66,4 +77,12 @@ ext2gd_free_slot(struct ext2_gdesc* gd, int type_sel, int slot)
     if (llist_empty(free_ent)) {
         llist_append(free_list, free_ent);
     }
+
+    if (type_sel == GDESC_INO_SEL) {
+        gd->info->bg_free_ino_cnt++;
+    } else {
+        gd->info->bg_free_blk_cnt++;
+    }
+
+    fsblock_dirty(gd->buf);
 }

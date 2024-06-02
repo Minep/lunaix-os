@@ -1,6 +1,8 @@
 #include <lunaix/fs/api.h>
 #include <lunaix/mm/valloc.h>
 
+#include <klibc/string.h>
+
 #include "ext2.h"
 
 #define IMODE_IFSOCK    0xc000
@@ -22,11 +24,14 @@ struct walk_state
 static struct v_inode_ops ext2_inode_ops = {
     .dir_lookup = ext2dr_lookup,
     .open  = ext2_open_inode,
-    .mkdir = NULL,
-    .rmdir = NULL,
-    .read_symlink = NULL,
-    .set_symlink  = NULL,
-    .rename = NULL
+    .mkdir = ext2_mkdir,
+    .rmdir = ext2_rmdir,
+    .read_symlink = ext2_get_symlink,
+    .set_symlink  = ext2_set_symlink,
+    .rename = ext2_rename,
+    .link = ext2_link,
+    .unlink = ext2_unlink,
+    .create = ext2_create
 };
 
 static struct v_file_ops ext2_file_ops = {
@@ -39,7 +44,7 @@ static struct v_file_ops ext2_file_ops = {
     .write_page = ext2_inode_write_page,
     
     .readdir = ext2dr_read,
-    .seek = NULL,
+    .seek = ext2_seek_inode,
     .sync = ext2_sync_inode
 };
 
@@ -225,34 +230,68 @@ ext2_destruct_inode(struct v_inode* inode)
     vfree(e_inode);
 }
 
+static inline void
+__ext2ino_fill_common(struct v_inode* inode, ino_t ino_id)
+{
+    fsapi_inode_setid(inode, ino_id, ino_id);
+    fsapi_inode_setfops(inode, &ext2_file_ops);
+    fsapi_inode_setops(inode, &ext2_inode_ops);
+    fsapi_inode_setdector(inode, ext2_destruct_inode);
+}
+
+
+static unsigned int
+__translate_vfs_itype(unsigned int v_itype)
+{
+    unsigned int e_itype = IMODE_IFREG;
+
+    if (v_itype == VFS_IFFILE) {
+        e_itype = IMODE_IFREG;
+    }
+    else if (check_itype(v_itype, VFS_IFDIR)) {
+        e_itype = IMODE_IFDIR;
+    }
+    else if (check_itype(v_itype, VFS_IFSEQDEV)) {
+        e_itype = IMODE_IFCHR;
+    }
+    else if (check_itype(v_itype, VFS_IFVOLDEV)) {
+        e_itype = IMODE_IFBLK;
+    }
+    
+    if (check_itype(v_itype, VFS_IFSYMLINK)) {
+        e_itype |= IMODE_IFLNK;
+    }
+
+    return e_itype;
+}
+
 int
 ext2ino_fill(struct v_inode* inode, ino_t ino_id)
 {
     struct ext2_sbinfo* sb;
-    struct ext2_inode* ext2inode;
-    struct ext2b_inode* b_ino;
+    struct ext2_inode* e_ino;
     struct v_superblock* vsb;
+    struct ext2b_inode* b_ino;
     unsigned int type = VFS_IFFILE;
     int errno = 0;
 
     vsb = inode->sb;
     sb = EXT2_SB(vsb);
 
-    if ((errno = ext2ino_get(vsb, ino_id, &ext2inode))) {
+    if ((errno = ext2ino_get(vsb, ino_id, &e_ino))) {
         return errno;
     }
-    b_ino = ext2inode->ino;
     
-    fsapi_inode_setid(inode, ino_id, ino_id);
+    b_ino = e_ino->ino;
+    ino_id = e_ino->ino_id;
+
     fsapi_inode_setsize(inode, b_ino->i_size);
     
     fsapi_inode_settime(inode, b_ino->i_ctime, 
                                b_ino->i_mtime, 
                                b_ino->i_atime);
     
-    fsapi_inode_setfops(inode, &ext2_file_ops);
-    fsapi_inode_setops(inode, &ext2_inode_ops);
-    fsapi_inode_setdector(inode, ext2_destruct_inode);
+    __ext2ino_fill_common(inode, ino_id);
 
     if (check_itype(b_ino->i_mode, IMODE_IFLNK)) {
         type = VFS_IFSYMLINK;
@@ -269,9 +308,9 @@ ext2ino_fill(struct v_inode* inode, ino_t ino_id)
 
     fsapi_inode_settype(inode, type);
 
-    fsapi_inode_complete(inode, ext2inode);
+    fsapi_inode_complete(inode, e_ino);
 
-    return errno;
+    return 0;
 }
 
 static struct ext2_inode*
@@ -306,6 +345,7 @@ __create_inode(struct v_superblock* vsb, struct ext2_gdesc* gd, int inode_idx)
     assert(is_pot(ind_ents));
 
     inode->inds_lgents = ILOG2(ind_ents);
+    inode->ino_id = gd->ino_base + inode_idx;
 
     return inode;
 }
@@ -383,6 +423,9 @@ ext2ino_alloc(struct v_superblock* vsb,
         ext2gd_free_inode(gd, free_ino_idx);
         return EIO;
     }
+
+    memset(inode->ino, 0, sizeof(*inode->ino));
+    fsblock_dirty(inode->buf);
 
     *out = inode;
     return 0;
@@ -496,6 +539,61 @@ ext2ino_free(struct v_superblock* vsb, struct ext2_inode* inode)
 
     return errno;
 }
+
+int
+ext2ino_make(struct v_superblock* vsb, unsigned int itype, 
+             struct ext2_inode* hint, struct v_inode** out)
+{
+    int errno = 0;
+    struct ext2_inode* e_ino;
+    struct ext2b_inode* b_ino;
+    struct v_inode* inode;
+
+    errno = ext2ino_alloc(vsb, hint, &e_ino);
+    if (errno) {
+        return errno;
+    }
+
+    b_ino = e_ino->ino;
+    inode = vfs_i_alloc(vsb);
+    
+    __ext2ino_fill_common(inode, e_ino->ino_id);
+
+    b_ino->i_ctime = inode->ctime;
+    b_ino->i_atime = inode->atime;
+    b_ino->i_mtime = inode->mtime;
+
+    b_ino->i_mode  = __translate_vfs_itype(itype);
+
+    fsapi_inode_settype(inode, itype);
+    fsapi_inode_complete(inode, e_ino);
+
+    *out = inode;
+    return errno;
+}
+
+int
+ext2_create(struct v_inode* this, struct v_dnode* dnode)
+{
+    // TODO
+    return 0;
+}
+
+int
+ext2_link(struct v_inode* this, struct v_dnode* new_name)
+{
+    // TODO
+    return 0;
+}
+
+int
+ext2_unlink(struct v_inode* this)
+{
+    // TODO
+    return 0;
+}
+
+/* ******************* Data Blocks ******************* */
 
 
 /**

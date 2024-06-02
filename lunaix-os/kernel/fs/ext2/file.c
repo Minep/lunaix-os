@@ -2,6 +2,9 @@
 #include <lunaix/mm/page.h>
 #include "ext2.h"
 
+#define blkpos(e_sb, fpos) (fpos / e_sb->block_size)
+#define blkoff(e_sb, fpos) (fpos / e_sb->block_size)
+
 int
 ext2_open_inode(struct v_inode* inode, struct v_file* file)
 {
@@ -123,12 +126,51 @@ ext2_inode_read_page(struct v_inode *inode, void *buffer, size_t fpos)
 int
 ext2_inode_write(struct v_inode *inode, void *buffer, size_t len, size_t fpos)
 {
+    int errno;
+    unsigned int acc, blk_off, end, size;
+    struct ext2_sbinfo* e_sb;
+    bbuf_t buf;
+
+    e_sb  = EXT2_SB(inode->sb);
+
+    acc = 0;
+    end = fpos + len;
+    while (fpos < end) {
+        errno = ext2db_acquire(inode, blkpos(e_sb, fpos), &buf);
+        if (errno) {
+            return errno;
+        }
+
+        blk_off = blkoff(e_sb, fpos);
+        size = e_sb->block_size - blk_off;
+
+        memcpy(offset(blkbuf_data(buf), blk_off), buffer, size);
+        buffer = offset(buffer, size);
+
+        fpos += blk_off;
+        acc += size;
+    }
+
+    // TODO update metadata
+
+    return (int)acc;
+}
+
+int
+ext2_inode_write_page(struct v_inode *inode, void *buffer, size_t fpos)
+{
+    return ext2_inode_write(inode, buffer, PAGE_SIZE, fpos);
+}
+
+int
+ext2_get_symlink(struct v_inode *this, const char **path_out)
+{
     // TODO
     return 0;
 }
 
 int
-ext2_inode_write_page(struct v_inode *inode, void *buffer, size_t fpos)
+ext2_set_symlink(struct v_inode *this, const char *target)
 {
     // TODO
     return 0;

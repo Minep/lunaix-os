@@ -22,6 +22,7 @@ fsapi_blockdev(struct v_superblock* vsb)
 
 typedef void (*inode_init)(struct v_superblock* vsb, struct v_inode* inode) ;
 typedef void (*inode_free)(struct v_inode* inode) ;
+typedef void (*dnode_free)(struct v_dnode* dnode) ;
 
 static inline void
 fsapi_set_inode_initiator(struct v_superblock* vsb, inode_init inode_initiator)
@@ -137,6 +138,13 @@ fsapi_inode_settime(struct v_inode* inode,
 }
 
 static inline void
+fsapi_dnode_setdector(struct v_dnode* dnode, 
+                      dnode_free free_cb)
+{
+    dnode->destruct = free_cb;
+}
+
+static inline void
 fsapi_dir_report(struct dir_context *dctx, 
                  const char *name, const int len, const int dtype)
 {
@@ -160,9 +168,8 @@ fsblock_take(struct v_superblock* vsb, unsigned int block_id)
 }
 
 /**
- * @brief put the block back into cache, recommend to pair with
- *        fsblock_take. Properly pairing will allow Lunaix to 
- *        recycle the dangling fsblock more efficient
+ * @brief put the block back into cache, must to pair with
+ *        fsblock_take. Otherwise memory leakage will occur.
  * 
  * @param blkbuf 
  */

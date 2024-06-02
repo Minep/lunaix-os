@@ -190,6 +190,7 @@ struct ext2_gdesc
     };
 
     unsigned int base;
+    unsigned int ino_base;
 
     struct ext2b_gdesc* info;
     struct ext2_sbinfo* sb;
@@ -223,6 +224,7 @@ struct ext2_inode
 {
     bbuf_t buf;                  // partial inotab that holds this inode
     unsigned int inds_lgents;       // log2(# of block in an indirection level)
+    unsigned int ino_id;
 
     struct ext2b_inode* ino;        // raw ext2 inode
     struct ext2_btlb* btlb;         // block-TLB
@@ -242,6 +244,20 @@ struct ext2_inode
     bbuf_t ind_ord1;
 };
 #define EXT2_INO(v_inode) (fsapi_impl_data(v_inode, struct ext2_inode))
+
+struct ext2_dnode_sub
+{
+    bbuf_t buf;
+    struct ext2b_dirent* dirent;
+};
+
+struct ext2_dnode
+{
+    struct ext2_dnode_sub self;
+    struct ext2_dnode_sub prev;
+};
+#define EXT2_DNO(v_dnode) (fsapi_impl_data(v_dnode, struct ext2_dnode))
+
 
 /**
  * @brief General purpose iterator for ext2 objects
@@ -295,6 +311,18 @@ ext2ino_get(struct v_superblock* vsb,
 int
 ext2ino_fill(struct v_inode* inode, ino_t ino_id);
 
+int
+ext2ino_make(struct v_superblock* vsb, unsigned int itype, 
+             struct ext2_inode* hint, struct v_inode** out);
+
+static inline void
+ext2ino_linkto(struct ext2_inode* e_ino, struct ext2b_dirent* dirent)
+{
+    dirent->inode = e_ino->ino_id;
+    e_ino->ino->i_lnk_cnt++;
+    fsblock_dirty(e_ino->buf);
+}
+
 void
 ext2db_itbegin(struct ext2_iterator* iter, struct v_inode* inode);
 
@@ -309,6 +337,7 @@ ext2db_itffw(struct ext2_iterator* iter, int count);
 
 void
 ext2db_itreset(struct ext2_iterator* iter);
+
 
 /**
  * @brief Get the data block at given data pos associated with the
@@ -397,6 +426,23 @@ ext2dr_open(struct v_inode* this, struct v_file* file);
 int
 ext2dr_seek(struct v_file* file, size_t offset);
 
+int
+ext2dr_insert(struct v_inode* this, struct ext2b_dirent* dirent,
+              struct ext2_dnode** e_dno_out);
+
+int
+ext2dr_remove(struct ext2_dnode* e_dno);
+
+int
+ext2_rmdir(struct v_inode* parent, struct v_dnode* dnode);
+
+int
+ext2_mkdir(struct v_inode* parent, struct v_dnode* dnode);
+
+int
+ext2_rename(struct v_inode* from_inode, struct v_dnode* from_dnode,
+            struct v_dnode* to_dnode);
+
 
 /* ************   Files   ************ */
 
@@ -420,6 +466,24 @@ ext2_inode_write(struct v_inode *inode, void *buffer, size_t len, size_t fpos);
 
 int
 ext2_inode_write_page(struct v_inode *inode, void *buffer, size_t fpos);
+
+int
+ext2_seek_inode(struct v_file* file, size_t offset);
+
+int
+ext2_create(struct v_inode* this, struct v_dnode* dnode);
+
+int
+ext2_link(struct v_inode* this, struct v_dnode* new_name);
+
+int
+ext2_unlink(struct v_inode* this);
+
+int
+ext2_get_symlink(struct v_inode *this, const char **path_out);
+
+int
+ext2_set_symlink(struct v_inode *this, const char *target);
 
 /* ***********   Bitmap   *********** */
 
