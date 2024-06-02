@@ -90,7 +90,7 @@ run: $(BUILD_DIR)/$(OS_ISO)
 	@telnet 127.0.0.1 $(QEMU_MON_PORT)
 
 debug-qemu: all-debug
-	@i686-elf-objcopy --only-keep-debug $(kbin) $(kbuild_dir)/kernel.dbg
+	@objcopy --only-keep-debug $(kbin) $(kbuild_dir)/kernel.dbg
 	@qemu-system-i386 $(call get_qemu_options,$(kimg))
 	@sleep 1
 	@QMPORT=$(QEMU_MON_PORT) gdb $(kbin) -ex "target remote localhost:1234"
