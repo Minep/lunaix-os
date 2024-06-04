@@ -36,6 +36,7 @@ done:
 int
 ext2_close_inode(struct v_file* file)
 {
+    ext2ino_update(file->inode);
     vfree(file->data);
     return 0;
 }
@@ -44,6 +45,12 @@ int
 ext2_sync_inode(struct v_file* file)
 {
     // TODO
+    // a modification to an inode may involves multiple
+    //  blkbuf scattering among different groups.
+    // For now, we just sync everything, until we figure out
+    //  a way to track each dirtied blkbuf w.r.t inode
+    blkbuf_syncall(file->inode->sb->blks, false);
+
     return 0;
 }
 
@@ -162,16 +169,121 @@ ext2_inode_write_page(struct v_inode *inode, void *buffer, size_t fpos)
     return ext2_inode_write(inode, buffer, PAGE_SIZE, fpos);
 }
 
+#define SYMLNK_INPLACE \
+        sizeof(((struct ext2b_inode*)0)->i_block_arr)
+
+static inline int
+__readlink_symlink(struct v_inode *this, char* path)
+{
+    size_t size;
+    char* link = NULL;
+    int errno;
+    bbuf_t buf;
+    struct ext2_inode* e_ino;
+    
+    e_ino = EXT2_INO(this);
+    size  = e_ino->ino->i_size;
+    if (size <= SYMLNK_INPLACE) {
+        link = (char*) e_ino->ino->i_block_arr;
+        strncpy(path, link, size);
+    }
+    else {
+        buf = ext2db_get(this, 0);
+        if (blkbuf_errbuf(buf)) {
+            return EIO;
+        }
+
+        link = blkbuf_data(buf);
+        strncpy(path, link, size);
+
+        fsblock_put(buf);
+    }
+
+    return 0;
+}
+
 int
 ext2_get_symlink(struct v_inode *this, const char **path_out)
 {
-    // TODO
-    return 0;
+    int errno;
+    size_t size;
+    char* symlink;
+    struct ext2_inode* e_ino;
+    
+    e_ino = EXT2_INO(this);
+    size  = e_ino->ino->i_size;
+
+    if (!size) {
+        return ENOENT;
+    }
+
+    if (!e_ino->symlink) {
+        symlink = valloc(size);
+        if ((errno = __readlink_symlink(this, symlink))) {
+            vfree(symlink);
+            return errno;
+        }
+
+        e_ino->symlink = symlink;
+    }
+
+    *path_out = e_ino->symlink;
+
+    return size;
 }
 
 int
 ext2_set_symlink(struct v_inode *this, const char *target)
 {
-    // TODO
-    return 0;
+    int errno = 0;
+    bbuf_t buf = NULL;
+    char* link;
+    size_t size, new_len;
+    struct ext2_inode* e_ino;
+    
+    e_ino = EXT2_INO(this);
+    size = e_ino->ino->i_size;
+    new_len = strlen(target);
+
+    if (new_len > this->sb->blksize) {
+        return ENAMETOOLONG;
+    }
+
+    if (size != new_len) {
+        vfree_safe(e_ino->symlink);
+        e_ino->symlink = valloc(new_len);
+    }
+    
+    link = (char*) e_ino->ino->i_block_arr;
+
+    // if new size is shrinked to inplace range
+    if (size > SYMLNK_INPLACE && new_len <= SYMLNK_INPLACE) {
+        ext2db_free_pos(this, 0);
+    }
+    
+    // if new size is too big to fit inpalce
+    if (new_len > SYMLNK_INPLACE) {
+
+        // repurpose the i_block array back to normal
+        if (size <= SYMLNK_INPLACE) {
+            memset(link, 0, SYMLNK_INPLACE);
+        }
+
+        errno = ext2db_acquire(this, 0, &buf);
+        if (errno) {
+            goto done;
+        }
+
+        link = blkbuf_data(buf);
+    }
+
+    strncpy(e_ino->symlink, target, new_len);
+    strncpy(link, target, new_len);
+
+    if (buf) {
+        fsblock_put(buf);
+    }
+
+done:
+    return errno;
 }

@@ -569,10 +569,26 @@ cleanup1:
     return errno;
 }
 
+void
+ext2dr_setup_dirent(struct ext2b_dirent* dirent, struct v_dnode* dnode)
+{
+    struct hstr* name = &dnode->name;
+    *dirent = (struct ext2b_dirent){
+        .name_len = name->len    
+    };
+    strncpy(dirent->name, name->value, name->len);
+}
+
 int
 ext2_rename(struct v_inode* from_inode, struct v_dnode* from_dnode,
             struct v_dnode* to_dnode)
 {
-    // TODO
-    return 0;
+    int errno;
+
+    errno = ext2_unlink(from_inode, from_dnode);
+    if (errno) {
+        return errno;
+    }
+
+    return ext2_link(from_inode, to_dnode);;
 }

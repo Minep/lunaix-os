@@ -129,7 +129,14 @@ failed:
 static int 
 ext2_umount(struct v_superblock* vsb)
 {
-    // TODO
+    // sync all dirty buffers
+    if (!blkbuf_syncall(vsb->blks, false)) {
+        return EAGAIN;
+    }
+
+    ext2gd_release_gdt(vsb);
+
+    blkbuf_release(vsb->blks);
     return 0;
 }
 

@@ -160,19 +160,26 @@ struct v_file_ops
 
 struct v_inode_ops
 {
-    int (*create)(struct v_inode* this, struct v_dnode* dnode);
+    int (*create)(struct v_inode* this, struct v_dnode* dnode, 
+                  unsigned int itype);
+    
     int (*open)(struct v_inode* this, struct v_file* file);
     int (*sync)(struct v_inode* this);
+
     int (*mkdir)(struct v_inode* this, struct v_dnode* dnode);
     int (*rmdir)(struct v_inode* this, struct v_dnode* dnode);
-    int (*unlink)(struct v_inode* this);
+    int (*unlink)(struct v_inode* this, struct v_dnode* name);
     int (*link)(struct v_inode* this, struct v_dnode* new_name);
+
     int (*read_symlink)(struct v_inode* this, const char** path_out);
     int (*set_symlink)(struct v_inode* this, const char* target);
+    
     int (*dir_lookup)(struct v_inode* this, struct v_dnode* dnode);
+
     int (*rename)(struct v_inode* from_inode,
                   struct v_dnode* from_dnode,
                   struct v_dnode* to_dnode);
+
     int (*getxattr)(struct v_inode* this,
                     struct v_xattr_entry* entry); // optional
     int (*setxattr)(struct v_inode* this,

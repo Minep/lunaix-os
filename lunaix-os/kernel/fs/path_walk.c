@@ -6,6 +6,7 @@
 #include <klibc/string.h>
 
 #define VFS_SYMLINK_DEPTH 16
+#define VFS_SYMLINK_MAXLEN 512
 
 extern struct lru_zone *dnode_lru, *inode_lru;
 
@@ -122,18 +123,23 @@ __vfs_walk(struct v_dnode* start,
         if (check_symlink_node(current_inode) &&
             !(walk_options & VFS_WALK_NOFOLLOW)) {
             const char* link;
+            struct v_inode_ops* iops;
 
-            if (!current_inode->ops->read_symlink) {
+            iops = current_inode->ops;
+
+            if (!iops->read_symlink) {
                 errno = ENOTSUP;
                 goto error;
             }
 
             lock_inode(current_inode);
-            if ((errno =
-                   current_inode->ops->read_symlink(current_inode, &link))) {
+
+            errno = iops->read_symlink(current_inode, &link);
+            if ((errno < 0)) {
                 unlock_inode(current_inode);
                 goto error;
             }
+
             unlock_inode(current_inode);
 
             errno = __vfs_walk(current_level->parent,

@@ -226,6 +226,7 @@ ext2_destruct_inode(struct v_inode* inode)
 
     ext2gd_put(e_inode->blk_grp);
 
+    vfree_safe(e_inode->symlink);
     vfree(e_inode->btlb);
     vfree(e_inode);
 }
@@ -540,6 +541,17 @@ ext2ino_free(struct v_superblock* vsb, struct ext2_inode* inode)
     return errno;
 }
 
+static void
+__update_inode_metadata(struct ext2b_inode* b_ino, 
+                        struct v_inode* inode)
+{
+    b_ino->i_ctime = inode->ctime;
+    b_ino->i_atime = inode->atime;
+    b_ino->i_mtime = inode->mtime;
+    b_ino->i_size  = inode->fsize;
+
+}
+
 int
 ext2ino_make(struct v_superblock* vsb, unsigned int itype, 
              struct ext2_inode* hint, struct v_inode** out)
@@ -559,10 +571,7 @@ ext2ino_make(struct v_superblock* vsb, unsigned int itype,
     
     __ext2ino_fill_common(inode, e_ino->ino_id);
 
-    b_ino->i_ctime = inode->ctime;
-    b_ino->i_atime = inode->atime;
-    b_ino->i_mtime = inode->mtime;
-
+    __update_inode_metadata(b_ino, inode);
     b_ino->i_mode  = __translate_vfs_itype(itype);
 
     fsapi_inode_settype(inode, itype);
@@ -573,24 +582,73 @@ ext2ino_make(struct v_superblock* vsb, unsigned int itype,
 }
 
 int
-ext2_create(struct v_inode* this, struct v_dnode* dnode)
+ext2_create(struct v_inode* this, struct v_dnode* dnode, unsigned int itype)
 {
-    // TODO
-    return 0;
+    int errno;
+    struct v_inode* created;
+    
+    errno = ext2ino_make(this->sb, itype, EXT2_INO(this), &created);
+    if (errno) {
+        return errno;
+    }
+
+    return ext2_link(created, dnode);
 }
 
 int
 ext2_link(struct v_inode* this, struct v_dnode* new_name)
 {
-    // TODO
+    int errno = 0;
+    struct ext2_inode* e_ino;
+    struct ext2_dnode* e_dno;
+    struct ext2b_dirent dirent;
+
+    e_ino = EXT2_INO(this);
+
+    ext2dr_setup_dirent(&dirent, new_name);
+    ext2ino_linkto(e_ino, &dirent);
+    
+    errno = ext2dr_insert(this, &dirent, &e_dno);
+    if (errno) {
+        return errno;
+    }
+
+    new_name->data = e_dno;
+    vfs_assign_inode(new_name, this);
+    
     return 0;
 }
 
 int
-ext2_unlink(struct v_inode* this)
+ext2_unlink(struct v_inode* this, struct v_dnode* name)
 {
-    // TODO
-    return 0;
+    int errno = 0;
+    struct ext2_inode* e_ino;
+    struct ext2_dnode* e_dno;
+
+    e_ino = EXT2_INO(this);
+    e_dno = EXT2_DNO(name);
+
+    assert_fs(e_dno);
+    assert_fs(e_dno->self.dirent->inode == e_ino->ino_id);
+
+    errno = ext2dr_remove(e_dno);
+    if (errno) {
+        return errno;
+    }
+
+    return ext2ino_free(this->sb, e_ino);
+}
+
+void
+ext2ino_update(struct v_inode* inode)
+{
+    struct ext2_inode* e_ino;
+    
+    e_ino = EXT2_INO(inode);
+    __update_inode_metadata(e_ino->ino, inode);
+
+    fsblock_dirty(e_ino->buf);
 }
 
 /* ******************* Data Blocks ******************* */
@@ -814,23 +872,28 @@ ext2db_alloc(struct v_inode* inode, bbuf_t* out)
     return 0;
 }
 
-int
-ext2db_free(struct v_inode* inode, bbuf_t buf)
+void
+ext2db_free_pos(struct v_inode* inode, unsigned int block_pos)
 {
     struct ext2_inode* e_inode;
     struct ext2_gdesc* gd;
-    unsigned int block_pos;
 
-    block_pos = blkbuf_id(buf);
     e_inode = EXT2_INO(inode);
     gd = e_inode->blk_grp;
 
-    assert(blkbuf_not_shared(buf));
     assert(block_pos >= gd->base);
     
     block_pos -= gd->base;
 
     ext2gd_free_block(gd, block_pos);
+}
+
+int
+ext2db_free(struct v_inode* inode, bbuf_t buf)
+{
+    assert(blkbuf_not_shared(buf));
+
+    ext2db_free_pos(inode, blkbuf_id(buf));
     fsblock_put(buf);
 
     return 0;

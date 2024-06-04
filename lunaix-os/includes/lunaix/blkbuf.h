@@ -95,4 +95,7 @@ blkbuf_release(struct blkbuf_cache* bc);
 void
 blkbuf_put(bbuf_t buf);
 
+bool
+blkbuf_syncall(struct blkbuf_cache* bc, bool async);
+
 #endif /* __LUNAIX_BLKBUF_H */

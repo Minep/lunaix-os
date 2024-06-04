@@ -46,10 +46,14 @@ twimap_read(struct twimap* map, void* buffer, size_t len, size_t fpos)
     // FIXME what if TWIMAP_BUFFER_SIZE is not big enough?
 
     size_t pos = map->size_acc;
-    while (pos <= fpos && map->go_next(map)) {
+    while (pos <= fpos) {
         map->size_acc = 0;
         map->read(map);
         pos += map->size_acc;
+        
+        if (!map->go_next(map)) {
+            break;
+        }
     }
 
     if (pos <= fpos) {

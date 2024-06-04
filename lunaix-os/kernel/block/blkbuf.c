@@ -27,6 +27,23 @@ __blkbuf_do_sync(struct bcache* bc, unsigned long tag, void* data)
 }
 
 static void
+__blkbuf_sync_callback(struct blkio_req* req)
+{
+    struct blk_buf* buf;
+
+    buf = (struct blk_buf*)req->evt_args;
+
+    if (req->errcode) {
+        ERROR("sync failed: io error, 0x%x", req->errcode);
+        return;
+    }
+
+    if (!llist_empty(&buf->dirty)) {
+        llist_delete(&buf->dirty);
+    }
+}
+
+static void
 __blkbuf_evict_callback(struct blkio_req* req)
 {
     struct blk_buf* buf;
@@ -57,6 +74,7 @@ __blkbuf_do_try_release(struct bcache* bc, void* data)
         return;
     }
     
+    // since we are evicting, don't care if the sync is failed
     llist_delete(&buf->dirty);
 
     blkio_when_completed(req, __blkbuf_evict_callback);
@@ -76,14 +94,19 @@ __blkbuf_take_slow(struct blkbuf_cache* bc, unsigned int block_id)
     struct blkio_req* req;
     struct vecbuf* vbuf;
     void* data;
+    unsigned int lba;
 
     data = valloc(bc->blksize);
 
     vbuf = NULL;
     vbuf_alloc(&vbuf, data, bc->blksize);
 
+    lba = __tolba(bc, block_id);
     buf = (struct blk_buf*)cake_grab(bb_pile);
-    req = blkio_vreq(vbuf, __tolba(bc, block_id), NULL, buf, 0);
+    req = blkio_vreq(vbuf, lba, __blkbuf_sync_callback, buf, 0);
+
+    // give dirty a know state
+    llist_init_head(&buf->dirty);
 
     blkio_setread(req);
     blkio_bindctx(req, bc->blkdev->blkio);
@@ -158,22 +181,43 @@ blkbuf_dirty(bbuf_t buf)
     }
 }
 
+static inline void
+__schedule_sync_event(struct blk_buf* bbuf, bool wait)
+{
+    blkio_setwrite(bbuf->breq);
+    blkio_commit(bbuf->breq, 
+                 wait ? BLKIO_WAIT : BLKIO_NOWAIT);
+}
+
 void
 blkbuf_schedule_sync(bbuf_t buf)
 {
     struct blk_buf* bbuf;
     bbuf = to_blkbuf(buf);
 
-    blkio_setwrite(bbuf->breq);
-    blkio_commit(bbuf->breq, BLKIO_NOWAIT);
+    __schedule_sync_event(bbuf, false);
+}
+
+bool
+blkbuf_syncall(struct blkbuf_cache* bc, bool async)
+{
+    struct blk_buf *pos, *n;
+
+    llist_for_each(pos, n, &bc->dirty, dirty) {
+        __schedule_sync_event(pos, !async);
+    }
+
+    if (async) {
+        return true;
+    }
+
+    return llist_empty(&bc->dirty);
 }
 
 void
-blkbuf_sync_all(struct blkbuf_cache* bc)
+blkbuf_release(struct blkbuf_cache* bc)
 {
-    bcache_flush(&bc->cached);
-
-    assert(llist_empty(&bc->dirty));
+    bcache_free(&bc->cached);
     vfree(bc);
 }
 

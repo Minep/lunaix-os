@@ -258,7 +258,8 @@ vfs_pclose(struct v_file* file, pid_t pid)
     int errno = 0;
     if (file->ref_count > 1) {
         atomic_fetch_sub(&file->ref_count, 1);
-    } else if (!(errno = file->ops->close(file))) {
+    } 
+    else if (!(errno = file->ops->close(file))) {
         atomic_fetch_sub(&file->dnode->ref_count, 1);
         file->inode->open_count--;
 
@@ -532,9 +533,14 @@ vfs_i_free(struct v_inode* inode)
 
 /* ---- System call definition and support ---- */
 
-#define FLOCATE_CREATE_EMPTY 1
-#define FLOCATE_CREATE_ONLY 2
-#define FLOCATE_NOFOLLOW 4
+// make a new name when not exists
+#define FLOC_MAYBE_MKNAME 1
+
+// name must be non-exist and made.
+#define FLOC_MKNAME 2
+
+// no follow symlink
+#define FLOC_NOFOLLOW 4
 
 int
 vfs_getfd(int fd, struct v_fd** fd_s)
@@ -545,53 +551,80 @@ vfs_getfd(int fd, struct v_fd** fd_s)
     return EBADF;
 }
 
-int
+static int
+__vfs_mknod(struct v_inode* parent, struct v_dnode* dnode, 
+            unsigned int itype, dev_t* dev)
+{
+    int errno;
+
+    errno = parent->ops->create(parent, dnode, itype);
+    if (errno) {
+        return errno;
+    }
+
+    return 0;
+}
+
+struct file_locator {
+    struct v_dnode* dir;
+    struct v_dnode* file;
+    bool fresh;
+};
+
+static int
 __vfs_try_locate_file(const char* path,
-                      struct v_dnode** fdir,
-                      struct v_dnode** file,
+                      struct file_locator* floc,
                       int options)
 {
     char name_str[VFS_NAME_MAXLEN];
+    struct v_dnode *fdir, *file;
     struct hstr name = HSTR(name_str, 0);
     int errno, woption = 0;
 
-    if ((options & FLOCATE_NOFOLLOW)) {
+    if ((options & FLOC_NOFOLLOW)) {
         woption |= VFS_WALK_NOFOLLOW;
+        options &= ~FLOC_NOFOLLOW;
     }
 
+    floc->fresh = false;
     name_str[0] = 0;
-    if ((errno = vfs_walk_proc(path, fdir, &name, woption | VFS_WALK_PARENT))) {
+    errno = vfs_walk_proc(path, &fdir, &name, woption | VFS_WALK_PARENT);
+    if (errno) {
         return errno;
     }
 
-    errno = vfs_walk(*fdir, name.value, file, NULL, woption);
+    errno = vfs_walk(fdir, name.value, &file, NULL, woption);
 
-    if (errno != ENOENT && (options & FLOCATE_CREATE_ONLY)) {
-        return EEXIST;
+    if (errno && errno != ENOENT) {
+        goto done;
+    }
+    
+    if (!errno) {
+        if ((options & FLOC_MKNAME)) {
+            errno = EEXIST;
+        }
+        goto done;
     }
 
-    if (errno != ENOENT ||
-        !(options & (FLOCATE_CREATE_EMPTY | FLOCATE_CREATE_ONLY))) {
-        return errno;
+    // errno == ENOENT
+    if (!options) {
+        goto done;
     }
 
-    struct v_dnode* parent = *fdir;
-    struct v_dnode* file_new = vfs_d_alloc(parent, &name);
+    errno = 0;
+    floc->fresh = true;
 
-    if (!file_new) {
+    file = vfs_d_alloc(fdir, &name);
+
+    if (!file) {
         return ENOMEM;
     }
 
-    lock_dnode(parent);
+    vfs_dcache_add(fdir, file);
 
-    if (!(errno = parent->inode->ops->create(parent->inode, file_new))) {
-        vfs_dcache_add(parent, file_new);
-        *file = file_new;
-    } else {
-        vfs_d_free(file_new);
-    }
-
-    unlock_dnode(parent);
+done:
+    floc->dir   = fdir;
+    floc->file  = file;
 
     return errno;
 }
@@ -602,37 +635,58 @@ vfs_do_open(const char* path, int options)
     int errno, fd, loptions = 0;
     struct v_dnode *dentry, *file;
     struct v_file* ofile = NULL;
+    struct file_locator floc;
+    struct v_inode* inode;
 
     if ((options & FO_CREATE)) {
-        loptions |= FLOCATE_CREATE_EMPTY;
+        loptions |= FLOC_MAYBE_MKNAME;
     } else if ((options & FO_NOFOLLOW)) {
-        loptions |= FLOCATE_NOFOLLOW;
+        loptions |= FLOC_NOFOLLOW;
     }
 
-    errno = __vfs_try_locate_file(path, &dentry, &file, loptions);
+    errno = __vfs_try_locate_file(path, &floc, loptions);
 
-    if (!errno && !(errno = vfs_alloc_fdslot(&fd))) {
+    if (errno || (errno = vfs_alloc_fdslot(&fd))) {
+        return errno;
+    }
 
-        if (errno || (errno = vfs_open(file, &ofile))) {
+    file   = floc.file;
+    dentry = floc.dir;
+
+    if (floc.fresh) {
+        errno = __vfs_mknod(dentry->inode, file, VFS_IFFILE, NULL);
+        if (errno) {
+            vfs_d_free(file);
             return errno;
         }
-
-        struct v_fd* fd_s = cake_grab(fd_pile);
-        memset(fd_s, 0, sizeof(*fd_s));
-
-        ofile->f_pos = ofile->inode->fsize & -((options & FO_APPEND) != 0);
-        if (vfs_get_dtype(ofile->inode->itype) == DT_DIR) {
-            ofile->f_pos = 0;
-        }
-        
-        fd_s->file = ofile;
-        fd_s->flags = options;
-        __current->fdtable->fds[fd] = fd_s;
-        
-        return fd;
     }
 
-    return errno;
+
+    if ((errno = vfs_open(file, &ofile))) {
+        return errno;
+    }
+
+    inode = ofile->inode;
+    lock_inode(inode);
+
+    struct v_fd* fd_s = cake_grab(fd_pile);
+    memset(fd_s, 0, sizeof(*fd_s));
+
+    if ((options & O_TRUNC)) {
+        file->inode->fsize = 0;   
+    }
+
+    if (vfs_get_dtype(inode->itype) == DT_DIR) {
+        ofile->f_pos = 0;
+    }
+    
+    fd_s->file = ofile;
+    fd_s->flags = options;
+    __current->fdtable->fds[fd] = fd_s;
+
+    unlock_inode(inode);
+    
+    return fd;
 }
 
 __DEFINE_LXSYSCALL2(int, open, const char*, path, int, options)
@@ -752,6 +806,7 @@ __DEFINE_LXSYSCALL3(int, write, int, fd, void*, buf, size_t, count)
         goto done;
     }
 
+    struct v_inode* inode;
     struct v_file* file = fd_s->file;
 
     if ((errno = vfs_check_writable(file->dnode))) {
@@ -763,23 +818,29 @@ __DEFINE_LXSYSCALL3(int, write, int, fd, void*, buf, size_t, count)
         goto done;
     }
 
-    lock_inode(file->inode);
+    inode = file->inode;
+    lock_inode(inode);
 
-    file->inode->mtime = clock_unixtime();
+    inode->mtime = clock_unixtime();
+    if ((fd_s->flags & O_APPEND)) {
+        file->f_pos = inode->fsize;
+    }
 
-    if (check_seqdev_node(file->inode) || (fd_s->flags & FO_DIRECT)) {
-        errno = file->ops->write(file->inode, buf, count, file->f_pos);
+    if (check_seqdev_node(inode) || (fd_s->flags & FO_DIRECT)) {
+        errno = file->ops->write(inode, buf, count, file->f_pos);
     } else {
-        errno = pcache_write(file->inode, buf, count, file->f_pos);
+        errno = pcache_write(inode, buf, count, file->f_pos);
     }
 
     if (errno > 0) {
         file->f_pos += errno;
-        unlock_inode(file->inode);
+        inode->fsize = MAX(inode->fsize, file->f_pos);
+
+        unlock_inode(inode);
         return errno;
     }
 
-    unlock_inode(file->inode);
+    unlock_inode(inode);
 
 done:
     return DO_STATUS(errno);
@@ -872,16 +933,24 @@ vfs_readlink(struct v_dnode* dnode, char* buf, size_t size)
 {
     const char* link;
     struct v_inode* inode = dnode->inode;
-    if (inode->ops->read_symlink) {
-        lock_inode(inode);
 
-        int errno = inode->ops->read_symlink(inode, &link);
-        strncpy(buf, link, size);
-
-        unlock_inode(inode);
-        return errno;
+    if (!check_symlink_node(inode)) {
+        return EINVAL;
     }
-    return 0;
+
+    if (!inode->ops->read_symlink) {
+        return ENOTSUP;
+    }
+
+    lock_inode(inode);
+
+    int errno = inode->ops->read_symlink(inode, &link);
+    if (errno >= 0) {
+        strncpy(buf, link, MIN(size, (size_t)errno));
+    }
+
+    unlock_inode(inode);
+    return errno;
 }
 
 int
@@ -1094,7 +1163,7 @@ __vfs_do_unlink(struct v_dnode* dnode)
     if (inode->open_count) {
         errno = EBUSY;
     } else if (!check_directory_node(inode)) {
-        errno = inode->ops->unlink(inode);
+        errno = inode->ops->unlink(inode, dnode);
         if (!errno) {
             vfs_d_free(dnode);
         }
@@ -1141,17 +1210,27 @@ done:
 __DEFINE_LXSYSCALL2(int, link, const char*, oldpath, const char*, newpath)
 {
     int errno;
-    struct v_dnode *dentry, *to_link, *name_dentry, *name_file;
+    struct file_locator floc;
+    struct v_dnode *to_link, *name_file;
 
-    errno = __vfs_try_locate_file(oldpath, &dentry, &to_link, 0);
-    if (!errno) {
-        // FIXME newpath should be created with no inode 
-        errno = __vfs_try_locate_file(
-          newpath, &name_dentry, &name_file, FLOCATE_CREATE_ONLY);
-        if (!errno) {
-            errno = vfs_link(to_link, name_file);
-        }
+    errno = __vfs_try_locate_file(oldpath, &floc, 0);
+    if (errno) {
+        goto done;
     }
+
+    to_link = floc.file;
+    errno = __vfs_try_locate_file(newpath, &floc, FLOC_MKNAME);
+    if (!errno) {
+        goto done;       
+    }
+
+    name_file = floc.file;
+    errno = vfs_link(to_link, name_file);
+    if (errno) {
+        vfs_d_free(name_file);
+    }
+
+done:
     return DO_STATUS(errno);
 }
 
@@ -1241,26 +1320,41 @@ __DEFINE_LXSYSCALL2(
   int, symlink, const char*, pathname, const char*, link_target)
 {
     int errno;
-    struct v_dnode *dnode, *file;
-    if ((errno = __vfs_try_locate_file(
-           pathname, &dnode, &file, FLOCATE_CREATE_ONLY))) {
+    struct file_locator floc;
+    struct v_dnode *file;
+    struct v_inode *f_ino;
+    
+    errno = __vfs_try_locate_file(pathname, &floc, FLOC_MKNAME);
+    if (errno) {
         goto done;
     }
 
-    if ((errno = vfs_check_writable(file))) {
+    file = floc.file;
+    errno = __vfs_mknod(floc.dir->inode, file, VFS_IFSYMLINK, NULL);
+    if (errno) {
+        vfs_d_free(file);
         goto done;
     }
 
-    if (!file->inode->ops->set_symlink) {
+    f_ino = file->inode;
+
+    assert(f_ino);
+
+    errno = vfs_check_writable(file);
+    if (errno) {
+        goto done;
+    }
+
+    if (!f_ino->ops->set_symlink) {
         errno = ENOTSUP;
         goto done;
     }
 
-    lock_inode(file->inode);
+    lock_inode(f_ino);
 
-    errno = file->inode->ops->set_symlink(file->inode, link_target);
+    errno = f_ino->ops->set_symlink(f_ino, link_target);
 
-    unlock_inode(file->inode);
+    unlock_inode(f_ino);
 
 done:
     return DO_STATUS(errno);

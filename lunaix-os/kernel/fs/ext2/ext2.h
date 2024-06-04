@@ -242,6 +242,7 @@ struct ext2_inode
 
     // prefetched block for 1st order of indirection
     bbuf_t ind_ord1;
+    char* symlink;
 };
 #define EXT2_INO(v_inode) (fsapi_impl_data(v_inode, struct ext2_inode))
 
@@ -315,6 +316,9 @@ int
 ext2ino_make(struct v_superblock* vsb, unsigned int itype, 
              struct ext2_inode* hint, struct v_inode** out);
 
+void
+ext2ino_update(struct v_inode* inode);
+
 static inline void
 ext2ino_linkto(struct ext2_inode* e_ino, struct ext2b_dirent* dirent)
 {
@@ -362,6 +366,8 @@ ext2db_get(struct v_inode* inode, unsigned int data_pos);
 int
 ext2db_acquire(struct v_inode* inode, unsigned int data_pos, bbuf_t* out);
 
+void
+ext2db_free_pos(struct v_inode* inode, unsigned int block_pos);
 
 /* ************* Iterator ************* */
 
@@ -443,6 +449,9 @@ int
 ext2_rename(struct v_inode* from_inode, struct v_dnode* from_dnode,
             struct v_dnode* to_dnode);
 
+void
+ext2dr_setup_dirent(struct ext2b_dirent* dirent, struct v_dnode* dnode);
+
 
 /* ************   Files   ************ */
 
@@ -471,13 +480,13 @@ int
 ext2_seek_inode(struct v_file* file, size_t offset);
 
 int
-ext2_create(struct v_inode* this, struct v_dnode* dnode);
+ext2_create(struct v_inode* this, struct v_dnode* dnode, unsigned int itype);
 
 int
 ext2_link(struct v_inode* this, struct v_dnode* new_name);
 
 int
-ext2_unlink(struct v_inode* this);
+ext2_unlink(struct v_inode* this, struct v_dnode* name);
 
 int
 ext2_get_symlink(struct v_inode *this, const char **path_out);

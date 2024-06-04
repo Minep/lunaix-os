@@ -114,7 +114,7 @@ ramfs_mkdir(struct v_inode* this, struct v_dnode* dnode)
 }
 
 int
-ramfs_create(struct v_inode* this, struct v_dnode* dnode)
+ramfs_create(struct v_inode* this, struct v_dnode* dnode, unsigned int itype)
 {
     return __ramfs_mknod(dnode, NULL, RAMF_FILE);
 }
@@ -171,6 +171,7 @@ ramfs_mksymlink(struct v_inode* this, const char* target)
     this->itype = VFS_IFSYMLINK;
     rinode->flags |= RAMF_SYMLINK;
     rinode->symlink = symlink;
+    rinode->size = len;
 
     return 0;
 }
@@ -186,11 +187,11 @@ ramfs_read_symlink(struct v_inode* this, const char** path_out)
 
     *path_out = rinode->symlink;
 
-    return 0;
+    return rinode->size;
 }
 
 int
-ramfs_unlink(struct v_inode* this)
+ramfs_unlink(struct v_inode* this, struct v_dnode* name)
 {
     struct ram_inode* rinode = RAM_INODE(this->data);
 
