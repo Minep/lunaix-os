@@ -1,6 +1,3 @@
-#include <hal/apic_timer.h>
-#include <hal/rtc/mc146818a.h>
-
 #include <hal/hwrtc.h>
 #include <hal/hwtimer.h>
 
@@ -9,6 +6,8 @@
 
 #include <sys/i386_intr.h>
 #include <sys/interrupts.h>
+
+#include "hal/apic_timer.h"
 
 void
 exception_init()
@@ -30,7 +29,7 @@ arch_preinit()
 }
 
 struct hwtimer*
-hwtimer_choose()
+select_platform_timer()
 {
     struct hwtimer* timer;
 

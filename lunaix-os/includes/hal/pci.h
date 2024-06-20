@@ -39,7 +39,8 @@
 #define PCI_BAR_ADDR_MM(x) ((x) & ~0xf)
 #define PCI_BAR_ADDR_IO(x) ((x) & ~0x3)
 
-#define PCI_MSI_ADDR(msi_base) ((msi_base) + 4)
+#define PCI_MSI_ADDR_LO(msi_base) ((msi_base) + 4)
+#define PCI_MSI_ADDR_HI(msi_base) ((msi_base) + 8)
 #define PCI_MSI_DATA(msi_base, offset) ((msi_base) + 8 + offset)
 #define PCI_MSI_MASK(msi_base, offset) ((msi_base) + 0xc + offset)
 
@@ -167,6 +168,9 @@ pci_bind_instance(struct pci_device* pcidev, void* devobj);
 
 void
 pci_probe_bar_info(struct pci_device* device);
+
+void
+pci_setup_msi(struct pci_device* device, int vector);
 
 void
 pci_probe_msi_info(struct pci_device* device);

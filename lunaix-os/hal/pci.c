@@ -215,6 +215,42 @@ pci_probe_bar_info(struct pci_device* device)
 }
 
 void
+pci_setup_msi(struct pci_device* device, int vector)
+{
+    // PCI LB Spec. (Rev 3) Section 6.8 & 6.8.1
+
+    ptr_t msi_addr = pci_get_msi_base();
+    u32_t msi_data = pci_config_msi_data(vector);
+
+    pci_reg_t reg1 = pci_read_cspace(device->cspace_base, device->msi_loc);
+    pci_reg_t msg_ctl = reg1 >> 16;
+    int offset_cap64 = !!(msg_ctl & MSI_CAP_64BIT) * 4;
+
+    pci_write_cspace(device->cspace_base, 
+                     PCI_MSI_ADDR_LO(device->msi_loc), 
+                     msi_addr);
+    
+    if (offset_cap64) {
+        pci_write_cspace(device->cspace_base, 
+                         PCI_MSI_ADDR_HI(device->msi_loc), 
+                         (u64_t)msi_addr >> 32);
+    }
+
+    pci_write_cspace(device->cspace_base,
+                     PCI_MSI_DATA(device->msi_loc, offset_cap64),
+                     msi_data & 0xffff);
+
+    if ((msg_ctl & MSI_CAP_MASK)) {
+        pci_write_cspace(
+          device->cspace_base, PCI_MSI_MASK(device->msi_loc, offset_cap64), 0);
+    }
+
+    // manipulate the MSI_CTRL to allow device using MSI to request service.
+    reg1 = (reg1 & 0xff8fffff) | 0x10000;
+    pci_write_cspace(device->cspace_base, device->msi_loc, reg1);
+}
+
+void
 pci_probe_msi_info(struct pci_device* device)
 {
     // Note that Virtualbox have to use ICH9 chipset for MSI support.

@@ -26,7 +26,7 @@ void
 hwtimer_init(u32_t hertz, void* tick_callback);
 
 struct hwtimer*
-hwtimer_choose();
+select_platform_timer();
 
 ticks_t
 hwtimer_base_frequency();

@@ -15,7 +15,7 @@
 #include <lunaix/status.h>
 #include <lunaix/pcontext.h>
 
-#include <hal/rtc/mc146818a.h>
+#include <hal/hwrtc.h>
 
 #include <klibc/string.h>
 
@@ -53,6 +53,8 @@
 
 #define RTC_FREQUENCY_1024HZ 0b110
 #define RTC_DIVIDER_33KHZ (0b010 << 4)
+
+#define PC_AT_IRQ_RTC                   8
 
 struct mc146818
 {

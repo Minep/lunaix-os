@@ -26,7 +26,7 @@ Referenced headers
     * <some_arch>/includes/cpu.h
 
 Referenced functions
-    * includes/hal/hwtimer.h:hwtimer_choose
+    * includes/hal/hwtimer.h:select_platform_timer
     * includes/hal/hwrtc.h:hwrtc_choose
     * includes/hal/intc.h:intc_init
     * includes/lunaix/process.h:proc_init_transfer

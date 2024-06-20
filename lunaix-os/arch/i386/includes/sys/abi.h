@@ -16,21 +16,24 @@
 #define intr_ivec(th) (th)->intr_ctx->execp->vector
 #define intr_ierr(th) (th)->intr_ctx->execp->err_code
 
-#define j_usr(sp, pc)                                                          \
-    asm volatile("movw %0, %%ax\n"                                             \
-                 "movw %%ax, %%es\n"                                           \
-                 "movw %%ax, %%ds\n"                                           \
-                 "movw %%ax, %%fs\n"                                           \
-                 "movw %%ax, %%gs\n"                                           \
-                 "pushl %0\n"                                                  \
-                 "pushl %1\n"                                                  \
-                 "pushl %2\n"                                                  \
-                 "pushl %3\n"                                                  \
-                 "retf" ::"i"(UDATA_SEG),                                      \
-                 "r"(sp),                                                      \
-                 "i"(UCODE_SEG),                                               \
-                 "r"(pc)                                                       \
+static inline void must_inline 
+j_usr(ptr_t sp, ptr_t pc) 
+{
+    asm volatile("movw %0, %%ax\n"
+                 "movw %%ax, %%es\n"
+                 "movw %%ax, %%ds\n"
+                 "movw %%ax, %%fs\n"
+                 "movw %%ax, %%gs\n"
+                 "pushl %0\n"
+                 "pushl %1\n"
+                 "pushl %2\n"
+                 "pushl %3\n"
+                 "retf" ::"i"(UDATA_SEG),
+                 "r"(sp),
+                 "i"(UCODE_SEG),
+                 "r"(pc)
                  : "eax", "memory");
+}
 
 
 static inline void must_inline noret

@@ -1,4 +1,4 @@
-#include <hal/apic_timer.h>
+#include "apic_timer.h"
 #include <hal/hwtimer.h>
 
 #include <lunaix/clock.h>

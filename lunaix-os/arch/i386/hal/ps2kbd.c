@@ -56,6 +56,8 @@
 
 #define PS2_NO_ARG 0xff00
 
+#define PC_AT_IRQ_KBD                   1
+
 struct ps2_cmd
 {
     char cmd;

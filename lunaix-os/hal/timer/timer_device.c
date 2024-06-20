@@ -51,7 +51,7 @@ __hwtimer_ioctl(struct device* dev, u32_t req, va_list args)
 void
 hwtimer_init(u32_t hertz, void* tick_callback)
 {
-    struct hwtimer* hwt_ctx = hwtimer_choose();
+    struct hwtimer* hwt_ctx = select_platform_timer();
 
     hwt_ctx->init(hwt_ctx, hertz, tick_callback);
     hwt_ctx->running_freq = hertz;
