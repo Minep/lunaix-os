@@ -2,7 +2,7 @@
 
 #include <lunaix/mm/mmio.h>
 
-#include <sys/interrupts.h>
+#include <sys/hart.h>
 #include "sys/ioapic.h"
 #include "sys/x86_isa.h"
 

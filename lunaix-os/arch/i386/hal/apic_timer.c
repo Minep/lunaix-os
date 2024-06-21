@@ -23,13 +23,13 @@ static volatile ticks_t systicks = 0;
 static timer_tick_cb tick_cb = NULL;
 
 static void
-temp_intr_routine_apic_timer(const isr_param* param)
+temp_intr_routine_apic_timer(const struct hart_state* state)
 {
     apic_timer_done = 1;
 }
 
 static void
-apic_timer_tick_isr(const isr_param* param)
+apic_timer_tick_isr(const struct hart_state* state)
 {
     systicks++;
 

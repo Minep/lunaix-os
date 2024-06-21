@@ -13,7 +13,7 @@
 #include <sys/cpu.h>
 
 #include "sys/apic.h"
-#include <sys/interrupts.h>
+#include <sys/hart.h>
 
 #include <lunaix/mm/mmio.h>
 #include <lunaix/spike.h>

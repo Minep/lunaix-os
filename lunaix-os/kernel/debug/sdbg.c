@@ -39,31 +39,31 @@ sdbg_serial_callback(struct serial_dev* sdev)
 }
 
 void
-sdbg_imm(const isr_param* param)
+sdbg_imm(const struct hart_state* hstate)
 {
-    struct exec_param* execp = param->execp;
+    struct exec_param* execp = hstate->execp;
     DEBUG("Quick debug mode\n");
     DEBUG("cs=%p eip=%p eax=%p ebx=%p\n",
             execp->cs,
             execp->eip,
-            param->registers.eax,
-            param->registers.ebx);
+            hstate->registers.eax,
+            hstate->registers.ebx);
     DEBUG("ecx=%p edx=%p edi=%p esi=%p\n",
-            param->registers.ecx,
-            param->registers.edx,
-            param->registers.edi,
-            param->registers.esi);
+            hstate->registers.ecx,
+            hstate->registers.edx,
+            hstate->registers.edi,
+            hstate->registers.esi);
     DEBUG("u.esp=%p k.esp=%p ebp=%p ps=%p\n",
-            param->esp,
+            hstate->esp,
             execp->esp,
-            param->registers.ebp,
+            hstate->registers.ebp,
             execp->eflags);
     DEBUG("ss=%p ds=%p es=%p fs=%p gs=%p\n",
             execp->ss,
-            param->registers.ds,
-            param->registers.es,
-            param->registers.fs,
-            param->registers.gs);
+            hstate->registers.ds,
+            hstate->registers.es,
+            hstate->registers.fs,
+            hstate->registers.gs);
     while (1)
         ;
 }
@@ -71,9 +71,9 @@ sdbg_imm(const isr_param* param)
 static char buf[4];
 
 static void
-__sdbg_breakpoint(const isr_param* param)
+__sdbg_breakpoint(const struct hart_state* hstate)
 {
-    gdbstub_loop(param);
+    gdbstub_loop(hstate);
 }
 
 void

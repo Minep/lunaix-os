@@ -1,5 +1,5 @@
 #define __ASM__
-#include <sys/interrupts.h>
+#include <sys/hart.h>
 #include <sys/abi.h>
 #include <sys/interrupt.S.inc>
 
@@ -120,7 +120,7 @@
         # fxrstor (%eax)
 
 1:
-        popl %eax   # discard isr_param::depth
+        popl %eax   # discard struct hart_state::depth
         popl %eax
         popl %ebx
         popl %ecx
@@ -140,7 +140,7 @@
         movl current_thread, %eax
 
         # nested intr: restore saved context
-        popl thread_intr_ctx(%eax)
+        popl thread_hstate(%eax)
 
         addl $8, %esp
 
@@ -195,13 +195,13 @@
             由于这中间没有进行地址空间的交换，所以第二次跳转使用的是同一个内核栈，而之前默认tss.esp0的值是永远指向最顶部
             这样一来就有可能会覆盖更早的上下文信息（比如嵌套的信号捕获函数）
         */
-        movl thread_intr_ctx(%ebx), %ecx      # __current->intr_ctx
+        movl thread_hstate(%ebx), %ecx      # __current->hstate
         movl %ecx, (tss_esp0_off + _tss)
 
         jmp handle_signal
 
     1:
-        movl thread_intr_ctx(%ebx), %eax
+        movl thread_hstate(%ebx), %eax
         jmp soft_iret
 
     .type handle_signal, @function 
@@ -210,13 +210,13 @@
         # 注意1：任何对proc_sig的布局改动，都须及时的保证这里的一致性！
         # 注意2：handle_signal在调用之前，须确保proc_sig已经写入用户栈！
         # arg1 in %eax: addr of proc_sig structure in user stack
-        movl psig_saved_ictx(%eax), %ebx      # %ebx = &proc_sig->saved_ictx
+        movl psig_saved_hstate(%eax), %ebx      # %ebx = &proc_sig->saved_hstate
 
         pushl $UDATA_SEG
         pushl %eax              # esp
 
         movl iexecp(%ebx), %ebx
-        pushl exeflags(%ebx)          # proc_sig->saved_ictx->execp->eflags
+        pushl exeflags(%ebx)          # proc_sig->saved_hstate->execp->eflags
         
         pushl $UCODE_SEG        # cs
         pushl psig_sigact(%eax)           # %eip = proc_sig->sigact

@@ -16,7 +16,7 @@
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
-#include <lunaix/pcontext.h>
+#include <lunaix/hart_state.h>
 
 #include <hal/hwtimer.h>
 

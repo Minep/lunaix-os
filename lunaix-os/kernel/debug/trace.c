@@ -139,7 +139,7 @@ void
 trace_printstack()
 {
     if (current_thread) {
-        trace_printstack_isr(current_thread->intr_ctx);
+        trace_printstack_isr(current_thread->hstate);
     }
     else {
         trace_printstack_of(abi_get_callframe());
@@ -147,25 +147,26 @@ trace_printstack()
 }
 
 static void
-trace_printswctx(const isr_param* p, bool from_usr, bool to_usr)
+trace_printswctx(const struct hart_state* hstate, bool from_usr, bool to_usr)
 {
 
-    struct ksym_entry* sym = trace_sym_lookup(p->execp->eip);
+    struct ksym_entry* sym = trace_sym_lookup(hstate->execp->eip);
 
+    // FIXME: isolation
     DEBUG("^^^^^ --- %s", to_usr ? "user" : "kernel");
     DEBUG("  interrupted on #%d, ecode=%p",
-          p->execp->vector,
-          p->execp->err_code);
+          hart_vector_stamp(hstate),
+          hart_ecause(hstate));
     DEBUG("vvvvv --- %s", from_usr ? "user" : "kernel");
 
-    ptr_t sym_pc = sym ? sym->pc : p->execp->eip;
-    trace_print_code_entry(sym_pc, p->execp->eip, ksym_getstr(sym));
+    ptr_t sym_pc = sym ? sym->pc : hart_pc(hstate);
+    trace_print_code_entry(sym_pc, hart_pc(hstate), ksym_getstr(sym));
 }
 
 void
-trace_printstack_isr(const isr_param* isrm)
+trace_printstack_isr(const struct hart_state* hstate)
 {
-    isr_param* p = isrm;
+    struct hart_state* p = hstate;
     ptr_t fp = abi_get_callframe();
     int prev_usrctx = 0;
 
@@ -184,7 +185,7 @@ trace_printstack_isr(const isr_param* isrm)
             trace_printswctx(p, false, true);
         }
 
-        fp = saved_fp(p);
+        fp = hart_stack_frame(p);
         if (!valid_fp(fp)) {
             DEBUG("??? invalid frame: %p", fp);
             break;
@@ -194,7 +195,7 @@ trace_printstack_isr(const isr_param* isrm)
 
         prev_usrctx = !kernel_context(p);
 
-        p = p->execp->saved_prev_ctx;
+        p = hart_parent_state(p);
     }
 
     DEBUG("----- [trace end] -----\n");

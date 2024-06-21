@@ -7,14 +7,9 @@
 
 #ifndef __ASM__
 #define align_stack(ptr) ((ptr) & stack_alignment)
-#define store_retval(retval) current_thread->intr_ctx->registers.eax = (retval)
+#define store_retval(retval) current_thread->hstate->registers.eax = (retval)
 
-#define store_retval_to(th, retval) (th)->intr_ctx->registers.eax = (retval)
-
-#define eret_target(th) (th)->intr_ctx->execp->eip
-#define eret_stack(th) (th)->intr_ctx->execp->esp
-#define intr_ivec(th) (th)->intr_ctx->execp->vector
-#define intr_ierr(th) (th)->intr_ctx->execp->err_code
+#define store_retval_to(th, retval) (th)->hstate->registers.eax = (retval)
 
 static inline void must_inline 
 j_usr(ptr_t sp, ptr_t pc) 

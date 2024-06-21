@@ -12,7 +12,7 @@
 #include <lunaix/timer.h>
 #include <lunaix/types.h>
 #include <lunaix/spike.h>
-#include <lunaix/pcontext.h>
+#include <lunaix/hart_state.h>
 #include <stdint.h>
 
 
@@ -60,7 +60,7 @@ struct proc_sig
     int sig_num;
     void* sigact;
     void* sighand;
-    isr_param* saved_ictx;
+    struct hart_state* saved_hstate;
 } __attribute__((packed));
 
 
@@ -81,7 +81,7 @@ struct thread
      */
     struct
     {
-        isr_param* intr_ctx;
+        struct hart_state* hstate;
         ptr_t ustack_top;
     };                              // *critical section
 
@@ -133,7 +133,7 @@ struct proc_info
     };
 
     struct proc_mm* mm;
-    struct sigregister* sigreg;
+    struct sigregistry* sigreg;
     struct v_fdtable* fdtable;
     struct v_dnode* cwd;
     struct {
@@ -351,7 +351,7 @@ thread_release_mem(struct thread* thread);
 static inline struct sigact*
 active_signal(struct thread* thread) {
     struct sigctx* sigctx = &thread->sigctx;
-    struct sigregister* sigreg = thread->process->sigreg;
+    struct sigregistry* sigreg = thread->process->sigreg;
     return sigreg->signals[sigctx->sig_active];
 } 
 

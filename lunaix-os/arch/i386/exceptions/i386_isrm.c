@@ -20,7 +20,7 @@ static ptr_t ivhand_payload[TOTAL_IV];
 static struct x86_intc arch_intc_ctx;
 
 extern void
-intr_routine_fallback(const isr_param* param);
+intr_routine_fallback(const struct hart_state* state);
 
 void
 isrm_init()
@@ -126,9 +126,9 @@ isrm_get(int iv)
 }
 
 ptr_t
-isrm_get_payload(const isr_param* param)
+isrm_get_payload(const struct hart_state* state)
 {
-    int iv = param->execp->vector;
+    int iv = state->execp->vector;
     assert(iv < 256);
 
     return ivhand_payload[iv];

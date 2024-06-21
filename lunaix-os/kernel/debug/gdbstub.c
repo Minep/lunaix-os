@@ -1200,10 +1200,10 @@ static volatile int start_debugging = 0;
  * Debug interrupt handler.
  */
 void
-gdbstub_loop(isr_param* param)
+gdbstub_loop(struct hart_state* hstate)
 {
     /* Translate vector to signal */
-    switch (param->execp->vector) {
+    switch (hstate->execp->vector) {
         case 1:
             gdb_state.signum = 5;
             break;
@@ -1215,42 +1215,42 @@ gdbstub_loop(isr_param* param)
     }
 
     /* Load Registers */
-    gdb_state.registers[GDB_CPU_I386_REG_EAX] = param->registers.eax;
-    gdb_state.registers[GDB_CPU_I386_REG_ECX] = param->registers.ecx;
-    gdb_state.registers[GDB_CPU_I386_REG_EDX] = param->registers.edx;
-    gdb_state.registers[GDB_CPU_I386_REG_EBX] = param->registers.ebx;
-    gdb_state.registers[GDB_CPU_I386_REG_ESP] = param->esp;
-    gdb_state.registers[GDB_CPU_I386_REG_EBP] = param->registers.ebp;
-    gdb_state.registers[GDB_CPU_I386_REG_ESI] = param->registers.esi;
-    gdb_state.registers[GDB_CPU_I386_REG_EDI] = param->registers.edi;
-    gdb_state.registers[GDB_CPU_I386_REG_PC] = param->execp->eip;
-    gdb_state.registers[GDB_CPU_I386_REG_CS] = param->execp->cs;
-    gdb_state.registers[GDB_CPU_I386_REG_PS] = param->execp->eflags;
-    gdb_state.registers[GDB_CPU_I386_REG_SS] = param->execp->ss;
-    gdb_state.registers[GDB_CPU_I386_REG_DS] = param->registers.ds;
-    gdb_state.registers[GDB_CPU_I386_REG_ES] = param->registers.es;
-    gdb_state.registers[GDB_CPU_I386_REG_FS] = param->registers.fs;
-    gdb_state.registers[GDB_CPU_I386_REG_GS] = param->registers.gs;
+    gdb_state.registers[GDB_CPU_I386_REG_EAX] = hstate->registers.eax;
+    gdb_state.registers[GDB_CPU_I386_REG_ECX] = hstate->registers.ecx;
+    gdb_state.registers[GDB_CPU_I386_REG_EDX] = hstate->registers.edx;
+    gdb_state.registers[GDB_CPU_I386_REG_EBX] = hstate->registers.ebx;
+    gdb_state.registers[GDB_CPU_I386_REG_ESP] = hstate->esp;
+    gdb_state.registers[GDB_CPU_I386_REG_EBP] = hstate->registers.ebp;
+    gdb_state.registers[GDB_CPU_I386_REG_ESI] = hstate->registers.esi;
+    gdb_state.registers[GDB_CPU_I386_REG_EDI] = hstate->registers.edi;
+    gdb_state.registers[GDB_CPU_I386_REG_PC] = hstate->execp->eip;
+    gdb_state.registers[GDB_CPU_I386_REG_CS] = hstate->execp->cs;
+    gdb_state.registers[GDB_CPU_I386_REG_PS] = hstate->execp->eflags;
+    gdb_state.registers[GDB_CPU_I386_REG_SS] = hstate->execp->ss;
+    gdb_state.registers[GDB_CPU_I386_REG_DS] = hstate->registers.ds;
+    gdb_state.registers[GDB_CPU_I386_REG_ES] = hstate->registers.es;
+    gdb_state.registers[GDB_CPU_I386_REG_FS] = hstate->registers.fs;
+    gdb_state.registers[GDB_CPU_I386_REG_GS] = hstate->registers.gs;
 
     gdb_main(&gdb_state);
 
     /* Restore Registers */
-    param->registers.eax = gdb_state.registers[GDB_CPU_I386_REG_EAX];
-    param->registers.ecx = gdb_state.registers[GDB_CPU_I386_REG_ECX];
-    param->registers.edx = gdb_state.registers[GDB_CPU_I386_REG_EDX];
-    param->registers.ebx = gdb_state.registers[GDB_CPU_I386_REG_EBX];
-    param->esp = gdb_state.registers[GDB_CPU_I386_REG_ESP];
-    param->registers.ebp = gdb_state.registers[GDB_CPU_I386_REG_EBP];
-    param->registers.esi = gdb_state.registers[GDB_CPU_I386_REG_ESI];
-    param->registers.edi = gdb_state.registers[GDB_CPU_I386_REG_EDI];
-    param->execp->eip = gdb_state.registers[GDB_CPU_I386_REG_PC];
-    param->execp->cs = gdb_state.registers[GDB_CPU_I386_REG_CS];
-    param->execp->eflags = gdb_state.registers[GDB_CPU_I386_REG_PS];
-    param->execp->ss = gdb_state.registers[GDB_CPU_I386_REG_SS];
-    param->registers.ds = gdb_state.registers[GDB_CPU_I386_REG_DS];
-    param->registers.es = gdb_state.registers[GDB_CPU_I386_REG_ES];
-    param->registers.fs = gdb_state.registers[GDB_CPU_I386_REG_FS];
-    param->registers.gs = gdb_state.registers[GDB_CPU_I386_REG_GS];
+    hstate->registers.eax = gdb_state.registers[GDB_CPU_I386_REG_EAX];
+    hstate->registers.ecx = gdb_state.registers[GDB_CPU_I386_REG_ECX];
+    hstate->registers.edx = gdb_state.registers[GDB_CPU_I386_REG_EDX];
+    hstate->registers.ebx = gdb_state.registers[GDB_CPU_I386_REG_EBX];
+    hstate->esp = gdb_state.registers[GDB_CPU_I386_REG_ESP];
+    hstate->registers.ebp = gdb_state.registers[GDB_CPU_I386_REG_EBP];
+    hstate->registers.esi = gdb_state.registers[GDB_CPU_I386_REG_ESI];
+    hstate->registers.edi = gdb_state.registers[GDB_CPU_I386_REG_EDI];
+    hstate->execp->eip = gdb_state.registers[GDB_CPU_I386_REG_PC];
+    hstate->execp->cs = gdb_state.registers[GDB_CPU_I386_REG_CS];
+    hstate->execp->eflags = gdb_state.registers[GDB_CPU_I386_REG_PS];
+    hstate->execp->ss = gdb_state.registers[GDB_CPU_I386_REG_SS];
+    hstate->registers.ds = gdb_state.registers[GDB_CPU_I386_REG_DS];
+    hstate->registers.es = gdb_state.registers[GDB_CPU_I386_REG_ES];
+    hstate->registers.fs = gdb_state.registers[GDB_CPU_I386_REG_FS];
+    hstate->registers.gs = gdb_state.registers[GDB_CPU_I386_REG_GS];
 }
 
 /*****************************************************************************

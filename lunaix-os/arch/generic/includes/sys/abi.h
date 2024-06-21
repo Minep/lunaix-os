@@ -11,11 +11,6 @@
 
 #define store_retval_to(th, retval) (void)
 
-#define eret_target(th) (void)
-#define eret_stack(th)  (void)
-#define intr_ivec(th)   (void)
-#define intr_ierr(th)   (void)
-
 static inline void must_inline noret
 j_usr(ptr_t sp, ptr_t pc) 
 {

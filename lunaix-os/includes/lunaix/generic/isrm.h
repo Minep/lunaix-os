@@ -12,9 +12,9 @@
 #define __LUNAIX_ISRM_H
 
 #include <lunaix/types.h>
-#include <lunaix/pcontext.h>
+#include <lunaix/hart_state.h>
 
-typedef void (*isr_cb)(const isr_param*);
+typedef void (*isr_cb)(const struct hart_state*);
 
 void
 isrm_init();
@@ -70,7 +70,7 @@ isr_cb
 isrm_get(int iv);
 
 ptr_t
-isrm_get_payload(const isr_param*);
+isrm_get_payload(const struct hart_state*);
 
 void
 isrm_set_payload(int iv, ptr_t);

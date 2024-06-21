@@ -7,15 +7,15 @@
 LOG_MODULE("io_evt")
 
 void
-ahci_hba_isr(const isr_param* param)
+ahci_hba_isr(const struct hart_state* hstate)
 {
     struct ahci_hba* hba;
     struct ahci_driver *pos, *n;
-    struct llist_header* ahcis = (struct llist_header*)isrm_get_payload(param);
+    struct llist_header* ahcis = (struct llist_header*)isrm_get_payload(hstate);
 
     llist_for_each(pos, n, ahcis, ahci_drvs)
     {
-        if (pos->id == (int)param->execp->vector) {
+        if (pos->id == hart_vector_stamp(hstate)) {
             hba = &pos->hba;
             goto proceed;
         }

@@ -4,7 +4,7 @@
 #include <lunaix/spike.h>
 
 #include "sys/i386_intr.h"
-#include "sys/interrupts.h"
+#include "sys/hart.h"
 
 #include "hal/apic_timer.h"
 
@@ -17,7 +17,7 @@ exception_init()
 }
 
 extern void
-syscall_hndlr(const isr_param* param);
+syscall_hndlr(const struct hart_state* hstate);
 
 void
 arch_preinit()

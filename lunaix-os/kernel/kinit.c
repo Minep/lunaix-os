@@ -16,7 +16,7 @@
 #include <lunaix/trace.h>
 #include <lunaix/tty/tty.h>
 #include <lunaix/owloysius.h>
-#include <lunaix/pcontext.h>
+#include <lunaix/hart_state.h>
 
 #include <hal/acpi/acpi.h>
 

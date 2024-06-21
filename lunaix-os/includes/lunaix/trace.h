@@ -2,7 +2,7 @@
 #define __LUNAIX_TRACE_H
 
 #include <lunaix/boot_generic.h>
-#include <lunaix/pcontext.h>
+#include <lunaix/hart_state.h>
 
 struct ksym_entry
 {
@@ -77,7 +77,7 @@ trace_printstack_of(ptr_t fp);
  * @param isrm
  */
 void
-trace_printstack_isr(const isr_param* isrm);
+trace_printstack_isr(const struct hart_state* hstate);
 
 /**
  * @brief Print the stack trace starting from caller's frame pointer.

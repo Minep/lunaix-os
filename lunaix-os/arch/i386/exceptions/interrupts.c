@@ -1,6 +1,6 @@
 #include <sys/cpu.h>
 #include <sys/i386_intr.h>
-#include <sys/interrupts.h>
+#include <sys/hart.h>
 #include "sys/x86_isa.h"
 
 #include "sys/x86_isa.h"
@@ -14,30 +14,30 @@
 LOG_MODULE("INTR")
 
 static inline void
-update_thread_context(isr_param* param)
+update_thread_context(struct hart_state* state)
 {
     if (!current_thread) {
         return;
     }
 
-    isr_param* ppctx = current_thread->intr_ctx;
-    param->execp->saved_prev_ctx = ppctx;
-    current_thread->intr_ctx = param;
+    struct hart_state* parent = current_thread->hstate;
+    hart_push_state(parent, state);
+    current_thread->hstate = state;
 
-    if (ppctx) {
-        param->depth = ppctx->depth + 1;
+    if (parent) {
+        state->depth = parent->depth + 1;
     }
 }
 
 void
-intr_handler(isr_param* param)
+intr_handler(struct hart_state* state)
 {
-    update_thread_context(param);
+    update_thread_context(state);
 
-    volatile struct exec_param* execp = param->execp;
+    volatile struct exec_param* execp = state->execp;
     if (execp->vector <= 255) {
         isr_cb subscriber = isrm_get(execp->vector);
-        subscriber(param);
+        subscriber(state);
         goto done;
     }
 

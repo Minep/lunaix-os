@@ -13,7 +13,7 @@
 #include <lunaix/generic/isrm.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/status.h>
-#include <lunaix/pcontext.h>
+#include <lunaix/hart_state.h>
 
 #include <hal/hwrtc.h>
 
@@ -145,9 +145,9 @@ mc146818_check_support(struct hwrtc* rtc)
 }
 
 static void
-__rtc_tick(const isr_param* param)
+__rtc_tick(const struct hart_state* hstate)
 {
-    struct mc146818* state = (struct mc146818*)isrm_get_payload(param);
+    struct mc146818* state = (struct mc146818*)isrm_get_payload(hstate);
 
     state->tick_counts++;
 

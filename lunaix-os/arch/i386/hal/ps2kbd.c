@@ -5,7 +5,7 @@
 #include <lunaix/keyboard.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
-#include <lunaix/pcontext.h>
+#include <lunaix/hart_state.h>
 
 #include "sys/x86_isa.h"
 
@@ -189,7 +189,7 @@ static struct input_device* kbd_idev;
 // #define KBD_DBGLOG
 
 static void
-intr_ps2_kbd_handler(const isr_param* param);
+intr_ps2_kbd_handler(const struct hart_state* hstate);
 
 static u8_t
 ps2_issue_cmd_wretry(char cmd, u16_t arg);
@@ -401,7 +401,7 @@ kbd_buffer_key_event(kbd_keycode_t key, u8_t scancode, kbd_kstate_t state)
 }
 
 static void
-intr_ps2_kbd_handler(const isr_param* param)
+intr_ps2_kbd_handler(const struct hart_state* hstate)
 {
 
     // This is important! Don't believe me? try comment it out and run on Bochs!

@@ -59,6 +59,6 @@ struct ahci_driver*
 ahci_driver_init(struct ahci_driver_param* param);
 
 void
-ahci_hba_isr(const isr_param* param);
+ahci_hba_isr(const struct hart_state* hstate);
 
 #endif /* __LUNAIX_AHCI_H */

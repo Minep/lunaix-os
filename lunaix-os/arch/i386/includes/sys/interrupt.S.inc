@@ -30,8 +30,8 @@ igs:
 iexecp:
 iesp:
     .struct iesp + regsize
-isave_prev:
-    .struct isave_prev + regsize
+isave_parent:
+    .struct isave_parent + regsize
 ivec:
     .struct ivec + regsize
 iecode:
@@ -67,8 +67,8 @@ exuss:
 
 /* struct layout: critical section of struct proc_info */
     .struct 0
-thread_intr_ctx:
-    .struct thread_intr_ctx + regsize
+thread_hstate:
+    .struct thread_hstate + regsize
 thread_ustack_top:
 
 /* struct layout: proc_sig */
@@ -79,4 +79,4 @@ psig_sigact:
     .struct psig_sigact + regsize
 psig_sighand:
     .struct psig_sighand + regsize
-psig_saved_ictx:
+psig_saved_hstate:
