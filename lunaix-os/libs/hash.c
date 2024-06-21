@@ -1,4 +1,4 @@
-#include <lib/hash.h>
+#include <klibc/hash.h>
 #include <lunaix/compiler.h>
 
 /**

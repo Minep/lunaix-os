@@ -1,5 +1,5 @@
 #define __LUNAIX_LIBC
-#include <klibc/stdlib.h>
+#include <klibc/ia_utils.h>
 #include <klibc/strfmt.h>
 #include <klibc/string.h>
 #include <lunaix/types.h>

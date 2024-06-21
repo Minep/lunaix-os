@@ -41,7 +41,7 @@ Before jumping to `kernel_bootstrap`, one
 
 ## Alternative Implementation
 
-Most functions in `klib` can be override by an architectural port. To achieve
+Most functions in `klibc` can be override by an architectural port. To achieve
 this, one just need to add definition of such function. This allow port to 
 provide better performance on these library functions by exploiting the
 architectural specific feature.
@@ -49,5 +49,5 @@ architectural specific feature.
 All non-static function from these header can be overriden:
 
 + `klibc/string.h`
-+ `lib/crc.h`
-+ `lib/hash.h`
++ `klibc/crc.h`
++ `klibc/hash.h`
