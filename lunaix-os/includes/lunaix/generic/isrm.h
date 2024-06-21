@@ -75,4 +75,23 @@ isrm_get_payload(const isr_param*);
 void
 isrm_set_payload(int iv, ptr_t);
 
+void
+isrm_irq_attach(int irq, int iv, cpu_t dest, u32_t flags);
+
+/**
+ * @brief Notify end of interrupt event
+ *
+ * @param id
+ */
+void
+isrm_notify_eoi(cpu_t id, int iv);
+
+/**
+ * @brief Notify end of scheduling event
+ *
+ * @param id
+ */
+void
+isrm_notify_eos(cpu_t id);
+
 #endif /* __LUNAIX_ISRM_H */

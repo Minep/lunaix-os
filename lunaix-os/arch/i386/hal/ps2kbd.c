@@ -1,13 +1,13 @@
 #include <lunaix/clock.h>
 #include <lunaix/ds/mutex.h>
 #include <lunaix/input.h>
-#include <lunaix/isrm.h>
+#include <lunaix/generic/isrm.h>
 #include <lunaix/keyboard.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
 #include <lunaix/pcontext.h>
 
-#include <hal/intc.h>
+#include "sys/x86_isa.h"
 
 #include <klibc/string.h>
 

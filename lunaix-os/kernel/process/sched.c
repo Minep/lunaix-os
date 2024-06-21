@@ -1,7 +1,6 @@
 #include <sys/abi.h>
 #include <sys/mm/mempart.h>
 
-#include <hal/intc.h>
 #include <sys/cpu.h>
 
 #include <lunaix/fs/taskfs.h>
@@ -20,6 +19,8 @@
 #include <lunaix/syslog.h>
 #include <lunaix/pcontext.h>
 #include <lunaix/kpreempt.h>
+
+#include <lunaix/generic/isrm.h>
 
 #include <klibc/string.h>
 
@@ -207,7 +208,7 @@ schedule()
     sched_ctx.procs_index = to_check->process->pid;
 
 done:
-    intc_notify_eos(0);
+    isrm_notify_eos(0);
     run(to_check);
 
     fail("unexpected return from scheduler");

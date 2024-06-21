@@ -1,32 +1,53 @@
-Lunaix kernel arch specific ABI
-======
+# Porting Lunaix to Other ISAs
 
-This document provides a checklist if one wants to add support for novel architecture
+This document briefly describe how to add support for other ISA
 
-(It is far from complete, as the refactoring is going on)
+## Adding Implementations
 
-Implementation checklist:
-    [ ] An entry point that recieve control from second stage bootloader.
-    [ ] Interrupt vectoring must be done before invoking kernel_bootstrap.
-    [ ] Prepare the boot_handoff state struct, according to system info provided
-        by upstream bootloader
-    [ ] Invoke the kernel_bootstrap, pass the boot_handoff as it's only argument
-        This will transfer the control to Lunaix kernel.
-    [ ] A syscall handler, syscall table, and the syscall vectoring
-    [ ] A interrupt handler, must take care of context save/restore, signal handling
-    [ ] A system virtual memory map
-    [ ] Implement the following abstractions
- 
-Referenced headers
-    * <some_arch>/includes/sys/abi.h
-    * <some_arch>/includes/sys/interrupt.h
-    * <some_arch>/includes/sys/port_io.h
-    * <some_arch>/includes/sys/pci_hba.h
-    * <some_arch>/includes/mm/mempart.h
-    * <some_arch>/includes/cpu.h
+Lunaix provide bunch of headers that **MUST** be implemented.
 
-Referenced functions
-    * includes/hal/hwtimer.h:select_platform_timer
-    * includes/hal/hwrtc.h:hwrtc_choose
-    * includes/hal/intc.h:intc_init
-    * includes/lunaix/process.h:proc_init_transfer
++ Follow the structure and derive the template header files according to
+  `arch/generic/includes`. You must copy the header file and add your own
+  declaration & other stuffs. You must not remove or modify the data structure,
+  function signature and any declaration that already in the template header
+  files unless stated explicitly.
+
++ Add implementation to function signature defined in header files under 
+  `includes/lunaix/generic`
+
++ Add implementation of syscall dispatching (Reference: `arhc/i386/syscall.S`)  
+
++ Add implementation of interrupt handler dispatching  (Reference:
+  `arhc/i386/exceptions/intrhnds.S`)  
+
++ Add implementation of context switching, signal handling. (Reference:
+  `arhc/i386/exceptions/interrupt.S`)  
+  **TODO: make this procedure more standalone**
+
+## Preparing the Flows
+
+When system boot up, Lunaix start the execution from `start_`, and then the
+control flow will transfer to the `kinit.c::kernel_bootstrap`. A boot hand-over 
+context `struct boot_handoff*` must passed to the bootstrap procedure.
+
+Before jumping to `kernel_bootstrap`, one
+
++ Must constructure a proper `struct boot_handoff` context.
++ Must remap the kernel to architecturally favoured address range. 
+    **TODO: the algorithm for doing kernel remapping should be arch-agnostic**
++ Must perform any essential CPU statet initialization, for example, setting up
+  address translation scheme, enable/disable ISA extensions, probing CPU/SOC
+  features.
+
+## Alternative Implementation
+
+Most functions in `klib` can be override by an architectural port. To achieve
+this, one just need to add definition of such function. This allow port to 
+provide better performance on these library functions by exploiting the
+architectural specific feature.
+
+All non-static function from these header can be overriden:
+
++ `klibc/string.h`
++ `lib/crc.h`
++ `lib/hash.h`

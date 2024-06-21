@@ -1,6 +1,6 @@
 #include <sys/interrupts.h>
 
-#include <lunaix/isrm.h>
+#include <lunaix/generic/isrm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/spike.h>
@@ -10,7 +10,7 @@
 
 #include <klibc/strfmt.h>
 
-#include <sys/apic.h>
+#include "sys/apic.h"
 #include <sys/i386_intr.h>
 
 LOG_MODULE("INTR")

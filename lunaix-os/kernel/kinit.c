@@ -19,7 +19,6 @@
 #include <lunaix/pcontext.h>
 
 #include <hal/acpi/acpi.h>
-#include <hal/intc.h>
 
 #include <sys/abi.h>
 #include <sys/mm/mm_defs.h>
@@ -59,12 +58,9 @@ kernel_bootstrap(struct boot_handoff* bhctx)
 
     device_scan_drivers();
 
-    invoke_init_function(on_earlyboot);
-
     device_sysconf_load();
 
-    /* Get intc online, this is the cornerstone when initing devices */
-    intc_init();
+    invoke_init_function(on_earlyboot);
 
     clock_init();
     timer_init();

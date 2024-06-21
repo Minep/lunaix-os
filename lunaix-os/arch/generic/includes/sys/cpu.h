@@ -23,73 +23,49 @@ cpu_trap_panic(char* message);
  *
  * @return ptr_t
  */
-static inline ptr_t
-cpu_ldstate()
-{
-    return 0;
-}
+ptr_t
+cpu_ldstate();
 
 /**
  * @brief Load current processor config
  *
  * @return ptr_t
  */
-static inline ptr_t
-cpu_ldconfig()
-{
-    return 0;
-}
+ptr_t
+cpu_ldconfig();
 
 /**
  * @brief Change current processor state
  *
  * @return ptr_t
  */
-static inline void
-cpu_chconfig(ptr_t val)
-{
-    return;
-}
+void
+cpu_chconfig(ptr_t val);
 
 /**
  * @brief Change current virtual memory space
  *
  * @return ptr_t
  */
-static inline void
-cpu_chvmspace(ptr_t val)
-{
-    return;
-}
+void
+cpu_chvmspace(ptr_t val);
 
-static inline void
-cpu_enable_interrupt()
-{
-    return;
-}
+void
+cpu_enable_interrupt();
 
-static inline void
-cpu_disable_interrupt()
-{
-    return;
-}
+void
+cpu_disable_interrupt();
 
-static inline void
-cpu_wait()
-{
-    return;
-}
+void
+cpu_wait();
 
 /**
  * @brief Read exeception address
  *
  * @return ptr_t
  */
-static inline ptr_t
-cpu_ldeaddr()
-{
-    return 0;
-}
+ptr_t
+cpu_ldeaddr();
 
 
 #endif /* __LUNAIX_CPU_H */

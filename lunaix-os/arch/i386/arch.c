@@ -1,11 +1,10 @@
-#include <hal/hwrtc.h>
 #include <hal/hwtimer.h>
 
-#include <lunaix/isrm.h>
+#include <lunaix/generic/isrm.h>
 #include <lunaix/spike.h>
 
-#include <sys/i386_intr.h>
-#include <sys/interrupts.h>
+#include "sys/i386_intr.h"
+#include "sys/interrupts.h"
 
 #include "hal/apic_timer.h"
 

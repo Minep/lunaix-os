@@ -1,11 +1,11 @@
 #include <sys/cpu.h>
 #include <sys/i386_intr.h>
 #include <sys/interrupts.h>
-#include <sys/x86_isa.h>
+#include "sys/x86_isa.h"
 
-#include <hal/intc.h>
+#include "sys/x86_isa.h"
 
-#include <lunaix/isrm.h>
+#include <lunaix/generic/isrm.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
@@ -50,7 +50,7 @@ intr_handler(isr_param* param)
 done:
 
     if (execp->vector > IV_BASE_END) {
-        intc_notify_eoi(0, execp->vector);
+        isrm_notify_eoi(0, execp->vector);
     }
 
     return;

@@ -10,7 +10,7 @@
  *
  */
 
-#include <lunaix/isrm.h>
+#include <lunaix/generic/isrm.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/status.h>
 #include <lunaix/pcontext.h>

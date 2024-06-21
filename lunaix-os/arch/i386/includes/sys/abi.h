@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_I386ABI_H
 #define __LUNAIX_I386ABI_H
 
-#include <sys/x86_isa.h>
+#include "sys/x86_isa.h"
 
 #define stack_alignment 0xfffffff0
 

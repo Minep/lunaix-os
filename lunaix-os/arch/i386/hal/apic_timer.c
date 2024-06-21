@@ -3,11 +3,11 @@
 
 #include <lunaix/clock.h>
 #include <lunaix/compiler.h>
-#include <lunaix/isrm.h>
+#include <lunaix/generic/isrm.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 
-#include <sys/apic.h>
+#include "sys/apic.h"
 
 LOG_MODULE("APIC_TIMER")
 

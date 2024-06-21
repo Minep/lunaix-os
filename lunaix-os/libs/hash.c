@@ -1,4 +1,5 @@
 #include <lib/hash.h>
+#include <lunaix/compiler.h>
 
 /**
  * @brief Simple string hash function
@@ -8,7 +9,7 @@
  * @param str
  * @return unsigned int
  */
-u32_t
+u32_t weak
 strhash_32(const char* str, u32_t truncate_to)
 {
     if (!str)

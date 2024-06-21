@@ -1,4 +1,5 @@
 #include <lib/crc.h>
+#include <lunaix/compiler.h>
 
 // crc32 lookup table. (https://web.mit.edu/freebsd/head/sys/libkern/crc32.c)
 const unsigned int crc32_tab[] = {
@@ -54,7 +55,7 @@ const unsigned int crc32_tab[] = {
  * @param size
  * @return unsigned int
  */
-unsigned int
+unsigned int weak
 crc32b(unsigned char* data, unsigned int size)
 {
     unsigned int crc = (unsigned int)-1, i = 0;

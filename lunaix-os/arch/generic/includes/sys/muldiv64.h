@@ -5,22 +5,11 @@
 #include <lunaix/spike.h>
 #include <lunaix/types.h>
 
-#define do_udiv64(n, base)                                                     \
-    ({ 0; })
+u64_t
+udiv64(u64_t n, unsigned int base);
 
-static inline u64_t
-udiv64(u64_t n, unsigned int base)
-{
-    do_udiv64(n, base);
-
-    return n;
-}
-
-static inline unsigned int
-umod64(u64_t n, unsigned int base)
-{
-    return do_udiv64(n, base);
-}
+unsigned int
+umod64(u64_t n, unsigned int base);
 
 
 #endif /* __LUNAIX_ARCH_MULDIV64_H */

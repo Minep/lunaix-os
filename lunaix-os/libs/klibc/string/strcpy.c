@@ -1,6 +1,7 @@
 #include <klibc/string.h>
+#include <lunaix/compiler.h>
 
-char*
+char* weak
 strcpy(char* dest, const char* src)
 {
     char c;
@@ -13,7 +14,7 @@ strcpy(char* dest, const char* src)
     return &dest[i];
 }
 
-char*
+char* weak
 strncpy(char* dest, const char* src, unsigned long n)
 {
     char c;

@@ -1,10 +1,10 @@
 #include <hal/acpi/acpi.h>
-#include <hal/intc.h>
 
 #include <lunaix/mm/mmio.h>
 
 #include <sys/interrupts.h>
-#include <sys/ioapic.h>
+#include "sys/ioapic.h"
+#include "sys/x86_isa.h"
 
 #define IOAPIC_IOREGSEL 0x00
 #define IOAPIC_IOWIN 0x10
@@ -56,7 +56,7 @@ ioapic_read(u8_t sel)
 }
 
 void
-ioapic_irq_remap(struct intc_context*, int irq, int iv, cpu_t dest, u32_t flags)
+ioapic_irq_remap(struct x86_intc* intc, int irq, int iv, cpu_t dest, u32_t flags)
 {
     /*
         FIXME move it to HAL level. since every platform might have their own

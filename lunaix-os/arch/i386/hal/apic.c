@@ -9,10 +9,10 @@
  *
  */
 
-#include <hal/intc.h>
+#include "sys/x86_isa.h"
 #include <sys/cpu.h>
 
-#include <sys/apic.h>
+#include "sys/apic.h"
 #include <sys/interrupts.h>
 
 #include <lunaix/mm/mmio.h>
@@ -102,7 +102,7 @@ apic_setup_lvts()
 }
 
 void
-apic_on_eoi(struct intc_context* intc_ctx, cpu_t cpu, int iv)
+apic_on_eoi(struct x86_intc* intc_ctx, cpu_t cpu, int iv)
 {
     // for all external interrupts except the spurious interrupt
     //  this is required by Intel Manual Vol.3A, section 10.8.1 & 10.8.5

@@ -7,7 +7,7 @@
 #include <sdbg/lsdbg.h>
 #include <sdbg/protocol.h>
 
-#include <lunaix/isrm.h>
+#include <lunaix/generic/isrm.h>
 
 // #define USE_LSDBG_BACKEND
 

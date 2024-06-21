@@ -9,7 +9,7 @@
  *
  */
 #include <lunaix/device.h>
-#include <lunaix/isrm.h>
+#include <lunaix/generic/isrm.h>
 
 #include <sys/port_io.h>
 

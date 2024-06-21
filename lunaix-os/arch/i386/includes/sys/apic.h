@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_APIC_H
 #define __LUNAIX_APIC_H
 
-#include <hal/intc.h>
+#include "sys/x86_isa.h"
 #include <lunaix/types.h>
 
 #define __APIC_BASE_PADDR 0xFEE00000
@@ -76,6 +76,6 @@ void
 apic_init();
 
 void
-apic_on_eoi(struct intc_context* intc_ctx, cpu_t cpu, int iv);
+apic_on_eoi(struct x86_intc* intc_ctx, cpu_t cpu, int iv);
 
 #endif /* __LUNAIX_APIC_H */
