@@ -25,7 +25,7 @@ trace_log(const char* fmt, ...)
     va_list args;
     va_start(args, fmt);
 
-    kprintf_m(KDEBUG, fmt, args);
+    kprintf_m("TRACE", fmt, args);
 
     va_end(args);
 }

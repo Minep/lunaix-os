@@ -35,54 +35,10 @@
 #include <hal/serial.h>
 #include <klibc/string.h>
 #include <sdbg/gdbstub.h>
+
 #include <sys/port_io.h>
-
-/*****************************************************************************
- * Types
- ****************************************************************************/
-
-#ifndef GDBSTUB_DONT_DEFINE_STDINT_TYPES
-typedef unsigned char u8_t;
-typedef unsigned short u16_t;
-typedef unsigned long uint32_t;
-#endif
-
-typedef unsigned int address;
-typedef unsigned int reg;
-
-enum GDB_REGISTER
-{
-    GDB_CPU_I386_REG_EAX = 0,
-    GDB_CPU_I386_REG_ECX = 1,
-    GDB_CPU_I386_REG_EDX = 2,
-    GDB_CPU_I386_REG_EBX = 3,
-    GDB_CPU_I386_REG_ESP = 4,
-    GDB_CPU_I386_REG_EBP = 5,
-    GDB_CPU_I386_REG_ESI = 6,
-    GDB_CPU_I386_REG_EDI = 7,
-    GDB_CPU_I386_REG_PC = 8,
-    GDB_CPU_I386_REG_PS = 9,
-    GDB_CPU_I386_REG_CS = 10,
-    GDB_CPU_I386_REG_SS = 11,
-    GDB_CPU_I386_REG_DS = 12,
-    GDB_CPU_I386_REG_ES = 13,
-    GDB_CPU_I386_REG_FS = 14,
-    GDB_CPU_I386_REG_GS = 15,
-    GDB_CPU_NUM_REGISTERS = 16
-};
-
-struct gdb_state
-{
-    int signum;
-    struct serial_dev* sdev;
-    reg registers[GDB_CPU_NUM_REGISTERS];
-};
-
-/*****************************************************************************
- *
- *  GDB Remote Serial Protocol
- *
- ****************************************************************************/
+#include <sys/cpu.h>
+#include <sys/gdbstub.h>
 
 /*****************************************************************************
  * Macros
@@ -90,13 +46,7 @@ struct gdb_state
 
 #define GDB_PRINT(...)
 
-#define COM_PORT SERIAL_COM1
-
 #define GDB_EOF (-1)
-
-#ifndef NULL
-#define NULL ((void*)0)
-#endif
 
 #ifndef GDB_ASSERT
 #define GDB_ASSERT(x)                                                          \
@@ -119,13 +69,10 @@ gdb_sys_getc(struct gdb_state* state);
 int
 gdb_sys_putchar(struct gdb_state* state, int ch);
 int
-gdb_sys_mem_readb(struct gdb_state* state, address addr, char* val);
+gdb_sys_mem_readb(struct gdb_state* state, ptr_t addr, char* val);
 int
-gdb_sys_mem_writeb(struct gdb_state* state, address addr, char val);
-int
-gdb_sys_continue(struct gdb_state* state);
-int
-gdb_sys_step(struct gdb_state* state);
+gdb_sys_mem_writeb(struct gdb_state* state, ptr_t addr, char val);
+
 
 /*****************************************************************************
  * Types
@@ -159,9 +106,7 @@ gdb_read(struct gdb_state* state,
          unsigned int buf_len,
          unsigned int len);
 
-/* String processing helper functions */
-static int
-gdb_strlen(const char* ch);
+
 static char
 gdb_get_digit(int val);
 static int
@@ -228,14 +173,14 @@ static int
 gdb_mem_read(struct gdb_state* state,
              char* buf,
              unsigned int buf_len,
-             address addr,
+             ptr_t addr,
              unsigned int len,
              gdb_enc_func enc);
 static int
 gdb_mem_write(struct gdb_state* state,
               const char* buf,
               unsigned int buf_len,
-              address addr,
+              ptr_t addr,
               unsigned int len,
               gdb_dec_func dec);
 static int
@@ -246,22 +191,6 @@ gdb_step(struct gdb_state* state);
 /*****************************************************************************
  * String Processing Helper Functions
  ****************************************************************************/
-
-/*
- * Get null-terminated string length.
- */
-static int
-gdb_strlen(const char* ch)
-{
-    int len;
-
-    len = 0;
-    while (*ch++) {
-        len += 1;
-    }
-
-    return len;
-}
 
 /*
  * Get integer value for a string representation.
@@ -703,7 +632,7 @@ static int
 gdb_mem_read(struct gdb_state* state,
              char* buf,
              unsigned int buf_len,
-             address addr,
+             ptr_t addr,
              unsigned int len,
              gdb_enc_func enc)
 {
@@ -733,7 +662,7 @@ static int
 gdb_mem_write(struct gdb_state* state,
               const char* buf,
               unsigned int buf_len,
-              address addr,
+              ptr_t addr,
               unsigned int len,
               gdb_dec_func dec)
 {
@@ -811,7 +740,7 @@ gdb_send_conmsg_packet(struct gdb_state* state,
     }
 
     buf[0] = 'O';
-    status = gdb_enc_hex(&buf[1], buf_len - 1, msg, gdb_strlen(msg));
+    status = gdb_enc_hex(&buf[1], buf_len - 1, msg, strlen(msg));
     if (status == GDB_EOF) {
         return GDB_EOF;
     }
@@ -925,7 +854,7 @@ gdb_read(struct gdb_state* state,
 int
 gdb_main(struct gdb_state* state)
 {
-    address addr;
+    ptr_t addr;
     char pkt_buf[256];
     int status;
     unsigned int length;
@@ -1162,36 +1091,6 @@ gdb_main(struct gdb_state* state)
     return 0;
 }
 
-/*****************************************************************************
- * Types
- ****************************************************************************/
-
-struct gdb_idtr
-{
-    u16_t len;
-    uint32_t offset;
-} __attribute__((packed));
-
-struct gdb_idt_gate
-{
-    u16_t offset_low;
-    u16_t segment;
-    u16_t flags;
-    u16_t offset_high;
-} __attribute__((packed));
-
-/*****************************************************************************
- * Prototypes
- ****************************************************************************/
-#define gdb_x86_io_write_8(port, val) port_wrbyte(port, val)
-#define gdb_x86_io_read_8(port) port_rdbyte(port)
-
-#define gdb_x86_serial_getc() serial_rx_byte(COM_PORT)
-#define gdb_x86_serial_putchar(ch) serial_tx_byte(COM_PORT, ch)
-
-#ifdef __STRICT_ANSI__
-#define asm __asm__
-#endif
 
 static struct gdb_state gdb_state;
 static volatile int start_debugging = 0;
@@ -1202,55 +1101,12 @@ static volatile int start_debugging = 0;
 void
 gdbstub_loop(struct hart_state* hstate)
 {
-    /* Translate vector to signal */
-    switch (hstate->execp->vector) {
-        case 1:
-            gdb_state.signum = 5;
-            break;
-        case 3:
-            gdb_state.signum = 5;
-            break;
-        default:
-            gdb_state.signum = 7;
-    }
-
-    /* Load Registers */
-    gdb_state.registers[GDB_CPU_I386_REG_EAX] = hstate->registers.eax;
-    gdb_state.registers[GDB_CPU_I386_REG_ECX] = hstate->registers.ecx;
-    gdb_state.registers[GDB_CPU_I386_REG_EDX] = hstate->registers.edx;
-    gdb_state.registers[GDB_CPU_I386_REG_EBX] = hstate->registers.ebx;
-    gdb_state.registers[GDB_CPU_I386_REG_ESP] = hstate->esp;
-    gdb_state.registers[GDB_CPU_I386_REG_EBP] = hstate->registers.ebp;
-    gdb_state.registers[GDB_CPU_I386_REG_ESI] = hstate->registers.esi;
-    gdb_state.registers[GDB_CPU_I386_REG_EDI] = hstate->registers.edi;
-    gdb_state.registers[GDB_CPU_I386_REG_PC] = hstate->execp->eip;
-    gdb_state.registers[GDB_CPU_I386_REG_CS] = hstate->execp->cs;
-    gdb_state.registers[GDB_CPU_I386_REG_PS] = hstate->execp->eflags;
-    gdb_state.registers[GDB_CPU_I386_REG_SS] = hstate->execp->ss;
-    gdb_state.registers[GDB_CPU_I386_REG_DS] = hstate->registers.ds;
-    gdb_state.registers[GDB_CPU_I386_REG_ES] = hstate->registers.es;
-    gdb_state.registers[GDB_CPU_I386_REG_FS] = hstate->registers.fs;
-    gdb_state.registers[GDB_CPU_I386_REG_GS] = hstate->registers.gs;
-
+    arch_gdbstub_setup_state(&gdb_state, hstate);
+    arch_gdbstub_save_regs(&gdb_state, hstate);
+    
     gdb_main(&gdb_state);
 
-    /* Restore Registers */
-    hstate->registers.eax = gdb_state.registers[GDB_CPU_I386_REG_EAX];
-    hstate->registers.ecx = gdb_state.registers[GDB_CPU_I386_REG_ECX];
-    hstate->registers.edx = gdb_state.registers[GDB_CPU_I386_REG_EDX];
-    hstate->registers.ebx = gdb_state.registers[GDB_CPU_I386_REG_EBX];
-    hstate->esp = gdb_state.registers[GDB_CPU_I386_REG_ESP];
-    hstate->registers.ebp = gdb_state.registers[GDB_CPU_I386_REG_EBP];
-    hstate->registers.esi = gdb_state.registers[GDB_CPU_I386_REG_ESI];
-    hstate->registers.edi = gdb_state.registers[GDB_CPU_I386_REG_EDI];
-    hstate->execp->eip = gdb_state.registers[GDB_CPU_I386_REG_PC];
-    hstate->execp->cs = gdb_state.registers[GDB_CPU_I386_REG_CS];
-    hstate->execp->eflags = gdb_state.registers[GDB_CPU_I386_REG_PS];
-    hstate->execp->ss = gdb_state.registers[GDB_CPU_I386_REG_SS];
-    hstate->registers.ds = gdb_state.registers[GDB_CPU_I386_REG_DS];
-    hstate->registers.es = gdb_state.registers[GDB_CPU_I386_REG_ES];
-    hstate->registers.fs = gdb_state.registers[GDB_CPU_I386_REG_FS];
-    hstate->registers.gs = gdb_state.registers[GDB_CPU_I386_REG_GS];
+    arch_gdbstub_restore_regs(&gdb_state, hstate);
 }
 
 /*****************************************************************************
@@ -1282,7 +1138,7 @@ gdb_sys_getc(struct gdb_state* state)
  * Read one byte from memory.
  */
 int
-gdb_sys_mem_readb(struct gdb_state* state, address addr, char* val)
+gdb_sys_mem_readb(struct gdb_state* state, ptr_t addr, char* val)
 {
     *val = *(volatile char*)addr;
     return 0;
@@ -1292,28 +1148,8 @@ gdb_sys_mem_readb(struct gdb_state* state, address addr, char* val)
  * Write one byte to memory.
  */
 int
-gdb_sys_mem_writeb(struct gdb_state* state, address addr, char val)
+gdb_sys_mem_writeb(struct gdb_state* state, ptr_t addr, char val)
 {
     *(volatile char*)addr = val;
-    return 0;
-}
-
-/*
- * Continue program execution.
- */
-int
-gdb_sys_continue(struct gdb_state* state)
-{
-    gdb_state.registers[GDB_CPU_I386_REG_PS] &= ~(1 << 8);
-    return 0;
-}
-
-/*
- * Single step the next instruction.
- */
-int
-gdb_sys_step(struct gdb_state* state)
-{
-    gdb_state.registers[GDB_CPU_I386_REG_PS] |= 1 << 8;
     return 0;
 }

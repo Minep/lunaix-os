@@ -21,9 +21,9 @@ cpu_trap_panic(char* message);
 /**
  * @brief Load current processor state
  *
- * @return u32_t
+ * @return reg_t
  */
-static inline u32_t
+static inline reg_t
 cpu_ldstate()
 {
     ptr_t val;
@@ -36,12 +36,12 @@ cpu_ldstate()
 /**
  * @brief Load current processor config
  *
- * @return u32_t
+ * @return reg_t
  */
-static inline u32_t
+static inline reg_t
 cpu_ldconfig()
 {
-    ptr_t val;
+    reg_t val;
     asm volatile("movl %%cr0,%0" : "=r"(val));
     return val;
 }
@@ -49,10 +49,10 @@ cpu_ldconfig()
 /**
  * @brief Change current processor state
  *
- * @return u32_t
+ * @return reg_t
  */
 static inline void
-cpu_chconfig(u32_t val)
+cpu_chconfig(reg_t val)
 {
     asm("mov %0, %%cr0" ::"r"(val));
 }
@@ -60,10 +60,10 @@ cpu_chconfig(u32_t val)
 /**
  * @brief Change current virtual memory space
  *
- * @return u32_t
+ * @return reg_t
  */
 static inline void
-cpu_chvmspace(u32_t val)
+cpu_chvmspace(reg_t val)
 {
     asm("mov %0, %%cr3" ::"r"(val));
 }

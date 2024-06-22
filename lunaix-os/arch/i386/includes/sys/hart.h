@@ -11,17 +11,17 @@ struct exec_param;
 
 struct regcontext
 {
-    u32_t eax;
-    u32_t ebx;
-    u32_t ecx;
-    u32_t edx;
-    u32_t edi;
-    u32_t ebp;
-    u32_t esi;
-    u32_t ds;
-    u32_t es;
-    u32_t fs;
-    u32_t gs;
+    reg_t eax;
+    reg_t ebx;
+    reg_t ecx;
+    reg_t edx;
+    reg_t edi;
+    reg_t ebp;
+    reg_t esi;
+    reg_t ds;
+    reg_t es;
+    reg_t fs;
+    reg_t gs;
 } compact;
 
 struct hart_state
@@ -30,7 +30,7 @@ struct hart_state
     struct regcontext registers;
     union
     {
-        u32_t esp;
+        reg_t esp;
         volatile struct exec_param* execp;
     };
 } compact;
@@ -38,13 +38,13 @@ struct hart_state
 struct exec_param
 {
     struct hart_state* parent_state;
-    u32_t vector;
-    u32_t err_code;
-    u32_t eip;
-    u32_t cs;
-    u32_t eflags;
-    u32_t esp;
-    u32_t ss;
+    reg_t vector;
+    reg_t err_code;
+    reg_t eip;
+    reg_t cs;
+    reg_t eflags;
+    reg_t esp;
+    reg_t ss;
 } compact;
 
 
