@@ -1,14 +1,12 @@
-#include <hal/apic_timer.h>
-#include <hal/rtc/mc146818a.h>
-
-#include <hal/hwrtc.h>
 #include <hal/hwtimer.h>
 
-#include <lunaix/isrm.h>
+#include <lunaix/generic/isrm.h>
 #include <lunaix/spike.h>
 
-#include <sys/i386_intr.h>
-#include <sys/interrupts.h>
+#include "sys/i386_intr.h"
+#include "sys/hart.h"
+
+#include "hal/apic_timer.h"
 
 void
 exception_init()
@@ -19,7 +17,7 @@ exception_init()
 }
 
 extern void
-syscall_hndlr(const isr_param* param);
+syscall_hndlr(const struct hart_state* hstate);
 
 void
 arch_preinit()
@@ -30,7 +28,7 @@ arch_preinit()
 }
 
 struct hwtimer*
-hwtimer_choose()
+select_platform_timer()
 {
     struct hwtimer* timer;
 

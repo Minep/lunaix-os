@@ -2,7 +2,7 @@
 #include <lunaix/fs/twifs.h>
 #include <lunaix/status.h>
 
-#include <lib/hash.h>
+#include <klibc/hash.h>
 
 #include <klibc/strfmt.h>
 

@@ -9,7 +9,7 @@
  *
  */
 #include <lunaix/device.h>
-#include <lunaix/isrm.h>
+#include <lunaix/generic/isrm.h>
 
 #include <sys/port_io.h>
 
@@ -36,9 +36,10 @@ com_regwrite(struct uart16550* uart, ptr_t regoff, u32_t val)
 }
 
 static void
-com_irq_handler(const isr_param* param)
+com_irq_handler(const struct hart_state* hstate)
 {
-    uart_general_irq_handler(param->execp->vector, &com_ports);
+    int vector = hart_vector_stamp(hstate);
+    uart_general_irq_handler(vector, &com_ports);
 }
 
 static int

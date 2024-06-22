@@ -10,12 +10,12 @@
  *
  */
 
-#include <lunaix/isrm.h>
+#include <lunaix/generic/isrm.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/status.h>
-#include <lunaix/pcontext.h>
+#include <lunaix/hart_state.h>
 
-#include <hal/rtc/mc146818a.h>
+#include <hal/hwrtc.h>
 
 #include <klibc/string.h>
 
@@ -53,6 +53,8 @@
 
 #define RTC_FREQUENCY_1024HZ 0b110
 #define RTC_DIVIDER_33KHZ (0b010 << 4)
+
+#define PC_AT_IRQ_RTC                   8
 
 struct mc146818
 {
@@ -143,9 +145,9 @@ mc146818_check_support(struct hwrtc* rtc)
 }
 
 static void
-__rtc_tick(const isr_param* param)
+__rtc_tick(const struct hart_state* hstate)
 {
-    struct mc146818* state = (struct mc146818*)isrm_get_payload(param);
+    struct mc146818* state = (struct mc146818*)isrm_get_payload(hstate);
 
     state->tick_counts++;
 

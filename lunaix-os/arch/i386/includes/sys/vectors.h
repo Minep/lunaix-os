@@ -48,9 +48,6 @@
 #define APIC_SPIV_IV                    252
 #define APIC_TIMER_IV                   253
 
-#define PC_AT_IRQ_RTC                   8
-#define PC_AT_IRQ_KBD                   1
-
 // clang-format on
 
 #endif /* __LUNAIX_VECTORS_H */

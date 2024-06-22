@@ -1,13 +1,13 @@
-#include <hal/apic_timer.h>
+#include "apic_timer.h"
 #include <hal/hwtimer.h>
 
 #include <lunaix/clock.h>
 #include <lunaix/compiler.h>
-#include <lunaix/isrm.h>
+#include <lunaix/generic/isrm.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 
-#include <sys/apic.h>
+#include "sys/apic.h"
 
 LOG_MODULE("APIC_TIMER")
 
@@ -23,13 +23,13 @@ static volatile ticks_t systicks = 0;
 static timer_tick_cb tick_cb = NULL;
 
 static void
-temp_intr_routine_apic_timer(const isr_param* param)
+temp_intr_routine_apic_timer(const struct hart_state* state)
 {
     apic_timer_done = 1;
 }
 
 static void
-apic_timer_tick_isr(const isr_param* param)
+apic_timer_tick_isr(const struct hart_state* state)
 {
     systicks++;
 

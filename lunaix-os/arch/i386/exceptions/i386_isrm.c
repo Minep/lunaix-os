@@ -1,7 +1,10 @@
-#include <lunaix/isrm.h>
+#include <lunaix/generic/isrm.h>
 #include <lunaix/spike.h>
+#include <lunaix/owloysius.h>
 
-#include <hal/intc.h>
+#include "sys/x86_isa.h"
+#include "sys/ioapic.h"
+#include "sys/apic.h"
 
 /*
     total: 256 ivs
@@ -14,8 +17,10 @@ static char iv_bmp[(IV_EX_END - IV_BASE_END) / 8];
 static isr_cb handlers[TOTAL_IV];
 static ptr_t ivhand_payload[TOTAL_IV];
 
+static struct x86_intc arch_intc_ctx;
+
 extern void
-intr_routine_fallback(const isr_param* param);
+intr_routine_fallback(const struct hart_state* state);
 
 void
 isrm_init()
@@ -95,7 +100,7 @@ isrm_bindirq(int irq, isr_cb irq_handler)
     }
 
     // fixed, edge trigged, polarity=high
-    intc_irq_attach(irq, iv, 0, IRQ_DEFAULT);
+    isrm_irq_attach(irq, iv, 0, IRQ_DEFAULT);
 
     return iv;
 }
@@ -121,9 +126,9 @@ isrm_get(int iv)
 }
 
 ptr_t
-isrm_get_payload(const isr_param* param)
+isrm_get_payload(const struct hart_state* state)
 {
-    int iv = param->execp->vector;
+    int iv = state->execp->vector;
     assert(iv < 256);
 
     return ivhand_payload[iv];
@@ -136,3 +141,34 @@ isrm_set_payload(int iv, ptr_t payload)
 
     ivhand_payload[iv] = payload;
 }
+
+void
+isrm_irq_attach(int irq, int iv, cpu_t dest, u32_t flags)
+{
+    arch_intc_ctx.irq_attach(&arch_intc_ctx, irq, iv, dest, flags);
+}
+
+void
+isrm_notify_eoi(cpu_t id, int iv)
+{
+    arch_intc_ctx.notify_eoi(&arch_intc_ctx, id, iv);
+}
+
+void
+isrm_notify_eos(cpu_t id)
+{
+    isrm_notify_eoi(id, LUNAIX_SCHED);
+}
+
+
+static void
+__intc_init()
+{
+    apic_init();
+    ioapic_init();
+
+    arch_intc_ctx.name = "i386_apic";
+    arch_intc_ctx.irq_attach = ioapic_irq_remap;
+    arch_intc_ctx.notify_eoi = apic_on_eoi;
+}
+owloysius_fetch_init(__intc_init, on_earlyboot);

@@ -1,6 +1,6 @@
-#include <sys/interrupts.h>
+#include <sys/hart.h>
 
-#include <lunaix/isrm.h>
+#include <lunaix/generic/isrm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/spike.h>
@@ -10,60 +10,60 @@
 
 #include <klibc/strfmt.h>
 
-#include <sys/apic.h>
+#include "sys/apic.h"
 #include <sys/i386_intr.h>
 
 LOG_MODULE("INTR")
 
 extern void
-intr_routine_page_fault(const isr_param* param);
+intr_routine_page_fault(const struct hart_state* state);
 
 extern u32_t debug_resv;
 
 void
-__print_panic_msg(const char* msg, const isr_param* param)
+__print_panic_msg(const char* msg, const struct hart_state* state)
 {
     ERROR("panic: %s", msg);
     failsafe_diagnostic();
 }
 
 void
-intr_routine_divide_zero(const isr_param* param)
+intr_routine_divide_zero(const struct hart_state* state)
 {
-    __print_panic_msg("div zero", param);
+    __print_panic_msg("div zero", state);
 }
 
 void
-intr_routine_general_protection(const isr_param* param)
+intr_routine_general_protection(const struct hart_state* state)
 {
-    __print_panic_msg("general protection", param);
+    __print_panic_msg("general protection", state);
 }
 
 void
-intr_routine_sys_panic(const isr_param* param)
+intr_routine_sys_panic(const struct hart_state* state)
 {
-    __print_panic_msg((char*)(param->registers.edi), param);
+    __print_panic_msg((char*)(state->registers.edi), state);
 }
 
 void
-intr_routine_fallback(const isr_param* param)
+intr_routine_fallback(const struct hart_state* state)
 {
-    __print_panic_msg("unknown interrupt", param);
+    __print_panic_msg("unknown interrupt", state);
 }
 
 /**
  * @brief ISR for Spurious interrupt
  *
- * @param isr_param passed by CPU
+ * @param struct hart_state passed by CPU
  */
 void
-intr_routine_apic_spi(const isr_param* param)
+intr_routine_apic_spi(const struct hart_state* state)
 {
     // FUTURE: do nothing for now
 }
 
 void
-intr_routine_apic_error(const isr_param* param)
+intr_routine_apic_error(const struct hart_state* state)
 {
     u32_t error_reg = apic_read_reg(APIC_ESR);
     char buf[32];
@@ -73,7 +73,7 @@ intr_routine_apic_error(const isr_param* param)
 }
 
 void
-intr_routine_sched(const isr_param* param)
+intr_routine_sched(const struct hart_state* state)
 {
     schedule();
 }

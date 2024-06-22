@@ -20,6 +20,17 @@ extern struct ksyms __lunaix_ksymtable[];
 static struct trace_context trace_ctx;
 
 void
+trace_log(const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+
+    kprintf_m("TRACE", fmt, args);
+
+    va_end(args);
+}
+
+void
 trace_modksyms_init(struct boot_handoff* bhctx)
 {
     trace_ctx.ksym_table = __lunaix_ksymtable;
@@ -111,9 +122,9 @@ static inline void
 trace_print_code_entry(ptr_t sym_pc, ptr_t inst_pc, char* sym)
 {
     if (sym_pc) {
-        DEBUG("%s+%p", sym, inst_pc - sym_pc);
+        trace_log("%s+%p", sym, inst_pc - sym_pc);
     } else {
-        DEBUG("%s [%p]", sym, sym_pc);
+        trace_log("%s [%p]", sym, sym_pc);
     }
 }
 
@@ -126,7 +137,7 @@ trace_printstack_of(ptr_t fp)
     int n = trace_walkback(tbs, fp, NB_TRACEBACK, &fp);
 
     if (fp) {
-        DEBUG("...<truncated>");
+        trace_log("...<truncated>");
     }
 
     for (int i = 0; i < n; i++) {
@@ -139,7 +150,7 @@ void
 trace_printstack()
 {
     if (current_thread) {
-        trace_printstack_isr(current_thread->intr_ctx);
+        trace_printstack_isr(current_thread->hstate);
     }
     else {
         trace_printstack_of(abi_get_callframe());
@@ -147,29 +158,27 @@ trace_printstack()
 }
 
 static void
-trace_printswctx(const isr_param* p, bool from_usr, bool to_usr)
+trace_printswctx(const struct hart_state* hstate, bool from_usr, bool to_usr)
 {
 
-    struct ksym_entry* sym = trace_sym_lookup(p->execp->eip);
+    struct ksym_entry* sym = trace_sym_lookup(hstate->execp->eip);
 
-    DEBUG("^^^^^ --- %s", to_usr ? "user" : "kernel");
-    DEBUG("  interrupted on #%d, ecode=%p",
-          p->execp->vector,
-          p->execp->err_code);
-    DEBUG("vvvvv --- %s", from_usr ? "user" : "kernel");
+    trace_log("^^^^^ --- %s", to_usr ? "user" : "kernel");
+    trace_print_transistion_short(hstate);
+    trace_log("vvvvv --- %s", from_usr ? "user" : "kernel");
 
-    ptr_t sym_pc = sym ? sym->pc : p->execp->eip;
-    trace_print_code_entry(sym_pc, p->execp->eip, ksym_getstr(sym));
+    ptr_t sym_pc = sym ? sym->pc : hart_pc(hstate);
+    trace_print_code_entry(sym_pc, hart_pc(hstate), ksym_getstr(sym));
 }
 
 void
-trace_printstack_isr(const isr_param* isrm)
+trace_printstack_isr(const struct hart_state* hstate)
 {
-    isr_param* p = isrm;
+    struct hart_state* p = hstate;
     ptr_t fp = abi_get_callframe();
     int prev_usrctx = 0;
 
-    DEBUG("stack trace (pid=%d)\n", __current->pid);
+    trace_log("stack trace (pid=%d)\n", __current->pid);
 
     trace_printstack_of(fp);
 
@@ -184,9 +193,9 @@ trace_printstack_isr(const isr_param* isrm)
             trace_printswctx(p, false, true);
         }
 
-        fp = saved_fp(p);
+        fp = hart_stack_frame(p);
         if (!valid_fp(fp)) {
-            DEBUG("??? invalid frame: %p", fp);
+            trace_log("??? invalid frame: %p", fp);
             break;
         }
 
@@ -194,8 +203,8 @@ trace_printstack_isr(const isr_param* isrm)
 
         prev_usrctx = !kernel_context(p);
 
-        p = p->execp->saved_prev_ctx;
+        p = hart_parent_state(p);
     }
 
-    DEBUG("----- [trace end] -----\n");
+    trace_log("----- [trace end] -----\n");
 }

@@ -4,14 +4,14 @@
 #include <lunaix/mm/mm.h>
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/procvm.h>
-#include <lunaix/pcontext.h>
+#include <lunaix/hart_state.h>
 
 #define RESOLVE_OK      ( 0b000001 )
 #define NO_PREALLOC     ( 0b000010 )
 
 struct fault_context
 {
-    isr_param* ictx;
+    struct hart_state* hstate;
 
     struct 
     {

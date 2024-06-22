@@ -41,7 +41,7 @@ signal_dispatch()
         return 0;
     }
 
-    struct sigregister* sigreg = __current->sigreg;
+    struct sigregistry* sigreg = __current->sigreg;
     struct sigctx* psig = &current_thread->sigctx;
     struct sigact* prev_working = active_signal(current_thread);
     sigset_t mask = psig->sig_mask | (prev_working ? prev_working->sa_mask : 0);
@@ -78,7 +78,7 @@ signal_dispatch()
     sigframe->sigact = action->sa_actor;
     sigframe->sighand = action->sa_handler;
 
-    sigframe->saved_ictx = current_thread->intr_ctx;
+    sigframe->saved_hstate = current_thread->hstate;
 
     sigactive_push(current_thread, sig_selected);
 
@@ -196,9 +196,9 @@ signal_dup_context(struct sigctx* dest_ctx)
 }
 
 void
-signal_dup_registers(struct sigregister* dest_reg)
+signal_dup_registry(struct sigregistry* dest_reg)
 {
-    struct sigregister* oldreg = __current->sigreg;
+    struct sigregistry* oldreg = __current->sigreg;
     for (int i = 0; i < _SIG_NUM; i++) {
         struct sigact* oldact = oldreg->signals[i];
         if (!oldact) {
@@ -218,7 +218,7 @@ signal_reset_context(struct sigctx* sigctx) {
 }
 
 void
-signal_reset_register(struct sigregister* sigreg) {
+signal_reset_registry(struct sigregistry* sigreg) {
     for (int i = 0; i < _SIG_NUM; i++) {
         struct sigact* act = sigreg->signals[i];
         if (act) {
@@ -229,8 +229,8 @@ signal_reset_register(struct sigregister* sigreg) {
 }
 
 void
-signal_free_registers(struct sigregister* sigreg) {
-    signal_reset_register(sigreg);
+signal_free_registry(struct sigregistry* sigreg) {
+    signal_reset_registry(sigreg);
     vfree(sigreg);
 }
 
@@ -267,14 +267,14 @@ __DEFINE_LXSYSCALL1(int, sigreturn, struct proc_sig, *sig_ctx)
         schedule();
     }
 
-    current_thread->intr_ctx = sig_ctx->saved_ictx;
+    current_thread->hstate = sig_ctx->saved_hstate;
     if (proc_terminated(__current)) {
         __current->exit_code |= PEXITSIG;
     } else if (sigset_test(CORE, sig_ctx->sig_num)) {
         signal_terminate(sig_ctx->sig_num);
     }
 
-    ptr_t ictx = (ptr_t)current_thread->intr_ctx;
+    ptr_t ictx = (ptr_t)current_thread->hstate;
 
     /*
         Ensure our restored context is within kernel stack

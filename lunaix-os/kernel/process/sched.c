@@ -1,7 +1,6 @@
 #include <sys/abi.h>
 #include <sys/mm/mempart.h>
 
-#include <hal/intc.h>
 #include <sys/cpu.h>
 
 #include <lunaix/fs/taskfs.h>
@@ -18,8 +17,10 @@
 #include <lunaix/status.h>
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
-#include <lunaix/pcontext.h>
+#include <lunaix/hart_state.h>
 #include <lunaix/kpreempt.h>
+
+#include <lunaix/generic/isrm.h>
 
 #include <klibc/string.h>
 
@@ -207,7 +208,7 @@ schedule()
     sched_ctx.procs_index = to_check->process->pid;
 
 done:
-    intc_notify_eos(0);
+    isrm_notify_eos(0);
     run(to_check);
 
     fail("unexpected return from scheduler");
@@ -389,7 +390,7 @@ alloc_process()
     proc->created = clock_systime();
     proc->pgid = proc->pid;
 
-    proc->sigreg = vzalloc(sizeof(struct sigregister));
+    proc->sigreg = vzalloc(sizeof(struct sigregistry));
     proc->fdtable = vzalloc(sizeof(struct v_fdtable));
 
     proc->mm = procvm_create(proc);
@@ -509,7 +510,7 @@ delete_process(struct proc_info* proc)
 
     vfree(proc->fdtable);
 
-    signal_free_registers(proc->sigreg);
+    signal_free_registry(proc->sigreg);
 
     procvm_mount(mm);
     

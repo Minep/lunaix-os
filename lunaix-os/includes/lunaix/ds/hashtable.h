@@ -13,7 +13,7 @@
 #ifndef __LUNAIX_HASHTABLE_H
 #define __LUNAIX_HASHTABLE_H
 
-#include <lib/hash.h>
+#include <klibc/hash.h>
 #include <lunaix/ds/llist.h>
 
 struct hbucket

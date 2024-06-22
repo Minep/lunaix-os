@@ -1,20 +1,17 @@
 #include <klibc/string.h>
 #include <lunaix/types.h>
 
-void*
+void* weak
 memcpy(void* dest, const void* src, unsigned long num)
 {
-    if (!num)
-        return dest;
-    asm volatile("movl %1, %%edi\n"
-                 "rep movsb\n" ::"S"(src),
-                 "r"(dest),
-                 "c"(num)
-                 : "edi", "memory");
+    for (size_t i = 0; i < num; i++) {
+        ((u8_t*)dest)[i] = ((u8_t*)src)[i];
+    }
+
     return dest;
 }
 
-void*
+void* weak
 memmove(void* dest, const void* src, unsigned long num)
 {
     u8_t* dest_ptr = (u8_t*)dest;
@@ -31,18 +28,17 @@ memmove(void* dest, const void* src, unsigned long num)
     return dest;
 }
 
-void*
+void* weak
 memset(void* ptr, int value, unsigned long num)
 {
-    asm volatile("movl %1, %%edi\n"
-                 "rep stosb\n" ::"c"(num),
-                 "r"(ptr),
-                 "a"(value)
-                 : "edi", "memory");
+    for (size_t i = 0; i < num; i++) {
+        ((u8_t*)ptr)[i] = 0;
+    }
+
     return ptr;
 }
 
-int
+int weak
 memcmp(const void* ptr1, const void* ptr2, unsigned long num)
 {
     u8_t* p1 = (u8_t*)ptr1;
