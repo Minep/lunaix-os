@@ -263,7 +263,7 @@ __DEFINE_LXSYSCALL3(int,
 
     // we will jump to new entry point (_u_start) upon syscall's
     // return so execve 'will not return' from the perspective of it's invoker
-    hart_change_execution(current_thread->hstate, 
+    hart_flow_redirect(current_thread->hstate, 
                           container.exe.entry, container.stack_top);
 
     // these become meaningless once execved!

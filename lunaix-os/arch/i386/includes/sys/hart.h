@@ -49,7 +49,7 @@ struct exec_param
 
 
 static inline void
-hart_change_execution(struct hart_state* hstate, ptr_t pc, ptr_t sp)
+hart_flow_redirect(struct hart_state* hstate, ptr_t pc, ptr_t sp)
 {
     hstate->execp->eip = pc;
     hstate->execp->esp = sp;
