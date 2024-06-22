@@ -40,16 +40,4 @@ hart_kernel_transfer(struct hart_transition* tctx,
     hart_prepare_transition(tctx, kstack_tp, 0, entry, false);
 }
 
-static inline struct hart_state*
-hart_parent_state(struct hart_state* hstate)
-{
-    return hstate->execp->parent_state;
-}
-
-static inline void
-hart_push_state(struct hart_state* p_hstate, struct hart_state* hstate)
-{
-    hstate->execp->parent_state = p_hstate;
-}
-
 #endif /* __LUNAIX_CONTEXT_H */

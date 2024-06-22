@@ -7,12 +7,16 @@ This document briefly describe how to add support for other ISA
 Lunaix provide bunch of headers that **MUST** be implemented.
 
 + Follow the structure and derive the template header files according to
-  `arch/generic/includes`. You must copy the header file and add your own
-  declaration & other stuffs. You must not remove or modify the data structure,
-  function signature and any declaration that already in the template header
+  `arch/generic/includes`.
+  ! You **MUST** copy the header file and add your own
+  declaration & other stuffs.
+  ! You **MUST NOT** remove or modify the data structure,
+  function signature or any declaration that already in the template header
   files unless stated explicitly.
+  ! Read the comment carefully, it may contains implementation recommendation
+  which is vital to the overall correctness.
 
-+ Add implementation to function signature defined in header files under 
++ Add implementation to function signature defined in header files under
   `includes/lunaix/generic`
 
 + Add implementation of syscall dispatching (Reference: `arhc/i386/syscall.S`)  
@@ -42,7 +46,7 @@ Before jumping to `kernel_bootstrap`, one
 ## Alternative Implementation
 
 Most functions in `klibc` can be override by an architectural port. To achieve
-this, one just need to add definition of such function. This allow port to 
+this, one just need to add definition of such function. This allow port to
 provide better performance on these library functions by exploiting the
 architectural specific feature.
 

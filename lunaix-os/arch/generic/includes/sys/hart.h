@@ -43,6 +43,12 @@ hart_vector_stamp(struct hart_state* hstate);
 unsigned int
 hart_ecause(struct hart_state* hstate);
 
+struct hart_state*
+hart_parent_state(struct hart_state* hstate);
+
+void
+hart_push_state(struct hart_state* p_hstate, struct hart_state* hstate);
+
 #endif
 
 #endif /* __LUNAIX_ARCH_HART_H */

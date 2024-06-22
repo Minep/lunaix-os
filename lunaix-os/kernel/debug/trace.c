@@ -20,6 +20,17 @@ extern struct ksyms __lunaix_ksymtable[];
 static struct trace_context trace_ctx;
 
 void
+trace_log(const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+
+    kprintf_m(KDEBUG, fmt, args);
+
+    va_end(args);
+}
+
+void
 trace_modksyms_init(struct boot_handoff* bhctx)
 {
     trace_ctx.ksym_table = __lunaix_ksymtable;
@@ -111,9 +122,9 @@ static inline void
 trace_print_code_entry(ptr_t sym_pc, ptr_t inst_pc, char* sym)
 {
     if (sym_pc) {
-        DEBUG("%s+%p", sym, inst_pc - sym_pc);
+        trace_log("%s+%p", sym, inst_pc - sym_pc);
     } else {
-        DEBUG("%s [%p]", sym, sym_pc);
+        trace_log("%s [%p]", sym, sym_pc);
     }
 }
 
@@ -126,7 +137,7 @@ trace_printstack_of(ptr_t fp)
     int n = trace_walkback(tbs, fp, NB_TRACEBACK, &fp);
 
     if (fp) {
-        DEBUG("...<truncated>");
+        trace_log("...<truncated>");
     }
 
     for (int i = 0; i < n; i++) {
@@ -152,12 +163,9 @@ trace_printswctx(const struct hart_state* hstate, bool from_usr, bool to_usr)
 
     struct ksym_entry* sym = trace_sym_lookup(hstate->execp->eip);
 
-    // FIXME: isolation
-    DEBUG("^^^^^ --- %s", to_usr ? "user" : "kernel");
-    DEBUG("  interrupted on #%d, ecode=%p",
-          hart_vector_stamp(hstate),
-          hart_ecause(hstate));
-    DEBUG("vvvvv --- %s", from_usr ? "user" : "kernel");
+    trace_log("^^^^^ --- %s", to_usr ? "user" : "kernel");
+    trace_print_transistion_short(hstate);
+    trace_log("vvvvv --- %s", from_usr ? "user" : "kernel");
 
     ptr_t sym_pc = sym ? sym->pc : hart_pc(hstate);
     trace_print_code_entry(sym_pc, hart_pc(hstate), ksym_getstr(sym));
@@ -170,7 +178,7 @@ trace_printstack_isr(const struct hart_state* hstate)
     ptr_t fp = abi_get_callframe();
     int prev_usrctx = 0;
 
-    DEBUG("stack trace (pid=%d)\n", __current->pid);
+    trace_log("stack trace (pid=%d)\n", __current->pid);
 
     trace_printstack_of(fp);
 
@@ -187,7 +195,7 @@ trace_printstack_isr(const struct hart_state* hstate)
 
         fp = hart_stack_frame(p);
         if (!valid_fp(fp)) {
-            DEBUG("??? invalid frame: %p", fp);
+            trace_log("??? invalid frame: %p", fp);
             break;
         }
 
@@ -198,5 +206,5 @@ trace_printstack_isr(const struct hart_state* hstate)
         p = hart_parent_state(p);
     }
 
-    DEBUG("----- [trace end] -----\n");
+    trace_log("----- [trace end] -----\n");
 }

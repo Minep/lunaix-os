@@ -89,6 +89,18 @@ hart_ecause(struct hart_state* hstate) {
     return hstate->execp->err_code;
 }
 
+static inline struct hart_state*
+hart_parent_state(struct hart_state* hstate)
+{
+    return hstate->execp->parent_state;
+}
+
+static inline void
+hart_push_state(struct hart_state* p_hstate, struct hart_state* hstate)
+{
+    hstate->execp->parent_state = p_hstate;
+}
+
 #endif
 
 #endif /* __LUNAIX_ARCH_HART_H */

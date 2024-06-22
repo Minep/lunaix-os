@@ -3,6 +3,7 @@
 
 #include <lunaix/boot_generic.h>
 #include <lunaix/hart_state.h>
+#include <lunaix/generic/trace_arch.h>
 
 struct ksym_entry
 {
@@ -85,5 +86,8 @@ trace_printstack_isr(const struct hart_state* hstate);
  */
 void
 trace_printstack();
+
+void
+trace_log(const char* fmt, ...);
 
 #endif /* __LUNAIX_TRACE_H */
