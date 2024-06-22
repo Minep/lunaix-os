@@ -1,0 +1,6 @@
+sources([
+    "blkpart_gpt.c",
+    "blk_mapping.c",
+    "blkio.c",
+    "block.c"
+])

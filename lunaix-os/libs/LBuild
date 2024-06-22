@@ -1,0 +1,12 @@
+sources([
+    "crc.c",
+    "hash.c",
+    "klibc/itoa.c",
+    "klibc/ksprintf.c",
+    "klibc/string/mem.c",
+    "klibc/string/strchr.c",
+    "klibc/string/strcmp.c",
+    "klibc/string/strcpy.c",
+    "klibc/string/strlen.c",
+    "klibc/string/trim.c"
+])

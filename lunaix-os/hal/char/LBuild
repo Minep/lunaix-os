@@ -1,0 +1,8 @@
+use("uart")
+
+sources([
+    "devnull.c",
+    "serial.c",
+    "devzero.c",
+    "lxconsole.c",
+])

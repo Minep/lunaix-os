@@ -1,0 +1,24 @@
+use("twifs")
+use("ramfs")
+use("iso9660")
+
+sources([
+    "twimap.c",
+    "pcache.c",
+    "mount.c",
+    "xattr.c",
+    "inode.c",
+    "file.c",
+    "mount.c",
+    "directory.c",
+    "utils.c",
+    "rockridge.c",
+    "vfs.c",
+    "defaults.c",
+    "ramfs.c",
+    "path_walk.c",
+    "fsm.c",
+    "twifs.c",
+    "fs_export.c",
+    "probe_boot.c"
+])

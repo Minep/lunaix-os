@@ -1,0 +1,9 @@
+sources([
+    "signal.c",
+    "sched.c",
+    "fork.c",
+    "process.c",
+    "taskfs.c",
+    "task_attr.c",
+    "thread.c"
+])

@@ -1,0 +1,12 @@
+sources([
+    "waitq.c",
+    "buffer.c",
+    "lru.c",
+    "rbuffer.c",
+    "btrie.c",
+    "semaphore.c",
+    "mutex.c",
+    "hstr.c",
+    "fifo.c",
+    "rwlock.c"
+])

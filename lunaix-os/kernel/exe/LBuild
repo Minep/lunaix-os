@@ -1,0 +1,5 @@
+use("elf32")
+
+sources([
+    "exec.c"
+])

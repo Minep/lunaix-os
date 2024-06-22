@@ -1,0 +1,29 @@
+sources([
+    "exceptions/interrupts.c",
+    "exceptions/i386_isrdef.c",
+    "exceptions/intr_routines.c",
+    "exceptions/i386_isrm.c"
+])
+
+sources([
+    "boot/mb_parser.c",
+    "boot/kpt_setup.c",
+    "boot/init32.c"
+])
+
+sources([
+    "mm/fault.c",
+    "mm/tlb.c",
+    "mm/pmm.c",
+    "mm/gdt.c",
+    "mm/vmutils.c"
+])
+
+sources([
+    "klib/fast_crc.c",
+    "klib/fast_str.c",
+    "hart.c",
+    "arch.c",
+    "gdbstub.c",
+    "trace.c"
+])

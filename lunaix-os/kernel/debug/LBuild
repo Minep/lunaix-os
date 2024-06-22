@@ -1,0 +1,5 @@
+sources([
+    "failsafe.c",
+    "gdbstub.c",
+    "trace.c",
+])
