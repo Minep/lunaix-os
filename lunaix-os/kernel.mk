@@ -1,37 +1,22 @@
 include os.mkinc
 include toolchain.mkinc
 
-kexclusion = $(shell cat ksrc.excludes)
-
-define ksrc_dirs
-	kernel
-	hal
-	libs
-	arch/$(ARCH)
-endef
-
-define kinc_dirs
-	includes
-	includes/usr
-	arch/$(ARCH)/includes
-endef
-
+ksrc_files = $(shell cat .builder/sources.list)
+kinc_dirs  = $(shell cat .builder/includes.list)
+khdr_files = $(shell cat .builder/headers.list)
 
 kbin_dir := $(BUILD_DIR)
 kbin := $(BUILD_NAME)
 
-ksrc_files := $(foreach f, $(ksrc_dirs), $(shell find $(f) -name "*.[cS]"))
-ksrc_files := $(filter-out $(kexclusion),$(ksrc_files))
 ksrc_objs := $(addsuffix .o,$(ksrc_files))
 ksrc_deps := $(addsuffix .d,$(ksrc_files))
-
+khdr_opts := $(addprefix -include ,$(khdr_files))
 kinc_opts := $(addprefix -I,$(kinc_dirs))
 
 tmp_kbin  := $(BUILD_DIR)/tmpk.bin
 ksymtable := lunaix_ksyms.o
 
-CFLAGS += -include flags.h
-CFLAGS += -include config.h
+CFLAGS += $(khdr_opts)
 
 %.S.o: %.S
 	$(call status_,AS,$<)

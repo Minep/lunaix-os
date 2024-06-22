@@ -3,6 +3,7 @@
 
 #include <lunaix/hart_state.h>
 #include <hal/serial.h>
+#include <sys/gdbstub.h>
 
 struct gdb_state
 {

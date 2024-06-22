@@ -6,13 +6,25 @@
 from lbuild.contract import LunaBuildFile
 from lbuild.common import BuildEnvironment
 from lbuild.api import ConfigProvider
-from os import getcwd
+from os import mkdir
+from os.path import abspath, basename, dirname, exists
+from argparse import ArgumentParser
 
 def main():
-    env = BuildEnvironment(getcwd())
+    parser = ArgumentParser()
+    parser.add_argument("root", nargs="?", default="LBuild")
+    parser.add_argument("-o", "--out-dir", required=True)
+
+    opts = parser.parse_args()
+    
+    root_path = abspath(opts.root)
+    ws_path = dirname(root_path)
+    root_name = basename(root_path)
+
+    env = BuildEnvironment(ws_path)
     env.set_config_provider(ConfigProvider())
 
-    root = LunaBuildFile(env, "LBuild")
+    root = LunaBuildFile(env, root_name)
 
     try:
         root.resolve()
@@ -20,7 +32,11 @@ def main():
         print("failed to resolve root build file")
         return
     
-    env.export_sources("sources.list")
+    out_dir = opts.out_dir
+    if not exists(out_dir):
+        mkdir(out_dir)
+    
+    env.export(out_dir)
 
 if __name__ == "__main__":
     main()

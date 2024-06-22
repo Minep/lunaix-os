@@ -1,4 +1,4 @@
 sources([
-    "16650_base.c"
-    "16650_pmio.c"
+    "16550_base.c",
+    "16550_pmio.c"
 ])

@@ -38,7 +38,6 @@
 
 #include <sys/port_io.h>
 #include <sys/cpu.h>
-#include <sys/gdbstub.h>
 
 /*****************************************************************************
  * Macros

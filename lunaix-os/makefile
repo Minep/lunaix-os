@@ -28,9 +28,11 @@ $(DEPS):
 		echo "failed" && exit 1;\
 	fi
 
-check-cc:
-	@echo -n "checking target i686-elf.... "
-	@test "`i686-elf-gcc -dumpmachine`" = "i686-elf" && echo ok || (echo "failed" && exit 1)
+define builder_data
+	.builder/sources.list 
+	.builder/headers.list 
+	.builder/includes.list
+endef
 
 $(kbuild_dir):
 	@mkdir -p $(kbin_dir)
@@ -39,10 +41,13 @@ $(kbuild_dir):
 	@mkdir -p $(os_img_dir)/boot/grub
 	@mkdir -p $(os_img_dir)/usr
 
+.builder/%.list: 
+	@./scripts/build-tools/luna_build.py LBuild -o .builder
+
 .PHONY: kernel
 export BUILD_DIR=$(kbin_dir)
 export BUILD_NAME=$(kbin)
-kernel:
+kernel: $(builder_data)
 	$(call status,TASK,$(notdir $@))
 	@$(MAKE) $(MKFLAGS) -I $(mkinc_dir) -f kernel.mk all
 
@@ -80,12 +85,13 @@ instable: all
 all-debug: bootable-debug
 
 clean:
-	@rm -rf $(kbuild_dir) || exit 1
 	@$(MAKE) -C usr clean -I $(mkinc_dir)
 	@$(MAKE) -f kernel.mk clean -I $(mkinc_dir)
+	@rm -rf $(kbuild_dir) || exit 1
+	@rm -rf .builder || exit 1
 
-run: $(BUILD_DIR)/$(OS_ISO)
-	@qemu-system-i386 $(QEMU_OPTIONS)
+run: all
+	@qemu-system-i386 $(call get_qemu_options,$(kimg))
 	@sleep 1
 	@telnet 127.0.0.1 $(QEMU_MON_PORT)
 

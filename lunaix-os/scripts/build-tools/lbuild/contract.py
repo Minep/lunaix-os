@@ -1,6 +1,6 @@
 from lib.sandbox import Sandbox
-from .common import BuildEnvironment
 from lib.utils import join_path
+from .common import BuildEnvironment
 
 import os
 
@@ -11,6 +11,8 @@ class LunaBuildFile(Sandbox):
                 path,
             "sources": 
                 lambda src: self.export_sources(src),
+            "headers":
+                lambda hdr: self.export_headers(hdr),
             "configured":
                 lambda name: self.check_config(name),
             "config":
@@ -20,6 +22,7 @@ class LunaBuildFile(Sandbox):
         })
         
         self.__srcs = []
+        self.__hdrs = []
         self.__env  = env
 
         self.__path = path
@@ -27,31 +30,34 @@ class LunaBuildFile(Sandbox):
         
     def resolve(self):
         self.execute(self.__path)
-        self.__process_sources()
+        self.__env.add_sources(self.__do_process(self.__srcs))
+        self.__env.add_headers(self.__do_process(self.__hdrs))
 
-    def __process_sources(self):
+    def __do_process(self, list):
         resolved = []
-        for entry in self.__srcs:
+        for entry in list:
             if not entry:
                 continue
-            resolved.append(self.__resolve_sources(entry))
-        
-        self.__env.add_sources(resolved)
+            resolved.append(self.__resolve_value(entry))
+        return resolved
 
-    def __resolve_sources(self, source):
+    def expand_select(self, val):
+        tests = list(val.keys())
+        if len(tests) != 1:
+            raise TypeError(
+                "select statement must have exactly one conditional")
+        
+        test = tests[0]
+        outcomes = val[test]
+        if test not in outcomes:
+            self.__raise("unbounded select")
+        return outcomes[test]
+
+    def __resolve_value(self, source):
         resolved = source
         while not isinstance(resolved, str):
             if isinstance(resolved, dict):
-                tests = list(resolved.keys())
-                if len(tests) != 1:
-                    raise TypeError(
-                        "select statement must have exactly one conditional")
-                
-                test = tests[0]
-                outcomes = resolved[test]
-                if test not in outcomes:
-                    self.__raise("unbounded select")
-                resolved = outcomes[test]
+                resolved = self.expand_select(resolved)
             else:
                 self.__raise(f"entry with unknown type: {resolved}")
         
@@ -61,7 +67,7 @@ class LunaBuildFile(Sandbox):
         return self.__env.to_wspath(resolved)
     
     def import_buildfile(self, path):
-        path = self.__resolve_sources(path)
+        path = self.__resolve_value(path)
         path = self.__env.to_wspath(path)
         
         if (os.path.isdir(path)):
@@ -75,8 +81,15 @@ class LunaBuildFile(Sandbox):
 
         LunaBuildFile(self.__env, path).resolve()
 
-    def export_sources(self, src_list):
-        self.__srcs += src_list
+    def export_sources(self, src):
+        if not isinstance(src, list):
+            src = [src]
+        self.__srcs += src
+
+    def export_headers(self, hdr):
+        if not isinstance(hdr, list):
+            hdr = [hdr]
+        self.__hdrs += hdr
 
     def check_config(self, name):
         return self.__env.config_provider().has_config(name)

@@ -1,14 +1,22 @@
+use("hal")
+
 sources([
     "exceptions/interrupts.c",
     "exceptions/i386_isrdef.c",
     "exceptions/intr_routines.c",
-    "exceptions/i386_isrm.c"
+    "exceptions/i386_isrm.c",
+    
+    "exceptions/interrupt.S",
+    "exceptions/intrhnds.S",
 ])
 
 sources([
     "boot/mb_parser.c",
     "boot/kpt_setup.c",
-    "boot/init32.c"
+    "boot/init32.c",
+
+    "boot/boot.S",
+    "boot/prologue.S"
 ])
 
 sources([
@@ -25,5 +33,12 @@ sources([
     "hart.c",
     "arch.c",
     "gdbstub.c",
-    "trace.c"
+    "trace.c",
+
+    "syscall.S",
+    "failsafe.S"
+])
+
+headers([
+    "includes"
 ])
