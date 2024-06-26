@@ -44,6 +44,7 @@ $(kbuild_dir):
 	@mkdir -p $(os_img_dir)/usr
 
 .builder/configs.h: $(all_lconfigs)
+	@echo restarting configuration...
 	@./scripts/build-tools/luna_build.py --config --lconfig-file LConfig -o $(@D)
 
 .builder/%.list: .builder/configs.h
@@ -61,14 +62,15 @@ export KCMD=$(CMDLINE)
 export _OS_NAME=$(OS_NAME)
 image: usr/build kernel
 	$(call status,TASK,$(notdir $@))
-	@./config-grub.sh $(os_img_dir)/boot/grub/grub.cfg
+	@./scripts/grub/config-grub.sh $(os_img_dir)/boot/grub/grub.cfg
 	@cp -r usr/build/* $(os_img_dir)/usr
 	@cp -r $(kbin_dir)/* $(os_img_dir)/boot
-	@grub-mkrescue -o $(kimg) $(os_img_dir) -- -volid "$(OS_ID) $(OS_VER)" -system_id "$(OS_NAME)"
+	@grub-mkrescue -o $(kimg) $(os_img_dir)\
+		-- -volid "$(OS_ID) $(OS_VER)" -system_id "$(OS_NAME)"
 
 usr/build: user
 
-check: $(DEPS) check-cc GRUB_TEMPLATE
+check: $(DEPS) check-cc scripts/grub/GRUB_TEMPLATE
 
 prepare: check $(os_img_dir)
 

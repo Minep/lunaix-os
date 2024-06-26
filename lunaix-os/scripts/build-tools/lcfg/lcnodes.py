@@ -9,7 +9,7 @@ from .utils import (
     to_displayable
 )
 
-import ast
+import ast, textwrap
 from abc import abstractmethod
 
 
@@ -135,6 +135,7 @@ class LCFuncNode(LCNode):
         if isinstance(maybe_doc, ast.Expr):
             if isinstance(maybe_doc.value, ast.Constant):
                 self._help = maybe_doc.value.value
+                self._help = textwrap.dedent(self._help)
         
         decors = extract_decorators(astn)
         for name, args, kwargs in decors:
