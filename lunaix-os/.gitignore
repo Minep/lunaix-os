@@ -10,7 +10,9 @@ draft/
 iso_inspect/
 unused/
 __pycache__/
+
 .builder/
+.config.json
 
 .gdb_history
 

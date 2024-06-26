@@ -1,6 +1,7 @@
 from .api import (
     ConfigLoadException,
-    ConfigTypeCheckError
+    ConfigTypeCheckError,
+    Renderable
 )
 
 from .utils import (
@@ -13,8 +14,10 @@ from abc import abstractmethod
 
 
 
-class LCNode:
-    def __init__(self, fo, astn) -> None:
+class LCNode(Renderable):
+    def __init__(self, fo, astn):
+        super().__init__()
+
         self._fo = fo
         self._env = fo.env()
         self._astn = self.prune_astn(astn)
@@ -110,6 +113,10 @@ class LCModuleNode(LCNode):
         for node in self.__nodes:
             node.serialise(dict)
 
+    def render(self, rctx):
+        for node in self.__nodes:
+            node.render(rctx)
+
 class LCFuncNode(LCNode):
     def __init__(self, fo, astn) -> None:
         self._decors = {}
@@ -125,8 +132,9 @@ class LCFuncNode(LCNode):
         self._display_name = to_displayable(self._name)
         
         maybe_doc = astn.body[0]
-        if isinstance(maybe_doc, ast.Constant):
-            self._help = maybe_doc.value
+        if isinstance(maybe_doc, ast.Expr):
+            if isinstance(maybe_doc.value, ast.Constant):
+                self._help = maybe_doc.value.value
         
         decors = extract_decorators(astn)
         for name, args, kwargs in decors:
@@ -208,6 +216,9 @@ class LCTermNode(LCFuncNode):
     def set_type(self, type_def):
         self._type = self._env.type_factory().create(type_def)
 
+    def get_type(self):
+        return self._type
+
     def __assert_type(self, val):
         if not self._type:
             raise ConfigLoadException(
@@ -246,7 +257,8 @@ class LCTermNode(LCFuncNode):
         return self._rdonly
 
     def render(self, rctx):
-        rctx.add_field(self._display_name, self)
+        if self.enabled():
+            rctx.add_field(self._display_name, self)
 
     def serialise(self, dict):
         s_val = self._type.serialise(self._value)
@@ -365,8 +377,10 @@ class LCCollectionNode(LCGroupNode):
         return "Collection"
     
     def render(self, rctx):
+        _super = super()
         rctx.add_expandable(
-            self._display_name, 
+            self._display_name,
+            self, 
             lambda _ctx: 
-                super().render(_ctx)
+                _super.render(_ctx)
         )

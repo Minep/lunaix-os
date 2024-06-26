@@ -34,6 +34,8 @@ define builder_data
 	.builder/includes.list
 endef
 
+all_lconfigs = $(shell find . -name "LConfig")
+
 $(kbuild_dir):
 	@mkdir -p $(kbin_dir)
 	@mkdir -p $(os_img_dir)
@@ -41,8 +43,11 @@ $(kbuild_dir):
 	@mkdir -p $(os_img_dir)/boot/grub
 	@mkdir -p $(os_img_dir)/usr
 
-.builder/%.list: 
-	@./scripts/build-tools/luna_build.py LBuild -o .builder
+.builder/configs.h: $(all_lconfigs)
+	@./scripts/build-tools/luna_build.py --config --lconfig-file LConfig -o $(@D)
+
+.builder/%.list: .builder/configs.h
+	@./scripts/build-tools/luna_build.py LBuild --lconfig-file LConfig -o $(@D)
 
 .PHONY: kernel
 export BUILD_DIR=$(kbin_dir)

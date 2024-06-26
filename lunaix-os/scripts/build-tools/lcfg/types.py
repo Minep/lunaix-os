@@ -28,6 +28,11 @@ class PrimitiveType(TypeProviderBase):
     
     def to_input(self, val):
         return self.serialise(val)
+    
+    def __str__(self) -> str:
+        if isinstance(self._type, type):
+            return f"any with type of {self._type}"
+        return f"exact of value '{self._type}'"
 
 
 class MultipleChoiceType(PrimitiveType):
@@ -63,3 +68,10 @@ class MultipleChoiceType(PrimitiveType):
     
     def allow_none(self):
         return None in self._type
+    
+    def __str__(self) -> str:
+        accepted = [f"  {t}" for t in self._type]
+        return "\n".join([
+            "choose one: \n",
+            *accepted
+        ])

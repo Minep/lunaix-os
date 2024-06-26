@@ -66,13 +66,25 @@ class TypeProviderBase:
     @staticmethod
     def typedef_matched(typedef):
         return False
+    
+    @abstractmethod
+    def __str__(self) -> str:
+        pass
+
+class Renderable:
+    def __init__(self) -> None:
+        pass
+    
+    @abstractmethod
+    def render(self, rctx):
+        pass
 
 class RenderContext:
     def __init__(self) -> None:
         pass
 
     @abstractmethod
-    def add_expandable(self, label, on_expand_cb):
+    def add_expandable(self, label, node, on_expand_cb):
         pass
 
     @abstractmethod

@@ -4,6 +4,7 @@ import ast, json
 from .lcnodes import LCModuleNode
 from .api import (
     ConfigLoadException, 
+    Renderable
 )
 
 class LConfigFile:
@@ -71,10 +72,9 @@ class DependencyGraph:
         q = [start]
         while len(q) > 0:
             current = q.pop()
-            if current not in self._edges:
-                continue
-            for x in self._edges[current]:
-                q.append(x)
+            if current in self._edges:
+                for x in self._edges[current]:
+                    q.append(x)
             current.evaluate()
 
 class ConfigTypeFactory:
@@ -108,8 +108,10 @@ class LConfigEvaluationWrapper:
     def evaluate(self):
         return self.__env.evaluate_node(self.__node)
 
-class LConfigEnvironment:
+class LConfigEnvironment(Renderable):
     def __init__(self, workspace, config_io) -> None:
+        super().__init__()
+        
         self.__ws_path = path.abspath(workspace)
         self.__exec_globl = globals()
         self.__eval_stack = []
@@ -196,7 +198,7 @@ class LConfigEnvironment:
     def export(self):
         self.__config_io.export(self, self.__config_val)
     
-    def save(self, _path = "config.json"):
+    def save(self, _path = ".config.json"):
         data = {}
         for mod in self.__lc_modules:
             mod.serialise(data)
@@ -204,7 +206,7 @@ class LConfigEnvironment:
         with open(_path, 'w') as f:
             json.dump(data, f)
 
-    def load(self, _path = "config.json"):
+    def load(self, _path = ".config.json"):
         if not path.exists(_path):
             return
         
@@ -216,3 +218,7 @@ class LConfigEnvironment:
             mod.deserialise(data)
 
         self.update()
+
+    def render(self, rctx):
+        for mod in self.__lc_modules:
+            mod.render(rctx)
