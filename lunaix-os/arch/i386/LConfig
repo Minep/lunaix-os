@@ -1,0 +1,23 @@
+
+@Group
+def x86_configurations():
+    @Term
+    def x86_enable_sse_feature():
+        """ 
+            Config whether to allow using SSE feature for certain
+            optimization
+        """
+        
+        type(bool)
+        default(False)
+
+        add_to_collection(architecture_support)
+
+
+    @Term
+    def x86_boot_options():
+        type(["multiboot"])
+        # type(["multiboot", "none"])
+        default("multiboot")
+
+    return v(arch) == "i386"

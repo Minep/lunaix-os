@@ -25,16 +25,16 @@ struct pmem_pool
     struct ppage* pool_start;
     struct ppage* pool_end;
     
-#if defined(CONFIG_PMALLOC_NCONTIG)
+#if defined(CONFIG_PMALLOC_METHOD_NCONTIG)
 
     struct llist_header idle_page;
     struct llist_header busy_page;
     
-#elif defined(CONFIG_PMALLOC_BUDDY)
+#elif defined(CONFIG_PMALLOC_METHOD_BUDDY)
 
     struct llist_header idle_order[MAX_PAGE_ORDERS];
     
-#elif defined(CONFIG_PMALLOC_SIMPLE)
+#elif defined(CONFIG_PMALLOC_METHOD_SIMPLE)
 
     struct llist_header idle_order[MAX_PAGE_ORDERS];
     int count[MAX_PAGE_ORDERS];

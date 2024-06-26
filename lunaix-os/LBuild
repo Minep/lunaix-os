@@ -5,8 +5,5 @@ use("hal")
 
 headers([
     "includes",
-    "includes/usr",
-
-    "flags.h",
-    "config.h"
+    "includes/usr"
 ])

@@ -1,0 +1,13 @@
+include("i386/LConfig")
+
+@Collection
+def architecture_support():
+    """
+        Config ISA related features
+    """
+
+    @Term
+    def arch():
+        """ Config ISA support """
+        type(["i386", "x86_64", "aarch64", "rv64"])
+        default("i386")

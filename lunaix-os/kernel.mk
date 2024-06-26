@@ -4,6 +4,7 @@ include toolchain.mkinc
 ksrc_files = $(shell cat .builder/sources.list)
 kinc_dirs  = $(shell cat .builder/includes.list)
 khdr_files = $(shell cat .builder/headers.list)
+khdr_files += .builder/configs.h
 
 kbin_dir := $(BUILD_DIR)
 kbin := $(BUILD_NAME)

@@ -1,9 +1,7 @@
-# use({
-#     config("arch"): {
-#         "x86": "i386",
-#         "arm": "arm",
-#         "riscv": "riscv"
-#     }
-# })
-
-use("i386")
+use({
+    config("arch"): {
+        "i386": "i386",
+        "aarch64": "arm",
+        "rv64": "riscv"
+    }
+})
