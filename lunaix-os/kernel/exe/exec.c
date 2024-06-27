@@ -201,6 +201,11 @@ exec_load_byname(struct exec_container* container, const char* filename)
         goto done;
     }
 
+    if (!check_itype_any(dnode->inode, F_FILE)) {
+        errno = EISDIR;
+        goto done;
+    }
+
     errno = exec_load(container, file);
 
     // It shouldn't matter which pid we passed. As the only reader is 
@@ -258,13 +263,13 @@ __DEFINE_LXSYSCALL3(int,
 
     // we will jump to new entry point (_u_start) upon syscall's
     // return so execve 'will not return' from the perspective of it's invoker
-    eret_target(current_thread) = container.exe.entry;
-    eret_stack(current_thread) = container.stack_top;
+    hart_flow_redirect(current_thread->hstate, 
+                          container.exe.entry, container.stack_top);
 
     // these become meaningless once execved!
     current_thread->ustack_top = 0;
     signal_reset_context(&current_thread->sigctx);
-    signal_reset_register(__current->sigreg);
+    signal_reset_registry(__current->sigreg);
 
 done:
     // set return value

@@ -83,7 +83,7 @@
     syscall_hndlr:
         pushl %ebp
         movl %esp, %ebp
-        movl 8(%esp), %ebx          // isr_param*
+        movl 8(%esp), %ebx          // struct hart_state*
 
         addl $4, %ebx
         movl (%ebx), %eax          /* eax: call code as well as the return value from syscall */

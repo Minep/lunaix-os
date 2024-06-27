@@ -1,36 +1,34 @@
 #ifndef __LUNAIX_I386ABI_H
 #define __LUNAIX_I386ABI_H
 
-#include <sys/x86_isa.h>
+#include "sys/x86_isa.h"
 
 #define stack_alignment 0xfffffff0
 
 #ifndef __ASM__
 #define align_stack(ptr) ((ptr) & stack_alignment)
-#define store_retval(retval) current_thread->intr_ctx->registers.eax = (retval)
+#define store_retval(retval) current_thread->hstate->registers.eax = (retval)
 
-#define store_retval_to(th, retval) (th)->intr_ctx->registers.eax = (retval)
+#define store_retval_to(th, retval) (th)->hstate->registers.eax = (retval)
 
-#define eret_target(th) (th)->intr_ctx->execp->eip
-#define eret_stack(th) (th)->intr_ctx->execp->esp
-#define intr_ivec(th) (th)->intr_ctx->execp->vector
-#define intr_ierr(th) (th)->intr_ctx->execp->err_code
-
-#define j_usr(sp, pc)                                                          \
-    asm volatile("movw %0, %%ax\n"                                             \
-                 "movw %%ax, %%es\n"                                           \
-                 "movw %%ax, %%ds\n"                                           \
-                 "movw %%ax, %%fs\n"                                           \
-                 "movw %%ax, %%gs\n"                                           \
-                 "pushl %0\n"                                                  \
-                 "pushl %1\n"                                                  \
-                 "pushl %2\n"                                                  \
-                 "pushl %3\n"                                                  \
-                 "retf" ::"i"(UDATA_SEG),                                      \
-                 "r"(sp),                                                      \
-                 "i"(UCODE_SEG),                                               \
-                 "r"(pc)                                                       \
+static inline void must_inline 
+j_usr(ptr_t sp, ptr_t pc) 
+{
+    asm volatile("movw %0, %%ax\n"
+                 "movw %%ax, %%es\n"
+                 "movw %%ax, %%ds\n"
+                 "movw %%ax, %%fs\n"
+                 "movw %%ax, %%gs\n"
+                 "pushl %0\n"
+                 "pushl %1\n"
+                 "pushl %2\n"
+                 "pushl %3\n"
+                 "retf" ::"i"(UDATA_SEG),
+                 "r"(sp),
+                 "i"(UCODE_SEG),
+                 "r"(pc)
                  : "eax", "memory");
+}
 
 
 static inline void must_inline noret

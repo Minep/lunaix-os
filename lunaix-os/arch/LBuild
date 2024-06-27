@@ -1,0 +1,7 @@
+use({
+    config("arch"): {
+        "i386": "i386",
+        "aarch64": "arm",
+        "rv64": "riscv"
+    }
+})

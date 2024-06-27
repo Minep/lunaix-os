@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_HSTR_H
 #define __LUNAIX_HSTR_H
 
-#include <lib/hash.h>
+#include <klibc/hash.h>
 
 #define HSTR_FULL_HASH 32
 

@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_MEMORY_H
-#define __LUNAIX_MEMORY_H
+#ifndef __LUNAIX_ARCH_MEMORY_H
+#define __LUNAIX_ARCH_MEMORY_H
 
 #include <lunaix/mm/pagetable.h>
 #include <lunaix/mann_flags.h>
@@ -24,4 +24,4 @@ translate_vmr_prot(unsigned int vmr_prot)
 }
 
 
-#endif /* __LUNAIX_MEMORY_H */
+#endif /* __LUNAIX_ARCH_MEMORY_H */

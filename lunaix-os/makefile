@@ -28,6 +28,14 @@ $(DEPS):
 		echo "failed" && exit 1;\
 	fi
 
+define builder_data
+	.builder/sources.list 
+	.builder/headers.list 
+	.builder/includes.list
+endef
+
+all_lconfigs = $(shell find . -name "LConfig")
+
 $(kbuild_dir):
 	@mkdir -p $(kbin_dir)
 	@mkdir -p $(os_img_dir)
@@ -35,10 +43,18 @@ $(kbuild_dir):
 	@mkdir -p $(os_img_dir)/boot/grub
 	@mkdir -p $(os_img_dir)/usr
 
+.builder/configs.h: $(all_lconfigs)
+	@echo restarting configuration...
+	@echo 
+	@./scripts/build-tools/luna_build.py --config --lconfig-file LConfig -o $(@D)
+
+.builder/%.list: .builder/configs.h
+	@./scripts/build-tools/luna_build.py LBuild --lconfig-file LConfig -o $(@D)
+
 .PHONY: kernel
 export BUILD_DIR=$(kbin_dir)
 export BUILD_NAME=$(kbin)
-kernel:
+kernel: $(builder_data)
 	$(call status,TASK,$(notdir $@))
 	@$(MAKE) $(MKFLAGS) -I $(mkinc_dir) -f kernel.mk all
 
@@ -47,14 +63,15 @@ export KCMD=$(CMDLINE)
 export _OS_NAME=$(OS_NAME)
 image: usr/build kernel
 	$(call status,TASK,$(notdir $@))
-	@./config-grub.sh $(os_img_dir)/boot/grub/grub.cfg
+	@./scripts/grub/config-grub.sh $(os_img_dir)/boot/grub/grub.cfg
 	@cp -r usr/build/* $(os_img_dir)/usr
 	@cp -r $(kbin_dir)/* $(os_img_dir)/boot
-	@grub-mkrescue -o $(kimg) $(os_img_dir) -- -volid "$(OS_ID) $(OS_VER)" -system_id "$(OS_NAME)"
+	@grub-mkrescue -o $(kimg) $(os_img_dir)\
+		-- -volid "$(OS_ID) $(OS_VER)" -system_id "$(OS_NAME)"
 
 usr/build: user
 
-check: $(DEPS) GRUB_TEMPLATE
+check: $(DEPS) check-cc scripts/grub/GRUB_TEMPLATE
 
 prepare: check $(os_img_dir)
 
@@ -76,12 +93,13 @@ instable: all
 all-debug: bootable-debug
 
 clean:
-	@rm -rf $(kbuild_dir) || exit 1
 	@$(MAKE) -C usr clean -I $(mkinc_dir)
 	@$(MAKE) -f kernel.mk clean -I $(mkinc_dir)
+	@rm -rf $(kbuild_dir) || exit 1
+	@rm -f .builder/*.list || exit 1
 
-run: $(BUILD_DIR)/$(OS_ISO)
-	@qemu-system-i386 $(QEMU_OPTIONS)
+run: all
+	@qemu-system-i386 $(call get_qemu_options,$(kimg))
 	@sleep 1
 	@telnet 127.0.0.1 $(QEMU_HMP)
 

@@ -14,7 +14,8 @@
 LOG_MODULE("THREAD")
 
 static ptr_t
-__alloc_user_thread_stack(struct proc_info* proc, struct mm_region** stack_region, ptr_t vm_mnt)
+__alloc_user_thread_stack(struct proc_info* proc, 
+                          struct mm_region** stack_region, ptr_t vm_mnt)
 {
     ptr_t th_stack_top = (proc->thread_count + 1) * USR_STACK_SIZE;
     th_stack_top = ROUNDUP(USR_STACK_END - th_stack_top, MEM_PAGE);
@@ -28,8 +29,9 @@ __alloc_user_thread_stack(struct proc_info* proc, struct mm_region** stack_regio
                                 .flags = MAP_ANON | MAP_PRIVATE,
                                 .type = REGION_TYPE_STACK };
 
-    int errno = mmap_user((void**)&th_stack_top, &vmr, th_stack_top, NULL, &param);
-
+    int errno;
+    
+    errno = mmap_user((void**)&th_stack_top, &vmr, th_stack_top, NULL, &param);
     if (errno) {
         WARN("failed to create user thread stack: %d", errno);
         return 0;
@@ -144,22 +146,22 @@ start_thread(struct thread* th, ptr_t entry)
 
     assert(mm->vm_mnt);
     
-    struct transfer_context transfer;
+    struct hart_transition transition;
     if (!kernel_addr(entry)) {
         assert(th->ustack);
 
         ptr_t ustack_top = align_stack(th->ustack->end - 1);
         ustack_top -= 16;   // pre_allocate a 16 byte for inject parameter
-        thread_create_user_transfer(&transfer, th->kstack, ustack_top, entry);
+        hart_user_transfer(&transition, th->kstack, ustack_top, entry);
 
         th->ustack_top = ustack_top;
     } 
     else {
-        thread_create_kernel_transfer(&transfer, th->kstack, entry);
+        hart_kernel_transfer(&transition, th->kstack, entry);
     }
 
-    inject_transfer_context(mm->vm_mnt, &transfer);
-    th->intr_ctx = (isr_param*)transfer.inject;
+    install_hart_transition(mm->vm_mnt, &transition);
+    th->hstate = (struct hart_state*)transition.inject;
 
     commit_thread(th);
 }

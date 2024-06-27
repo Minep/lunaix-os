@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_LSDBG_H
 #define __LUNAIX_LSDBG_H
 
-#include <lunaix/pcontext.h>
+#include <lunaix/hart_state.h>
 
 #define SDBG_CLNT_HI 0x10
 #define SDBG_CLNT_QUIT 0xff
@@ -18,6 +18,6 @@
 #define SDBG_STATE_WAIT_BRK 2
 
 void
-lunaix_sdbg_loop(isr_param* param);
+lunaix_sdbg_loop(struct hart_state* hstate);
 
 #endif /* __LUNAIX_LSDBG_H */

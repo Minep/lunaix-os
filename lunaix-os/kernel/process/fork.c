@@ -106,7 +106,7 @@ dup_active_thread(ptr_t vm_mnt, struct proc_info* duped_pcb)
         return NULL;
     }
 
-    th->intr_ctx = current_thread->intr_ctx;
+    th->hstate = current_thread->hstate;
     th->kstack = current_thread->kstack;
 
     signal_dup_context(&th->sigctx);

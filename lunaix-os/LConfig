@@ -1,0 +1,32 @@
+import time
+
+include("kernel/LConfig")
+include("arch/LConfig")
+
+@Term("Version")
+@ReadOnly
+def lunaix_ver():
+    """
+    Lunaix kernel version
+    """
+
+    type(str)
+    
+    seq_num = int(time.time() / 3600)
+    default("dev-2024_%d"%(seq_num))
+
+@Collection
+def debug_and_testing():
+    """
+    General settings for kernel debugging feature
+    """
+
+    @Term("Supress assertion")
+    def no_assert():
+        """
+        Supress all assertion fail activity.
+        Note: Enable this is highly NOT recommended and would result system
+              extermly unstable
+        """
+        type(bool)
+        default(False)

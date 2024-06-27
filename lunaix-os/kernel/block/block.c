@@ -3,7 +3,7 @@
 
 #include <hal/ahci/hba.h>
 
-#include <lib/crc.h>
+#include <klibc/crc.h>
 
 #include <lunaix/blkpart_gpt.h>
 #include <lunaix/block.h>

@@ -2,7 +2,7 @@
 #define __LUNAIX_AHCI_H
 
 #include "hba.h"
-#include <lunaix/isrm.h>
+#include <lunaix/generic/isrm.h>
 
 /*
  * Macro naming rule:
@@ -59,6 +59,6 @@ struct ahci_driver*
 ahci_driver_init(struct ahci_driver_param* param);
 
 void
-ahci_hba_isr(const isr_param* param);
+ahci_hba_isr(const struct hart_state* hstate);
 
 #endif /* __LUNAIX_AHCI_H */

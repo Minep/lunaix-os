@@ -1,0 +1,9 @@
+use("kernel")
+use("libs")
+use("arch")
+use("hal")
+
+headers([
+    "includes",
+    "includes/usr"
+])

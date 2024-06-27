@@ -66,7 +66,7 @@
                                                       : 0)                      \
                              : (31 - clz(x)))
 
-#ifndef __LUNAIXOS_NASSERT__
+#ifndef CONFIG_NO_ASSERT
 #define assert(cond)                                                           \
     do {                                                                       \
         if (unlikely(!(cond))) {                                                \
@@ -111,7 +111,7 @@ __assert_fail(const char* expr, const char* file, unsigned int line)
 #define assert(cond) (void)(cond);          // assert nothing
 #define assert_msg(cond, msg) (void)(cond); // assert nothing
 
-#endif // __LUNAIXOS_NASSERT__
+#endif // CONFIG_NO_ASSERT
 
 void noret
 panick(const char* msg);

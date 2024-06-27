@@ -1,0 +1,92 @@
+
+@Collection
+def memory_subsystem():
+    """ Config the memory subsystem """
+
+    @Collection
+    def physical_mm():
+        """ Physical memory manager  """
+
+        @Term
+        def pmalloc_method():
+            """ Allocation policy for phiscal memory  """
+            
+            type(["simple", "buddy", "ncontig"])
+            default("simple")
+
+        @Group
+        def pmalloc_simple_po_thresholds():
+            
+            @Term
+            def pmalloc_simple_max_po0():
+                """ free list capacity for order-0 pages  """
+                
+                type(int)
+                default(4096)
+
+            @Term
+            def pmalloc_simple_max_po1():
+                """ free list capacity for order-1 pages  """
+
+                type(int)
+                default(2048)
+            
+            @Term
+            def pmalloc_simple_max_po2():
+                """ free list capacity for order-2 pages  """
+
+                type(int)
+                default(2048)
+            
+            @Term
+            def pmalloc_simple_max_po3():
+                """ free list capacity for order-3 pages  """
+                
+                type(int)
+                default(2048)
+            
+            @Term
+            def pmalloc_simple_max_po4():
+                """ free list capacity for order-4 pages  """
+
+                type(int)
+                default(512)
+            
+            @Term
+            def pmalloc_simple_max_po5():
+                """ free list capacity for order-5 pages  """
+
+                type(int)
+                default(512)
+            
+            @Term
+            def pmalloc_simple_max_po6():
+                """ free list capacity for order-6 pages  """
+
+                type(int)
+                default(128)
+            
+            @Term
+            def pmalloc_simple_max_po7():
+                """ free list capacity for order-7 pages  """
+
+                type(int)
+                default(128)
+            
+            @Term
+            def pmalloc_simple_max_po8():
+                """ free list capacity for order-8 pages  """
+
+                type(int)
+                default(64)
+            
+            @Term
+            def pmalloc_simple_max_po9():
+                """ free list capacity for order-9 pages  """
+
+                type(int)
+                default(32)
+
+            return v(pmalloc_method) == "simple"
+
+    add_to_collection(kernel_feature)

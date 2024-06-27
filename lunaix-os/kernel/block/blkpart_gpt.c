@@ -7,7 +7,7 @@
 
 #include <sys/muldiv64.h>
 
-#include <lib/crc.h>
+#include <klibc/crc.h>
 
 #define GPT_BLKSIZE 512
 #define LBA2OFF(lba) ((lba) * GPT_BLKSIZE)

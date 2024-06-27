@@ -1,0 +1,16 @@
+sources([
+    "mmap.c",
+    "valloc.c",
+    "cake.c",
+    "fault.c",
+    "procvm.c",
+    "page.c",
+    "region.c",
+    "pmalloc_simple.c",
+    "vmm.c",
+    "mmio.c",
+    "pmm.c",
+    "cake_export.c",
+    "vmap.c",
+    "dmm.c"
+])

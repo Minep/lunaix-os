@@ -7,7 +7,7 @@
 #include <lunaix/status.h>
 #include <lunaix/syslog.h>
 #include <lunaix/trace.h>
-#include <lunaix/pcontext.h>
+#include <lunaix/hart_state.h>
 #include <lunaix/failsafe.h>
 
 #include <sys/mm/mm_defs.h>
@@ -108,7 +108,7 @@ __prepare_fault_context(struct fault_context* fault)
 
     fault->resolving = pte_mkloaded(fault->resolving);
     fault->kernel_vmfault = kernel_vmfault;
-    fault->kernel_access  = kernel_context(fault->ictx);
+    fault->kernel_access  = kernel_context(fault->hstate);
 
     return true;
 }
@@ -265,7 +265,7 @@ __fail_to_resolve(struct fault_context* fault)
         failsafe_diagnostic();
     }
 
-    trace_printstack_isr(fault->ictx);
+    trace_printstack_isr(fault->hstate);
     
     thread_setsignal(current_thread, _SIGSEGV);
 
@@ -316,15 +316,15 @@ done:
 }
 
 void
-intr_routine_page_fault(const isr_param* param)
+intr_routine_page_fault(const struct hart_state* hstate)
 {
-    if (param->depth > 10) {
+    if (hstate->depth > 10) {
         // Too many nested fault! we must messed up something
         // XXX should we failed silently?
         spin();
     }
 
-    struct fault_context fault = { .ictx = param };
+    struct fault_context fault = { .hstate = hstate };
 
     if (!__prepare_fault_context(&fault)) {
         __fail_to_resolve(&fault);

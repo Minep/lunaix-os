@@ -1,5 +1,5 @@
 #include <lunaix/types.h>
-#include <sys/x86_isa.h>
+#include "sys/x86_isa.h"
 
 #define SD_TYPE(x) (x << 8)
 #define SD_CODE_DATA(x) (x << 12)

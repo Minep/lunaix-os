@@ -3,7 +3,7 @@
 
 #include <lunaix/ds/llist.h>
 #include <lunaix/time.h>
-#include <lunaix/pcontext.h>
+#include <lunaix/hart_state.h>
 
 #define SYS_TIMER_FREQUENCY_HZ 1000
 

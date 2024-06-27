@@ -1,7 +1,8 @@
 #include <klibc/string.h>
+#include <lunaix/compiler.h>
 
-unsigned long
-strlen(const char* str)
+unsigned long weak
+strlen(const char *str)
 {
     unsigned long len = 0;
     while (str[len])
@@ -9,8 +10,8 @@ strlen(const char* str)
     return len;
 }
 
-unsigned long
-strnlen(const char* str, unsigned long max_len)
+unsigned long weak
+strnlen(const char *str, unsigned long max_len)
 {
     unsigned long len = 0;
     while (str[len] && len <= max_len)

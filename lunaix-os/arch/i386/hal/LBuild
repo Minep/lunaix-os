@@ -1,0 +1,9 @@
+sources([
+    "apic.c",
+    "rngx86.c",
+    "cpu.c",
+    "ps2kbd.c",
+    "apic_timer.c",
+    "ioapic.c",
+    "mc146818a.c"
+])
