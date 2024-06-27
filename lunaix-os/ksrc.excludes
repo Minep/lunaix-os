@@ -1,2 +1,0 @@
-kernel/debug/sdbg.c
-kernel/debug/gdbstub.c

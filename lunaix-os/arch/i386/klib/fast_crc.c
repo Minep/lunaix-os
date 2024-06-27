@@ -1,7 +1,7 @@
 #include <lunaix/types.h>
 #include <klibc/crc.h>
 
-#ifdef CONFIG_X86_SSE4
+#ifdef CONFIG_X86_ENABLE_SSE_FEATURE
 unsigned int
 crc32b(unsigned char* data, unsigned int size)
 {
