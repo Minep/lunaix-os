@@ -6,6 +6,10 @@ include("arch/LConfig")
 @Term("Version")
 @ReadOnly
 def lunaix_ver():
+    """
+    Lunaix kernel version
+    """
+
     type(str)
     
     seq_num = int(time.time() / 3600)

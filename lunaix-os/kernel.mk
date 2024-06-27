@@ -19,13 +19,15 @@ ksymtable := lunaix_ksyms.o
 
 CFLAGS += $(khdr_opts)
 
-%.S.o: %.S
-	$(call status_,AS,$<)
-	@$(CC) $(CFLAGS) $(kinc_opts) -c $< -o $@
+-include $(ksrc_deps)
 
-%.c.o: %.c
+%.S.o: %.S $(khdr_files) kernel.mk
+	$(call status_,AS,$<)
+	@$(CC) $(CFLAGS) $(kinc_opts) -MMD -MP -c $< -o $@
+
+%.c.o: %.c $(khdr_files) kernel.mk
 	$(call status_,CC,$<)
-	@$(CC) $(CFLAGS) $(kinc_opts) -c $< -o $@
+	@$(CC) $(CFLAGS) $(kinc_opts) -MMD -MP -c $< -o $@
 
 $(tmp_kbin): $(ksrc_objs)
 	$(call status_,LD,$@)

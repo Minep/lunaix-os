@@ -96,7 +96,7 @@ clean:
 	@$(MAKE) -C usr clean -I $(mkinc_dir)
 	@$(MAKE) -f kernel.mk clean -I $(mkinc_dir)
 	@rm -rf $(kbuild_dir) || exit 1
-	@rm -rf .builder || exit 1
+	@rm -f .builder/*.list || exit 1
 
 run: all
 	@qemu-system-i386 $(call get_qemu_options,$(kimg))
