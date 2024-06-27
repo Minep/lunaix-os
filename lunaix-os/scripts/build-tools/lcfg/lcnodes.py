@@ -235,6 +235,9 @@ class LCTermNode(LCFuncNode):
         if self._rdonly:
             return
         
+        if isinstance(val, str):
+            val = self._type.parse_input(val)
+        
         self.__assert_type(val)
         self._value = val
         self.__update_value()

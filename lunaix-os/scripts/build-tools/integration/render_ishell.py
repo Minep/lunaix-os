@@ -1,20 +1,27 @@
 from lcfg.api import (
     RenderContext, 
     InteractiveRenderer, 
-    Renderable
+    Renderable,
+    ConfigTypeCheckError,
+    ConfigLoadException
 )
 from lcfg.common import LConfigEnvironment
 
 import shlex
 from lib.utils import join_path
 from pathlib import Path
+import readline
+
+class ShellException(Exception):
+    def __init__(self, *args: object) -> None:
+        super().__init__(*args)
 
 class ViewElement:
     def __init__(self, label, node) -> None:
-        self.label = node.get_name()
+        self.label = label
         self.node = node
 
-    def select(self, sctx):
+    def expand(self, sctx):
         return False
 
     def read(self, sctx):
@@ -38,16 +45,32 @@ class SubviewLink(ViewElement):
         super().__init__(label, node)
         self.__callback = cb
 
-    def select(self, sctx):
+    def expand(self, sctx):
         sctx.clear_view()
         self.__callback(sctx)
         return True
     
     def draw(self, sctx, canvas):
-        print(f"({self.label})")
+        print(f" [{self.label}]")
 
     def get_type(self, sctx):
         return f"Collection: {self.label}"
+
+class RootWrapper(ViewElement):
+    def __init__(self, root) -> None:
+        self.__root = root
+        super().__init__("root", None)
+
+    def expand(self, sctx):
+        sctx.clear_view()
+        self.__root.render(sctx)
+        return True
+    
+    def draw(self, sctx, canvas):
+        pass
+
+    def get_type(self, sctx):
+        return ""
 
 class FieldView(ViewElement):
     def __init__(self, label, node) -> None:
@@ -69,8 +92,8 @@ class FieldView(ViewElement):
     def draw(self, sctx, canvas):
         suffix = ""
         if self.node.read_only():
-            suffix = " [ro]"
-        print(f"{self.label}{suffix}")
+            suffix = " (ro)"
+        print(f" {self.label}{suffix}")
 
 class ShellContext(RenderContext):
     def __init__(self) -> None:
@@ -82,12 +105,12 @@ class ShellContext(RenderContext):
     
     def add_expandable(self, label, node, on_expand_cb):
         name = node.get_name()
-        self._view[name] = SubviewLink(label, node, on_expand_cb)
+        self._view[name] = SubviewLink(name, node, on_expand_cb)
         self._subviews.append(name)
     
     def add_field(self, label, node):
         name = node.get_name()
-        self._view[name] = FieldView(label, node)
+        self._view[name] = FieldView(name, node)
         self._field.append(name)
     
     def clear_view(self):
@@ -107,7 +130,8 @@ class ShellContext(RenderContext):
 class InteractiveShell(InteractiveRenderer):
     def __init__(self, root: Renderable) -> None:
         super().__init__()
-        self.__levels = [root]
+        self.__levels = [RootWrapper(root)]
+        self.__aborted = True
         self.__sctx = ShellContext()
         self.__cmd = {
             "ls": (
@@ -125,15 +149,10 @@ class InteractiveShell(InteractiveRenderer):
                 lambda *args: 
                     self.print_type(*args)
             ),
-            "open": (
-                "open a collection node",
+            "cd": (
+                "navigate to a collection node given a unix-like path",
                 lambda *args: 
                     self.get_in(*args)
-            ),
-            "back": (
-                "back to upper level collection",
-                lambda *args: 
-                    self.get_out()
             ),
             "usage": (
                 "print out the usage",
@@ -143,12 +162,29 @@ class InteractiveShell(InteractiveRenderer):
         }
 
     def get_path(self):
-        l = [level.label for level in self.__levels]
-        return '/'.join(l)
+        l = [level.label for level in self.__levels[1:]]
+        return f"/{'/'.join(l)}"
     
     def resolve(self, relative):
+        ctx = ShellContext()
         p = join_path(self.get_path(), relative)
-        return Path(p).resolve().parts
+        ps = Path(p).resolve().parts
+        if ps[0] == '/':
+            ps = ps[1:]
+
+        node = self.__levels[0]
+        levels = [node]
+        for part in ps:
+            if not node.expand(ctx):
+                raise ShellException(f"node is not a collection: {part}")
+            
+            node = ctx.get_view(part)
+            if not node:
+                raise ShellException(f"no such node: {part}")
+
+            levels.append(node)
+        
+        return (node, levels)
 
     def print_usage(self):
         for cmd, (desc, _) in self.__cmd.items():
@@ -159,61 +195,48 @@ class InteractiveShell(InteractiveRenderer):
             ]))
 
     def print_help(self, node_name):
-        view = self.__sctx.get_view(node_name)
-        if not view:
-            print(f"no config node named {node_name}")
-            return
+        view, _ = self.resolve(node_name)
         
-        print()
         print(view.get_help(self.__sctx))
 
     def print_type(self, node_name):
-        view = self.__sctx.get_view(node_name)
-        if not view:
-            print(f"no config node named {node_name}")
-            return
+        view, _ = self.resolve(node_name)
         
-        print()
         print(view.get_type(self.__sctx))
 
+    def do_read(self, node_name):
+        view, _ = self.resolve(node_name)
+        rd_val = view.read(self.__sctx)
+        if not rd_val:
+            raise ShellException(f"config node {view.label} is not readable")
+    
+        print(rd_val)
+
+    def do_write(self, node_name, val):
+        view, _ = self.resolve(node_name)
+        wr = view.write(self.__sctx, val)
+        if not wr:
+            raise ShellException(f"config node {view.label} is read only")
+
+        print(f"write: {val}")
+        self.do_render()
+
     def get_in(self, node_name):
-        view = self.__sctx.get_view(node_name)
-        if not view:
-            print(f"no config node named {node_name}")
-            return
+        view, lvl = self.resolve(node_name)
         
-        
-        if not view.select(self.__sctx):
+        if not view.expand(self.__sctx):
             print(f"{node_name} is not a collection")
             return
         
-        self.__levels.append(view)
-
-    def get_out(self):
-        if len(self.__levels) == 1:
-            return
-        
-        self.__levels.pop()
-        self.__sctx.clear_view()
-        self.do_render()
+        self.__levels = lvl
 
     def do_render(self):
         
-        curr = self.__levels[-1]
-        if len(self.__levels) == 1:
-            self.__sctx.clear_view()
-            curr.render(self.__sctx)
-            return
-        
-        curr.select(self.__sctx)
+        curr = self.__levels[-1]        
+        curr.expand(self.__sctx)
 
     def __loop(self):
-        root = self.__levels[-1]
-        prefix = "config: %s> "
-        if isinstance(root, LConfigEnvironment):
-            prefix = prefix%("root")
-        else:
-            prefix = prefix%(root.node.get_name())
+        prefix = "config: %s> "%(self.__levels[-1].label)
 
         line = input(prefix)
         args = shlex.split(line)
@@ -226,28 +249,22 @@ class InteractiveShell(InteractiveRenderer):
             return True
         
         if cmd == "exit":
+            self.__aborted = False
             return False
         
-        node = self.__sctx.get_view(cmd)
-        if not node:
-            print(f"unrecognised command {line}")
-            return True
+        if cmd == "abort":
+            return False
         
-        if len(args) == 3 and args[1] == '<':
-            wr = node.write(self.__sctx, args[2])
-            if not wr:
-                print(f"config node {cmd} is read only")
-            else:
-                self.do_render()
-                print(f"write: {args[2]}")
+        node = self.resolve(cmd)
+        if not node:
+            raise ShellException(f"unrecognised command {line}")
+        
+        if len(args) == 3 and args[1] == '=':
+            self.do_write(args[0], args[2])
             return True
         
         if len(args) == 1:
-            rd_val = node.read(self.__sctx)
-            if not rd_val:
-                print(f"config node {cmd} is not readable")
-            else:
-                print(rd_val)
+            self.do_read(args[0])
             return True
         
         print(f"unrecognised command {line}")
@@ -259,8 +276,21 @@ class InteractiveShell(InteractiveRenderer):
         print("\n".join([
             "Interactive LConfig Shell",
             "   type 'usage' to find out how to use",
+            "   type 'exit' to end (with saving)",
+            "   type 'abort' to abort (without saving)",
+            "   type node name directly to read the value",
+            "   type 'node = val' to set 'val' to 'node'",
             ""
         ]))
         while True:
-            if not self.__loop():
+            try:
+                if not self.__loop():
+                    break
+            except KeyboardInterrupt:
                 break
+            except ConfigTypeCheckError as e:
+                print(e.args[0])
+            except ShellException as e:
+                print(e.args[0])
+
+        return not self.__aborted

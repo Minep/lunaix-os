@@ -45,6 +45,7 @@ $(kbuild_dir):
 
 .builder/configs.h: $(all_lconfigs)
 	@echo restarting configuration...
+	@echo 
 	@./scripts/build-tools/luna_build.py --config --lconfig-file LConfig -o $(@D)
 
 .builder/%.list: .builder/configs.h

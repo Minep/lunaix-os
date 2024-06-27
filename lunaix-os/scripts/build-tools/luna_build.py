@@ -34,7 +34,9 @@ def prepare_lconfig_env(out_dir):
 
 def do_config(lcfg_env):
     shell = InteractiveShell(lcfg_env)
-    shell.render_loop()
+    if not shell.render_loop():
+        print("Configuration aborted.")
+        exit(-1)
 
     lcfg_env.export()
     lcfg_env.save()
