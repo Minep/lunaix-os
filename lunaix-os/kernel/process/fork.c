@@ -149,9 +149,6 @@ done:
 pid_t
 dup_proc()
 {
-    // FIXME need investigate: issue with fork, as well as pthread
-    //       especially when involving frequent alloc and dealloc ops
-    //       (could be issue in allocator's segregated free list)
     struct proc_info* pcb = alloc_process();
     if (!pcb) {
         syscall_result(ENOMEM);

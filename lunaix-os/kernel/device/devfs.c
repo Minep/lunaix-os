@@ -1,5 +1,5 @@
 #include <lunaix/device.h>
-#include <lunaix/fs.h>
+#include <lunaix/fs/api.h>
 #include <lunaix/fs/devfs.h>
 #include <lunaix/spike.h>
 
@@ -67,7 +67,7 @@ devfs_write_page(struct v_inode* inode, void* buffer, size_t fpos)
 int
 devfs_get_itype(struct device_meta* dm)
 {
-    int itype = VFS_IFFILE;
+    int itype = VFS_IFDEV;
 
     if (valid_device_subtype_ref(dm, DEV_CAT)) {
         return VFS_IFDIR;
@@ -78,11 +78,9 @@ devfs_get_itype(struct device_meta* dm)
     
     if (dev_if == DEV_IFVOL) {
         itype |= VFS_IFVOLDEV;
-    } else if (dev_if == DEV_IFSEQ) {
-        itype |= VFS_IFSEQDEV;
-    } else {
-        itype |= VFS_IFDEV;
     }
+
+    // otherwise, the mapping is considered to be generic seq dev.
     return itype;
 }
 
@@ -147,8 +145,12 @@ devfs_readdir(struct v_file* file, struct dir_context* dctx)
         return ENOTDIR;
     }
 
+    if (fsapi_handle_pseudo_dirent(file, dctx)) {
+        return 1;
+    }
+
     struct device_meta* dev =
-      device_getbyoffset(rootdev, dctx->index);
+      device_getbyoffset(rootdev, file->f_pos - 2);
     
     if (!dev) {
         return 0;

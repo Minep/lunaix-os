@@ -17,7 +17,8 @@ __cake_stat_gonext(struct twimap* map)
 void
 __cake_stat_reset(struct twimap* map)
 {
-    map->index = container_of(piles.next, struct cake_pile, piles);
+    map->index = container_of(&piles, struct cake_pile, piles);
+    twimap_printf(map, "name, n_cakes, pg/cake, slices/cake, n_slices\n");
 }
 
 void
@@ -98,7 +99,6 @@ cake_export()
     map->reset = __cake_stat_reset;
     map->go_next = __cake_stat_gonext;
     map->read = __cake_rd_stat;
-    __cake_stat_reset(map);
 
     struct cake_pile *pos, *n;
     llist_for_each(pos, n, &piles, piles)

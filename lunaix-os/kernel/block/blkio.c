@@ -1,10 +1,13 @@
 #include <lunaix/blkio.h>
+#include <lunaix/syslog.h>
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/valloc.h>
 
 #include <sys/cpu.h>
 
 static struct cake_pile* blkio_reqpile;
+
+LOG_MODULE("blkio")
 
 void
 blkio_init()
@@ -72,10 +75,19 @@ blkio_newctx(req_handler handler)
 }
 
 void
-blkio_commit(struct blkio_context* ctx, struct blkio_req* req, int options)
+blkio_commit(struct blkio_req* req, int options)
 {
+    struct blkio_context* ctx;
+
+    if ((req->flags & BLKIO_PENDING)) {
+        // prevent double submition
+        return;
+    }
+
+    assert(req->io_ctx);
+
+    ctx = req->io_ctx;
     req->flags |= BLKIO_PENDING;
-    req->io_ctx = ctx;
     llist_append(&ctx->queue, &req->reqs);
 
     // if the pipeline is not running (e.g., stalling). Then we should schedule
@@ -121,19 +133,27 @@ blkio_schedule(struct blkio_context* ctx)
 void
 blkio_complete(struct blkio_req* req)
 {
-    req->flags &= ~(BLKIO_BUSY | BLKIO_PENDING);
+    struct blkio_context* ctx;
 
-    if (req->completed) {
-        req->completed(req);
-    }
+    ctx = req->io_ctx;
+    req->flags &= ~(BLKIO_BUSY | BLKIO_PENDING);
 
     // Wake all blocked processes on completion,
     //  albeit should be no more than one process in everycase (by design)
     pwake_all(&req->wait);
 
+    if (req->errcode) {
+        WARN("request completed with error. (errno=0x%x, ctx=%p)",
+                req->errcode, (ptr_t)ctx);
+    }
+
+    if (req->completed) {
+        req->completed(req);
+    }
+
     if ((req->flags & BLKIO_FOC)) {
         blkio_free_req(req);
     }
 
-    req->io_ctx->busy--;
+    ctx->busy--;
 }

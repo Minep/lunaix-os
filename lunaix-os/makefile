@@ -2,9 +2,9 @@ mkinc_dir := $(CURDIR)/makeinc
 
 include $(mkinc_dir)/os.mkinc
 include $(mkinc_dir)/toolchain.mkinc
-include $(mkinc_dir)/qemu.mkinc
 include $(mkinc_dir)/utils.mkinc
 
+QEMU_HMP ?= 45454
 ARCH ?= i386
 export ARCH
 
@@ -101,18 +101,18 @@ clean:
 run: all
 	@qemu-system-i386 $(call get_qemu_options,$(kimg))
 	@sleep 1
-	@telnet 127.0.0.1 $(QEMU_MON_PORT)
+	@telnet 127.0.0.1 $(QEMU_HMP)
 
 debug-qemu: all-debug
 	@objcopy --only-keep-debug $(kbin) $(kbuild_dir)/kernel.dbg
-	@qemu-system-i386 $(call get_qemu_options,$(kimg))
+	@scripts/debug_qemu.sh -m 1G --cd-rom "$(kimg)" --hdd "$(PART_DISK)" --hmp $(QEMU_HMP) &
 	@sleep 1
-	@QMPORT=$(QEMU_MON_PORT) gdb $(kbin) -ex "target remote localhost:1234"
+	@QMPORT=$(QEMU_HMP) gdb $(kbin) -ex "target remote localhost:1234"
 
 debug-qemu-vscode: all-debug
 	@qemu-system-i386 $(call get_qemu_options,$(kimg))
 	@sleep 0.5
-	@telnet 127.0.0.1 $(QEMU_MON_PORT)
+	@telnet 127.0.0.1 $(QEMU_HMP)
 
 debug-bochs: all-debug
 	@bochs -q -f bochs.cfg

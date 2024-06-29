@@ -11,7 +11,7 @@
 #include <klibc/strfmt.h>
 #include <klibc/string.h>
 #include <lunaix/clock.h>
-#include <lunaix/fs.h>
+#include <lunaix/fs/api.h>
 #include <lunaix/fs/twifs.h>
 #include <lunaix/fs/twimap.h>
 #include <lunaix/mm/cake.h>
@@ -132,7 +132,7 @@ __twifs_dirlookup(struct v_inode* inode, struct v_dnode* dnode)
 {
     struct twifs_node* twi_node = (struct twifs_node*)inode->data;
 
-    if ((twi_node->itype & F_FILE)) {
+    if (!check_directory_node(inode)) {
         return ENOTDIR;
     }
 
@@ -165,14 +165,17 @@ int
 __twifs_iterate_dir(struct v_file* file, struct dir_context* dctx)
 {
     struct twifs_node* twi_node = (struct twifs_node*)(file->inode->data);
-    int counter = 0;
+    unsigned int counter = 2;
     struct twifs_node *pos, *n;
+
+    if (fsapi_handle_pseudo_dirent(file, dctx)) {
+        return 1;
+    }
 
     llist_for_each(pos, n, &twi_node->children, siblings)
     {
-        if (counter++ >= dctx->index) {
-            dctx->index = counter;
-            dctx->read_complete_callback(
+        if (counter++ >= file->f_pos) {
+            fsapi_dir_report(
               dctx, pos->name.value, pos->name.len, vfs_get_dtype(pos->itype));
             return 1;
         }
@@ -194,7 +197,7 @@ __twifs_openfile(struct v_inode* inode, struct v_file* file)
 int
 twifs_rm_node(struct twifs_node* node)
 {
-    if (!(node->itype & F_FILE) && !llist_empty(&node->children)) {
+    if (check_itype(node->itype, VFS_IFDIR) && !llist_empty(&node->children)) {
         return ENOTEMPTY;
     }
     llist_delete(&node->siblings);

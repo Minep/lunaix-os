@@ -69,15 +69,29 @@
 #ifndef CONFIG_NO_ASSERT
 #define assert(cond)                                                           \
     do {                                                                       \
-        if (unlikely(!(cond))) {                                                         \
+        if (unlikely(!(cond))) {                                                \
             __assert_fail(#cond, __FILE__, __LINE__);                          \
+        }                                                                      \
+    } while(0)
+
+#define assert_p(cond, prefix)                                                 \
+    do {                                                                       \
+        if (unlikely(!(cond))) {                                               \
+            __assert_fail(prefix ": " #cond, __FILE__, __LINE__);              \
         }                                                                      \
     } while(0)
 
 #define assert_msg(cond, msg)                                                  \
     do {                                                                       \
-        if (unlikely(!(cond))) {                                                         \
+        if (unlikely(!(cond))) {                                               \
             __assert_fail(msg, __FILE__, __LINE__);                            \
+        }                                                                      \
+    } while(0)
+
+#define assert_msg_p(cond, prefix, msg)                                        \
+    do {                                                                       \
+        if (unlikely(!(cond))) {                                               \
+            __assert_fail(prefix ":" msg, __FILE__, __LINE__);                     \
         }                                                                      \
     } while(0)
 
@@ -88,6 +102,7 @@
     } while(0)
 
 #define fail(msg) __assert_fail(msg, __FILE__, __LINE__);
+#define fail_p(msg, prefix) fail(prefix msg);
 
 void
 __assert_fail(const char* expr, const char* file, unsigned int line)

@@ -4,3 +4,4 @@ def kernel_feature():
     pass
 
 include("mm/LConfig")
+include("fs/LConfig")

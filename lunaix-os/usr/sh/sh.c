@@ -110,21 +110,34 @@ sigint_handle(int signum)
 void
 sh_exec(const char* name, const char** argv)
 {
+    static int prev_exit;
     if (!strcmp(name, "cd")) {
         chdir(argv[0] ? argv[0] : ".");
         sh_printerr();
         return;
     }
 
+    if (!strcmp(name, "?")) {
+        printf("%d\n", prev_exit);
+        return;
+    }
+
+    char buffer[1024];
+    strcpy(buffer, "/usr/bin/");
+    strcpy(&buffer[9], name);
+
     pid_t p;
+    int res;
     if (!(p = fork())) {
-        if (execve(name, argv, NULL)) {
+        if (execve(buffer, argv, NULL)) {
             sh_printerr();
         }
         _exit(1);
     }
     setpgid(p, getpgid());
-    waitpid(p, NULL, 0);
+    waitpid(p, &res, 0);
+
+    prev_exit = WEXITSTATUS(res);
 }
 
 void

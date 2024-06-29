@@ -1,4 +1,4 @@
-#include <lunaix/fs.h>
+#include <lunaix/fs/api.h>
 
 int
 default_file_close(struct v_file* file)
@@ -7,8 +7,9 @@ default_file_close(struct v_file* file)
 }
 
 int
-default_file_seek(struct v_inode* inode, size_t offset)
+default_file_seek(struct v_file* file, size_t offset)
 {
+    file->f_pos = offset;
     return 0;
 }
 
@@ -45,19 +46,24 @@ default_file_write_page(struct v_inode* inode, void* buffer, size_t fpos)
 int
 default_file_readdir(struct v_file* file, struct dir_context* dctx)
 {
-    int i = 0;
+    unsigned int i = 0;
     struct v_dnode *pos, *n;
+
+    if (fsapi_handle_pseudo_dirent(file, dctx)) {
+        return 1;
+    }
+
     llist_for_each(pos, n, &file->dnode->children, siblings)
     {
-        if (i < dctx->index) {
+        if (i < file->f_pos) {
             i++;
             continue;
         }
         dctx->read_complete_callback(dctx, pos->name.value, pos->name.len, 0);
-        break;
+        return 1;
     }
 
-    return i;
+    return 0;
 }
 
 int

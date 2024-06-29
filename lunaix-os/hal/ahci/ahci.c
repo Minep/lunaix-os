@@ -411,6 +411,7 @@ int
 ahci_identify_device(struct hba_device* device)
 {
     // 用于重新识别设备（比如在热插拔的情况下）
+    // FIXME this is not right...
     vfree(device);
     return ahci_init_device(device->port);
 }

@@ -52,17 +52,21 @@ taskfs_readdir(struct v_file* file, struct dir_context* dctx)
 {
     struct v_inode* inode = file->inode;
     pid_t pid = inode->id >> 16;
-    int counter = 0;
+    unsigned int counter = 0;
 
     if ((inode->id & COUNTER_MASK)) {
         return ENOTDIR;
+    }
+
+    if (fsapi_handle_pseudo_dirent(file, dctx)) {
+        return 1;
     }
 
     if (pid) {
         struct task_attribute *pos, *n;
         llist_for_each(pos, n, &attributes, siblings)
         {
-            if (counter == dctx->index) {
+            if (counter == file->f_pos) {
                 dctx->read_complete_callback(
                   dctx, pos->key_val, VFS_NAME_MAXLEN, DT_FILE);
                 return 1;
@@ -76,7 +80,7 @@ taskfs_readdir(struct v_file* file, struct dir_context* dctx)
     struct proc_info *root = get_process(pid), *pos, *n;
     llist_for_each(pos, n, &root->tasks, tasks)
     {
-        if (counter == dctx->index) {
+        if (counter == file->f_pos) {
             ksnprintf(name, VFS_NAME_MAXLEN, "%d", pos->pid);
             dctx->read_complete_callback(dctx, name, VFS_NAME_MAXLEN, DT_DIR);
             return 1;

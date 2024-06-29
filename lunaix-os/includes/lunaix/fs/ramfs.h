@@ -10,6 +10,7 @@
 struct ram_inode
 {
     u32_t flags;
+    size_t size;
     char* symlink;
 };
 

@@ -1,7 +1,6 @@
 sources([
     "waitq.c",
     "buffer.c",
-    "lru.c",
     "rbuffer.c",
     "btrie.c",
     "semaphore.c",

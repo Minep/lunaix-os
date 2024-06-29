@@ -1,0 +1,21 @@
+
+@Collection
+def file_system():
+    """ Config feature related to file system supports """
+
+    add_to_collection(kernel_feature)
+
+    @Term
+    def fs_ext2():
+        """ Enable ext2 file system support """
+
+        type(bool)
+        default(False)
+    
+    @Term
+    def fs_iso9660():
+        """ Enable iso9660 file system support """
+
+        type(bool)
+        default(True)
+
