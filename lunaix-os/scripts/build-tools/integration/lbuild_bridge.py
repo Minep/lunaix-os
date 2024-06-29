@@ -11,7 +11,7 @@ class LConfigProvider(ConfigProvider):
     
     def has_config(self, name):
         try:
-            self.__env.lookup_value(name)
-            return True
+            v = self.__env.lookup_value(name)
+            return not not v
         except:
             return False

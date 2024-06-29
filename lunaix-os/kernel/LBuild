@@ -13,6 +13,8 @@ sources([
     "kinit.c",
     "lunad.c",
     "spike.c",
+    "lrud.c",
+    "bcache.c",
     "tty/tty.c",
     "kprint/kp_records.c",
     "kprint/kprintf.c",
