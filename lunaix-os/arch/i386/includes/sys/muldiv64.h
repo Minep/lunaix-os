@@ -4,6 +4,7 @@
 #include <lunaix/spike.h>
 #include <lunaix/types.h>
 
+#ifdef CONFIG_ARCH_I386
 #define do_udiv64(n, base)                                                     \
     ({                                                                         \
         unsigned long __upper, __low, __high, __mod, __base;                   \
@@ -25,6 +26,9 @@
         }                                                                      \
         __mod;                                                                 \
     })
+#else
+    #define do_udiv64(n, base)  ((n) / (base))
+#endif
 
 static inline u64_t
 udiv64(u64_t n, unsigned int base)

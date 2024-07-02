@@ -31,7 +31,7 @@ struct gpt_header
     u32_t ent_size;
     u32_t ent_cksum;
     // reserved start here
-} PACKED;
+} compact;
 
 struct gpt_entry
 {
@@ -41,7 +41,7 @@ struct gpt_entry
     u64_t end_lba;
     u64_t attr_flags;
     char name[72];
-} PACKED;
+} compact;
 
 int
 blkpart_probegpt(struct device* master);

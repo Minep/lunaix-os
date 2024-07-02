@@ -2,11 +2,9 @@ use("hal")
 
 sources([
     "exceptions/interrupts.c",
-    "exceptions/i386_isrdef.c",
+    "exceptions/isrdef.c",
     "exceptions/intr_routines.c",
-    "exceptions/i386_isrm.c",
-    
-    "exceptions/interrupt.S",
+    "exceptions/isrm.c",
     "exceptions/intrhnds.S",
 ])
 
@@ -23,7 +21,6 @@ sources([
     "mm/fault.c",
     "mm/tlb.c",
     "mm/pmm.c",
-    "mm/gdt.c",
     "mm/vmutils.c"
 ])
 
@@ -34,10 +31,27 @@ sources([
     "arch.c",
     "gdbstub.c",
     "trace.c",
+    "hart.c",
+    "descriptors.c",
 
     "syscall.S",
     "failsafe.S"
 ])
+
+sources({
+    config("arch"): {
+        "x86_64": [
+            "hart64.c",
+            "syscall64.S",
+            "exceptions/interrupt64.S"
+        ],
+        "i386": [
+            "hart32.c",
+            "syscall.S",
+            "exceptions/interrupt32.S"
+        ]
+    }
+})
 
 headers([
     "includes"

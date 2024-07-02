@@ -1,5 +1,5 @@
 #include <sys/cpu.h>
-#include <sys/i386_intr.h>
+#include <sys/int_handler.h>
 #include <sys/hart.h>
 #include "sys/x86_isa.h"
 
@@ -29,7 +29,7 @@ update_thread_context(struct hart_state* state)
     }
 }
 
-void
+ptr_t
 intr_handler(struct hart_state* state)
 {
     update_thread_context(state);
@@ -41,17 +41,11 @@ intr_handler(struct hart_state* state)
         goto done;
     }
 
-    ERROR("INT %u: (%x) [%p: %p] Unknown",
-            execp->vector,
-            execp->err_code,
-            execp->cs,
-            execp->eip);
-
 done:
 
     if (execp->vector > IV_BASE_END) {
         isrm_notify_eoi(0, execp->vector);
     }
 
-    return;
+    return state;
 }

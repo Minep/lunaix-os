@@ -11,3 +11,20 @@ def architecture_support():
         """ Config ISA support """
         type(["i386", "x86_64", "aarch64", "rv64"])
         default("i386")
+
+    @Term
+    @ReadOnly
+    def arch_bits():
+        type(["64", "32"])
+        match v(arch):
+            case "i386": 
+                default("32")
+            case "aarch64": 
+                default("64")
+            case "rv64": 
+                default("64")
+            case "x86_64": 
+                default("64")
+            case _:
+                default("32")
+        

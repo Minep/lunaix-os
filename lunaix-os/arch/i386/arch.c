@@ -2,8 +2,10 @@
 
 #include <lunaix/generic/isrm.h>
 #include <lunaix/spike.h>
+#include <lunaix/process.h>
 
-#include "sys/i386_intr.h"
+#include "sys/int_handler.h"
+#include "sys/x86_isa.h"
 #include "sys/hart.h"
 
 #include "hal/apic_timer.h"
@@ -40,4 +42,15 @@ select_platform_timer()
     // TODO select alternatives...
 
     panick("no timer to use.");
+}
+
+void
+update_tss()
+{
+    extern struct x86_tss _tss;
+#ifdef CONFIG_ARCH_X86_64
+    _tss.ists[1] = (ptr_t)current_thread->hstate;
+#else
+    _tss.esp0 = (u32_t)current_thread->hstate;
+#endif
 }

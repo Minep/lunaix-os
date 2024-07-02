@@ -53,11 +53,44 @@
 
 #define GDT_ENTRY 6
 
-u64_t _gdt[GDT_ENTRY];
+x86_segdesc_t _gdt[GDT_ENTRY];
 u16_t _gdt_limit = sizeof(_gdt) - 1;
 
-void
-_set_gdt_entry(u32_t index, u32_t base, u32_t limit, u32_t flags)
+
+#ifdef CONFIG_ARCH_X86_64
+
+static inline void
+_set_gdt_entry(int index, int dpl)
+{
+    u64_t desc = 0;
+    desc |= 0b01 << 21; // D, L
+    desc |= 1 << 15;    // P
+    desc |= (dpl & 0b11) << 13;  // DPL
+
+    _gdt[index] = desc;
+}
+
+static inline void
+_set_tss(int index, ptr_t base, size_t size)
+{
+    struct x86_sysdesc* tssd;
+    u32_t attr;
+    
+    size = size - 1;
+    tssd = (struct x86_sysdesc*)&_gdt[index];
+    tssd->hi = base >> 32;
+    
+    attr = SD_4K_GRAN(1) | SD_PRESENT(1) | SD_TYPE(9) | SD_DPL(0);
+    attr |= (SEG_LIM_H(size) << 16);
+
+    tssd->lo = (SEG_BASE_H(base) | attr | SEG_BASE_M(base)) << 32;
+    tssd->lo |= SEG_BASE_L(base) | SEG_LIM_L(size);
+}
+
+#else
+
+static inline void
+_set_gdt_entry(u32_t index, ptr_t base, u32_t limit, u32_t flags)
 {
     _gdt[index] =
       SEG_BASE_H(base) | flags | SEG_LIM_H(limit) | SEG_BASE_M(base);
@@ -65,15 +98,32 @@ _set_gdt_entry(u32_t index, u32_t base, u32_t limit, u32_t flags)
     _gdt[index] |= SEG_BASE_L(base) | SEG_LIM_L(limit);
 }
 
-extern struct x86_tss _tss;
+static inline void
+_set_tss(int index, ptr_t base, size_t size)
+{
+    _set_gdt_entry(5, base, size - 1, SEG_TSS);
+}
+
+#endif
+
 
 void
 _init_gdt()
 {
+    extern struct x86_tss _tss;
+
+#ifdef CONFIG_ARCH_X86_64
+    _gdt[0] = 0;
+    _set_gdt_entry(1, 0);   // kernel code
+    _set_gdt_entry(2, 3);   // user code
+    _set_gdt_entry(3, 0);   // generic data
+    _set_tss(4, (ptr_t)&_tss, sizeof(_tss));
+#else
     _set_gdt_entry(0, 0, 0, 0);
     _set_gdt_entry(1, 0, 0xfffff, SEG_R0_CODE);
     _set_gdt_entry(2, 0, 0xfffff, SEG_R0_DATA);
     _set_gdt_entry(3, 0, 0xfffff, SEG_R3_CODE);
     _set_gdt_entry(4, 0, 0xfffff, SEG_R3_DATA);
-    _set_gdt_entry(5, (u32_t)&_tss, sizeof(struct x86_tss) - 1, SEG_TSS);
+    _set_tss(5, (u32_t)&_tss, sizeof(struct x86_tss) - 1, SEG_TSS);
+#endif
 }

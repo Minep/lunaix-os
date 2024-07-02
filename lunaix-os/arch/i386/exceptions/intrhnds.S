@@ -1,6 +1,8 @@
-/* Generated from i386_intrhnds.S.j2. Do NOT modify */
+/* Generated from int_handlerhnds.S.j2. Do NOT modify */
 
 #define __ASM__
+#ifdef CONFIG_ARCH_I386
+.align 16
 .macro isr_template vector, no_error_code=1
     .global _asm_isr\vector
     .type _asm_isr\vector, @function
@@ -11,6 +13,17 @@
         pushl $\vector
         jmp interrupt_wrapper
 .endm
+#else
+.align 16
+.macro isr_template vector, no_error_code=1
+    .global _asm_isr\vector
+    .type _asm_isr\vector, @function
+    _asm_isr\vector:
+        pushq $\vector
+        jmp interrupt_wrapper
+.endm
+#endif
+
 .section .text
     isr_template 0, no_error_code=1
     isr_template 1, no_error_code=1

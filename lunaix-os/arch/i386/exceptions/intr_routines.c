@@ -11,7 +11,7 @@
 #include <klibc/strfmt.h>
 
 #include "sys/apic.h"
-#include <sys/i386_intr.h>
+#include <sys/int_handler.h>
 
 LOG_MODULE("INTR")
 
@@ -42,7 +42,11 @@ intr_routine_general_protection(const struct hart_state* state)
 void
 intr_routine_sys_panic(const struct hart_state* state)
 {
+#ifdef CONFIG_ARCH_X86_64
+    __print_panic_msg((char*)(state->registers.rdi), state);
+#else
     __print_panic_msg((char*)(state->registers.edi), state);
+#endif
 }
 
 void

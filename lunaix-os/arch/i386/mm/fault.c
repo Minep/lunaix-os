@@ -17,7 +17,7 @@ __arch_prepare_fault_context(struct fault_context* fault)
 
     fault->fault_ptep  = mkptep_va(VMS_SELF, ptr);
     fault->fault_data  = ictx->execp->err_code;
-    fault->fault_instn = ictx->execp->eip;
+    fault->fault_instn = hart_pc(ictx);
     fault->fault_va    = ptr;
 
     return true;

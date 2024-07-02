@@ -1,10 +1,11 @@
 #define __ASM__
 #include <sys/hart.h>
 #include <sys/abi.h>
-#include <sys/interrupt.S.inc>
+#include <sys/interrupt32.S.inc>
 
 #include <lunaix/syscall.h>
 
+#define tss_esp0_off 4
 #define __ASM_INTR_DIAGNOSIS
 
 #ifdef __ASM_INTR_DIAGNOSIS
@@ -38,7 +39,7 @@
     interrupt_wrapper:
         cld
 
-        subl $4, %esp
+        subl $4, %esp       # prealloc slot for parent linkage
         pushl %esp
 
         subl $16, %esp
@@ -195,8 +196,7 @@
             由于这中间没有进行地址空间的交换，所以第二次跳转使用的是同一个内核栈，而之前默认tss.esp0的值是永远指向最顶部
             这样一来就有可能会覆盖更早的上下文信息（比如嵌套的信号捕获函数）
         */
-        movl thread_hstate(%ebx), %ecx      # __current->hstate
-        movl %ecx, (tss_esp0_off + _tss)
+        call update_tss
 
         jmp handle_signal
 

@@ -11,12 +11,7 @@
     __kinit_stack_end:
         .skip 2048, 0
     __kinit_stack_top:
-    # TODO 
-    # This stack was too small that corrupt the ambient kernel structures.
-    #  (took me days to figure this out!)
-    # We should spent more time to implement a good strategy to detect such
-    #  run-over (we can check these invariants when we trapped in some non-recoverable
-    #  state and provide good feedback to user)
+
 
 .section .text
     .global hhk_entry_

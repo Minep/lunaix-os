@@ -120,3 +120,6 @@ debug-bochs: all-debug
 debug-metal: 
 	@printf "@cmc" > $(PORT)
 	@gdb -s $(kbuild_dir)/kernel.dbg -ex "target remote $(PORT)"
+
+config: $(all_lconfigs)
+	@./scripts/build-tools/luna_build.py --config --lconfig-file LConfig -o .builder/

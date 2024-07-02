@@ -18,6 +18,24 @@
             "compilerPath": "${HOME}/opt/i686-gcc-12/bin/i686-elf-gcc",
             "cStandard": "gnu99",
             "intelliSenseMode": "gcc-x86"
+        },
+        {
+            "name": "OS-DEV64",
+            "includePath": [
+                "${workspaceFolder}/includes",
+                "${workspaceFolder}/includes/usr",
+                "${workspaceFolder}/usr/includes",
+                "${workspaceFolder}/arch/i386/includes",
+            ],
+            "compilerArgs": [
+                "-ffreestanding",
+                "-m64",
+                "-include .builder/configs.h"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "gnu99",
+            "intelliSenseMode": "gcc-x86"
         }
     ],
     "version": 4

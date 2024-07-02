@@ -28,7 +28,7 @@ cpu_ldstate()
 {
     ptr_t val;
     asm volatile("pushf\n"
-                 "popl %0\n"
+                 "pop %0\n"
                  : "=r"(val)::);
     return val;
 }
@@ -42,7 +42,7 @@ static inline reg_t
 cpu_ldconfig()
 {
     reg_t val;
-    asm volatile("movl %%cr0,%0" : "=r"(val));
+    asm volatile("mov %%cr0,%0" : "=r"(val));
     return val;
 }
 
@@ -95,7 +95,7 @@ static inline ptr_t
 cpu_ldeaddr()
 {
     ptr_t val;
-    asm volatile("movl %%cr2,%0" : "=r"(val));
+    asm volatile("mov %%cr2,%0" : "=r"(val));
     return val;
 }
 
