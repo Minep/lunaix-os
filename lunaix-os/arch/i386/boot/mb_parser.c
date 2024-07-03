@@ -6,6 +6,8 @@
 #include <sys/mm/mempart.h>
 
 #define BHCTX_ALLOC 4096
+#define MEM_1M      0x100000UL
+
 
 u8_t bhctx_buffer[BHCTX_ALLOC] boot_bss;
 

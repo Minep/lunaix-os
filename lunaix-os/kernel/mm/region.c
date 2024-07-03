@@ -26,7 +26,7 @@ region_create_range(ptr_t start, size_t length, u32_t attr)
     struct mm_region* region = valloc(sizeof(struct mm_region));
     *region = (struct mm_region){ .attr = attr,
                                   .start = start,
-                                  .end = ROUNDUP(start + length, MEM_PAGE) };
+                                  .end = ROUNDUP(start + length, PAGE_SIZE) };
     return region;
 }
 

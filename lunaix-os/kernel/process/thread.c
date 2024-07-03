@@ -18,7 +18,7 @@ __alloc_user_thread_stack(struct proc_info* proc,
                           struct mm_region** stack_region, ptr_t vm_mnt)
 {
     ptr_t th_stack_top = (proc->thread_count + 1) * USR_STACK_SIZE;
-    th_stack_top = ROUNDUP(USR_STACK_END - th_stack_top, MEM_PAGE);
+    th_stack_top = ROUNDUP(USR_STACK_END - th_stack_top, PAGE_SIZE);
 
     struct mm_region* vmr;
     struct proc_mm* mm = vmspace(proc);

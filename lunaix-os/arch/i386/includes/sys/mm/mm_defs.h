@@ -5,9 +5,6 @@
 #include "mempart.h"
 #include "pagetable.h"
 
-#define KSTACK_PAGES            3
-#define KSTACK_SIZE             (KSTACK_PAGES * MEM_PAGE)
-
 /*
     Regardless architecture we need to draw the line very carefully, and must 
     take the size of VM into account. In general, we aims to achieve 
@@ -19,12 +16,23 @@
     In light of upcomming x86_64 support (for Level 4&5 Paging):
         * #510 entry of PML4        (0x0000ff0000000000, ~512GiB)
         * #510 entry of PML5        (0x01fe000000000000, ~256TiB)
-*/
-// Where the kernel getting re-mapped.
-#define KERNEL_RESIDENT         0xc0000000UL
+    
 
-// Pages reserved for kernel image
-#define KEXEC_RSVD              16
+    KERNEL_RESIDENT  -  a high-mem region, kernel should be
+    KSTACK_PAGES     -  kernel stack, pages allocated to
+    KEXEC_RSVD       -  page reserved for kernel images
+*/
+
+#ifdef CONFIG_ARCH_X86_64
+#   define KSTACK_PAGES            4
+#   define KEXEC_RSVD              32
+#else
+#   define KSTACK_PAGES            3
+#   define KEXEC_RSVD              16
+#endif
+
+#define KSTACK_SIZE             (KSTACK_PAGES * PAGE_SIZE)
+#define KERNEL_RESIDENT         KERNEL_IMG
 
 #define kernel_addr(addr)       ((addr) >= KERNEL_RESIDENT || (addr) < USR_EXEC)
 

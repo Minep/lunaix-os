@@ -4,7 +4,7 @@
 #include <lunaix/owloysius.h>
 #include <lunaix/status.h>
 
-#include <sys/mm/mempart.h>
+#include <sys/mm/pagetable.h>
 
 #include <hal/serial.h>
 #include <hal/term.h>
@@ -162,7 +162,7 @@ __serial_read_async(struct device* dev, void* buf, off_t fpos, size_t len)
 static int
 __serial_read_page(struct device* dev, void* buf, off_t fpos)
 {
-    return serial_readbuf(serial_device(dev), (u8_t*)buf, MEM_PAGE);
+    return serial_readbuf(serial_device(dev), (u8_t*)buf, PAGE_SIZE);
 }
 
 static int
@@ -181,7 +181,7 @@ __serial_write_async(struct device* dev, void* buf, off_t fpos, size_t len)
 static int
 __serial_write_page(struct device* dev, void* buf, off_t fpos)
 {
-    return serial_writebuf(serial_device(dev), (u8_t*)buf, MEM_PAGE);
+    return serial_writebuf(serial_device(dev), (u8_t*)buf, PAGE_SIZE);
 }
 
 static int

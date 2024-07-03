@@ -24,27 +24,22 @@ u16_t _idt_limit = sizeof(_idt) - 1;
 
 #else
 
-struct idte {
-    u64_t lo;
-    u64_t hi;
-} compact;
-
 static inline must_inline void 
-install_idte(struct idte* idt, int iv, void* isr, int dpl) 
+install_idte(struct x86_sysdesc* idt, int iv, void* isr, int dpl) 
 {
-    struct idte* idte = &idt[iv];
+    struct x86_sysdesc* idte = &idt[iv];
     ptr_t isr_p = (ptr_t)isr;
 
     idte->hi = isr_p >> 32;
     
-    idte->lo = (isr_p & 0xffff0000ULL) | IDT_ATTR(dpl, IDT_INTERRUPT); 
+    idte->lo = (isr_p & 0xffff0000UL) | IDT_ATTR(dpl, IDT_INTERRUPT); 
     idte->lo |= 1;  // IST=1
 
     idte->lo <<= 32;                                                     
-    idte->lo |= (KCODE_SEG << 16) | (isr_p & 0x0000ffffULL);           
+    idte->lo |= (KCODE_SEG << 16) | (isr_p & 0x0000ffffUL);           
 }
 
-struct idte _idt[IDT_ENTRY];
+struct x86_sysdesc _idt[IDT_ENTRY];
 u16_t _idt_limit = sizeof(_idt) - 1;
 
 #endif

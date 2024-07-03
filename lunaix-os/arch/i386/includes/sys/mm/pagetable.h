@@ -6,31 +6,15 @@
 
 /* ******** Page Table Manipulation ******** */
 
-// Levels of page table to traverse for a single page walk
-#define _PTW_LEVEL          2
+#ifdef CONFIG_ARCH_X86_64
 
-#define _PAGE_BASE_SHIFT    12
-#define _PAGE_BASE_SIZE     ( 1UL << _PAGE_BASE_SHIFT )
-#define _PAGE_BASE_MASK     ( _PAGE_BASE_SIZE - 1)
+#include "pt_def64.h"
 
-#define _PAGE_LEVEL_SHIFT   10
-#define _PAGE_LEVEL_SIZE    ( 1UL << _PAGE_LEVEL_SHIFT )
-#define _PAGE_LEVEL_MASK    ( _PAGE_LEVEL_SIZE - 1 )
-#define _PAGE_Ln_SIZE(n)    ( 1UL << (_PAGE_BASE_SHIFT + _PAGE_LEVEL_SHIFT * (_PTW_LEVEL - (n) - 1)) )
+#else
 
-// Note: we set VMS_SIZE = VMS_MASK as it is impossible
-//       to express 4Gi in 32bit unsigned integer
+#include "pt_def32.h"
 
-#define VMS_MASK            ( -1UL )
-#define VMS_SIZE            VMS_MASK
-
-/* General size of a LnT huge page */
-
-#define L0T_SIZE            _PAGE_Ln_SIZE(0)
-#define L1T_SIZE            _PAGE_Ln_SIZE(1)
-#define L2T_SIZE            _PAGE_Ln_SIZE(1)
-#define L3T_SIZE            _PAGE_Ln_SIZE(1)
-#define LFT_SIZE            _PAGE_Ln_SIZE(1)
+#endif
 
 /* General mask to get page offset of a LnT huge page */
 
@@ -62,32 +46,12 @@
 // max translation level supported
 #define MAX_LEVEL           _PTW_LEVEL
 
-
-/* ******** PTE Manipulation ******** */
-
-struct __pte {
-    unsigned int val;
-} align(4);
-
 #ifndef pte_t
 typedef struct __pte pte_t;
 #endif
 
 typedef unsigned int pfn_t;
 typedef unsigned int pte_attr_t;
-
-#define _PTE_P                  (1 << 0)
-#define _PTE_W                  (1 << 1)
-#define _PTE_U                  (1 << 2)
-#define _PTE_WT                 (1 << 3)
-#define _PTE_CD                 (1 << 4)
-#define _PTE_A                  (1 << 5)
-#define _PTE_D                  (1 << 6)
-#define _PTE_PS                 (1 << 7)
-#define _PTE_PAT                (1 << 7)
-#define _PTE_G                  (1 << 8)
-#define _PTE_X                  (0)
-#define _PTE_R                  (0)
 
 #define _PTE_PROT_MASK          ( _PTE_W | _PTE_U | _PTE_X )
 
@@ -104,7 +68,6 @@ typedef unsigned int pte_attr_t;
 #define SELF_MAP                ( KERNEL_DATA | _PTE_WT | _PTE_CD )
 
 #define __mkpte_from(pte_val)   ((pte_t){ .val = (pte_val) })
-#define __MEMGUARD               0xdeadc0deUL
 
 #define null_pte                ( __mkpte_from(0) )
 #define guard_pte               ( __mkpte_from(__MEMGUARD) )

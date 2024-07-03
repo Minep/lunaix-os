@@ -69,8 +69,8 @@ struct x86_tss
 typedef u64_t x86_segdesc_t;
 
 struct x86_sysdesc {
-    u64_t hi;
     u64_t lo;
+    u64_t hi;
 } compact;
 
 #else

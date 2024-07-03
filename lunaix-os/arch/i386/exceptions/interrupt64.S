@@ -49,7 +49,7 @@
 
         pushq $0      // placeholder for depth accounting
 
-        movq ics(%esp), %rax   /* 取出 %cs */
+        movq ics(%rsp), %rax   /* 取出 %cs */
         andq $0x3, %rax          /* 判断 RPL */
         jz 1f
 

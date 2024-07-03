@@ -291,7 +291,7 @@ procvm_enter_remote(struct remote_vmctx* rvmctx, struct proc_mm* mm,
     ptr_t vm_mnt = mm->vm_mnt;
     assert(vm_mnt);
     
-    pfn_t size_pn = pfn(size + MEM_PAGE);
+    pfn_t size_pn = pfn(size + PAGE_SIZE);
     assert(size_pn < REMOTEVM_MAX_PAGES);
 
     struct mm_region* region = region_get(&mm->regions, remote_base);
