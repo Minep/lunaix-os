@@ -66,12 +66,12 @@ struct x86_tss
     u8_t rsvd_3[12];
 } compact;
 
-typedef u64_t x86_segdesc_t;
-
 struct x86_sysdesc {
     u64_t lo;
     u64_t hi;
 } compact;
+
+typedef u64_t x86_segdesc_t;
 
 #else
 
@@ -83,10 +83,12 @@ struct x86_tss
     u8_t __padding[94];
 } compact;
 
-typedef struct {
+struct x86_sysdesc {
     u32_t lo;
     u32_t hi;
-} compact x86_segdesc_t;
+} compact;
+
+typedef struct x86_sysdesc x86_segdesc_t;
 
 #endif
 

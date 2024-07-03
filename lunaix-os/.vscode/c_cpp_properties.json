@@ -6,7 +6,7 @@
                 "${workspaceFolder}/includes",
                 "${workspaceFolder}/includes/usr",
                 "${workspaceFolder}/usr/includes",
-                "${workspaceFolder}/arch/i386/includes",
+                "${workspaceFolder}/arch/x86/includes",
             ],
             "compilerArgs": [
                 "-ffreestanding",
@@ -25,7 +25,7 @@
                 "${workspaceFolder}/includes",
                 "${workspaceFolder}/includes/usr",
                 "${workspaceFolder}/usr/includes",
-                "${workspaceFolder}/arch/i386/includes",
+                "${workspaceFolder}/arch/x86/includes",
             ],
             "compilerArgs": [
                 "-ffreestanding",

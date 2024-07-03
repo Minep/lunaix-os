@@ -1,4 +1,4 @@
-include("i386/LConfig")
+include("x86/LConfig")
 
 @Collection
 def architecture_support():

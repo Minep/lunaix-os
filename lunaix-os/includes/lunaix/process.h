@@ -76,7 +76,7 @@ struct thread
 {
     /*
         Any change to *critical section*, including layout, size
-        must be reflected in arch/i386/interrupt.S.inc to avoid
+        must be reflected in arch/x86/interrupt.S.inc to avoid
         disaster!
      */
     struct
