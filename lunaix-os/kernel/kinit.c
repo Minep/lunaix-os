@@ -92,7 +92,6 @@ kernel_bootstrap(struct boot_handoff* bhctx)
      * and start geting into uspace
      */
     boot_end(bhctx);
-    boot_cleanup();
 
     spawn_lunad();
 }

@@ -15,6 +15,28 @@ extern u8_t __kboot_start[];
 extern u8_t __kboot_end[];
 
 // define the initial page table layout
+struct kernel_map;
+
+static struct kernel_map kernel_pt __section(".kpg");
+export_symbol(debug, boot, kernel_pt);
+
+#ifdef CONFIG_ARCH_X86_64
+
+struct kernel_map {
+    pte_t l0t[_PAGE_LEVEL_SIZE];        // root table
+    pte_t l1t_rsvd[_PAGE_LEVEL_SIZE];   // 0~4G reservation
+
+    pte_t l1t[_PAGE_LEVEL_SIZE];        // kernel pt start
+    pte_t l2t[_PAGE_LEVEL_SIZE];
+    pte_t pg_mnt[_PAGE_LEVEL_SIZE];
+
+    struct {
+        pte_t _lft[_PAGE_LEVEL_SIZE];
+    } kernel_lfts[16];
+} align(8);
+
+#else
+
 struct kernel_map {
     pte_t l0t[_PAGE_LEVEL_SIZE];
     pte_t pg_mnt[_PAGE_LEVEL_SIZE];
@@ -24,31 +46,54 @@ struct kernel_map {
     } kernel_lfts[16];
 } align(4);
 
-static struct kernel_map kernel_pt __section(".kpg");
-export_symbol(debug, boot, kernel_pt);
+#endif
 
-
-void boot_text
-_init_page()
+static void boot_text
+remap_kernel()
 {
     struct kernel_map* kpt_pa = (struct kernel_map*)to_kphysical(&kernel_pt);
-
-    pte_t* kl0tep       = (pte_t*) &kpt_pa->l0t[pfn_at(KERNEL_RESIDENT, L0T_SIZE)];
-    pte_t* kl1tep       = (pte_t*)  kpt_pa->kernel_lfts;    
+    
+    pte_t* klptep       = (pte_t*) &kpt_pa->l0t[pfn_at(KERNEL_RESIDENT, L0T_SIZE)];
+    pte_t* ktep         = (pte_t*)  kpt_pa->kernel_lfts;    
     pte_t* boot_l0tep   = (pte_t*)  kpt_pa;
 
+#ifdef CONFIG_ARCH_X86_64
+
+    set_pte(klptep, mkpte((ptr_t)&kpt_pa->l1t, KERNEL_DATA));
+    klptep = (pte_t*) &kpt_pa->l1t;
+
+    set_pte(klptep, mkpte((ptr_t)&kpt_pa->l2t, KERNEL_DATA));
+    klptep = (pte_t*) &kpt_pa->l2t;
+
+    // identity map the first 4G for legacy compatibility
+
+    pte_t* l1_rsvd = (pte_t*) kpt_pa->l1t_rsvd;
+    pte_t id_map   = pte_mkhuge(mkpte_prot(KERNEL_DATA));
+    
+    set_pte(boot_l0tep, mkpte((ptr_t)l1_rsvd, KERNEL_DATA));
+    
+    for (int i = 0; i < 4; i++, l1_rsvd++)
+    {
+        id_map = pte_setpaddr(id_map, (ptr_t)i << 30);
+        set_pte(l1_rsvd, id_map);
+    }
+
+#else
+
     set_pte(boot_l0tep, pte_mkhuge(mkpte_prot(KERNEL_DATA)));
+    
+#endif
 
     // --- 将内核重映射至高半区 ---
 
     // Hook the kernel reserved LFTs onto L0T
-    pte_t pte = mkpte((ptr_t)kl1tep, KERNEL_DATA);
+    pte_t pte = mkpte((ptr_t)ktep, KERNEL_DATA);
     
     for (u32_t i = 0; i < KEXEC_RSVD; i++) {
         pte = pte_setpaddr(pte, (ptr_t)&kpt_pa->kernel_lfts[i]);
-        set_pte(kl0tep, pte);
+        set_pte(klptep, pte);
 
-        kl0tep++;
+        klptep++;
     }
 
     // Ensure the size of kernel is within the reservation
@@ -64,25 +109,25 @@ _init_page()
 
     pfn_t kimg_end = pfn(to_kphysical(__kexec_end));
     pfn_t i = pfn(to_kphysical(__kexec_text_start));
-    kl1tep += i;
+    ktep += i;
 
     // kernel .text
     pte = pte_setprot(pte, KERNEL_EXEC);
     pfn_t ktext_end = pfn(to_kphysical(__kexec_text_end));
     for (; i < ktext_end; i++) {
         pte = pte_setpaddr(pte, page_addr(i));
-        set_pte(kl1tep, pte);
+        set_pte(ktep, pte);
 
-        kl1tep++;
+        ktep++;
     }
 
     // all remaining kernel sections
     pte = pte_setprot(pte, KERNEL_DATA);
     for (; i < kimg_end; i++) {
         pte = pte_setpaddr(pte, page_addr(i));
-        set_pte(kl1tep, pte);
+        set_pte(ktep, pte);
 
-        kl1tep++;
+        ktep++;
     }
 
     // XXX: Mapping the kernel .rodata section?
@@ -96,6 +141,7 @@ _init_page()
     set_pte(boot_l0tep + _PAGE_LEVEL_MASK, pte);
 }
 
+
 ptr_t boot_text
 kpg_init()
 {
@@ -104,7 +150,7 @@ kpg_init()
         ((u8_t*)kmap_pa)[i] = 0;
     }
 
-    _init_page();
+    remap_kernel();
 
     return kmap_pa;
 }

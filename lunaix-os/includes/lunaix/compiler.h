@@ -32,7 +32,8 @@
 #define cacheline_align         align(cacheline_size)
 
 #define export_symbol(domain, namespace, symbol)\
-    typeof(symbol)* must_emit __SYMEXPORT_Z##domain##_N##namespace##_S##symbol = &(symbol)
+    typeof(symbol)* must_emit __SYMEXPORT_Z##domain##_N##namespace##_S##symbol \
+         = &(symbol)
 
 inline static void noret
 spin()

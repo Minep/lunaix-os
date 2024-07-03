@@ -13,6 +13,28 @@
 #define CR0_EM              ( 1UL << 2  )
 #define CR0_MP              ( 1UL << 1  )
 
+#ifdef CONFIG_ARCH_X86_64
+
+#define crx_addflag(crx, flag)      \
+    asm(                            \
+        "movq %%" #crx ", %%rax\n"  \
+        "orq  %0,    %%rax\n"       \
+        "movq %%rax, %%" #crx "\n"  \
+        ::"r"(flag)                 \
+        :"rax"                      \
+    );
+
+#define crx_rmflag(crx, flag)       \
+    asm(                            \
+        "movq %%" #crx ", %%rax\n"  \
+        "andq  %0,    %%rax\n"      \
+        "movq %%rax, %%" #crx "\n"  \
+        ::"r"(~(flag))              \
+        :"rax"                      \
+    );
+
+#else
+
 #define crx_addflag(crx, flag)      \
     asm(                            \
         "movl %%" #crx ", %%eax\n"  \
@@ -30,6 +52,8 @@
         ::"r"(~(flag))              \
         :"eax"                      \
     );
+
+#endif
 
 static inline void
 cr4_setfeature(unsigned long feature)

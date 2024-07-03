@@ -1,13 +1,4 @@
-#define __ASM__ 1
-#include <sys/boot/multiboot.h>
-
-#define MB_FLAGS    (MULTIBOOT_MEMORY_INFO | MULTIBOOT_PAGE_ALIGN)
-#define KPG_SIZE    10*4096
-
-.section .multiboot
-    .long MULTIBOOT_MAGIC
-    .long MB_FLAGS
-    .long CHECKSUM(MB_FLAGS)
+#include "sys/boot/multiboot.S.inc"
 
 .section .boot.bss
     /* 根据System V ABI，栈地址必须16字节对齐 */

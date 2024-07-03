@@ -11,10 +11,7 @@ sources([
 sources([
     "boot/mb_parser.c",
     "boot/kpt_setup.c",
-    "boot/init32.c",
-
-    "boot/boot.S",
-    "boot/prologue.S"
+    "boot/boot_helper.c"
 ])
 
 sources([
@@ -43,12 +40,18 @@ sources({
         "x86_64": [
             "hart64.c",
             "syscall64.S",
-            "exceptions/interrupt64.S"
+            "exceptions/interrupt64.S",
+            "boot/x86_64/boot64.S",
+            "boot/x86_64/init64.c",
+            "boot/x86_64/prologue64.S"
         ],
         "i386": [
             "hart32.c",
-            "syscall.S",
-            "exceptions/interrupt32.S"
+            "syscall32.S",
+            "exceptions/interrupt32.S",
+            "boot/i386/boot32.S",
+            "boot/i386/init32.c",
+            "boot/i386/prologue32.S"
         ]
     }
 })

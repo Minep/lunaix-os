@@ -2,8 +2,8 @@
 #define __LUNAIX_ARCHINIT_H
 
 #include <lunaix/types.h>
-#include <sys/boot/bstage.h>
-#include <sys/boot/multiboot.h>
+#include "bstage.h"
+#include "multiboot.h"
 
 ptr_t boot_text
 kpg_init();
