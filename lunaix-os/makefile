@@ -28,12 +28,6 @@ $(DEPS):
 		echo "failed" && exit 1;\
 	fi
 
-define builder_data
-	.builder/sources.list 
-	.builder/headers.list 
-	.builder/includes.list
-endef
-
 all_lconfigs = $(shell find . -name "LConfig")
 
 $(kbuild_dir):
@@ -48,13 +42,13 @@ $(kbuild_dir):
 	@echo 
 	@./scripts/build-tools/luna_build.py --config --lconfig-file LConfig -o $(@D)
 
-.builder/%.list: .builder/configs.h
+.builder/lbuild.mkinc: .builder/configs.h
 	@./scripts/build-tools/luna_build.py LBuild --lconfig-file LConfig -o $(@D)
 
 .PHONY: kernel
 export BUILD_DIR=$(kbin_dir)
 export BUILD_NAME=$(kbin)
-kernel: $(builder_data)
+kernel: .builder/lbuild.mkinc
 	$(call status,TASK,$(notdir $@))
 	@$(MAKE) $(MKFLAGS) -I $(mkinc_dir) -f kernel.mk all
 
@@ -96,7 +90,7 @@ clean:
 	@$(MAKE) -C usr clean -I $(mkinc_dir)
 	@$(MAKE) -f kernel.mk clean -I $(mkinc_dir)
 	@rm -rf $(kbuild_dir) || exit 1
-	@rm -f .builder/*.list || exit 1
+	@rm -f .builder/lbuild.mkinc || exit 1
 
 run: all
 	@qemu-system-i386 $(call get_qemu_options,$(kimg))

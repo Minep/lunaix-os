@@ -1,37 +1,35 @@
 include os.mkinc
 include toolchain.mkinc
 
-ksrc_files = $(shell cat .builder/sources.list)
-kinc_dirs  = $(shell cat .builder/includes.list)
-khdr_files = $(shell cat .builder/headers.list)
-khdr_files += .builder/configs.h
+include .builder/lbuild.mkinc
 
 kbin_dir := $(BUILD_DIR)
 kbin := $(BUILD_NAME)
 
-ksrc_objs := $(addsuffix .o,$(ksrc_files))
-ksrc_deps := $(addsuffix .d,$(ksrc_files))
-khdr_opts := $(addprefix -include ,$(khdr_files))
-kinc_opts := $(addprefix -I,$(kinc_dirs))
+ksrc_objs := $(addsuffix .o,$(_LBUILD_SRCS))
+ksrc_deps := $(addsuffix .d,$(_LBUILD_SRCS))
+khdr_opts := $(addprefix -include ,$(_LBUILD_HDRS))
+kinc_opts := $(addprefix -I,$(_LBUILD_INCS))
+config_h += -include.builder/configs.h
 
 tmp_kbin  := $(BUILD_DIR)/tmpk.bin
 ksymtable := lunaix_ksyms.o
 
-CFLAGS += $(khdr_opts)
+CFLAGS += $(khdr_opts) $(kinc_opts) $(config_h) -MMD -MP
 
 -include $(ksrc_deps)
 
 %.S.o: %.S $(khdr_files) kernel.mk
 	$(call status_,AS,$<)
-	@$(CC) $(CFLAGS) $(kinc_opts) -MMD -MP -c $< -o $@
+	@$(CC) $(CFLAGS) -c $< -o $@
 
 %.c.o: %.c $(khdr_files) kernel.mk
 	$(call status_,CC,$<)
-	@$(CC) $(CFLAGS) $(kinc_opts) -MMD -MP -c $< -o $@
+	@$(CC) $(CFLAGS) -c $< -o $@
 
 $(tmp_kbin): $(ksrc_objs)
 	$(call status_,LD,$@)
-	@$(CC) -T link/linker.ld $(LDFLAGS) -o $@ $^
+	@$(CC) -T link/linker.ld $(config_h) $(LDFLAGS) -o $@ $^
 
 $(ksymtable): $(tmp_kbin)
 	$(call status_,KSYM,$@)
@@ -41,7 +39,7 @@ $(ksymtable): $(tmp_kbin)
 .PHONY: __do_relink
 __do_relink: $(ksrc_objs) $(ksymtable)
 	$(call status_,LD,$(kbin))
-	@$(CC) -T link/linker.ld $(LDFLAGS) -o $(kbin) $^
+	@$(CC) -T link/linker.ld $(config_h) $(LDFLAGS) -o $(kbin) $^
 	@rm $(tmp_kbin)
 
 .PHONY: all

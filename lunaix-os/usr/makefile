@@ -3,6 +3,10 @@ include toolchain.mkinc
 
 task := all
 
+# TODO make this use LBuild
+CFLAGS += -m32 -ffreestanding -fno-pie
+LDFLAGS += -m32 -nostdlib -nolibc -z noexecstack -no-pie -Wl,--build-id=none
+
 sys_include := $(CURDIR)/includes
 build_dir := $(CURDIR)/build
 libc_name := liblunac

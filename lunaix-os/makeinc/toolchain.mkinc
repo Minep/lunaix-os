@@ -3,10 +3,6 @@ CC := $(CX_PREFIX)gcc
 AS := $(CX_PREFIX)as
 AR := $(CX_PREFIX)ar
 
-STRIP_OSDEP_CC := -ffreestanding -fno-pie
-STRIP_OSDEP_LD := -nostdlib -nolibc -z noexecstack -no-pie -Wl,--build-id=none
-
-ARCH_OPT := -m32 -D__ARCH_IA32
 O := -O2
 W := -Wall -Wextra -Werror \
 		-Wno-unknown-pragmas \
@@ -27,15 +23,15 @@ OFLAGS := -fno-gcse\
 		  -fno-indirect-inlining\
 		  -fno-omit-frame-pointer
 
-CFLAGS := $(ARCH_OPT) -std=gnu99 $(OFLAGS) $(W)
+CFLAGS := -std=gnu99 $(OFLAGS) $(W)
 
 ifeq ($(BUILD_MODE),debug)
 	O = -Og
 	CFLAGS += -g
 endif
 
-CFLAGS += $(O) $(STRIP_OSDEP_CC)
+CFLAGS += $(O)
 
-LDFLAGS := $(ARCH_OPT) $(O) $(STRIP_OSDEP_LD)
+LDFLAGS := $(O)
 
 MKFLAGS := --no-print-directory
