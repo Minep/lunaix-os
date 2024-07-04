@@ -18,7 +18,8 @@ class LunaBuildFile(Sandbox):
             "config":
                 lambda name: self.read_config(name),
             "use":
-                lambda file: self.import_buildfile(file)
+                lambda file: self.import_buildfile(file),
+            **env.external_func_table()
         })
         
         self.__srcs = []

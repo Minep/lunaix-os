@@ -30,3 +30,7 @@ def parent(env, caller, ref):
 @contextual(caller_type=[LCTermNode])
 def default(env, caller, val):
     caller.set_default(val)
+
+@builtin()
+def env(env, key, default=None):
+    return os.getenv(key, default)

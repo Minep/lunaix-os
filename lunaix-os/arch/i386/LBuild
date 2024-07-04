@@ -42,3 +42,11 @@ sources([
 headers([
     "includes"
 ])
+
+compile_opts([
+    "-m32"
+])
+
+linking_opts([
+    "-m32"
+])

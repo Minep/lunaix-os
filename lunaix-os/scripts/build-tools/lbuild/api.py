@@ -7,3 +7,10 @@ class ConfigProvider:
     
     def has_config(self, name):
         return False
+    
+class BuildGenerator:
+    def __init__(self) -> None:
+        pass
+
+    def generate(self, env):
+        pass

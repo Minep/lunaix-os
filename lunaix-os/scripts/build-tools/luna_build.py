@@ -7,6 +7,7 @@ from lcfg.common import LConfigEnvironment
 from integration.config_io import CHeaderConfigProvider
 from integration.lbuild_bridge import LConfigProvider
 from integration.render_ishell import InteractiveShell
+from integration.build_gen import MakefileBuildGen, install_lbuild_functions
 
 import lcfg.types as lcfg_type
 import lcfg.builtins as builtin
@@ -26,6 +27,7 @@ def prepare_lconfig_env(out_dir):
     env.register_builtin_func(builtin.parent)
     env.register_builtin_func(builtin.default)
     env.register_builtin_func(builtin.include)
+    env.register_builtin_func(builtin.env)
 
     env.type_factory().regitser(lcfg_type.PrimitiveType)
     env.type_factory().regitser(lcfg_type.MultipleChoiceType)
@@ -46,7 +48,10 @@ def do_buildfile_gen(opts, lcfg_env):
     ws_path = dirname(root_path)
     root_name = basename(root_path)
 
-    env = BuildEnvironment(ws_path)
+    mkgen = MakefileBuildGen(opts.out_dir)
+    env = BuildEnvironment(ws_path, mkgen)
+
+    install_lbuild_functions(env)
 
     cfg_provider = LConfigProvider(lcfg_env)
     env.set_config_provider(cfg_provider)
@@ -59,7 +64,7 @@ def do_buildfile_gen(opts, lcfg_env):
         print("failed to resolve root build file")
         raise err
     
-    env.export(opts.out_dir)
+    env.export()
 
 def main():
     parser = ArgumentParser()
