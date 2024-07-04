@@ -1,0 +1,16 @@
+#ifndef __LUNAIX_BASE_DEFS_LD_INC
+#define __LUNAIX_BASE_DEFS_LD_INC
+
+#define __LD__
+#include <sys/mm/mm_defs.h>
+
+#define KEXEC_BASE      KERNEL_RESIDENT
+#define PAGE_GRAN       4K
+
+#ifdef CONFIG_X86_BOOT_OPTIONS_MULTIBOOT
+#   define LOAD_OFF        0x100000
+#else
+#   error "unknown boot option, can't infer load_off"
+#endif
+
+#endif /* __LUNAIX_BASE_DEFS_LD_INC */

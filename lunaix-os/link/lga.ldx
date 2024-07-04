@@ -1,0 +1,101 @@
+#include "base.ldx"
+
+.lga BLOCK(PAGE_GRAN) : AT ( ADDR(.lga) - KEXEC_BASE ) 
+{
+    PROVIDE(__lga_twiplugin_inits_start = .);
+        
+    KEEP(*(.lga.twiplugin_inits));
+
+    PROVIDE(__lga_twiplugin_inits_end = .);
+
+    /* ---- */
+
+    /* align to 8 bytes, so it can cover both 32 and 64 bits address line*/
+    . = ALIGN(8);
+
+    PROVIDE(__lga_devdefs_start = .);
+
+    KEEP(*(.lga.devdefs));
+
+    PROVIDE(__lga_devdefs_end = .);
+
+    /* ---- */
+
+    . = ALIGN(8);
+
+    PROVIDE(__lga_dev_ld_kboot_start = .);
+
+    KEEP(*(.lga.devdefs.ld_kboot));
+
+    PROVIDE(__lga_dev_ld_kboot_end = .);
+
+    /* ---- */
+
+    . = ALIGN(8);
+
+    PROVIDE(__lga_dev_ld_sysconf_start = .);
+
+    KEEP(*(.lga.devdefs.ld_sysconf));
+
+    PROVIDE(__lga_dev_ld_sysconf_end = .);
+
+    /* ---- */
+
+    . = ALIGN(8);
+
+    PROVIDE(__lga_dev_ld_timedev_start = .);
+
+    KEEP(*(.lga.devdefs.ld_timedev));
+
+    PROVIDE(__lga_dev_ld_timedev_end = .);
+
+    /* ---- */
+
+    . = ALIGN(8);
+
+    PROVIDE(__lga_dev_ld_post_start = .);
+
+    KEEP(*(.lga.devdefs.ld_post));
+
+    PROVIDE(__lga_dev_ld_post_end = .);
+
+    /* ---- */
+
+    . = ALIGN(8);
+
+    PROVIDE(__lga_fs_start = .);
+
+    KEEP(*(.lga.fs));
+
+    PROVIDE(__lga_fs_end = .);
+
+    /* ---- */
+
+    . = ALIGN(8);
+
+    PROVIDE(__lga_lunainit_on_earlyboot_start = .);
+
+    KEEP(*(.lga.lunainit.c_earlyboot));
+
+    PROVIDE(__lga_lunainit_on_earlyboot_end = .);
+
+    /* ---- */
+
+    . = ALIGN(8);
+
+    PROVIDE(__lga_lunainit_on_boot_start = .);
+
+    KEEP(*(.lga.lunainit.c_boot));
+
+    PROVIDE(__lga_lunainit_on_boot_end = .);
+
+    /* ---- */
+
+    . = ALIGN(8);
+
+    PROVIDE(__lga_lunainit_on_postboot_start = .);
+
+    KEEP(*(.lga.lunainit.c_postboot));
+
+    PROVIDE(__lga_lunainit_on_postboot_end = .);   
+}

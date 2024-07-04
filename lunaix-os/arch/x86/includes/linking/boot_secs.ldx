@@ -1,0 +1,35 @@
+#ifndef __LUNAIX_BOOT_SECS_LD_INC
+#define __LUNAIX_BOOT_SECS_LD_INC
+
+#include "base_defs.ldx"
+
+__kboot_start = .;
+
+.boot.text BLOCK(PAGE_GRAN) : 
+{
+    *(.multiboot)
+    *(.boot.text)
+}
+
+.boot.bss BLOCK(PAGE_GRAN) : 
+{
+    *(.boot.bss)
+}
+
+.boot.data BLOCK(PAGE_GRAN) : 
+{
+    *(.boot.data)
+}
+
+.boot.rodata BLOCK(PAGE_GRAN) : 
+{
+    *(.boot.rodata)
+}
+
+.boot.bss BLOCK(PAGE_GRAN) : 
+{
+    *(.boot.rodata)
+}
+__kboot_end = ALIGN(PAGE_GRAN);
+
+#endif /* __LUNAIX_BOOT_SECS_LD_INC */

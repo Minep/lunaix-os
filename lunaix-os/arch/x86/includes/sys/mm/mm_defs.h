@@ -1,8 +1,12 @@
 #ifndef __LUNAIX_MM_DEFS_H
 #define __LUNAIX_MM_DEFS_H
 
-
 #include "mempart.h"
+
+#define KERNEL_RESIDENT         KERNEL_IMG
+
+#ifndef __LD__
+
 #include "pagetable.h"
 
 /*
@@ -32,11 +36,12 @@
 #endif
 
 #define KSTACK_SIZE             (KSTACK_PAGES * PAGE_SIZE)
-#define KERNEL_RESIDENT         KERNEL_IMG
 
 #define kernel_addr(addr)       ((addr) >= KERNEL_RESIDENT || (addr) < USR_EXEC)
 
 #define to_kphysical(k_va)      ((ptr_t)(k_va) - KERNEL_RESIDENT)
 #define to_kvirtual(k_pa)       ((ptr_t)(k_pa) - KERNEL_RESIDENT)
+
+#endif
 
 #endif /* __LUNAIX_MM_DEFS_H */

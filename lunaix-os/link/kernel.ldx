@@ -1,0 +1,30 @@
+.text BLOCK(PAGE_GRAN) : AT ( ADDR(.text) - KEXEC_BASE ) 
+{
+    *(.text)
+}
+
+.kf.preempt BLOCK(PAGE_GRAN) : AT ( ADDR(.kf.preempt) - KEXEC_BASE ) 
+{
+    PROVIDE(__kf_preempt_start = .);
+    
+    KEEP(*(.kf.preempt));
+
+    PROVIDE(__kf_preempt_end = .);
+}
+
+PROVIDE(__kexec_text_end = .);
+
+.data BLOCK(PAGE_GRAN) : AT ( ADDR(.data) - KEXEC_BASE ) 
+{
+    *(.data)
+}
+
+.rodata BLOCK(PAGE_GRAN) : AT ( ADDR(.rodata) - KEXEC_BASE ) 
+{
+    *(.rodata)
+}
+
+.kpg BLOCK(PAGE_GRAN) : AT ( ADDR(.kpg) - KEXEC_BASE ) 
+{
+    *(.kpg)
+}

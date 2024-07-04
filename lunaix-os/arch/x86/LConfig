@@ -20,4 +20,4 @@ def x86_configurations():
         # type(["multiboot", "none"])
         default("multiboot")
 
-    return v(arch) == "i386"
+    return v(arch) in ["i386", "x86_64"]

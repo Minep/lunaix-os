@@ -14,10 +14,14 @@ config_h += -include.builder/configs.h
 
 tmp_kbin  := $(BUILD_DIR)/tmpk.bin
 ksymtable := lunaix_ksyms.o
+klinking  := link/lunaix.ld
 
 CFLAGS += $(khdr_opts) $(kinc_opts) $(config_h) -MMD -MP
 
 -include $(ksrc_deps)
+
+all_linkable = $(filter-out $(klinking),$(1))
+
 
 %.S.o: %.S $(khdr_files) kernel.mk
 	$(call status_,AS,$<)
@@ -27,23 +31,38 @@ CFLAGS += $(khdr_opts) $(kinc_opts) $(config_h) -MMD -MP
 	$(call status_,CC,$<)
 	@$(CC) $(CFLAGS) -c $< -o $@
 
+
+$(klinking): link/lunaix.ldx
+	@$(CC) $(CFLAGS) -x c -E -P $< -o $@
+
+
 $(tmp_kbin): $(ksrc_objs)
 	$(call status_,LD,$@)
-	@$(CC) -T link/linker.ld $(config_h) $(LDFLAGS) -o $@ $^
+
+	@$(CC) -T $(klinking) $(config_h) $(LDFLAGS) -o $@ \
+			$(call all_linkable,$^)
+
 
 $(ksymtable): $(tmp_kbin)
 	$(call status_,KSYM,$@)
 	@scripts/gen_ksymtable.sh DdRrTtAGg $< > .lunaix_ksymtable.S
+
 	@$(CC) $(CFLAGS) -c .lunaix_ksymtable.S -o $@
+
 
 .PHONY: __do_relink
 __do_relink: $(ksrc_objs) $(ksymtable)
 	$(call status_,LD,$(kbin))
-	@$(CC) -T link/linker.ld $(config_h) $(LDFLAGS) -o $(kbin) $^
+
+	@$(CC) -T $(klinking) $(config_h) $(LDFLAGS) -o $(kbin) \
+			$(call all_linkable,$^)
+	
 	@rm $(tmp_kbin)
+
 
 .PHONY: all
 all: __do_relink
+
 
 clean:
 	@rm -f $(ksrc_objs)

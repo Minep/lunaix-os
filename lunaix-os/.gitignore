@@ -14,6 +14,8 @@ __pycache__/
 .builder/
 .config.json
 
+link/lunaix.ld
+
 .gdb_history
 
 **.o
