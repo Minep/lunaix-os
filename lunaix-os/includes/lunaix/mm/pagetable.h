@@ -103,10 +103,12 @@ typedef struct __pte pte_t;
 #include <sys/mm/pagetable.h>
 #include <sys/cpu.h>
 
+#define __vaddr(va)             ( (va) & VMS_MASK )
+
 #define VMS_SELF                VMS_SELF_MOUNT
 
 #define _LnT_LEVEL_SIZE(n)      ( L##n##T_SIZE / PAGE_SIZE )
-#define _LFTEP_SELF             ( VMS_SELF & VMS_MASK )
+#define _LFTEP_SELF             ( __vaddr(VMS_SELF) )
 #define _L3TEP_SELF             ( _LFTEP_SELF | (_LFTEP_SELF / _LnT_LEVEL_SIZE(3)) )
 #define _L2TEP_SELF             ( _L3TEP_SELF | (_LFTEP_SELF / _LnT_LEVEL_SIZE(2)) )
 #define _L1TEP_SELF             ( _L2TEP_SELF | (_LFTEP_SELF / _LnT_LEVEL_SIZE(1)) )
@@ -122,10 +124,10 @@ typedef struct __pte pte_t;
 #define _VM_PFN_OF(ptep)        ( ((ptr_t)(ptep) & L0T_MASK) / sizeof(pte_t) )
 
 #define __LnTI_OF(ptep, n)\
-    (_VM_PFN_OF(ptep) * LFT_SIZE / L##n##T_SIZE)
+    ( __vaddr(_VM_PFN_OF(ptep) * LFT_SIZE / L##n##T_SIZE) )
 
 #define __LnTEP(ptep, va, n)\
-    ( (pte_t*)_L##n##TEP_AT(_VM_OF(ptep)) + (((va) & VMS_MASK) / L##n##T_SIZE) )
+    ( (pte_t*)_L##n##TEP_AT(_VM_OF(ptep)) + (__vaddr(va) / L##n##T_SIZE) )
 
 #define __LnTEP_OF(ptep, n)\
     ( (pte_t*)_L##n##TEP_AT(_VM_OF(ptep)) + __LnTI_OF(ptep, n))
@@ -187,7 +189,7 @@ ptep_vfn(pte_t* ptep)
 static inline ptr_t
 ptep_va(pte_t* ptep, size_t lvl_size)
 {
-    return ((ptr_t)ptep) / sizeof(pte_t) * lvl_size;
+    return __vaddr(ptep_pfn(ptep) * lvl_size);
 }
 
 static inline ptr_t
@@ -410,7 +412,7 @@ l3te_index(pte_t* ptep) {
 
 static inline pfn_t
 pfn(ptr_t addr) {
-    return (addr / PAGE_SIZE) & VMS_MASK;
+    return __vaddr(addr) / PAGE_SIZE;
 }
 
 static inline size_t
@@ -467,7 +469,7 @@ mkptep_pn(ptr_t vm_mnt, ptr_t pn)
 
 static inline pfn_t
 pfn_at(ptr_t va, size_t lvl_size) {
-    return va / lvl_size;
+    return __vaddr(va) / lvl_size;
 }
 
 
@@ -522,10 +524,10 @@ va_mntpoint(ptr_t va)
     return _VM_OF(va);
 }
 
-static inline ptr_t
-va_actual(ptr_t va)
+static inline bool
+l0tep_implie(pte_t* ptep, ptr_t addr)
 {
-    return page_addr(_VM_OF(va) ^ va);
+    return ptep_va(ptep, L0T_SIZE) == __vaddr(addr);
 }
 
 static inline bool
@@ -539,6 +541,13 @@ static inline bool
 active_vms(ptr_t vmnt)
 {
     return vmnt == VMS_SELF;
+}
+
+static inline bool
+l0tep_impile_vmnts(pte_t* ptep)
+{
+    return l0tep_implie(ptep, VMS_SELF) ||
+           l0tep_implie(ptep, VMS_MOUNT_1);
 }
 
 #endif /* __LUNAIX_PAGETABLE_H */

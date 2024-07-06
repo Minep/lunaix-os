@@ -105,8 +105,14 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
     assert(ptep_dest == ptepd_kernel);
     
     // Carry over the kernel (exclude last two entry)
-    while (ptep_vfn(ptep) < MAX_PTEN - 2) {
+    unsigned int i = ptep_vfn(ptep);
+    while (i++ < MAX_PTEN) {
         pte_t pte = *ptep;
+
+        if (l0tep_impile_vmnts(ptep)) {
+            goto _cont;
+        }
+
         assert(!pte_isnull(pte));
 
         // Ensure it is a next level pagetable,
@@ -117,12 +123,13 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
 
         set_pte(ptep_dest, pte);
         leaflet_borrow(leaflet);
-        
+    
+    _cont:
         ptep++;
         ptep_dest++;
     }
 
-    return pte_paddr(*(ptep_dest + 1));
+    return pte_paddr(pte_sms);
 }
 
 static void
@@ -130,6 +137,7 @@ vmsfree(ptr_t vm_mnt)
 {
     struct leaflet* leaflet;
     pte_t* ptep_head    = mkl0tep(mkptep_va(vm_mnt, 0));
+    pte_t* ptep_self    = mkl0tep(mkptep_va(vm_mnt, VMS_SELF));
     pte_t* ptep_kernel  = mkl0tep(mkptep_va(vm_mnt, KERNEL_RESIDENT));
 
     int level = 0;
@@ -171,7 +179,7 @@ vmsfree(ptr_t vm_mnt)
         ptep++;
     }
 
-    leaflet = pte_leaflet_aligned(ptep_head[MAX_PTEN - 1]);
+    leaflet = pte_leaflet_aligned(pte_at(ptep_self));
     leaflet_return(leaflet);
 }
 
