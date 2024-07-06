@@ -279,7 +279,7 @@ procvm_mount_self(struct proc_mm* mm)
 void
 procvm_unmount_self(struct proc_mm* mm)
 {
-    assert(mm->vm_mnt == VMS_SELF);
+    assert(active_vms(mm->vm_mnt));
 
     mm->vm_mnt = 0;
 }

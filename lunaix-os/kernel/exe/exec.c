@@ -123,7 +123,7 @@ exec_load(struct exec_container* container, struct v_file* executable)
         create_heap(vmspace(proc), page_aligned(container->exe.end));
     }
 
-    if (container->vms_mnt == VMS_SELF) {
+    if (active_vms(container->vms_mnt)) {
         // we are loading executable into current addr space
 
         ptr_t ustack = container->stack_top;

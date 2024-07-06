@@ -31,17 +31,19 @@ __gather_memaccess_info(struct fault_context* context)
     }
 
     context->ptep_fault = true;
-    context->remote_fault = (mnt != VMS_SELF);
+    context->remote_fault = !active_vms(mnt);
     
     if (context->remote_fault && context->mm) {
         context->mm = context->mm->guest_mm;
         assert(context->mm);
     }
 
+    // unpack the ptep to reveal the one true va!
+
 #if LnT_ENABLED(1)
     ptep = (pte_t*)page_addr(ptep_pfn(ptep));
     mnt  = ptep_vm_mnt(ptep);
-    if (mnt < VMS_MOUNT_1) {
+    if (!vmnt_packed(ptep)) {
         refva = (ptr_t)ptep;
         goto done;
     }
@@ -50,7 +52,7 @@ __gather_memaccess_info(struct fault_context* context)
 #if LnT_ENABLED(2)
     ptep = (pte_t*)page_addr(ptep_pfn(ptep));
     mnt  = ptep_vm_mnt(ptep);
-    if (mnt < VMS_MOUNT_1) {
+    if (!vmnt_packed(ptep)) {
         refva = (ptr_t)ptep;
         goto done;
     }
@@ -59,7 +61,7 @@ __gather_memaccess_info(struct fault_context* context)
 #if LnT_ENABLED(3)
     ptep = (pte_t*)page_addr(ptep_pfn(ptep));
     mnt  = ptep_vm_mnt(ptep);
-    if (mnt < VMS_MOUNT_1) {
+    if (!vmnt_packed(ptep)) {
         refva = (ptr_t)ptep;
         goto done;
     }
@@ -68,7 +70,7 @@ __gather_memaccess_info(struct fault_context* context)
     ptep = (pte_t*)page_addr(ptep_pfn(ptep));
     mnt  = ptep_vm_mnt(ptep);
     
-    assert(mnt < VMS_MOUNT_1);
+    assert(!vmnt_packed(ptep));
     refva = (ptr_t)ptep;
 
 done:

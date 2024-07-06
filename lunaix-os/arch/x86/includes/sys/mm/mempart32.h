@@ -53,8 +53,12 @@
 #define VMAP_SIZE                   __ulong(0x3b400000)
 #define VMAP_END END_POINT(VMAP)
 
+#define PMAP                        VMAP
+
 #define VMS_MOUNT_1                 __ulong(0xff800000)
 #define VMS_MOUNT_1_SIZE            __ulong(0x400000)
 #define VMS_MOUNT_1_END END_POINT(VMS_MOUNT_1)
+
+#define VMS_SELF_MOUNT              __ulong(0xffc00000)
 
 #endif /* __LUNAIX_MEMPART32_H */

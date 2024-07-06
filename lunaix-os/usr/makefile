@@ -68,4 +68,5 @@ clean: $(mkapp-list)
 	@$(MAKE) $(MKFLAGS) -C libc/ $(task)
 
 all: task := all
+.NOTPARALLEL:
 all: $(build_dir)/$(libc_name).a exec app

@@ -55,7 +55,8 @@ kernel: .builder/lbuild.mkinc
 .PHONY: image
 export KCMD=$(CMDLINE)
 export _OS_NAME=$(OS_NAME)
-image: usr/build kernel
+.NOTPARALLEL:
+image: kernel usr/build
 	$(call status,TASK,$(notdir $@))
 	@./scripts/grub/config-grub.sh $(os_img_dir)/boot/grub/grub.cfg
 	@cp -r usr/build/* $(os_img_dir)/usr

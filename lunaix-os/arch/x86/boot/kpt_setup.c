@@ -134,8 +134,10 @@ remap_kernel()
     set_pte(kmntep, mkpte((ptr_t)kpt_pa->pg_mnt, KERNEL_DATA));
 
     // Build up self-reference
+    int level = (VMS_SELF / L0T_SIZE) & _PAGE_LEVEL_MASK;
+    
     pte = mkpte_root((ptr_t)kpt_pa, KERNEL_DATA);
-    set_pte(boot_l0tep + _PAGE_LEVEL_MASK, pte);
+    set_pte(&boot_l0tep[level], pte);
 }
 
 

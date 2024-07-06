@@ -129,7 +129,11 @@
 
         addq $16, %rsp  # skip: err_code and vector
 
+        # calculate stack after iretq
         # Thank god they finally make things consistent in x86_64
+        addq $32, %rsp
+        movq %rsp, (_tss + tss_esp0_off)
+        subq $32, %rsp
 
         iretq
 
@@ -166,8 +170,10 @@
             由于这中间没有进行地址空间的交换，所以第二次跳转使用的是同一个内核栈，而之前默认tss.esp0的值是永远指向最顶部
             这样一来就有可能会覆盖更早的上下文信息（比如嵌套的信号捕获函数）
         */
+        pushq %rax
         call update_tss
 
+        popq %rax
         jmp handle_signal
 
     1:

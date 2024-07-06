@@ -31,7 +31,11 @@ found:;
     ptr_t kexec_end = to_kphysical(__kexec_end);
     ptr_t aligned_pplist = MAX(ent->start, kexec_end);
 
+#ifdef CONFIG_ARCH_X86_64
+    aligned_pplist = napot_upaligned(aligned_pplist, L2T_SIZE);
+#else
     aligned_pplist = napot_upaligned(aligned_pplist, L0T_SIZE);
+#endif
 
     if (aligned_pplist + pool_size > ent->start + ent->size) {
         return 0;
@@ -44,18 +48,28 @@ found:;
     //  regardless the actual physical memory size
 
     // anchor the pplist at vmap location (right after kernel)
-    memory->pplist = (struct ppage*)VMAP;
+    memory->pplist = (struct ppage*)PMAP;
     memory->list_len = ppfn_total;
 
-    pfn_t nhuge = page_count(pool_size, L0T_SIZE);
-    pte_t* ptep = mkl0tep_va(VMS_SELF, VMAP);
+    pfn_t nhuge;
+    pte_t* ptep;
+
+#ifdef CONFIG_ARCH_X86_64
+    nhuge = page_count(pool_size, L2T_SIZE);
+    ptep = mkl2tep_va(VMS_SELF, PMAP);
+#else
+    nhuge = page_count(pool_size, L0T_SIZE);
+    ptep = mkl0tep_va(VMS_SELF, PMAP);
+    
+    // since VMAP and PMAP share same address space
+    // we need to shift VMAP to make room
+    vmap_set_start(VMAP + nhuge * L0T_SIZE);
+#endif
+    
     pte_t pte   = mkpte(aligned_pplist, KERNEL_DATA);
     
     vmm_set_ptes_contig(ptep, pte_mkhuge(pte), L0T_SIZE, nhuge);
-    tlb_flush_kernel(VMAP);
 
-    // shift the actual vmap start address
-    vmap_set_start(VMAP + nhuge * L0T_SIZE);
-
+    tlb_flush_kernel(PMAP);
     return aligned_pplist;
 }
