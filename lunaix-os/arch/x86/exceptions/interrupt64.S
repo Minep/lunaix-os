@@ -7,9 +7,12 @@
 
 .section .bss
     .align 16
+    tmp_store:
+        .skip 8
     lo_tmp_stack:
         .skip 256
     tmp_stack:
+    
 
 /*
     This perhaps the ugliest part in the project. 
@@ -128,7 +131,7 @@
 
         # Thank god they finally make things consistent in x86_64
 
-        iret
+        iretq
 
     .type do_switch, @function
     .global do_switch
@@ -183,7 +186,7 @@
         pushq %rax              # esp
 
         movq iexecp(%rbx), %rbx
-        pushq exeflags(%rbx)          # proc_sig->saved_hstate->execp->eflags
+        pushq exrflags(%rbx)          # proc_sig->saved_hstate->execp->eflags
         
         pushq $UCODE_SEG        # cs
         pushq psig_sigact(%rax)           # %rip = proc_sig->sigact

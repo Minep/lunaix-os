@@ -1,7 +1,10 @@
 #define __ASM__
+
+#if defined(CONFIG_X86_BL_MB) || defined(CONFIG_X86_BL_MB2)
 #include "sys/boot/multiboot.S.inc"
+#endif
+
 #include "sys/mm/mempart64.h"
-#include <lunaix/compiler.h>
 
 .section .boot.bss
 
@@ -22,10 +25,12 @@
     .type start_, @function
 
     start_: 
+        .code32
         cld
         cli
 
         movl $__boot_stack_top, %esp
+        pushl $0
         pushl %ebx
 
         # first, setup a simple initial page table
@@ -35,23 +40,24 @@
         movl $0x3, %eax
         movl $_tmp_l1, %ebx
         orl  %eax, %ebx
-        movl %ebx, (_tmp_l0)
+        movl %ebx, _tmp_l0
         movl $0x80000000, %ebx
-        movl %ebx, 4(_tmp_l0)
+        movl %ebx, _tmp_l0 + 4
 
         # L1 map first 1G huge page, RWX
         orl  $(1 << 7), %eax
-        movl %eax, (_tmp_l1) 
+        movl %eax, _tmp_l1
         movl $0x80000000, %eax
-        movl %eax, 4(_tmp_l1)
+        movl %eax, _tmp_l1 + 4
 
-        movl $_tmp_l0, %cr3
+        movl $_tmp_l0, %eax
+        movl %eax, %cr3
 
         # now, commencing transition
 
         movl %cr4, %eax
         orl  $(1 << 5), %eax    # PAE
-        movl %cr4
+        movl %eax, %cr4
 
         movl $0xc0000080, %ecx
         rdmsr
@@ -67,17 +73,19 @@
 
         # clear the pipeline, 
         # although cpu might already cleared for us upon mode switching
-        nop
-        nop
-        nop
-        nop
+        .nop
+        .nop
+        .nop
+        .nop
 
         # x86_64
     _ia32e:
 
-        popl %ebx
+        .code64
+        popq %rbx
         movq %rbx, %rdi
         call x86_init
 
-        pushq $hhk_entry_
-        ret
+        movabsq $hhk_entry_, %rax
+        pushq %rax 
+        retq

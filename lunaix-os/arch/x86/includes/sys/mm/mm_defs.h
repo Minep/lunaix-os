@@ -2,12 +2,9 @@
 #define __LUNAIX_MM_DEFS_H
 
 #include "mempart.h"
+#include "pagetable.h"
 
 #define KERNEL_RESIDENT         KERNEL_IMG
-
-#ifndef __LD__
-
-#include "pagetable.h"
 
 /*
     Regardless architecture we need to draw the line very carefully, and must 
@@ -41,7 +38,5 @@
 
 #define to_kphysical(k_va)      ((ptr_t)(k_va) - KERNEL_RESIDENT)
 #define to_kvirtual(k_pa)       ((ptr_t)(k_pa) - KERNEL_RESIDENT)
-
-#endif
 
 #endif /* __LUNAIX_MM_DEFS_H */

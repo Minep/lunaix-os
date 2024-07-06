@@ -1,7 +1,7 @@
 #define __LD__
 #include "base.ldx"
 
-ENTRY(start_)
+ENTRY(ENTRY_POINT)
 
 SECTIONS {
     . = LOAD_OFF;

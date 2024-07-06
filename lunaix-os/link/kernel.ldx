@@ -22,6 +22,7 @@ PROVIDE(__kexec_text_end = .);
 .rodata BLOCK(PAGE_GRAN) : AT ( ADDR(.rodata) - KEXEC_BASE ) 
 {
     *(.rodata)
+    *(.rodata.*)
 }
 
 .kpg BLOCK(PAGE_GRAN) : AT ( ADDR(.kpg) - KEXEC_BASE ) 

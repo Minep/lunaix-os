@@ -1,6 +1,9 @@
 
 @Group
 def x86_configurations():
+    
+    add_to_collection(architecture_support)
+
     @Term
     def x86_enable_sse_feature():
         """ 
@@ -11,13 +14,21 @@ def x86_configurations():
         type(bool)
         default(False)
 
-        add_to_collection(architecture_support)
-
 
     @Term
-    def x86_boot_options():
-        type(["multiboot"])
-        # type(["multiboot", "none"])
-        default("multiboot")
+    def x86_bl():
+        """
+            Select the bootloader interface
+            
+            Supported interface
+                mb:      multiboot compliant
+                mb2:     multiboot2 compliant
+                none:    do not use any interface
+        """
+
+        type(["mb"])
+        # type(["mb", "mb2", "none"])
+        default("mb")
+
 
     return v(arch) in ["i386", "x86_64"]

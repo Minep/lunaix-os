@@ -23,12 +23,12 @@
         andq $stack_alignment, %rsp
 
         movq $__kinit_stack_end, %rax
-        movq $STACK_SANITY, (%rax)
-        movq $STACK_SANITY, 4(%rax)
-        movq $STACK_SANITY, 8(%rax)
-        movq $STACK_SANITY, 12(%rax)
+        movl $STACK_SANITY, (%rax)
+        movl $STACK_SANITY, 4(%rax)
+        movl $STACK_SANITY, 8(%rax)
+        movl $STACK_SANITY, 12(%rax)
 
-        subq $16, %rsp
+        andq $stack_alignment, %rsp
 
         /* 
             加载 GDT 
@@ -39,8 +39,8 @@
 
         movq $_gdt, 2(%rsp)
         movw _gdt_limit, %ax
-        movw %ax, (%esp)
-        lgdt (%esp)
+        movw %ax, (%rsp)
+        lgdt (%rsp)
 
         # initialize segment registers
         # we will not touch them again in x86_64
@@ -54,7 +54,7 @@
         # do a far jump to switch cs
         pushw $KCODE_SEG
         pushq $_after_gdt
-        retf
+        retfq
 
     _after_gdt:
 

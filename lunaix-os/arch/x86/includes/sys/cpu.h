@@ -3,6 +3,14 @@
 
 #include <lunaix/types.h>
 
+#ifdef CONFIG_ARCH_X86_64
+#   define _POP "popq "
+#   define _MOV "movq "
+#else
+#   define _POP "popl "
+#   define _MOV "movl "
+#endif
+
 /**
  * @brief Get processor ID string
  *
@@ -17,7 +25,6 @@ cpu_trap_sched();
 void
 cpu_trap_panic(char* message);
 
-
 /**
  * @brief Load current processor state
  *
@@ -28,7 +35,7 @@ cpu_ldstate()
 {
     ptr_t val;
     asm volatile("pushf\n"
-                 "pop %0\n"
+                 _POP "%0\n"
                  : "=r"(val)::);
     return val;
 }
@@ -42,7 +49,7 @@ static inline reg_t
 cpu_ldconfig()
 {
     reg_t val;
-    asm volatile("mov %%cr0,%0" : "=r"(val));
+    asm volatile(_MOV "%%cr0,%0" : "=r"(val));
     return val;
 }
 
@@ -54,7 +61,7 @@ cpu_ldconfig()
 static inline void
 cpu_chconfig(reg_t val)
 {
-    asm("mov %0, %%cr0" ::"r"(val));
+    asm(_MOV "%0, %%cr0" ::"r"(val));
 }
 
 /**
@@ -65,8 +72,22 @@ cpu_chconfig(reg_t val)
 static inline void
 cpu_chvmspace(reg_t val)
 {
-    asm("mov %0, %%cr3" ::"r"(val));
+    asm(_MOV "%0, %%cr3" ::"r"(val));
 }
+
+/**
+ * @brief Read exeception address
+ *
+ * @return ptr_t
+ */
+static inline ptr_t
+cpu_ldeaddr()
+{
+    ptr_t val;
+    asm volatile(_MOV "%%cr2,%0" : "=r"(val));
+    return val;
+}
+
 
 static inline void
 cpu_enable_interrupt()
@@ -84,19 +105,6 @@ static inline void
 cpu_wait()
 {
     asm("hlt");
-}
-
-/**
- * @brief Read exeception address
- *
- * @return ptr_t
- */
-static inline ptr_t
-cpu_ldeaddr()
-{
-    ptr_t val;
-    asm volatile("mov %%cr2,%0" : "=r"(val));
-    return val;
 }
 
 #endif /* __LUNAIX_CPU_H */

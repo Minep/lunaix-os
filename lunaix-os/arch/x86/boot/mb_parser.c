@@ -74,7 +74,7 @@ mb_parse_mmap(struct boot_handoff* bhctx,
               void* buffer)
 {
     struct multiboot_mmap_entry* mb_mmap =
-      (struct multiboot_mmap_entry*)mb->mmap_addr;
+      (struct multiboot_mmap_entry*)__ptr(mb->mmap_addr);
     size_t mmap_len = mb->mmap_length / sizeof(struct multiboot_mmap_entry);
 
     struct boot_mmapent* bmmap = (struct boot_mmapent*)buffer;
@@ -112,16 +112,19 @@ mb_parse_mods(struct boot_handoff* bhctx,
     }
 
     struct boot_modent* modents = (struct boot_modent*)buffer;
-    struct multiboot_mod_list* mods = (struct multiboot_mod_list*)mb->mods_addr;
+    struct multiboot_mod_list* mods = 
+        (struct multiboot_mod_list*)__ptr(mb->mods_addr);
 
-    ptr_t mod_str_ptr = (ptr_t)&modents[mb->mods_count];
+    ptr_t mod_str_ptr = __ptr(&modents[mb->mods_count]);
 
     for (size_t i = 0; i < mb->mods_count; i++) {
         struct multiboot_mod_list* mod = &mods[i];
         modents[i] = (struct boot_modent){ .start = mod->mod_start,
                                            .end = mod->mod_end,
                                            .str = (char*)mod_str_ptr };
-        mod_str_ptr += mb_strcpy((char*)mod_str_ptr, (char*)mod->cmdline);
+                                           
+        mod_str_ptr += mb_strcpy((char*)mod_str_ptr, 
+                                 (char*)__ptr(mod->cmdline));
     }
 
     bhctx->mods.mods_num = mb->mods_count;
@@ -161,7 +164,7 @@ mb_parse(struct multiboot_info* mb)
     /* Parse cmdline */
     if ((mb->flags & MULTIBOOT_INFO_CMDLINE)) {
         bhctx_ex +=
-          mb_parse_cmdline(bhctx, (void*)bhctx_ex, (char*)mb->cmdline);
+          mb_parse_cmdline(bhctx, (void*)bhctx_ex, (char*)__ptr(mb->cmdline));
         bhctx_ex = align_addr(bhctx_ex);
     }
 

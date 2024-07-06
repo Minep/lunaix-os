@@ -6,14 +6,31 @@
 static inline void
 rng_fill(void* data, size_t len)
 {
+#ifdef CONFIG_ARCH_X86_64
+    asm volatile("1:\n"
+                 "rdrand %%rax\n"
+                 "movq   %%rax, (%0)\n"
+                 "addq   $8, %%rax\n"
+                 "subq   $8, %1\n"
+                 "jnz    1b" 
+                 ::
+                 "r"((ptr_t)data),
+                 "r"((len & ~0x7))
+                 : 
+                 "%eax");
+#else
     asm volatile("1:\n"
                  "rdrand %%eax\n"
                  "movl %%eax, (%0)\n"
                  "addl $4, %%eax\n"
                  "subl $4, %1\n"
-                 "jnz 1b" ::"r"((ptr_t)data),
+                 "jnz 1b" 
+                 ::
+                 "r"((ptr_t)data),
                  "r"((len & ~0x3))
-                 : "%eax");
+                 : 
+                 "%eax");
+#endif
 }
 
 static int
@@ -26,9 +43,9 @@ __rand_rd_pg(struct device* dev, void* buf, size_t offset)
 static int
 __rand_rd(struct device* dev, void* buf, size_t offset, size_t len)
 {
-    if (unlikely(len < 4)) {
+    if (unlikely(len < sizeof(ptr_t))) {
         int tmp_buf = 0;
-        rng_fill(&tmp_buf, 4);
+        rng_fill(&tmp_buf, sizeof(ptr_t));
         memcpy(buf, &tmp_buf, len);
     } else {
         rng_fill(buf, len);

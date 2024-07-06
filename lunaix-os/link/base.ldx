@@ -2,6 +2,6 @@
 #define __LUNAIX_BASE_LD_INC
 
 #define __LD__
-#include <linking/base_defs.ldx>
+#include <linking/base_defs.ld.inc>
 
 #endif /* __LUNAIX_BASE_LD_INC */

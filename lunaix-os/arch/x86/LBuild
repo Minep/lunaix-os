@@ -18,6 +18,7 @@ sources([
     "mm/fault.c",
     "mm/tlb.c",
     "mm/pmm.c",
+    "mm/gdt.c",
     "mm/vmutils.c"
 ])
 
@@ -29,9 +30,6 @@ sources([
     "gdbstub.c",
     "trace.c",
     "hart.c",
-    "descriptors.c",
-
-    "syscall.S",
     "failsafe.S"
 ])
 
@@ -43,7 +41,8 @@ sources({
             "exceptions/interrupt64.S",
             "boot/x86_64/boot64.S",
             "boot/x86_64/init64.c",
-            "boot/x86_64/prologue64.S"
+            "boot/x86_64/prologue64.S",
+            "exec/elf64.c"
         ],
         "i386": [
             "hart32.c",
@@ -51,7 +50,8 @@ sources({
             "exceptions/interrupt32.S",
             "boot/i386/boot32.S",
             "boot/i386/init32.c",
-            "boot/i386/prologue32.S"
+            "boot/i386/prologue32.S",
+            "exec/elf32.c"
         ]
     }
 })
@@ -60,10 +60,19 @@ headers([
     "includes"
 ])
 
-compile_opts([
-    "-m64"
-])
 
-linking_opts([
-    "-m64"
-])
+if config("arch") == "x86_64":
+    compile_opts([
+        "-m64", 
+        "-fno-unwind-tables", 
+        "-fno-asynchronous-unwind-tables",
+        "-mcmodel=large"
+    ])
+    linking_opts([
+        "-m64",
+        "-mcmodel=large"
+    ])
+else:
+    compile_opts("-m32")
+    linking_opts("-m32")
+

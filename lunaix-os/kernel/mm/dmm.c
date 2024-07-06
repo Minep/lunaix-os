@@ -42,7 +42,7 @@ __DEFINE_LXSYSCALL1(void*, sbrk, ssize_t, incr)
     assert(heap);
     int err = mem_adjust_inplace(&pvms->regions, heap, heap->end + incr);
     if (err) {
-        return (void*)DO_STATUS(err);
+        return (void*)__ptr(DO_STATUS(err));
     }
     return (void*)heap->end;
 }

@@ -22,7 +22,6 @@ CFLAGS += $(khdr_opts) $(kinc_opts) $(config_h) -MMD -MP
 
 all_linkable = $(filter-out $(klinking),$(1))
 
-
 %.S.o: %.S $(khdr_files) kernel.mk
 	$(call status_,AS,$<)
 	@$(CC) $(CFLAGS) -c $< -o $@
@@ -33,10 +32,11 @@ all_linkable = $(filter-out $(klinking),$(1))
 
 
 $(klinking): link/lunaix.ldx
+	$(call status_,PP,$<)
 	@$(CC) $(CFLAGS) -x c -E -P $< -o $@
 
 
-$(tmp_kbin): $(ksrc_objs)
+$(tmp_kbin): $(klinking) $(ksrc_objs)
 	$(call status_,LD,$@)
 
 	@$(CC) -T $(klinking) $(config_h) $(LDFLAGS) -o $@ \
@@ -51,7 +51,7 @@ $(ksymtable): $(tmp_kbin)
 
 
 .PHONY: __do_relink
-__do_relink: $(ksrc_objs) $(ksymtable)
+__do_relink: $(klinking) $(ksrc_objs) $(ksymtable)
 	$(call status_,LD,$(kbin))
 
 	@$(CC) -T $(klinking) $(config_h) $(LDFLAGS) -o $(kbin) \
@@ -67,4 +67,5 @@ all: __do_relink
 clean:
 	@rm -f $(ksrc_objs)
 	@rm -f $(ksrc_deps)
+	@rm -f $(klinking)
 	@rm -f .lunaix_ksymtable.S $(ksymtable)

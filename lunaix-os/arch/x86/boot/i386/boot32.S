@@ -1,4 +1,8 @@
+#define __ASM__
+
+#if defined(CONFIG_X86_BL_MB) || defined(CONFIG_X86_BL_MB2)
 #include "sys/boot/multiboot.S.inc"
+#endif
 
 .section .boot.bss
     /* 根据System V ABI，栈地址必须16字节对齐 */

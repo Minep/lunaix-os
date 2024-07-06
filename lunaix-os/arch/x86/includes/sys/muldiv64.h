@@ -27,7 +27,11 @@
         __mod;                                                                 \
     })
 #else
-    #define do_udiv64(n, base)  ((n) / (base))
+    #define do_udiv64(n, base)  \
+        ({                      \
+            n = (n) / (base);   \
+            (n) % (base);       \
+        })
 #endif
 
 static inline u64_t

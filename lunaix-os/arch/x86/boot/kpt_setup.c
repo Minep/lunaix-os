@@ -6,13 +6,10 @@
 #include <sys/boot/bstage.h>
 #include <sys/mm/mm_defs.h>
 
-// Provided by linker (see linker.ld)
-extern u8_t __kexec_start[];
-extern u8_t __kexec_end[];
-extern u8_t __kexec_text_start[];
-extern u8_t __kexec_text_end[];
-extern u8_t __kboot_start[];
-extern u8_t __kboot_end[];
+bridge_farsym(__kexec_start);
+bridge_farsym(__kexec_end);
+bridge_farsym(__kexec_text_start);
+bridge_farsym(__kexec_text_end);
 
 // define the initial page table layout
 struct kernel_map;
@@ -98,7 +95,7 @@ remap_kernel()
 
     // Ensure the size of kernel is within the reservation
     pfn_t kimg_pagecount = 
-        pfn((ptr_t)__kexec_end - (ptr_t)__kexec_start);
+        pfn(__far(__kexec_end) - __far(__kexec_start));
     if (kimg_pagecount > KEXEC_RSVD * _PAGE_LEVEL_SIZE) {
         // ERROR: require more pages
         //  here should do something else other than head into blocking
@@ -107,13 +104,13 @@ remap_kernel()
 
     // Now, map the kernel
 
-    pfn_t kimg_end = pfn(to_kphysical(__kexec_end));
-    pfn_t i = pfn(to_kphysical(__kexec_text_start));
+    pfn_t kimg_end = pfn(to_kphysical(__far(__kexec_end)));
+    pfn_t i = pfn(to_kphysical(__far(__kexec_text_start)));
     ktep += i;
 
     // kernel .text
     pte = pte_setprot(pte, KERNEL_EXEC);
-    pfn_t ktext_end = pfn(to_kphysical(__kexec_text_end));
+    pfn_t ktext_end = pfn(to_kphysical(__far(__kexec_text_end)));
     for (; i < ktext_end; i++) {
         pte = pte_setpaddr(pte, page_addr(i));
         set_pte(ktep, pte);

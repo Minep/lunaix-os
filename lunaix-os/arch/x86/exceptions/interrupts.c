@@ -29,7 +29,7 @@ update_thread_context(struct hart_state* state)
     }
 }
 
-ptr_t
+struct hart_state*
 intr_handler(struct hart_state* state)
 {
     update_thread_context(state);

@@ -14,6 +14,8 @@
 #define unreachable             __builtin_unreachable()
 #define no_inline               __attribute__((noinline))
 
+#define defualt                 weak
+
 #define clz(bits)               __builtin_clz(bits)
 #define sadd_overflow(a, b, of) __builtin_sadd_overflow(a, b, of)
 #define umul_overflow(a, b, of) __builtin_umul_overflow(a, b, of)

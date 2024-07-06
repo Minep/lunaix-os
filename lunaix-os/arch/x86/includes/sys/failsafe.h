@@ -22,7 +22,22 @@ static inline void must_inline noret
 failsafe_diagnostic() {
     // asm ("jmp __fatal_state");
     extern int failsafe_stack_top[];
-    asm (
+#ifdef CONFIG_ARCH_X86_64
+     asm (
+        "movq %%rsp, %%rax\n"
+        "movq %%rbp, %%rbx\n"
+
+        "movq %0, %%rsp\n"
+
+        "pushq %%rax\n"
+        "pushq %%rbx\n"
+        
+        "call do_failsafe_unrecoverable\n"
+        ::"r"(failsafe_stack_top) 
+        :"memory"
+    );
+#else
+     asm (
         "movl %%esp, %%eax\n"
         "movl %%ebp, %%ebx\n"
 
@@ -35,6 +50,7 @@ failsafe_diagnostic() {
         ::"r"(failsafe_stack_top) 
         :"memory"
     );
+#endif
     unreachable;
 }
 

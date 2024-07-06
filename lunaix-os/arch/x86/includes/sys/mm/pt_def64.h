@@ -28,7 +28,7 @@
 #define L0T_SIZE            _PAGE_Ln_SIZE(0)
 #define L1T_SIZE            _PAGE_Ln_SIZE(1)
 #define L2T_SIZE            _PAGE_Ln_SIZE(2)
-#define L3T_SIZE            _PAGE_Ln_SIZE(2)
+#define L3T_SIZE            _PAGE_Ln_SIZE(3)
 #define LFT_SIZE            _PAGE_Ln_SIZE(3)
 
 

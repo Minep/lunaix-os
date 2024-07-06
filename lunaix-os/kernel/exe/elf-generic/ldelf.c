@@ -1,4 +1,4 @@
-#include <lunaix/exebi/elf32.h>
+#include <lunaix/exebi/elf.h>
 #include <lunaix/load.h>
 #include <lunaix/mm/mmap.h>
 #include <lunaix/mm/valloc.h>
@@ -7,9 +7,9 @@
 #include <sys/mm/mempart.h>
 
 int
-elf32_smap(struct load_context* ldctx,
-           const struct elf32* elf,
-           struct elf32_phdr* phdre,
+elf_smap(struct load_context* ldctx,
+           const struct elf* elf,
+           struct elf_phdr* phdre,
            uintptr_t base_va)
 {
     struct v_file* elfile = (struct v_file*)elf->elf_file;
@@ -58,25 +58,25 @@ load_executable(struct load_context* context, const struct v_file* exefile)
     int errno = 0;
 
     char* ldpath = NULL;
-    struct elf32 elf;
+    struct elf elf;
     struct exec_container* container = context->container;
 
-    if ((errno = elf32_openat(&elf, exefile))) {
+    if ((errno = elf_openat(&elf, exefile))) {
         goto done;
     }
 
-    if (!elf32_check_arch(&elf)) {
+    if (!elf_check_arch(&elf)) {
         errno = EINVAL;
         goto done;
     }
 
-    if (!(elf32_check_exec(&elf, ET_EXEC) || elf32_check_exec(&elf, ET_DYN))) {
+    if (!(elf_check_exec(&elf, ET_EXEC) || elf_check_exec(&elf, ET_DYN))) {
         errno = ENOEXEC;
         goto done;
     }
 
     ldpath = valloc(256);
-    errno = elf32_find_loader(&elf, ldpath, 256);
+    errno = elf_find_loader(&elf, ldpath, 256);
     uintptr_t load_base = 0;
 
     if (errno < 0) {
@@ -87,17 +87,17 @@ load_executable(struct load_context* context, const struct v_file* exefile)
         container->argv_pp[1] = ldpath;
 
         // close old elf
-        if ((errno = elf32_close(&elf))) {
+        if ((errno = elf_close(&elf))) {
             goto done;
         }
 
         // open the loader instead
-        if ((errno = elf32_open(&elf, ldpath))) {
+        if ((errno = elf_open(&elf, ldpath))) {
             goto done;
         }
 
         // Is this the valid loader?
-        if (!elf32_static_linked(&elf) || !elf32_check_exec(&elf, ET_DYN)) {
+        if (!elf_static_linked(&elf) || !elf_check_exec(&elf, ET_DYN)) {
             errno = ELIBBAD;
             goto done_close_elf32;
         }
@@ -110,7 +110,7 @@ load_executable(struct load_context* context, const struct v_file* exefile)
     struct v_file* elfile = (struct v_file*)elf.elf_file;
 
     for (size_t i = 0; i < elf.eheader.e_phnum && !errno; i++) {
-        struct elf32_phdr* phdr = &elf.pheaders[i];
+        struct elf_phdr* phdr = &elf.pheaders[i];
 
         if (phdr->p_type != PT_LOAD) {
             continue;
@@ -122,11 +122,11 @@ load_executable(struct load_context* context, const struct v_file* exefile)
             break;
         }
 
-        errno = elf32_smap(context, &elf, phdr, load_base);
+        errno = elf_smap(context, &elf, phdr, load_base);
     }
 
 done_close_elf32:
-    elf32_close(&elf);
+    elf_close(&elf);
 
 done:
     if (!container->argv_pp[1]) {

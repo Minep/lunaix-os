@@ -14,12 +14,23 @@ dup_leaflet(struct leaflet* leaflet)
 
     size_t cnt_wordsz = leaflet_size(new_leaflet) / sizeof(ptr_t);
 
+#ifdef CONFIG_ARCH_X86_64
+    asm volatile("movq %1, %%rdi\n"
+                 "movq %2, %%rsi\n"
+                 "rep movsq\n" ::"c"(cnt_wordsz),
+                 "r"(dest_va),
+                 "r"(src_va)
+                 : "memory", "%edi", "%esi");
+
+#else
     asm volatile("movl %1, %%edi\n"
                  "movl %2, %%esi\n"
                  "rep movsl\n" ::"c"(cnt_wordsz),
                  "r"(dest_va),
                  "r"(src_va)
                  : "memory", "%edi", "%esi");
+
+#endif
 
     leaflet_unmount(leaflet);
     vunmap(dest_va, new_leaflet);
