@@ -92,16 +92,17 @@ _set_tss(int index, ptr_t base, size_t size)
 static inline void
 _set_gdt_entry(u32_t index, ptr_t base, u32_t limit, u32_t flags)
 {
-    _gdt[index] =
+    x86_segdesc_t* gdte = &_gdt[index];
+
+    gdte->hi =
       SEG_BASE_H(base) | flags | SEG_LIM_H(limit) | SEG_BASE_M(base);
-    _gdt[index] <<= 32;
-    _gdt[index] |= SEG_BASE_L(base) | SEG_LIM_L(limit);
+    gdte->lo |= SEG_BASE_L(base) | SEG_LIM_L(limit);
 }
 
 static inline void
 _set_tss(int index, ptr_t base, size_t size)
 {
-    _set_gdt_entry(5, base, size - 1, SEG_TSS);
+    _set_gdt_entry(index, base, size - 1, SEG_TSS);
 }
 
 #endif
@@ -121,9 +122,9 @@ _init_gdt()
 #else
     _set_gdt_entry(0, 0, 0, 0);
     _set_gdt_entry(1, 0, 0xfffff, SEG_R0_CODE);
-    _set_gdt_entry(2, 0, 0xfffff, SEG_R0_DATA);
-    _set_gdt_entry(3, 0, 0xfffff, SEG_R3_CODE);
+    _set_gdt_entry(2, 0, 0xfffff, SEG_R3_CODE);
+    _set_gdt_entry(3, 0, 0xfffff, SEG_R0_DATA);
     _set_gdt_entry(4, 0, 0xfffff, SEG_R3_DATA);
-    _set_tss(5, (u32_t)&_tss, sizeof(struct x86_tss) - 1, SEG_TSS);
+    _set_tss(5, (u32_t)&_tss, sizeof(struct x86_tss) - 1);
 #endif
 }

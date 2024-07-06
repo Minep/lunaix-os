@@ -172,28 +172,6 @@ hart_stack_frame(struct hart_state* hstate)
     return hstate->registers.ebp;
 }
 
-static inline int
-hart_vector_stamp(struct hart_state* hstate) {
-    return hstate->execp->vector;
-}
-
-static inline unsigned int
-hart_ecause(struct hart_state* hstate) {
-    return hstate->execp->err_code;
-}
-
-static inline struct hart_state*
-hart_parent_state(struct hart_state* hstate)
-{
-    return hstate->execp->parent_state;
-}
-
-static inline void
-hart_push_state(struct hart_state* p_hstate, struct hart_state* hstate)
-{
-    hstate->execp->parent_state = p_hstate;
-}
-
 #endif
 
 #endif

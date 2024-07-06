@@ -196,8 +196,10 @@
             由于这中间没有进行地址空间的交换，所以第二次跳转使用的是同一个内核栈，而之前默认tss.esp0的值是永远指向最顶部
             这样一来就有可能会覆盖更早的上下文信息（比如嵌套的信号捕获函数）
         */
+        pushl %eax
         call update_tss
 
+        popl %eax
         jmp handle_signal
 
     1:

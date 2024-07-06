@@ -2,10 +2,10 @@
 
 #define __ASM__
 #ifdef CONFIG_ARCH_I386
-.align 16
 .macro isr_template vector, no_error_code=1
     .global _asm_isr\vector
     .type _asm_isr\vector, @function
+    .align 16
     _asm_isr\vector:
         .if \no_error_code
             pushl $0x0
@@ -14,10 +14,10 @@
         jmp interrupt_wrapper
 .endm
 #else
-.align 16
 .macro isr_template vector, no_error_code=1
     .global _asm_isr\vector
     .type _asm_isr\vector, @function
+    .align 16
     _asm_isr\vector:
         pushq $\vector
         jmp interrupt_wrapper

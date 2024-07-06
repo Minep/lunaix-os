@@ -26,7 +26,7 @@ arch_gdbstub_save_regs(struct gdb_state* state, struct hart_state* hstate)
     state->registers[GDB_CPU_I386_REG_ECX] = hstate->registers.ecx;
     state->registers[GDB_CPU_I386_REG_EDX] = hstate->registers.edx;
     state->registers[GDB_CPU_I386_REG_EBX] = hstate->registers.ebx;
-    state->registers[GDB_CPU_I386_REG_ESP] = hstate->esp;
+    state->registers[GDB_CPU_I386_REG_ESP] = hstate->sp;
     state->registers[GDB_CPU_I386_REG_EBP] = hstate->registers.ebp;
     state->registers[GDB_CPU_I386_REG_ESI] = hstate->registers.esi;
     state->registers[GDB_CPU_I386_REG_EDI] = hstate->registers.edi;
@@ -52,7 +52,7 @@ arch_gdbstub_restore_regs(struct gdb_state* state, struct hart_state* hstate)
     hstate->registers.ecx = state->registers[GDB_CPU_I386_REG_ECX];
     hstate->registers.edx = state->registers[GDB_CPU_I386_REG_EDX];
     hstate->registers.ebx = state->registers[GDB_CPU_I386_REG_EBX];
-    hstate->esp = state->registers[GDB_CPU_I386_REG_ESP];
+    hstate->sp = state->registers[GDB_CPU_I386_REG_ESP];
     hstate->registers.ebp = state->registers[GDB_CPU_I386_REG_EBP];
     hstate->registers.esi = state->registers[GDB_CPU_I386_REG_ESI];
     hstate->registers.edi = state->registers[GDB_CPU_I386_REG_EDI];

@@ -25,7 +25,7 @@
 
 #else
 #define bridge_farsym(far_sym) extern u8_t far_sym[];
-#define __far(far_sym) far_sym
+#define __far(far_sym) ((ptr_t)far_sym)
 
 #endif
 

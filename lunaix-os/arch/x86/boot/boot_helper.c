@@ -20,6 +20,8 @@ boot_clean_arch_reserve(struct boot_handoff* bhctx)
 
 #else
 
+#include <lunaix/mm/vmm.h>
+
 void
 boot_begin_arch_reserve(struct boot_handoff* bhctx)
 {

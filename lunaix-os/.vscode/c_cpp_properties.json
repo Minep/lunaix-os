@@ -10,12 +10,11 @@
             ],
             "compilerArgs": [
                 "-ffreestanding",
-                "-D__ARCH__=i386",
-                "-D__LUNAIXOS_DEBUG__",
+                "-m32",
                 "-include .builder/configs.h"
             ],
             "defines": [],
-            "compilerPath": "${HOME}/opt/i686-gcc-12/bin/i686-elf-gcc",
+            "compilerPath": "/usr/bin/gcc",
             "cStandard": "gnu99",
             "intelliSenseMode": "gcc-x86"
         },

@@ -13,13 +13,15 @@
 
 #ifndef CONFIG_ARCH_X86_64
 
-static inline void install_idte(u64_t idt, int iv, ptr_t isr, int dpl) 
+static inline void 
+install_idte(struct x86_sysdesc* idt, int iv, ptr_t isr, int dpl) 
 {
-    _idt[iv] = ((ptr_t)isr & 0xffff0000) | IDT_ATTR(dpl, IDT_INTERRUPT); 
-    _idt[iv] <<= 32;                                                     
-    _idt[iv] |= (KCODE_SEG << 16) | ((ptr_t)isr & 0x0000ffff);           
+    struct x86_sysdesc* idte = &idt[iv];
+
+    idte->hi = ((ptr_t)isr & 0xffff0000) | IDT_ATTR(dpl, IDT_INTERRUPT); 
+    idte->lo = (KCODE_SEG << 16) | ((ptr_t)isr & 0x0000ffff);           
 }
-u64_t _idt[IDT_ENTRY];
+struct x86_sysdesc _idt[IDT_ENTRY];
 u16_t _idt_limit = sizeof(_idt) - 1;
 
 #else

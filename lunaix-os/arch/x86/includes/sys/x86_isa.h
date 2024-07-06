@@ -8,7 +8,7 @@
 #define UCODE_SEG (SEL_INDEX(2) | SEL_RPL(3))
 
 #ifdef CONFIG_ARCH_I386
-    #define KDATA_SEG (SEL_INDEX(2) | SEL_RPL(0))
+    #define KDATA_SEG (SEL_INDEX(3) | SEL_RPL(0))
     #define UDATA_SEG (SEL_INDEX(4) | SEL_RPL(3))
     #define TSS_SEG   (SEL_INDEX(5) | SEL_RPL(0))
 
