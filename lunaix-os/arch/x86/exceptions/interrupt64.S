@@ -132,7 +132,7 @@
         # calculate stack after iretq
         # Thank god they finally make things consistent in x86_64
         addq $32, %rsp
-        movq %rsp, (_tss + tss_esp0_off)
+        movq %rsp, (_tss + ist_1)
         subq $32, %rsp
 
         iretq
@@ -197,4 +197,4 @@
         pushq $UCODE_SEG        # cs
         pushq psig_sigact(%rax)           # %rip = proc_sig->sigact
 
-        iret
+        iretq

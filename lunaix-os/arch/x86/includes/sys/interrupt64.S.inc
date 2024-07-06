@@ -1,5 +1,6 @@
 
-#define regsize 8
+#define regsize     8
+#define regsize32   4
 
 /* stack layout: saved interrupt context */
     .struct 0
@@ -80,9 +81,23 @@ thread_ustack_top:
 /* struct layout: proc_sig */
     .struct 0
 psig_signum:
-    .struct psig_signum + regsize
+    .struct psig_signum + regsize32
 psig_sigact:
     .struct psig_sigact + regsize
 psig_sighand:
     .struct psig_sighand + regsize
 psig_saved_hstate:
+
+/* struct layout: x86_tss */
+    .struct 0
+    .struct regsize32
+rsp_1:
+    .struct rsp_1 + regsize
+rsp_2:
+    .struct rsp_2 + regsize
+rsp_3:
+    .struct rsp_3 + regsize
+ist_null:
+    .struct ist_null + regsize
+ist_1:
+

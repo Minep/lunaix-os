@@ -512,6 +512,24 @@ mkl0tep_va(ptr_t mnt, ptr_t va)
     return mkl0tep(mkptep_va(mnt, va));
 }
 
+static inline pte_t*
+mkl1tep_va(ptr_t mnt, ptr_t va)
+{
+    return mkl1tep(mkptep_va(mnt, va));
+}
+
+static inline pte_t*
+mkl2tep_va(ptr_t mnt, ptr_t va)
+{
+    return mkl2tep(mkptep_va(mnt, va));
+}
+
+static inline pte_t*
+mkl3tep_va(ptr_t mnt, ptr_t va)
+{
+    return mkl3tep(mkptep_va(mnt, va));
+}
+
 static inline bool
 pt_last_level(int level)
 {

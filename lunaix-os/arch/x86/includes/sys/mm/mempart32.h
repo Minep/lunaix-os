@@ -25,7 +25,9 @@
 #define USR_STACK_SIZE              __ulong(0x40000)
 #define USR_STACK_END END_POINT(USR_STACK)
 
-#define KERNEL_IMG                  __ulong(0xc0000000)
+#define KERNEL_RESIDENT             __ulong(0xc0000000)
+
+#define KERNEL_IMG                  KERNEL_RESIDENT
 #define KERNEL_IMG_SIZE             __ulong(0x4000000)
 #define KERNEL_IMG_END END_POINT(KERNEL_IMG)
 

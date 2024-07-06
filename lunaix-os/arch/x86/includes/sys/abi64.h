@@ -18,7 +18,7 @@ j_usr(ptr_t sp, ptr_t pc)
                  "pushq %1\n"
                  "pushq %2\n"
                  "pushq %3\n"
-                 "retf" 
+                 "retfq" 
                  ::
                     "i"(UDATA_SEG),
                     "r"(sp),

@@ -4,8 +4,6 @@
 #include "mempart.h"
 #include "pagetable.h"
 
-#define KERNEL_RESIDENT         KERNEL_IMG
-
 /*
     Regardless architecture we need to draw the line very carefully, and must 
     take the size of VM into account. In general, we aims to achieve 

@@ -77,7 +77,7 @@ export BUILD_MODE=debug
 bootable-debug: $(kbuild_dir) image
 
 user:
-	$(call status,$@)
+	$(call status,TASK,$@)
 	@$(MAKE) $(MKFLAGS) -C usr all -I $(mkinc_dir)
 
 all: bootable
