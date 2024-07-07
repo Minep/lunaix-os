@@ -1,7 +1,13 @@
 ENTRY(_start)
 
+#ifdef CONFIG_ARCH_X86_64
+#   define EXEC_START 0x0000008000000000
+#else
+#   define EXEC_START 0x400000
+#endif
+
 SECTIONS {
-    . = 0x400000;
+    . = EXEC_START;
 
     .text BLOCK(4K) : {
         *(.text)

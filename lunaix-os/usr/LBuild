@@ -1,0 +1,37 @@
+sources([
+    "testp",
+    "ls",
+    "signal_demo",
+    "cat",
+    "stat",
+    "test_pthread"
+])
+
+compile_opts([
+    "-ffreestanding",
+    "-fno-pie"
+])
+
+linking_opts([
+    "-nostdlib", 
+    "-nolibc", 
+    "-z noexecstack", 
+    "-no-pie", 
+])
+
+linking_opts([
+    "-Wl,--build-id=none"
+])
+
+if config("arch") == "x86_64":
+    compile_opts([
+        "-m64", 
+        "-fno-unwind-tables", 
+        "-fno-asynchronous-unwind-tables",
+    ])
+    linking_opts([
+        "-m64",
+    ])
+else:
+    compile_opts("-m32")
+    linking_opts("-m32")

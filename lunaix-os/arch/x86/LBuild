@@ -66,11 +66,10 @@ if config("arch") == "x86_64":
         "-m64", 
         "-fno-unwind-tables", 
         "-fno-asynchronous-unwind-tables",
-        "-mcmodel=large"
+        "-mcmodel=kernel"
     ])
     linking_opts([
         "-m64",
-        "-mcmodel=large"
     ])
 else:
     compile_opts("-m32")

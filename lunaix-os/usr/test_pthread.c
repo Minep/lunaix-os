@@ -8,11 +8,14 @@
     Test payloads
 */
 
+#define __int(ptr)  ((int)(unsigned long)(ptr))
+#define __ptr(ptr)  ((void*)(unsigned long)(ptr))
+
 static void* 
 __print_and_sleep_randsec(void* value)
 {
     pthread_t tid = pthread_self();
-    printf("thread %d: gets number %d\n", tid, (int)value);
+    printf("thread %d: gets number %d\n", tid, __int(value));
     
     int fd = open("/dev/rand", O_RDONLY | O_DIRECT);
     if (fd < 0) {
@@ -40,9 +43,9 @@ static void*
 __print_and_sleep_seq(void* value)
 {
     pthread_t tid = pthread_self();
-    printf("thread %d: gets number %d\n", tid, (int)value);
+    printf("thread %d: gets number %d\n", tid, __int(value));
     
-    int second = (int)value % 30;
+    int second = __int(value) % 30;
 
     printf("thread %d: going to sleep %ds\n", tid, second);
     sleep(second);
@@ -55,7 +58,7 @@ static void*
 __print_and_sleep(void* value)
 {
     pthread_t tid = pthread_self();
-    printf("thread %d: gets number %d\n", tid, (int)value);
+    printf("thread %d: gets number %d\n", tid, __int(value));
 
     sleep(1);
     printf("thread %d: exit\n", tid);
@@ -95,7 +98,7 @@ spawn_detached_thread(void* (*fn)(void *), int amount)
         int err;                                                                    
         pthread_t created;                                                          
         for (int i = 0; i < amount; i++) {                                          
-            err = pthread_create(&created, NULL, fn, (void*)i);                     
+            err = pthread_create(&created, NULL, fn, __ptr(i));                     
             if (err) {                                                              
                 printf("unable to create thread: %d\n", err);                       
                 continue;                                                           
@@ -136,7 +139,7 @@ pthread_test_join(int param)
     void* v;
     for (int i = 0; i < param; i++)
     {
-        err = pthread_create(&created, NULL, __print_and_sleep, (void*)i);
+        err = pthread_create(&created, NULL, __print_and_sleep, __ptr(i));
         if (err) {
             printf("unable to create thread: %d\n", err);
         }

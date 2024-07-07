@@ -1,25 +1,42 @@
-#include "syscall.h"
+#include <lunaix/syscall.h>
 #include <lunaix/signal_defs.h>
 #include <lunaix/types.h>
 
-__LXSYSCALL1(int, sigpending, sigset_t, *set);
-__LXSYSCALL1(int, sigsuspend, const sigset_t, *mask);
+int
+sigpending(sigset_t *set)
+{
+    return do_lunaix_syscall(__SYSCALL_sigpending, set);
+}
 
-__LXSYSCALL3(int,
-             sigprocmask,
-             int,
-             how,
-             const sigset_t,
-             *set,
-             sigset_t,
-             *oldset);
+int
+sigsuspend(const sigset_t *mask)
+{
+    return do_lunaix_syscall(__SYSCALL_sigsuspend, mask);
+}
 
-__LXSYSCALL2(int, sys_sigaction, int, signum, struct sigaction*, action);
+int
+sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
+{
+    return do_lunaix_syscall(__SYSCALL_sigprocmask, how, set, oldset);
+}
 
-__LXSYSCALL2(int, kill, pid_t, pid, int, signum);
+int
+sys_sigaction(int signum, struct sigaction* action)
+{
+    return do_lunaix_syscall(__SYSCALL_sys_sigaction, signum, action);
+}
+
+int
+kill(pid_t pid, int signum)
+{
+    return do_lunaix_syscall(__SYSCALL_kill, pid, signum);
+}
 
 extern void
 sigtrampoline();
+
+extern pid_t
+getpid();
 
 sighandler_t
 signal(int signum, sighandler_t handler)
@@ -32,9 +49,6 @@ signal(int signum, sighandler_t handler)
 
     return handler;
 }
-
-extern pid_t
-getpid();
 
 int
 raise(int signum)

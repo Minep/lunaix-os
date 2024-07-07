@@ -2,6 +2,7 @@ CC := $(CX_PREFIX)gcc
 CC := $(CX_PREFIX)gcc
 AS := $(CX_PREFIX)as
 AR := $(CX_PREFIX)ar
+LBUILD ?= $(shell realpath ./scripts/build-tools/luna_build.py)
 
 O := -O2
 W := -Wall -Wextra -Werror \

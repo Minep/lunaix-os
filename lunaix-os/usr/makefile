@@ -1,25 +1,34 @@
 include utils.mkinc
 include toolchain.mkinc
+include lunabuild.mkinc
+
+include $(lbuild_mkinc)
+
+ifndef ARCH
+$(error ARCH is not set)
+endif
 
 task := all
-
-# TODO make this use LBuild
-CFLAGS += -m32 -ffreestanding -fno-pie
-LDFLAGS += -m32 -nostdlib -nolibc -z noexecstack -no-pie -Wl,--build-id=none
 
 sys_include := $(CURDIR)/includes
 build_dir := $(CURDIR)/build
 libc_name := liblunac
 libc_files := $(libc_name).a
 libc := $(addprefix $(build_dir)/lib/,$(libc_files))
-ldscript := $(CURDIR)/link-usr.ld
 
-common_param :=	CC AR INCLUDES BUILD_DIR BUILD_NAME CFLAGS LDFLAGS
+common_param :=	CC AR INCLUDES BUILD_DIR BUILD_NAME\
+				CFLAGS LDFLAGS ARCH LBUILD
 
 INCLUDES := $(sys_include)
 BUILD_DIR := $(build_dir)
 BUILD_NAME := $(libc_name).a
 
+mkapp-list := $(addprefix app-, $(shell cat apps.list))
+mkexec-list := $(addprefix $(build_dir)/bin/, $(_LBUILD_SRCS))
+
+uexec_ld := $(CURDIR)/uexec.ld
+
+# Directory structure prerequisites
 $(build_dir)/bin:
 	@mkdir -p $(build_dir)/bin
 
@@ -29,44 +38,48 @@ $(build_dir)/lib:
 $(build_dir)/includes:
 	@mkdir -p $(build_dir)/includes
 
+# LibC
 export $(common_param)
 $(build_dir)/$(libc_name).a: $(build_dir)/bin $(build_dir)/lib $(build_dir)/includes
 	$(call status,TASK,$(BUILD_NAME))
 	@$(MAKE) $(MKFLAGS) -C libc/ $(task)
 
-app-list = $(shell cat apps.list)
-exec-list = $(shell cat execs.list)
+$(uexec_ld): $(uexec_ld)x
+	@$(CC) -include $(lbuild_config_h) -x c -P -E $< -o $@
 
-mkapp-list := $(addprefix app-, $(app-list))
-mkexec-list := $(addprefix $(build_dir)/bin/, $(exec-list))
-
-export LD_SCRIPT := $(ldscript)
+# Application (with standalone makefile)
+export LD_SCRIPT := $(uexec_ld)
 export LIBC := $(libc)
-app-%:
+export $(common_param)
+app-%: $(uexec_ld)
 	$(call status,TASK,$*)
 	@$(MAKE) $(MKFLAGS) -C $* $(task) BUILD_NAME="$*"
-
-exec_%.o: %.c
-	$(call status,CC,$<)
-	@$(CC) $(CFLAGS) $(addprefix -I,$(INCLUDES)) -c $< -o $@
-
-$(build_dir)/bin/%: exec_%.o
-	$(call status,LD,$(@F))
-	@$(CC) -T $(ldscript) -o $@ $< $(libc) $(LDFLAGS)
 
 app: task := all
 app: INCLUDES += $(build_dir)/includes
 app: $(mkapp-list)
 
+
+# Programs (single file)
+exec_%.o: %.c
+	$(call status,CC,$<)
+	@$(CC) $(CFLAGS) $(addprefix -I,$(INCLUDES)) -c $< -o $@
+
+$(build_dir)/bin/%: exec_%.o $(uexec_ld)
+	$(call status,LD,$(@F))
+	@$(CC) -T $(uexec_ld) -o $@ $< $(libc) $(LDFLAGS)
+
 exec: task := all
 exec: INCLUDES += $(build_dir)/includes
 exec: $(mkexec-list)
 
+
+# General recipes
 clean: task := clean
 clean: $(mkapp-list)
-	@rm -rf $(build_dir)
+	@rm -rf $(build_dir) $(lbuild_dir)
 	@$(MAKE) $(MKFLAGS) -C libc/ $(task)
 
-all: task := all
 .NOTPARALLEL:
+all: task := all
 all: $(build_dir)/$(libc_name).a exec app

@@ -1,7 +1,8 @@
 include os.mkinc
 include toolchain.mkinc
+include lunabuild.mkinc
 
-include .builder/lbuild.mkinc
+include $(lbuild_mkinc)
 
 kbin_dir := $(BUILD_DIR)
 kbin := $(BUILD_NAME)
@@ -10,7 +11,7 @@ ksrc_objs := $(addsuffix .o,$(_LBUILD_SRCS))
 ksrc_deps := $(addsuffix .d,$(_LBUILD_SRCS))
 khdr_opts := $(addprefix -include ,$(_LBUILD_HDRS))
 kinc_opts := $(addprefix -I,$(_LBUILD_INCS))
-config_h += -include.builder/configs.h
+config_h += -include $(lbuild_config_h)
 
 tmp_kbin  := $(BUILD_DIR)/tmpk.bin
 ksymtable := lunaix_ksyms.o

@@ -75,7 +75,8 @@ class DependencyGraph:
             if current in self._edges:
                 for x in self._edges[current]:
                     q.append(x)
-            current.evaluate()
+            if current != start:
+                current.evaluate()
 
 class ConfigTypeFactory:
     def __init__(self) -> None:

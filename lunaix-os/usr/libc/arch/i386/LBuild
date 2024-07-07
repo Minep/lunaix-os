@@ -1,0 +1,8 @@
+sources([
+    "crt0.S",
+    "syscall.S",
+    "trampoline.S",
+])
+
+compile_opts("-m32")
+linking_opts("-m32")
