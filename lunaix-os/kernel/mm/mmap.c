@@ -469,16 +469,24 @@ mem_unmap(ptr_t mnt, vm_regions_t* regions, ptr_t addr, size_t length)
     return 0;
 }
 
-__DEFINE_LXSYSCALL3(void*, sys_mmap, void*, addr, size_t, length, va_list, lst)
+__DEFINE_LXSYSCALL1(void*, sys_mmap, struct usr_mmap_param*, mparam)
 {
-    int proct = va_arg(lst, int);
-    int fd = va_arg(lst, u32_t);
-    off_t offset = va_arg(lst, off_t);
-    int options = va_arg(lst, int);
-    int errno = 0;
-    void* result = (void*)-1;
+    off_t offset;
+    size_t length;
+    int proct, fd, options;
+    int errno;
+    void* result;
+    ptr_t addr_ptr;
 
-    ptr_t addr_ptr = (ptr_t)addr;
+    proct = mparam->proct;
+    fd = mparam->fd;
+    offset = mparam->offset;
+    options = mparam->flags;
+    addr_ptr = __ptr(mparam->addr);
+    length = mparam->length;
+
+    errno  = 0;
+    result = (void*)-1;
 
     if (!length || length > BS_SIZE || va_offset(addr_ptr)) {
         errno = EINVAL;

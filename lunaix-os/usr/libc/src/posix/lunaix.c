@@ -27,8 +27,8 @@ syslog(int level, const char* fmt, ...)
     va_list ap;
     va_start(ap, fmt);
 
-    vsnprintf(buf, 1024, fmt, ap);
-    do_lunaix_syscall(__SYSCALL_syslog, level, buf);
+    unsigned int size = vsnprintf(buf, 1024, fmt, ap);
+    do_lunaix_syscall(__SYSCALL_syslog, level, buf, size);
 
     va_end(ap);
 }
