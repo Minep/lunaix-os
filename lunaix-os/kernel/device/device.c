@@ -296,7 +296,9 @@ __DEFINE_LXSYSCALL3(int, ioctl, int, fd, int, req, sc_va_list, _args)
 {
     int errno = -1;
     struct v_fd* fd_s;
-    va_list args = to_valist(_args);
+    va_list args;
+
+    convert_valist(&args, _args);
 
     if ((errno &= vfs_getfd(fd, &fd_s))) {
         goto done;

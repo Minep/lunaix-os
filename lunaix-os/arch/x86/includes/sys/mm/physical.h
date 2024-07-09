@@ -4,7 +4,7 @@
 #include <lunaix/ds/llist.h>
 #include "mm_defs.h"
 
-#define PPLIST_STARTVM          VMAP
+#define PPLIST_STARTVM          PMAP
 
 struct ppage_arch
 {

@@ -3,11 +3,7 @@
 
 #include <lunaix/process.h>
 #include <lunaix/syscall.h>
-#include <stdarg.h>
-
-typedef va_list* sc_va_list;
-
-#define to_valist(sva)      (*(sva))
+#include <sys/syscall_utils.h>
 
 #define DO_STATUS(errno)    SYSCALL_ESTATUS(syscall_result(errno))
 #define DO_STATUS_OR_RETURN(errno) \

@@ -9,7 +9,8 @@
 #define IDT_ATTR(dpl, type) (((type) << 5) | ((dpl & 3) << 13) | (1 << 15))
 #define IDT_ENTRY 256
 
-#define DECLARE_ISR(iv) extern void _asm_isr##iv();
+#define __expand_iv(iv) _asm_isr##iv()
+#define DECLARE_ISR(iv) extern void __expand_iv(iv);
 
 #ifndef CONFIG_ARCH_X86_64
 
@@ -30,15 +31,13 @@ static inline must_inline void
 install_idte(struct x86_sysdesc* idt, int iv, ptr_t isr, int dpl) 
 {
     struct x86_sysdesc* idte = &idt[iv];
-    ptr_t isr_p = (ptr_t)isr;
-
-    idte->hi = isr_p >> 32;
     
-    idte->lo = (isr_p & 0xffff0000UL) | IDT_ATTR(dpl, IDT_INTERRUPT); 
-    idte->lo |= 1;  // IST=1
+    idte->hi = isr >> 32;
+    
+    idte->lo = (isr & 0xffff0000UL) | IDT_ATTR(dpl, IDT_INTERRUPT); 
 
     idte->lo <<= 32;                                                     
-    idte->lo |= (KCODE_SEG << 16) | (isr_p & 0x0000ffffUL);           
+    idte->lo |= (KCODE_SEG << 16) | (isr & 0x0000ffffUL);
 }
 
 struct x86_sysdesc _idt[IDT_ENTRY];
@@ -63,6 +62,6 @@ exception_install_handler()
 
 #ifdef CONFIG_ARCH_X86_64
     // TODO set different IST to some exception so it can get a
-    //      better and save stack to work with
+    //      better and safe stack to work with
 #endif
 }

@@ -38,6 +38,41 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
     pte_t* ptep_kernel  = mkl0tep(mkptep_va(src_mnt, KERNEL_RESIDENT));
 
     // Build the self-reference on dest vms
+
+    /* FIXME this does not scale. It made implicit assumption of
+     *      two level translation. 
+     *      
+     *      ptep_dest point to the pagetable itself that is mounted
+     *          at dest_mnt (or simply mnt): 
+     *              mnt -> self -> self -> self -> L0TE@offset
+     * 
+     *      ptep_sms shallowed the recursion chain:
+     *              self -> mnt -> self -> self -> L0TE@self
+     * 
+     *      ptep_ssm shallowed the recursion chain:
+     *              self -> self -> mnt -> self -> L0TE@self
+     *      
+     *      Now, here is the problem, back to x86_32, the translation is 
+     *      a depth-3 recursion:
+     *              L0T -> LFT -> Page
+     *      
+     *      So ptep_ssm will terminate at mnt and give us a leaf
+     *      slot for allocate a fresh page table for mnt:
+     *              self -> self -> L0TE@mnt
+     * 
+     *      but in x86_64 translation has extra two more step:
+     *              L0T -> L1T -> L2T -> LFT -> Page
+     *      
+     *      So we must continue push down.... 
+     *      ptep_sssms shallowed the recursion chain:
+     *              self -> self -> self -> mnt  -> L0TE@self
+     * 
+     *      ptep_ssssm shallowed the recursion chain:
+     *              self -> self -> self -> self -> L0TE@mnt
+     * 
+     *      Note: PML4: 2 extra steps
+     *            PML5: 3 extra steps
+    */
     pte_t* ptep_sms     = mkptep_va(VMS_SELF, (ptr_t)ptep_dest);
     pte_t* ptep_ssm     = mkptep_va(VMS_SELF, (ptr_t)ptep_sms);
     pte_t  pte_sms      = mkpte_prot(KERNEL_DATA);

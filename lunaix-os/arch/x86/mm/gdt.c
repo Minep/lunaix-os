@@ -33,21 +33,24 @@
 #define SEG_CODE_EXRDC 0x0E     // Execute/Read, conforming
 #define SEG_CODE_EXRDCA 0x0F    // Execute/Read, conforming, accessed
 
+#define BIT64   (SD_64BITS(1) | SD_32BITS(0))
+#define BIT32   (SD_64BITS(0) | SD_32BITS(1))
+
 #define SEG_R0_CODE                                                            \
     SD_TYPE(SEG_CODE_EXRD) | SD_CODE_DATA(1) | SD_DPL(0) | SD_PRESENT(1) |     \
-      SD_AVL(0) | SD_64BITS(0) | SD_32BITS(1) | SD_4K_GRAN(1)
+      SD_AVL(0) | SD_4K_GRAN(1)
 
 #define SEG_R0_DATA                                                            \
     SD_TYPE(SEG_DATA_RDWR) | SD_CODE_DATA(1) | SD_DPL(0) | SD_PRESENT(1) |     \
-      SD_AVL(0) | SD_64BITS(0) | SD_32BITS(1) | SD_4K_GRAN(1)
+      SD_AVL(0) | SD_4K_GRAN(1)
 
 #define SEG_R3_CODE                                                            \
     SD_TYPE(SEG_CODE_EXRD) | SD_CODE_DATA(1) | SD_DPL(3) | SD_PRESENT(1) |     \
-      SD_AVL(0) | SD_64BITS(0) | SD_32BITS(1) | SD_4K_GRAN(1)
+      SD_AVL(0) | SD_4K_GRAN(1)
 
 #define SEG_R3_DATA                                                            \
     SD_TYPE(SEG_DATA_RDWR) | SD_CODE_DATA(1) | SD_DPL(3) | SD_PRESENT(1) |     \
-      SD_AVL(0) | SD_64BITS(0) | SD_32BITS(1) | SD_4K_GRAN(1)
+      SD_AVL(0) | SD_4K_GRAN(1)
 
 #define SEG_TSS SD_TYPE(9) | SD_DPL(0) | SD_PRESENT(1)
 
@@ -60,12 +63,13 @@ u16_t _gdt_limit = sizeof(_gdt) - 1;
 #ifdef CONFIG_ARCH_X86_64
 
 static inline void
-_set_gdt_entry(int index, int dpl)
+_set_gdt_entry(int index, int dpl, unsigned int flags)
 {
     u64_t desc = 0;
-    desc |= 0b01 << 21; // D, L
-    desc |= 1 << 15;    // P
-    desc |= (dpl & 0b11) << 13;  // DPL
+    desc |= flags | BIT64;
+    desc |= 0xf << 16;
+    desc = desc << 32;
+    desc |= 0xffff;
 
     _gdt[index] = desc;
 }
@@ -94,6 +98,8 @@ _set_gdt_entry(u32_t index, ptr_t base, u32_t limit, u32_t flags)
 {
     x86_segdesc_t* gdte = &_gdt[index];
 
+    flags |= BIT32;
+
     gdte->hi =
       SEG_BASE_H(base) | flags | SEG_LIM_H(limit) | SEG_BASE_M(base);
     gdte->lo |= SEG_BASE_L(base) | SEG_LIM_L(limit);
@@ -115,9 +121,9 @@ _init_gdt()
 
 #ifdef CONFIG_ARCH_X86_64
     _gdt[0] = 0;
-    _set_gdt_entry(1, 0);   // kernel code
-    _set_gdt_entry(2, 3);   // user code
-    _set_gdt_entry(3, 0);   // generic data
+    _set_gdt_entry(1, 0, SEG_R0_CODE);   // kernel code
+    _set_gdt_entry(2, 3, SEG_R3_CODE);   // user code
+    _set_gdt_entry(3, 0, SEG_R0_DATA);   // generic data
     _set_tss(4, (ptr_t)&_tss, sizeof(_tss));
 #else
     _set_gdt_entry(0, 0, 0, 0);

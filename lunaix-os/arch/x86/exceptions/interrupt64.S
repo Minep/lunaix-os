@@ -121,6 +121,8 @@
         popq %r14
         popq %r15
 
+        popq %rsp
+
         movq %rax, tmp_store
         movq current_thread, %rax
 
@@ -132,7 +134,7 @@
         # calculate stack after iretq
         # Thank god they finally make things consistent in x86_64
         addq $32, %rsp
-        movq %rsp, (_tss + ist_1)
+        movq %rsp, (_tss + rsp_0)
         subq $32, %rsp
 
         iretq

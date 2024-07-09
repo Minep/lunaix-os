@@ -49,7 +49,7 @@ update_tss()
 {
     extern struct x86_tss _tss;
 #ifdef CONFIG_ARCH_X86_64
-    _tss.ists[1] = (ptr_t)current_thread->hstate;
+    _tss.rsps[0] = (ptr_t)current_thread->hstate;
 #else
     _tss.esp0 = (u32_t)current_thread->hstate;
 #endif

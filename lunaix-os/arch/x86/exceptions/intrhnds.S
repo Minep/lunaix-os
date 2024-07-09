@@ -19,6 +19,9 @@
     .type _asm_isr\vector, @function
     .align 16
     _asm_isr\vector:
+        .if \no_error_code
+            pushq $0x0
+        .endif
         pushq $\vector
         jmp interrupt_wrapper
 .endm

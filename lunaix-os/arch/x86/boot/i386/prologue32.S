@@ -51,7 +51,7 @@
         movw %cx, %ss
         
         /* 更新 CS:EIP */
-        pushw $KCODE_SEG
+        pushl $KCODE_SEG
         pushl $_after_gdt
         retf
 

@@ -247,7 +247,9 @@ iopoll_install(struct thread* thread, struct v_fd* fd)
 __DEFINE_LXSYSCALL2(int, pollctl, int, action, sc_va_list, _ap)
 {
     int retcode = 0;
-    va_list va = to_valist(_ap);
+    va_list va;
+
+    convert_valist(&va, _ap);
     
     switch (action) {
         case _SPOLL_ADD: {

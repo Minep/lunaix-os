@@ -54,9 +54,12 @@ found:;
     pfn_t nhuge;
     pte_t* ptep;
 
+    pte_t pte   = mkpte(aligned_pplist, KERNEL_DATA);
+
 #ifdef CONFIG_ARCH_X86_64
     nhuge = page_count(pool_size, L2T_SIZE);
     ptep = mkl2tep_va(VMS_SELF, PMAP);
+    vmm_set_ptes_contig(ptep, pte_mkhuge(pte), L2T_SIZE, nhuge);
 #else
     nhuge = page_count(pool_size, L0T_SIZE);
     ptep = mkl0tep_va(VMS_SELF, PMAP);
@@ -64,11 +67,8 @@ found:;
     // since VMAP and PMAP share same address space
     // we need to shift VMAP to make room
     vmap_set_start(VMAP + nhuge * L0T_SIZE);
-#endif
-    
-    pte_t pte   = mkpte(aligned_pplist, KERNEL_DATA);
-    
     vmm_set_ptes_contig(ptep, pte_mkhuge(pte), L0T_SIZE, nhuge);
+#endif
 
     tlb_flush_kernel(PMAP);
     return aligned_pplist;

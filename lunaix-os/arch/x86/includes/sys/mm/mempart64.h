@@ -27,11 +27,8 @@
 
 // 1GiB hole as page guard
 
-#define KERNEL_RESIDENT         __ulong(0xfffffd0000000000)     // -3T
-
-#define PMAP                    KERNEL_RESIDENT                 // -3T
-
-#define VMAP                    __ulong(0xfffffd8000000000)     // -2.5T
+#define KERNEL_RESIDENT         __ulong(0xfffffd8000000000)     // -2.5T
+#define VMAP                    KERNEL_RESIDENT                 // -2.5T
 #define VMAP_SIZE               __ulong(0x0000010000000000)
 #define VMAP_END END_POINT(VMAP)
 
@@ -39,9 +36,10 @@
 #define VMS_MOUNT_1_SIZE        __ulong(0x0000008000000000)
 #define VMS_MOUNT_1_END END_POINT(VMS_MOUNT_1)
 
-#define VMS_SELF_MOUNT          __ulong(0xffffff8000000000)     // -1T
+#define VMS_SELF_MOUNT          __ulong(0xffffff0000000000)     // -1T
 
-#define PG_MOUNT_1              __ulong(0xffffff8000000000)     // -512G
+#define KMAP                    __ulong(0xffffff8000000000)
+#define PG_MOUNT_1              KMAP                            // -512G
 #define PG_MOUNT_1_SIZE         __ulong(0x0000000000001000)
 #define PG_MOUNT_1_END END_POINT(PG_MOUNT_1)
 
@@ -60,6 +58,8 @@
 #define PG_MOUNT_VAR            __ulong(0xffffff8000004000)
 #define PG_MOUNT_VAR_SIZE       __ulong(0x000000003fffc000)
 #define PG_MOUNT_VAR_END END_POINT(PG_MOUNT_VAR)
+
+#define PMAP                    __ulong(0xffffff8040000000)
 
 #define KERNEL_IMG              __ulong(0xffffffff80000000)     // -2G
 #define KERNEL_IMG_SIZE         __ulong(0x0000000080000000)

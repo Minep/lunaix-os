@@ -43,9 +43,16 @@ struct __pte {
 #define _PTE_PAT                (1 << 7)
 #define _PTE_G                  (1 << 8)
 #define _PTE_X                  (0)
+#define _PTE_NX                 (0)
 #define _PTE_R                  (0)
 
 #define __MEMGUARD               0xdeadc0deUL
+
+typedef unsigned int pte_attr_t;
+typedef unsigned int pfn_t;
+
+#define __index(va)             ( (va) & VMS_MASK )
+#define __vaddr(va)             (va)
 
 #endif /* __LUNAIX_PT_DEF32_H */
 #endif

@@ -25,7 +25,7 @@ __gather_memaccess_info(struct fault_context* context)
     
     context->mm = vmspace(__current);
 
-    if (mnt < VMS_MOUNT_1) {
+    if (!vmnt_packed(ptep)) {
         refva = (ptr_t)ptep;
         goto done;
     }
@@ -210,7 +210,7 @@ static void
 __handle_kernel_page(struct fault_context* fault)
 {
     // we must ensure only ptep fault is resolvable
-    if (fault->fault_va < VMS_MOUNT_1) {
+    if (!is_ptep(fault->fault_va)) {
         return;
     }
     

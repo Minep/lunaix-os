@@ -34,7 +34,7 @@
 
 #define kernel_addr(addr)       ((addr) >= KERNEL_RESIDENT || (addr) < USR_EXEC)
 
-#define to_kphysical(k_va)      ((ptr_t)(k_va) - KERNEL_RESIDENT)
-#define to_kvirtual(k_pa)       ((ptr_t)(k_pa) - KERNEL_RESIDENT)
+#define to_kphysical(k_va)      ((ptr_t)(k_va) - KERNEL_IMG)
+#define to_kvirtual(k_pa)       ((ptr_t)(k_pa) + KERNEL_IMG)
 
 #endif /* __LUNAIX_MM_DEFS_H */

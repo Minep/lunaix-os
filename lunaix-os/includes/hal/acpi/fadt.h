@@ -70,6 +70,7 @@ typedef struct acpi_fadt
     u8_t time_info[3];
     u16_t boot_arch;
 } ACPI_TABLE_PACKED acpi_fadt_t;
+#define __acpi_fadt(acpi_ptr)   ((acpi_fadt_t*)__ptr(acpi_ptr))
 
 // TODO: FADT parser & support
 

@@ -50,20 +50,20 @@
 typedef struct __pte pte_t;
 #endif
 
-typedef unsigned int pfn_t;
-typedef unsigned int pte_attr_t;
 
 #define _PTE_PROT_MASK          ( _PTE_W | _PTE_U | _PTE_X )
 
 #define KERNEL_PAGE             ( _PTE_P )
 #define KERNEL_EXEC             ( KERNEL_PAGE | _PTE_X )
-#define KERNEL_DATA             ( KERNEL_PAGE | _PTE_W  )
-#define KERNEL_RDONLY           ( KERNEL_PAGE )
+#define KERNEL_DATA             ( KERNEL_PAGE | _PTE_W | _PTE_NX )
+#define KERNEL_RDONLY           ( KERNEL_PAGE | _PTE_NX )
+#define KERNEL_ROEXEC           ( KERNEL_PAGE | _PTE_X  )
 
 #define USER_PAGE               ( _PTE_P | _PTE_U )
 #define USER_EXEC               ( USER_PAGE | _PTE_X )
-#define USER_DATA               ( USER_PAGE | _PTE_W )
-#define USER_RDONLY             ( USER_PAGE )
+#define USER_DATA               ( USER_PAGE | _PTE_W | _PTE_NX )
+#define USER_RDONLY             ( USER_PAGE | _PTE_NX )
+#define USER_ROEXEC             ( USER_PAGE | _PTE_X  )
 
 #define SELF_MAP                ( KERNEL_DATA | _PTE_WT | _PTE_CD )
 
@@ -236,19 +236,19 @@ pte_allow_user(pte_t pte)
 static inline pte_t
 pte_mkexec(pte_t pte)
 {
-    return __mkpte_from(pte.val | _PTE_X);
+    return __mkpte_from(pte.val & ~_PTE_NX);
 }
 
 static inline pte_t
 pte_mknonexec(pte_t pte)
 {
-    return __mkpte_from(pte.val & ~_PTE_X);
+    return __mkpte_from(pte.val | _PTE_NX);
 }
 
 static inline bool
 pte_isexec(pte_t pte)
 {
-    return !!(pte.val & _PTE_X);
+    return !(pte.val & _PTE_NX);
 }
 
 static inline pte_t

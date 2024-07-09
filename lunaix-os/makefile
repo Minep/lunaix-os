@@ -89,18 +89,18 @@ clean:
 	@rm -rf .builder || exit 1
 
 run: all
-	@qemu-system-i386 $(call get_qemu_options,$(kimg))
+	@qemu-system-$(ARCH) $(call get_qemu_options,$(kimg))
 	@sleep 1
 	@telnet 127.0.0.1 $(QEMU_MON_PORT)
 
 debug-qemu: all-debug
 	@objcopy --only-keep-debug $(kbin) $(kbuild_dir)/kernel.dbg
-	@qemu-system-i386 $(call get_qemu_options,$(kimg))
+	@qemu-system-$(ARCH) $(call get_qemu_options,$(kimg))
 	@sleep 1
 	@QMPORT=$(QEMU_MON_PORT) gdb $(kbin) -ex "target remote localhost:1234"
 
 debug-qemu-vscode: all-debug
-	@qemu-system-i386 $(call get_qemu_options,$(kimg))
+	@qemu-system-$(ARCH) $(call get_qemu_options,$(kimg))
 	@sleep 0.5
 	@telnet 127.0.0.1 $(QEMU_MON_PORT)
 

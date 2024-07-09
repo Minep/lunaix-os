@@ -103,12 +103,10 @@ typedef struct __pte pte_t;
 #include <sys/mm/pagetable.h>
 #include <sys/cpu.h>
 
-#define __vaddr(va)             ( (va) & VMS_MASK )
-
 #define VMS_SELF                VMS_SELF_MOUNT
 
 #define _LnT_LEVEL_SIZE(n)      ( L##n##T_SIZE / PAGE_SIZE )
-#define _LFTEP_SELF             ( __vaddr(VMS_SELF) )
+#define _LFTEP_SELF             ( __index(VMS_SELF) )
 #define _L3TEP_SELF             ( _LFTEP_SELF | (_LFTEP_SELF / _LnT_LEVEL_SIZE(3)) )
 #define _L2TEP_SELF             ( _L3TEP_SELF | (_LFTEP_SELF / _LnT_LEVEL_SIZE(2)) )
 #define _L1TEP_SELF             ( _L2TEP_SELF | (_LFTEP_SELF / _LnT_LEVEL_SIZE(1)) )
@@ -124,10 +122,10 @@ typedef struct __pte pte_t;
 #define _VM_PFN_OF(ptep)        ( ((ptr_t)(ptep) & L0T_MASK) / sizeof(pte_t) )
 
 #define __LnTI_OF(ptep, n)\
-    ( __vaddr(_VM_PFN_OF(ptep) * LFT_SIZE / L##n##T_SIZE) )
+    ( __index(_VM_PFN_OF(ptep) * LFT_SIZE / L##n##T_SIZE) )
 
 #define __LnTEP(ptep, va, n)\
-    ( (pte_t*)_L##n##TEP_AT(_VM_OF(ptep)) + (__vaddr(va) / L##n##T_SIZE) )
+    ( (pte_t*)_L##n##TEP_AT(_VM_OF(ptep)) + (__index(va) / L##n##T_SIZE) )
 
 #define __LnTEP_OF(ptep, n)\
     ( (pte_t*)_L##n##TEP_AT(_VM_OF(ptep)) + __LnTI_OF(ptep, n))
@@ -195,7 +193,7 @@ ptep_va(pte_t* ptep, size_t lvl_size)
 static inline ptr_t
 ptep_vm_mnt(pte_t* ptep)
 {
-    return _VM_OF(ptep);
+    return __vaddr(_VM_OF(ptep));
 }
 
 /**
@@ -412,7 +410,7 @@ l3te_index(pte_t* ptep) {
 
 static inline pfn_t
 pfn(ptr_t addr) {
-    return __vaddr(addr) / PAGE_SIZE;
+    return __index(addr) / PAGE_SIZE;
 }
 
 static inline size_t
@@ -432,7 +430,7 @@ va_offset(ptr_t addr) {
 
 static inline ptr_t
 page_addr(ptr_t pfn) {
-    return pfn * PAGE_SIZE;
+    return __vaddr(pfn * PAGE_SIZE);
 }
 
 static inline ptr_t
@@ -469,7 +467,7 @@ mkptep_pn(ptr_t vm_mnt, ptr_t pn)
 
 static inline pfn_t
 pfn_at(ptr_t va, size_t lvl_size) {
-    return __vaddr(va) / lvl_size;
+    return __index(va) / lvl_size;
 }
 
 
@@ -539,7 +537,13 @@ pt_last_level(int level)
 static inline ptr_t
 va_mntpoint(ptr_t va)
 {
-    return _VM_OF(va);
+    return __vaddr(_VM_OF(va));
+}
+
+static inline unsigned int
+va_level_index(ptr_t va, size_t lvl_size)
+{
+    return (va / lvl_size) & _PAGE_LEVEL_MASK;
 }
 
 static inline bool
@@ -549,10 +553,16 @@ l0tep_implie(pte_t* ptep, ptr_t addr)
 }
 
 static inline bool
+is_ptep(ptr_t addr)
+{
+    ptr_t mnt = va_mntpoint(addr);
+    return mnt == VMS_MOUNT_1 || mnt == VMS_SELF;
+}
+
+static inline bool
 vmnt_packed(pte_t* ptep)
 {
-    ptr_t mnt = ptep_vm_mnt(ptep);
-    return mnt == VMS_MOUNT_1 || mnt == VMS_SELF;
+    return is_ptep(__ptr(ptep));
 }
 
 static inline bool

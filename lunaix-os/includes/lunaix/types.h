@@ -48,4 +48,6 @@ typedef int bool;
 
 #define __ptr(val)      ((ptr_t)(val))
 
+typedef va_list* sc_va_list;
+
 #endif /* __LUNAIX_TYPES_H */

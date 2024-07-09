@@ -43,8 +43,8 @@ ivec:
     .struct ivec + regsize
 iecode:
     .struct iecode + regsize
-ieip:
-    .struct ieip + regsize
+irip:
+    .struct irip + regsize
 ics:
     .struct ics + regsize
 irflags:
@@ -90,6 +90,7 @@ psig_saved_hstate:
 
 /* struct layout: x86_tss */
     .struct 0
+rsp_0:
     .struct regsize32
 rsp_1:
     .struct rsp_1 + regsize

@@ -46,10 +46,20 @@ struct __pte {
 #define _PTE_PS                 (1UL << 7)
 #define _PTE_PAT                (1UL << 7)
 #define _PTE_G                  (1UL << 8)
-#define _PTE_X                  (1UL << 63)
+#define _PTE_NX                 (1UL << 63)
+#define _PTE_X                  (0)
 #define _PTE_R                  (0)
 
 #define __MEMGUARD               0xf0f0f0f0f0f0f0f0UL
+
+typedef unsigned long pte_attr_t;
+typedef unsigned long pfn_t;
+
+// always do sign extend on x86_64
+
+#define __index(va)             ( (va) & VMS_MASK )
+#define __vaddr(va)             \
+        ( (__index(va) ^ ((VMS_MASK + 1) >> 1)) - ((VMS_MASK + 1) >> 1) )
 
 #endif /* __LUNAIX_PT_DEF64_H */
 #endif
