@@ -19,11 +19,11 @@ CFLAGS += $(khdr_opts) $(kinc_opts) $(config_h) -MMD -MP
 
 -include $(ksrc_deps)
 
-%.S.o: %.S $(khdr_files) kernel.mk
+%.S.o: %.S kernel.mk
 	$(call status_,AS,$<)
 	@$(CC) $(CFLAGS) -c $< -o $@
 
-%.c.o: %.c $(khdr_files) kernel.mk
+%.c.o: %.c kernel.mk
 	$(call status_,CC,$<)
 	@$(CC) $(CFLAGS) -c $< -o $@
 
