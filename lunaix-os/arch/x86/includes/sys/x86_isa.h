@@ -14,8 +14,8 @@
 
 #else
     #define KDATA_SEG (SEL_INDEX(3) | SEL_RPL(0))
-    #define UDATA_SEG (SEL_INDEX(3) | SEL_RPL(3))
-    #define TSS_SEG   (SEL_INDEX(4) | SEL_RPL(0))
+    #define UDATA_SEG (SEL_INDEX(4) | SEL_RPL(3))
+    #define TSS_SEG   (SEL_INDEX(5) | SEL_RPL(0))
 
 #endif
 

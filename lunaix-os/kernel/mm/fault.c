@@ -343,4 +343,6 @@ intr_routine_page_fault(const struct hart_state* hstate)
             leaflet_return(fault.prealloc);
         }
     }
+
+    tlb_flush_kernel(fault.fault_va);
 }

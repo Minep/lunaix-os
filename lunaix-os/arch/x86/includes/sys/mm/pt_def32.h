@@ -17,8 +17,13 @@
 // Note: we set VMS_SIZE = VMS_MASK as it is impossible
 //       to express 4Gi in 32bit unsigned integer
 
-#define VMS_MASK            ( -1UL )
-#define VMS_SIZE            VMS_MASK
+#define VMS_BITS            32
+#define PMS_BITS            32
+
+#define VMS_SIZE            ( 1UL << VMS_BITS)
+#define VMS_MASK            ( VMS_SIZE - 1 )
+#define PMS_SIZE            ( 1UL << PMS_BITS )
+#define PMS_MASK            ( PMS_SIZE - 1 )
 
 /* General size of a LnT huge page */
 
@@ -53,6 +58,7 @@ typedef unsigned int pfn_t;
 
 #define __index(va)             ( (va) & VMS_MASK )
 #define __vaddr(va)             (va)
+#define __paddr(pa)             ( (pa) & PMS_MASK )
 
 #endif /* __LUNAIX_PT_DEF32_H */
 #endif

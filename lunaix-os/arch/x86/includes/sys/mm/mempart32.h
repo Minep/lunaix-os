@@ -23,6 +23,7 @@
 
 #define USR_STACK                   __ulong(0xbffc0000)
 #define USR_STACK_SIZE              __ulong(0x40000)
+#define USR_STACK_SIZE_THREAD       __ulong(0x40000)
 #define USR_STACK_END END_POINT(USR_STACK)
 
 #define KERNEL_RESIDENT             __ulong(0xc0000000)

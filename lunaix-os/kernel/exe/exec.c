@@ -168,6 +168,10 @@ exec_load(struct exec_container* container, struct v_file* executable)
 
         container->stack_top = (ptr_t)exec_param;
 
+        /*
+            FIXME parameter injection still follow x86_32 abi convention!
+        */
+
         *exec_param =
           (struct uexec_param){ .argc = (argv_len - 1) / sizeof(ptr_t),
                                 .argv = (char**)argv_ptr,

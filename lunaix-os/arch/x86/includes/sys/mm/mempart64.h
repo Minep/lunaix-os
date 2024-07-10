@@ -9,7 +9,7 @@
 #define __ulong(val) val##UL
 #endif
 
-#define KSTACK_AREA             __ulong(0x0000000040000000)
+#define KSTACK_AREA             __ulong(0x0000000100000000)
 #define KSTACK_AREA_SIZE        __ulong(0x0000000040000000)
 #define KSTACK_AREA_END END_POINT(KSTACK_AREA)
 
@@ -21,11 +21,13 @@
 #define USR_MMAP_SIZE           __ulong(0x0000008000000000)
 #define USR_MMAP_END END_POINT(USR_MMAP)
 
-#define USR_STACK               __ulong(0xfffffd6000000000)
+#define USR_STACK               __ulong(0x00007f8000000000)
 #define USR_STACK_SIZE          __ulong(0x0000001fc0000000)
+#define USR_STACK_SIZE_THREAD   __ulong(0x0000000000200000)
 #define USR_STACK_END END_POINT(USR_STACK)
 
-// 1GiB hole as page guard
+
+// la casa del kernel
 
 #define KERNEL_RESIDENT         __ulong(0xfffffd8000000000)     // -2.5T
 #define VMAP                    KERNEL_RESIDENT                 // -2.5T

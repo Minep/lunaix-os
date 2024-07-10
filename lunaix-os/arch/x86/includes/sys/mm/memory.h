@@ -16,8 +16,8 @@ translate_vmr_prot(unsigned int vmr_prot)
         _pte_prot |= _PTE_W;
     }
 
-    if ((vmr_prot & PROT_EXEC)) {
-        _pte_prot |= _PTE_X;
+    if (!(vmr_prot & PROT_EXEC)) {
+        _pte_prot |= _PTE_NX;
     }
 
     return _pte_prot;

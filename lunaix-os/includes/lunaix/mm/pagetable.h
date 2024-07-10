@@ -104,6 +104,7 @@ typedef struct __pte pte_t;
 #include <sys/cpu.h>
 
 #define VMS_SELF                VMS_SELF_MOUNT
+#define VMS_SELF_L0TI           (__index(VMS_SELF_MOUNT) / L0T_SIZE)
 
 #define _LnT_LEVEL_SIZE(n)      ( L##n##T_SIZE / PAGE_SIZE )
 #define _LFTEP_SELF             ( __index(VMS_SELF) )

@@ -39,8 +39,8 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
 
     // Build the self-reference on dest vms
 
-    /* FIXME this does not scale. It made implicit assumption of
-     *      two level translation. 
+    /* 
+     *        -- What the heck are ptep_ssm and ptep_sms ? --
      *      
      *      ptep_dest point to the pagetable itself that is mounted
      *          at dest_mnt (or simply mnt): 
@@ -73,14 +73,15 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
      *      Note: PML4: 2 extra steps
      *            PML5: 3 extra steps
     */
-    pte_t* ptep_sms     = mkptep_va(VMS_SELF, (ptr_t)ptep_dest);
-    pte_t* ptep_ssm     = mkptep_va(VMS_SELF, (ptr_t)ptep_sms);
+    pte_t* ptep_ssm     = mkl0tep_va(VMS_SELF, dest_mnt);
+    pte_t* ptep_sms     = mkl1tep_va(VMS_SELF, dest_mnt) + VMS_SELF_L0TI;
     pte_t  pte_sms      = mkpte_prot(KERNEL_DATA);
 
     pte_sms = alloc_kpage_at(ptep_ssm, pte_sms, 0);
     set_pte(ptep_sms, pte_sms);    
     
     tlb_flush_kernel((ptr_t)dest_mnt);
+    tlb_flush_kernel((ptr_t)ptep_sms);
 
     if (only_kernel) {
         ptep = ptep_kernel;
@@ -124,7 +125,7 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
         }
         
     cont:
-        if (ptep_vfn(ptep) == MAX_PTEN - 1) {
+        while (ptep_vfn(ptep) == MAX_PTEN - 1) {
             assert(level > 0);
             ptep = ptep_step_out(ptep);
             ptep_dest = ptep_step_out(ptep_dest);
@@ -201,7 +202,7 @@ vmsfree(ptr_t vm_mnt)
         }
 
     cont:
-        if (ptep_vfn(ptep) == MAX_PTEN - 1) {
+        while (ptep_vfn(ptep) == MAX_PTEN - 1) {
             ptep = ptep_step_out(ptep);
             leaflet = pte_leaflet_aligned(pte_at(ptep));
             

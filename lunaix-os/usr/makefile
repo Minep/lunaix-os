@@ -77,7 +77,7 @@ exec: $(mkexec-list)
 # General recipes
 clean: task := clean
 clean: $(mkapp-list)
-	@rm -rf $(build_dir) $(lbuild_dir)
+	@rm -rf $(build_dir) $(lbuild_dir) $(uexec_ld)
 	@$(MAKE) $(MKFLAGS) -C libc/ $(task)
 
 .NOTPARALLEL:

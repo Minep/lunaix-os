@@ -54,13 +54,11 @@
 
 #define SEG_TSS SD_TYPE(9) | SD_DPL(0) | SD_PRESENT(1)
 
-#define GDT_ENTRY 6
-
-x86_segdesc_t _gdt[GDT_ENTRY];
-u16_t _gdt_limit = sizeof(_gdt) - 1;
-
 
 #ifdef CONFIG_ARCH_X86_64
+
+x86_segdesc_t _gdt[8];
+u16_t _gdt_limit = sizeof(_gdt) - 1;
 
 static inline void
 _set_gdt_entry(int index, int dpl, unsigned int flags)
@@ -93,6 +91,9 @@ _set_tss(int index, ptr_t base, size_t size)
 
 #else
 
+x86_segdesc_t _gdt[6];
+u16_t _gdt_limit = sizeof(_gdt) - 1;
+
 static inline void
 _set_gdt_entry(u32_t index, ptr_t base, u32_t limit, u32_t flags)
 {
@@ -124,7 +125,8 @@ _init_gdt()
     _set_gdt_entry(1, 0, SEG_R0_CODE);   // kernel code
     _set_gdt_entry(2, 3, SEG_R3_CODE);   // user code
     _set_gdt_entry(3, 0, SEG_R0_DATA);   // generic data
-    _set_tss(4, (ptr_t)&_tss, sizeof(_tss));
+    _set_gdt_entry(4, 4, SEG_R3_DATA);   // generic data
+    _set_tss(5, (ptr_t)&_tss, sizeof(_tss));
 #else
     _set_gdt_entry(0, 0, 0, 0);
     _set_gdt_entry(1, 0, 0xfffff, SEG_R0_CODE);

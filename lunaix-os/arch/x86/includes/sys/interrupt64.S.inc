@@ -18,6 +18,8 @@ irdi:
     .struct irdi + regsize
 irbp:
     .struct irbp + regsize
+irsi:
+    .struct irsi + regsize
 ir8:
     .struct ir8 + regsize
 ir9:
@@ -90,8 +92,9 @@ psig_saved_hstate:
 
 /* struct layout: x86_tss */
     .struct 0
-rsp_0:
     .struct regsize32
+rsp_0:
+    .struct rsp_0 + regsize
 rsp_1:
     .struct rsp_1 + regsize
 rsp_2:

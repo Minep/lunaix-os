@@ -122,13 +122,13 @@ pte_setppfn(pte_t pte, pfn_t ppfn)
 static inline ptr_t
 pte_paddr(pte_t pte)
 {
-    return pte.val & ~_PAGE_BASE_MASK;
+    return __paddr(pte.val) & ~_PAGE_BASE_MASK;
 }
 
 static inline pfn_t
 pte_ppfn(pte_t pte)
 {
-    return pte.val >> _PAGE_BASE_SHIFT;
+    return __paddr(pte.val) >> _PAGE_BASE_SHIFT;
 }
 
 static inline pte_t

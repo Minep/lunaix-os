@@ -28,6 +28,7 @@ if config("arch") == "x86_64":
         "-m64", 
         "-fno-unwind-tables", 
         "-fno-asynchronous-unwind-tables",
+        "-mcmodel=large"
     ])
     linking_opts([
         "-m64",

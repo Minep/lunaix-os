@@ -84,10 +84,11 @@
     syscall_hndlr:
         pushq   %rbp
         movq    %rsp, %rbp
-        movq    16(%rsp), %rbx          // struct hart_state*
+        pushq   %rbx
+        
+        movq    %rdi, %rbx          // struct hart_state*
 
-        leaq    irax(%rbx), %rbx
-        movq    (%rbx), %rax          /* rax: call code as well as the return value from syscall */
+        movq    irax(%rbx), %rax          /* rax: call code as well as the return value from syscall */
         cmpq    $__SYSCALL_MAX, %rax
         jae     2f
 
@@ -98,26 +99,25 @@
         jne     1f
     2:    
         negq    %rax
+        popq    %rbx
         movq    %rbp, %rsp
         popq    %rbp
+
         ret
 
     1:
-        pushq    %rbx
 
-        movq    28(%rbx), %r8     /* rsi -> r8  #5 arg */
-        movq    20(%rbx), %rcx    /* rdi -> rcx #4 arg */
-        movq    16(%rbx), %rdx    /* rdx -> rdx #3 arg */
-        movq    12(%rbx), %rsi    /* rcx -> rsi #2 arg */
-        movq    8(%rbx), %rdi    /* rbx -> rdi #1 arg */
+        movq    irbx(%rbx), %rdi    /* rbx -> rdi #1 arg */
+        movq    ircx(%rbx), %rsi    /* rcx -> rsi #2 arg */
+        movq    irdx(%rbx), %rdx    /* rdx -> rdx #3 arg */
+        movq    irdi(%rbx), %rcx    /* rdi -> rcx #4 arg */
+        movq    irsi(%rbx), %r8     /* rsi -> r8  #5 arg */
         
         call    *(%rax)
-
-        addq    $40, %rsp      /* remove the parameters from stack */
+        
+        movq    %rax, irax(%rbx)    /* save the return value */
         
         popq    %rbx
-        movq    %rax, (%rbx)    /* save the return value */
-        
         movq    %rbp,  %rsp
         popq    %rbp
         

@@ -129,13 +129,15 @@
         # nested intr: restore saved context
         popq thread_hstate(%rax)
 
+        movq tmp_store, %rax
+
         addq $16, %rsp  # skip: err_code and vector
 
         # calculate stack after iretq
         # Thank god they finally make things consistent in x86_64
-        addq $32, %rsp
+        addq $40, %rsp
         movq %rsp, (_tss + rsp_0)
-        subq $32, %rsp
+        subq $40, %rsp
 
         iretq
 

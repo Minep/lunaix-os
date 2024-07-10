@@ -3,7 +3,7 @@
 
 #include <lunaix/syscallid.h>
 
-extern unsigned long __attribute__((regparm(0)))
+extern unsigned long
 do_lunaix_syscall(unsigned long call_id, ...);
 
 #endif /* __LUNAIX_OSDEPS_SYSCALL_H */

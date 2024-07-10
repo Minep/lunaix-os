@@ -31,8 +31,8 @@ do_remap()
 {
     struct kernel_map* kpt_pa = (struct kernel_map*)to_kphysical(&kernel_pt);
     
-    size_t mio_casa_i   = pfn_at(KERNEL_RESIDENT, L0T_SIZE);
-    pte_t* klptep       = (pte_t*) &kpt_pa->l0t[mio_casa_i];
+    size_t mia_casa_i   = pfn_at(KERNEL_RESIDENT, L0T_SIZE);
+    pte_t* klptep       = (pte_t*) &kpt_pa->l0t[mia_casa_i];
     pte_t* ktep         = (pte_t*)  kpt_pa->kernel_lfts;    
     pte_t* boot_l0tep   = (pte_t*)  kpt_pa;
 

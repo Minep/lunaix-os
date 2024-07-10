@@ -20,8 +20,13 @@
 #define _PAGE_LEVEL_MASK    ( _PAGE_LEVEL_SIZE - 1 )
 #define _PAGE_Ln_SIZE(n)    ( 1UL << (_PAGE_BASE_SHIFT + _PAGE_LEVEL_SHIFT * (_PTW_LEVEL - (n) - 1)) )
 
-#define VMS_MASK            ( 0x0000ffffffffffffUL )
-#define VMS_SIZE            (VMS_MASK + 1)
+#define VMS_BITS            48
+#define PMS_BITS            52
+
+#define VMS_SIZE            ( 1UL << VMS_BITS)
+#define VMS_MASK            ( VMS_SIZE - 1 )
+#define PMS_SIZE            ( 1UL << PMS_BITS )
+#define PMS_MASK            ( PMS_SIZE - 1 )
 
 /* General size of a LnT huge page */
 
@@ -60,6 +65,7 @@ typedef unsigned long pfn_t;
 #define __index(va)             ( (va) & VMS_MASK )
 #define __vaddr(va)             \
         ( (__index(va) ^ ((VMS_MASK + 1) >> 1)) - ((VMS_MASK + 1) >> 1) )
+#define __paddr(pa)             ( (pa) & PMS_MASK )
 
 #endif /* __LUNAIX_PT_DEF64_H */
 #endif

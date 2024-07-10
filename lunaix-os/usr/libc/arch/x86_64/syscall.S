@@ -20,20 +20,20 @@ a5:
     .type do_lunaix_syscall, @function    
     .global do_lunaix_syscall
 
-    // do_lunaix_syscall always called with parameters
-    //  passed via stack
     do_lunaix_syscall:
         pushq %rbp
         movq %rsp, %rbp
 
         pushq %rbx
+
+        movq %rcx, %r10
        
-        movq id(%rbp), %rax
-        movq a1(%rbp), %rbx
-        movq a2(%rbp), %rcx
-        movq a3(%rbp), %rdx
-        movq a4(%rbp), %rdi
-        movq a5(%rbp), %rsi
+        movq %rdi, %rax
+        movq %rsi, %rbx
+        movq %rdx, %rcx
+        movq %r10, %rdx
+        movq %r8, %rdi
+        movq %r9, %rsi
         
         int $LUNAIX_SYSCALL
 

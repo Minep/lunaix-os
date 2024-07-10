@@ -25,7 +25,7 @@ j_usr(ptr_t sp, ptr_t pc)
                     "i"(UCODE_SEG),
                     "r"(pc)
                  : 
-                 "ax", "memory");
+                 "memory");
 }
 
 static inline ptr_t must_inline

@@ -10,6 +10,7 @@ get_qemu_options = -s -S -m 1G \
 				-no-shutdown \
 				-d cpu_reset \
 				-d trace:ide_dma_cb \
+				-d trace:x86_recv_interrupts \
 				-vga std,retrace=precise \
 				-serial telnet::12345,server,nowait,logfile=lunaix_ttyS0.log\
 				-drive id=cdrom,file="$(1)",readonly=on,if=none,format=raw \

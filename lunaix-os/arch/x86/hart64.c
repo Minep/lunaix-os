@@ -15,6 +15,7 @@ hart_prepare_transition(struct hart_transition* ht,
                       ptr_t kstack_tp, ptr_t ustack_pt, 
                       ptr_t entry, bool to_user) 
 {
+    ptr_t stack  = ustack_pt;
     ptr_t offset = (ptr_t)&ht->transfer.eret - (ptr_t)&ht->transfer;
     ht->inject = align_stack(kstack_tp - sizeof(ht->transfer));
 
@@ -29,10 +30,13 @@ hart_prepare_transition(struct hart_transition* ht,
         code_seg = UCODE_SEG, data_seg = UDATA_SEG;
         mstate |= 0x200;   // enable interrupt
     }
+    else {
+        stack = kstack_tp;
+    }
 
     ht->transfer.eret = (struct exec_param) {
                             .cs = code_seg, .rip = entry, 
-                            .ss = data_seg, .rsp = align_stack(ustack_pt),
+                            .ss = data_seg, .rsp = align_stack(stack),
                             .rflags = mstate
                         };
 }
