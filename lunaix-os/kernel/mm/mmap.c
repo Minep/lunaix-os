@@ -232,6 +232,7 @@ found:
       ((param->proct | param->flags) & 0x3f) | (param->type & ~0xffff));
 
     region->mfile = file;
+    region->flen = param->flen;
     region->foff = param->offset;
     region->proc_vms = param->pvms;
 
@@ -459,9 +460,14 @@ mem_unmap(ptr_t mnt, vm_regions_t* regions, ptr_t addr, size_t length)
         }
     }
 
-    while (&pos->head != regions && length) {
+    size_t remaining = length;
+    while (&pos->head != regions && remaining) {
         n = container_of(pos->head.next, typeof(*pos), head);
-        __unmap_overlapped_cases(mnt, pos, &cur_addr, &length);
+        if (pos->start > cur_addr + length) {
+            break;
+        }
+
+        __unmap_overlapped_cases(mnt, pos, &cur_addr, &remaining);
 
         pos = n;
     }
@@ -517,8 +523,10 @@ __DEFINE_LXSYSCALL1(void*, sys_mmap, struct usr_mmap_param*, mparam)
         }
     }
 
+    length = ROUNDUP(length, PAGE_SIZE);
     struct mmap_param param = { .flags = options,
-                                .mlen = ROUNDUP(length, PAGE_SIZE),
+                                .mlen = length,
+                                .flen = length,
                                 .offset = offset,
                                 .type = REGION_TYPE_GENERAL,
                                 .proct = proct,

@@ -176,14 +176,17 @@ __handle_anon_region(struct fault_context* fault)
 static void
 __handle_named_region(struct fault_context* fault)
 {
+    int errno = 0;
     struct mm_region* vmr = fault->vmr;
     struct v_file* file = vmr->mfile;
+    struct v_file_ops * fops = file->ops;
 
     pte_t pte       = fault->resolving;
     ptr_t fault_va  = page_aligned(fault->fault_va);
 
     u32_t mseg_off  = (fault_va - vmr->start);
     u32_t mfile_off = mseg_off + vmr->foff;
+    size_t mapped_len = vmr->flen;
 
     // TODO Potentially we can get different order of leaflet here
     struct leaflet* region_part = alloc_leaflet(0);
@@ -191,7 +194,25 @@ __handle_named_region(struct fault_context* fault)
     pte = pte_setprot(pte, region_pteprot(vmr));
     ptep_map_leaflet(fault->fault_ptep, pte, region_part);
 
-    int errno = file->ops->read_page(file->inode, (void*)fault_va, mfile_off);
+    if (mseg_off < mapped_len) {
+        mapped_len = MIN(mapped_len - mseg_off, PAGE_SIZE);
+    }
+    else {
+        mapped_len = 0;
+    }
+
+    if (mapped_len == PAGE_SIZE) {
+        errno = fops->read_page(file->inode, (void*)fault_va, mfile_off);
+    }
+    else {
+        leaflet_wipe(region_part);
+        
+        if (mapped_len) {
+            errno = fops->read(file->inode, 
+                    (void*)fault_va, mapped_len, mfile_off);
+        }
+    }
+
     if (errno < 0) {
         ERROR("fail to populate page (%d)", errno);
 

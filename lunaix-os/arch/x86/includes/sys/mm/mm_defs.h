@@ -26,7 +26,7 @@
 #   define KSTACK_PAGES            4
 #   define KEXEC_RSVD              32
 #else
-#   define KSTACK_PAGES            3
+#   define KSTACK_PAGES            2
 #   define KEXEC_RSVD              16
 #endif
 

@@ -25,6 +25,7 @@ sources([
 sources([
     "klib/fast_crc.c",
     "klib/fast_str.c",
+    "exec/exec.c",
     "hart.c",
     "arch.c",
     "gdbstub.c",

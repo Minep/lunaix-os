@@ -41,8 +41,7 @@ __alloc_user_thread_stack(struct proc_info* proc,
     set_pte(guardp, guard_pte);
 
     *stack_region = vmr;
-    // 0xfffffefebfdff000
-    // 0x13fff9e10
+
     ptr_t stack_top = align_stack(th_stack_top + USR_STACK_SIZE_THREAD - 1);
     return stack_top;
 }

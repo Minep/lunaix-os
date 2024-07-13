@@ -9,9 +9,14 @@
 .section .text
     .global _start
     _start:      
-        xorq %rax, %rax
         xorq %rbp, %rbp
+        
+        movq %rsp, %rax
+        movq (%rax), %rdi
+        leaq 8(%rax), %rsi
+
         fninit
+        xorq %rax, %rax
         call main
         
     1:

@@ -9,9 +9,17 @@
 .section .text
     .global _start
     _start:      
-        xorl %eax, %eax
         xorl %ebp, %ebp
+        movl %esp, %eax
+        andl $-16, %esp
+        
+        leal 4(%eax), %ebx
+        pushl %ebx
+        pushl (%eax)
+
         fninit
+
+        xorl %eax, %eax
         call main
         
     1:

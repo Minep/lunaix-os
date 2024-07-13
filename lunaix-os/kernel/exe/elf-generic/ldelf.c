@@ -28,12 +28,13 @@ elf_smap(struct load_context* ldctx,
     }
 
     uintptr_t va = phdre->p_va + base_va;
-    struct exec_container* container = ldctx->container;
+    struct exec_host* container = ldctx->container;
     struct mmap_param param = { .vms_mnt = container->vms_mnt,
                                 .pvms = vmspace(container->proc),
                                 .proct = proct,
                                 .offset = page_aligned(phdre->p_offset),
                                 .mlen = page_upaligned(phdre->p_memsz),
+                                .flen = phdre->p_filesz,
                                 .flags = MAP_FIXED | MAP_PRIVATE,
                                 .type = REGION_TYPE_CODE };
 
@@ -59,7 +60,7 @@ load_executable(struct load_context* context, const struct v_file* exefile)
 
     char* ldpath = NULL;
     struct elf elf;
-    struct exec_container* container = context->container;
+    struct exec_host* container = context->container;
 
     if ((errno = elf_openat(&elf, exefile))) {
         goto done;
@@ -84,8 +85,6 @@ load_executable(struct load_context* context, const struct v_file* exefile)
     }
 
     if (errno != NO_LOADER) {
-        container->argv_pp[1] = ldpath;
-
         // close old elf
         if ((errno = elf_close(&elf))) {
             goto done;
@@ -129,8 +128,6 @@ done_close_elf32:
     elf_close(&elf);
 
 done:
-    if (!container->argv_pp[1]) {
-        vfree_safe(ldpath);
-    }
+    vfree_safe(ldpath);
     return errno;
 }

@@ -109,13 +109,6 @@ hart_push_state(struct hart_state* p_hstate, struct hart_state* hstate)
 
 
 #ifdef CONFIG_ARCH_X86_64
-static inline void
-hart_flow_redirect(struct hart_state* hstate, ptr_t pc, ptr_t sp)
-{
-    hstate->execp->rip = pc;
-    hstate->execp->rsp = sp;
-}
-
 static inline ptr_t
 hart_pc(struct hart_state* hstate)
 {
@@ -141,13 +134,6 @@ hart_stack_frame(struct hart_state* hstate)
 }
 
 #else
-static inline void
-hart_flow_redirect(struct hart_state* hstate, ptr_t pc, ptr_t sp)
-{
-    hstate->execp->eip = pc;
-    hstate->execp->esp = sp;
-}
-
 static inline ptr_t
 hart_pc(struct hart_state* hstate)
 {

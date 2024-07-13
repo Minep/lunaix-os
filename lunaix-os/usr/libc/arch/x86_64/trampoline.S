@@ -15,7 +15,7 @@
         andq $-16, %rsp
         pushq %rax
         
-        movq (%rax), %rdi      // signum
+        movl (%rax), %edi      // signum
         xorq %rsi, %rsi        // siginfo = NULL
         leaq 4(%rax), %rdx     // (struct siguctx*)&sigact
         call sig_dohandling

@@ -5,14 +5,15 @@
 #include <lunaix/process.h>
 #include <lunaix/types.h>
 
+#define MAX_PARAM_LEN    1024
+#define MAX_PARAM_SIZE   4096
+
 #define MAX_VAR_PAGES 8
 #define DEFAULT_HEAP_PAGES 16
 
-struct exec_context;
-
 struct load_context
 {
-    struct exec_container* container;
+    struct exec_host* container;
     ptr_t base;
     ptr_t end;
     ptr_t mem_sz;
@@ -20,17 +21,24 @@ struct load_context
     ptr_t entry;
 };
 
-struct exec_container
+struct exec_arrptr
+{
+    unsigned int len;
+    unsigned int size;
+    ptr_t raw;
+    ptr_t copied;
+};
+
+
+struct exec_host
 {
     struct proc_info* proc;
     ptr_t vms_mnt;
 
     struct load_context exe;
 
-    // argv prependums
-    const char* argv_pp[2];
-    const char** argv;
-    const char** envp;
+    struct exec_arrptr argv;
+    struct exec_arrptr envp;
 
     ptr_t stack_top;
 
@@ -45,24 +53,23 @@ struct uexec_param
     char** envp;
 } compact;
 
-#ifndef __USR_WRAPPER__
+int
+exec_arch_prepare_entry(struct thread* thread, struct exec_host* container);
 
 int
-exec_load_byname(struct exec_container* container, const char* filename);
+exec_load_byname(struct exec_host* container, const char* filename);
 
 int
-exec_load(struct exec_container* container, struct v_file* executable);
+exec_load(struct exec_host* container, struct v_file* executable);
 
 int
 exec_kexecve(const char* filename, const char* argv[], const char* envp[]);
 
 void
-exec_init_container(struct exec_container* param,
+exec_init_container(struct exec_host* param,
                     struct thread* thread,
                     ptr_t vms,
                     const char** argv,
                     const char** envp);
-
-#endif
 
 #endif /* __LUNAIX_LOADER_H */

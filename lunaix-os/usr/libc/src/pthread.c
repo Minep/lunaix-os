@@ -25,7 +25,11 @@ pthread_create(pthread_t* thread,
         return ret;
     }
 
-    // FIXME we should encapsulate these parameter into struct
+    // FIXME this is not working for x86_64, need to pass
+    //       the parameter by registers, however, this can be
+    //       done only in kernel side. Our libc must have
+    //       dynamic allocator in order to do achieve this.
+    //       we should encapsulate these parameter into struct
     //       and pass it as a single thread param.
 
     void** th_stack = (void**) th_info.th_stack_top; 
