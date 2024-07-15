@@ -75,6 +75,23 @@ class BasicSerialDevice(QEMUPeripherals):
             cmds.append(f"logfile={logfile}")
         return [ "-serial", join_attrs(cmds) ]
     
+class PCISerialDevice(QEMUPeripherals):
+    def __init__(self, opt) -> None:
+        super().__init__("pci-serial", opt)
+
+    def get_qemu_opts(self):
+        name = f"chrdev.{hex(self.__hash__())[2:]}"
+        cmds = [ "pci-serial", f"chardev={name}" ]
+        chrdev = [ "file", f"id={name}" ]
+        
+        logfile = get_config(self._opt, "logfile", required=True)
+        chrdev.append(f"path={logfile}")
+        ()
+        return [ 
+            "-chardev", join_attrs(chrdev),
+            "-device", join_attrs(cmds)
+         ]
+    
 class AHCIBus(QEMUPeripherals):
     def __init__(self, opt) -> None:
         super().__init__("ahci", opt)
@@ -140,8 +157,9 @@ class QEMUExec:
         "ahci": AHCIBus,
         "rtc": RTCDevice,
         "hmp": QEMUMonitor,
+        "pci-serial": PCISerialDevice
     }
-    
+
     def __init__(self, options) -> None:
         self._opt = options
         self._devices = []
@@ -191,8 +209,9 @@ class QEMUExec:
     def add_peripheral(self, peripheral):
         self._devices.append(peripheral)
 
-    def start(self):
+    def start(self, qemu_dir_override=""):
         qemu_path = self.get_qemu_exec_name()
+        qemu_path = os.path.join(qemu_dir_override, qemu_path)
         cmds = [
             qemu_path,
             *self.get_qemu_arch_opts(),
@@ -228,6 +247,7 @@ def main():
     arg = argparse.ArgumentParser()
 
     arg.add_argument("config_file")
+    arg.add_argument("--qemu-dir", default="")
     arg.add_argument("-v", "--values", action='append', default=[])
 
     arg_opt = arg.parse_args()
@@ -248,7 +268,7 @@ def main():
     else:
         raise Exception(f"undefined arch: {arch}")
     
-    q.start()
+    q.start(arg_opt.qemu_dir)
 
 if __name__ == "__main__":
     try:

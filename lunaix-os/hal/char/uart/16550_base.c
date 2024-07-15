@@ -42,6 +42,12 @@ uart_general_tx(struct serial_dev* sdev, u8_t* data, size_t len)
     return RXTX_DONE;
 }
 
+#define UART_LCR_RESET \
+    (UART_rLC_STOPB | \
+     UART_rLC_PAREN | \
+     UART_rLC_PAREVN | \
+     UART_rLC_DLAB | 0b11)
+
 static void
 uart_set_control_mode(struct uart16550* uart, tcflag_t cflags)
 {
@@ -50,7 +56,7 @@ uart_set_control_mode(struct uart16550* uart, tcflag_t cflags)
     uart->cntl_save.rie |= (!!(cflags & _CREAD)) * UART_rIE_ERBFI;
     uart_setie(uart);
 
-    uart->cntl_save.rlc &= ~(UART_rLC_STOPB | UART_rLC_PAREN | UART_rLC_PAREVN | 0b11);
+    uart->cntl_save.rlc &= ~UART_LCR_RESET;
     uart->cntl_save.rlc |= (!!(cflags & _CSTOPB)) * UART_rLC_STOPB;
     uart->cntl_save.rlc |= (!!(cflags & _CPARENB)) * UART_rLC_PAREN;
     uart->cntl_save.rlc |= (!(cflags & _CPARODD)) * UART_rLC_PAREVN;

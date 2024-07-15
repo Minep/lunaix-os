@@ -8,6 +8,7 @@ make CMDLINE=${default_cmd} ARCH=${ARCH} MODE=debug image -j5 || exit -1
 
 ./scripts/qemu.py \
     scripts/qemus/qemu_x86_dev.json \
+    --qemu-dir "${QEMU_DIR}" \
     -v KIMG=build/lunaix.iso \
     -v QMPORT=${hmp_port} \
     -v GDB_PORT=${gdb_port} \
