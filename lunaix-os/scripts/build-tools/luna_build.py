@@ -84,10 +84,13 @@ def main():
     
     lcfg_env = prepare_lconfig_env(out_dir)
     require_config = exists(opts.lconfig_file)
-    if require_config:
-        lcfg_env.resolve_module(opts.lconfig_file)
-        lcfg_env.update()
-        lcfg_env.load()
+    try:
+        if require_config:
+            lcfg_env.resolve_module(opts.lconfig_file)
+            lcfg_env.update()
+            lcfg_env.load()
+    except Exception as e:
+        print(e)
     
     if opts.config:
         if require_config:

@@ -7,8 +7,7 @@ import os
 def v(env, caller, term):
     node = env.lookup_node(term.__name__)
     env.dependency().add(node, caller)
-    
-    return env.lookup_value(node.get_name())
+    return env.resolve_symbol(node.get_name())
 
 @contextual(caller_type=[LCModuleNode])
 def include(env, caller, file):

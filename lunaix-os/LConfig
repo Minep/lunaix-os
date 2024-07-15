@@ -13,7 +13,7 @@ def lunaix_ver():
     type(str)
     
     seq_num = int(time.time() / 3600)
-    default("dev-2024_%d"%(seq_num))
+    default("%s dev-2024_%d"%(v(arch), seq_num))
 
 @Collection
 def debug_and_testing():
