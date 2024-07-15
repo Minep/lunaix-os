@@ -26,7 +26,7 @@ all_linkable = $(filter-out $(klinking),$(1))
 	$(call status_,AS,$<)
 	@$(CC) $(CFLAGS) -c $< -o $@
 
-%.c.o: %.c $(khdr_files) kernel.mk
+%.c.o: %.c kernel.mk
 	$(call status_,CC,$<)
 	@$(CC) $(CFLAGS) -c $< -o $@
 

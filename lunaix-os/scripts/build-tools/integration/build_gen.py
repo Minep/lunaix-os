@@ -9,11 +9,10 @@ class MakefileBuildGen(BuildGenerator):
     
     def emit_makearray(self, name, values):
         r = []
-        r.append(f"define {name}")
+        r.append(f"{name} :=")
         for v in values:
-            r.append(v)
-        r.append("endef")
-        return r
+            r.append(f"{v}")
+        return [" ".join(r)]
 
     def generate(self, env: BuildEnvironment):
         path = env.to_wspath(self.__path)
