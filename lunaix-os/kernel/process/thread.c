@@ -185,21 +185,23 @@ thread_find(struct proc_info* proc, tid_t tid)
     return NULL;
 }
 
-__DEFINE_LXSYSCALL4(int, th_create, tid_t*, tid, struct uthread_info*, thinfo, 
-                                    void*, entry, void*, param)
+__DEFINE_LXSYSCALL3(int, th_create, tid_t*, tid, 
+                        struct uthread_param*, thparam, void*, entry)
 {
     struct thread* th = create_thread(__current, true);
     if (!th) {
         return EAGAIN;
     }
 
+    ptr_t ustack_top;
+
+    ustack_top = th->ustack_top;
+    ustack_top = align_stack(ustack_top - sizeof(*thparam));
+
+    memcpy((void*)ustack_top, thparam, sizeof(*thparam));
+
+    th->ustack_top = ustack_top;
     start_thread(th, (ptr_t)entry);
-
-    ptr_t ustack_top = th->ustack_top;
-    *((void**)ustack_top) = param;
-
-    thinfo->th_stack_sz = region_size(th->ustack);
-    thinfo->th_stack_top = (void*)ustack_top;
     
     if (tid) {
         *tid = th->tid;

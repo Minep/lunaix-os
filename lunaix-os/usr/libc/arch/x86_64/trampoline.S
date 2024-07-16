@@ -1,7 +1,6 @@
 #include <lunaix/syscallid.h>
 
 .section .text
-    .global sigtrampoline
     /*
     stack structure:
 
@@ -10,6 +9,7 @@
         void* sigact;   /
         int sig_num;    <--- %rsp
     */
+    .global sigtrampoline
     sigtrampoline:
         movq %rsp, %rax
         andq $-16, %rsp
@@ -22,4 +22,15 @@
         
         movq $__SYSCALL_sigreturn, %rax
         popq %rbx
+        int $33
+    
+    .global th_trampoline
+    th_trampoline:
+        movq (%rsp), %rax
+        movq 8(%rsp), %rdi
+
+        callq *(%rax)
+
+        movq %rax, %rbx
+        movq $__SYSCALL_th_exit, %rax
         int $33
