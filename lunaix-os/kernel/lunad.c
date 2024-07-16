@@ -41,8 +41,10 @@ int
 exec_initd()
 {
     int errno = 0;
+    const char* argv[] = { "/mnt/lunaix-os/usr/bin/init", 0 };
+    const char* envp[] = { 0 };
 
-    if ((errno = exec_kexecve("/mnt/lunaix-os/usr/bin/init", NULL, NULL))) {
+    if ((errno = exec_kexecve(argv[0], argv, envp))) {
         goto fail;
     }
 

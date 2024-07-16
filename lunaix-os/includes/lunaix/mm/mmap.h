@@ -11,6 +11,7 @@ struct mmap_param
     struct proc_mm* pvms; // process vm
     off_t offset;         // mapped file offset
     size_t mlen;          // mapped memory length
+    size_t flen;          // mapped file length
     u32_t proct;          // protections
     u32_t flags;          // other options
     u32_t type;           // region type

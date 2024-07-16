@@ -17,14 +17,9 @@ void
 boot_begin(struct boot_handoff* bhctx)
 {
     bhctx->prepare(bhctx);
+
+    boot_begin_arch_reserve(bhctx);
     
-    // Identity-map the first 3GiB address spaces
-    pte_t* ptep  = mkl0tep(mkptep_va(VMS_SELF, 0));
-    pte_t pte    = mkpte_prot(KERNEL_DATA);
-    size_t count = page_count(KERNEL_RESIDENT, L0T_SIZE);
-
-    vmm_set_ptes_contig(ptep, pte_mkhuge(pte), L0T_SIZE, count);
-
     // 将内核占据的页，包括前1MB，hhk_init 设为已占用
     size_t pg_count = leaf_count(to_kphysical(__kexec_end));
     pmm_onhold_range(0, pg_count);
@@ -70,18 +65,8 @@ boot_end(struct boot_handoff* bhctx)
     }
 
     bhctx->release(bhctx);
-}
 
-/**
- * @brief Clean up the boot stage code and data
- *
- */
-void
-boot_cleanup()
-{
-    pte_t* ptep  = mkl0tep(mkptep_va(VMS_SELF, 0));
-    size_t count = page_count(KERNEL_RESIDENT, L0T_SIZE);
-    vmm_unset_ptes(ptep, count);
+    boot_clean_arch_reserve(bhctx);
 }
 
 void

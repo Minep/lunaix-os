@@ -116,7 +116,7 @@ __dcache_hash(struct v_dnode* parent, u32_t* hash)
     // 确保低位更加随机
     _hash = _hash ^ (_hash >> VFS_HASHBITS);
     // 与parent的指针值做加法，来减小碰撞的可能性。
-    _hash += (u32_t)parent;
+    _hash += (u32_t)__ptr(parent);
     *hash = _hash;
     return &dnode_cache[_hash & VFS_HASH_MASK];
 }

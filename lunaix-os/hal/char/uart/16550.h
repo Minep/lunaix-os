@@ -17,7 +17,6 @@
 #define UART_rDLM 1
 
 #define UART_INTRX 0x1
-#define UART_DLAB (1 << 7)
 #define UART_LOOP (1 << 4)
 
 #define UART_rIE_ERBFI 1
@@ -29,6 +28,7 @@
 #define UART_rLC_PAREN (1 << 3)
 #define UART_rLC_PAREVN (1 << 4)
 #define UART_rLC_SETBRK (1 << 6)
+#define UART_rLC_DLAB (1 << 7)
 
 #define UART_rLS_THRE (1 << 5)
 #define UART_rLS_DR 1
@@ -116,13 +116,13 @@ uart_baud_divisor(struct uart16550* uart, int div)
 {
     u32_t rlc = uart->read_reg(uart, UART_rLC);
 
-    uart->write_reg(uart, UART_rLC, UART_DLAB | rlc);
+    uart->write_reg(uart, UART_rLC, UART_rLC_DLAB | rlc);
     u8_t ls = (div & 0xff), ms = (div & 0xff00) >> 8;
 
     uart->write_reg(uart, UART_rLS, ls);
     uart->write_reg(uart, UART_rMS, ms);
 
-    uart->write_reg(uart, UART_rLC, rlc & ~UART_DLAB);
+    uart->write_reg(uart, UART_rLC, rlc & ~UART_rLC_DLAB);
 
     return 0;
 }

@@ -1,6 +1,6 @@
 default=0
 timeout=0
 
-menuentry "$_OS_NAME" {
+menuentry "lunaix" {
 	multiboot /boot/kernel.bin $KCMD
 }

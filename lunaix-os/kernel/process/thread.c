@@ -17,14 +17,14 @@ static ptr_t
 __alloc_user_thread_stack(struct proc_info* proc, 
                           struct mm_region** stack_region, ptr_t vm_mnt)
 {
-    ptr_t th_stack_top = (proc->thread_count + 1) * USR_STACK_SIZE;
-    th_stack_top = ROUNDUP(USR_STACK_END - th_stack_top, MEM_PAGE);
+    ptr_t th_stack_top = (proc->thread_count + 1) * USR_STACK_SIZE_THREAD;
+    th_stack_top = ROUNDUP(USR_STACK_END - th_stack_top, PAGE_SIZE);
 
     struct mm_region* vmr;
     struct proc_mm* mm = vmspace(proc);
     struct mmap_param param = { .vms_mnt = vm_mnt,
                                 .pvms = mm,
-                                .mlen = USR_STACK_SIZE,
+                                .mlen = USR_STACK_SIZE_THREAD,
                                 .proct = PROT_READ | PROT_WRITE,
                                 .flags = MAP_ANON | MAP_PRIVATE,
                                 .type = REGION_TYPE_STACK };
@@ -37,11 +37,12 @@ __alloc_user_thread_stack(struct proc_info* proc,
         return 0;
     }
 
-    set_pte(mkptep_va(vm_mnt, vmr->start), guard_pte);
+    pte_t* guardp = mkptep_va(vm_mnt, vmr->start);
+    set_pte(guardp, guard_pte);
 
     *stack_region = vmr;
 
-    ptr_t stack_top = align_stack(th_stack_top + USR_STACK_SIZE - 1);
+    ptr_t stack_top = align_stack(th_stack_top + USR_STACK_SIZE_THREAD - 1);
     return stack_top;
 }
 
@@ -52,10 +53,9 @@ __alloc_kernel_thread_stack(struct proc_info* proc, ptr_t vm_mnt)
     pfn_t kstack_end = pfn(KSTACK_AREA);
     pte_t* ptep      = mkptep_pn(vm_mnt, kstack_top);
     while (ptep_pfn(ptep) > kstack_end) {
-        ptep -= KSTACK_PAGES;
+        ptep -= KSTACK_PAGES + 1;
 
-        // first page in the kernel stack is guardian page
-        pte_t pte = *(ptep + 1);
+        pte_t pte = pte_at(ptep + 1);
         if (pte_isnull(pte)) {
             goto found;
         }
@@ -65,8 +65,8 @@ __alloc_kernel_thread_stack(struct proc_info* proc, ptr_t vm_mnt)
     return 0;
 
 found:;
-    // KSTACK_PAGES = 3, removal one guardian pte, give order 1 page
-    struct leaflet* leaflet = alloc_leaflet(1);
+    unsigned int po = count_order(KSTACK_PAGES);
+    struct leaflet* leaflet = alloc_leaflet(po);
 
     if (!leaflet) {
         WARN("failed to create kernel stack: nomem\n");
@@ -134,6 +134,10 @@ create_thread(struct proc_info* proc, bool with_ustack)
     
     th->kstack = kstack;
     th->ustack = ustack_region;
+    
+    if (ustack_region) {
+        th->ustack_top = align_stack(ustack_region->end - 1);
+    }
 
     return th;
 }
@@ -150,11 +154,7 @@ start_thread(struct thread* th, ptr_t entry)
     if (!kernel_addr(entry)) {
         assert(th->ustack);
 
-        ptr_t ustack_top = align_stack(th->ustack->end - 1);
-        ustack_top -= 16;   // pre_allocate a 16 byte for inject parameter
-        hart_user_transfer(&transition, th->kstack, ustack_top, entry);
-
-        th->ustack_top = ustack_top;
+        hart_user_transfer(&transition, th->kstack, th->ustack_top, entry);
     } 
     else {
         hart_kernel_transfer(&transition, th->kstack, entry);
@@ -185,21 +185,23 @@ thread_find(struct proc_info* proc, tid_t tid)
     return NULL;
 }
 
-__DEFINE_LXSYSCALL4(int, th_create, tid_t*, tid, struct uthread_info*, thinfo, 
-                                    void*, entry, void*, param)
+__DEFINE_LXSYSCALL3(int, th_create, tid_t*, tid, 
+                        struct uthread_param*, thparam, void*, entry)
 {
     struct thread* th = create_thread(__current, true);
     if (!th) {
         return EAGAIN;
     }
 
+    ptr_t ustack_top;
+
+    ustack_top = th->ustack_top;
+    ustack_top = align_stack(ustack_top - sizeof(*thparam));
+
+    memcpy((void*)ustack_top, thparam, sizeof(*thparam));
+
+    th->ustack_top = ustack_top;
     start_thread(th, (ptr_t)entry);
-
-    ptr_t ustack_top = th->ustack_top;
-    *((void**)ustack_top) = param;
-
-    thinfo->th_stack_sz = region_size(th->ustack);
-    thinfo->th_stack_top = (void*)ustack_top;
     
     if (tid) {
         *tid = th->tid;

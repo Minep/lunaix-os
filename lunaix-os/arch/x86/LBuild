@@ -1,0 +1,82 @@
+use("hal")
+
+sources([
+    "exceptions/interrupts.c",
+    "exceptions/isrdef.c",
+    "exceptions/intr_routines.c",
+    "exceptions/isrm.c",
+    "exceptions/intrhnds.S",
+])
+
+sources([
+    "boot/mb_parser.c",
+    "boot/kpt_setup.c",
+    "boot/boot_helper.c"
+])
+
+sources([
+    "mm/fault.c",
+    "mm/tlb.c",
+    "mm/pmm.c",
+    "mm/gdt.c",
+    "mm/vmutils.c"
+])
+
+sources([
+    "klib/fast_crc.c",
+    "klib/fast_str.c",
+    "exec/exec.c",
+    "hart.c",
+    "arch.c",
+    "gdbstub.c",
+    "trace.c",
+    "hart.c",
+    "failsafe.S"
+])
+
+sources({
+    config("arch"): {
+        "x86_64": [
+            "hart64.c",
+            "syscall64.S",
+            "exceptions/interrupt64.S",
+            "boot/x86_64/boot64.S",
+            "boot/x86_64/init64.c",
+            "boot/x86_64/prologue64.S",
+            "boot/x86_64/kremap64.c",
+            "exec/elf64.c"
+        ],
+        "i386": [
+            "hart32.c",
+            "syscall32.S",
+            "exceptions/interrupt32.S",
+            "boot/i386/boot32.S",
+            "boot/i386/init32.c",
+            "boot/i386/prologue32.S",
+            "boot/i386/kremap32.c",
+            "exec/elf32.c"
+        ]
+    }
+})
+
+headers([
+    "includes"
+])
+
+
+if config("arch") == "x86_64":
+    compile_opts([
+        "-m64", 
+        "-fno-unwind-tables", 
+        "-fno-asynchronous-unwind-tables",
+        "-mcmodel=large"
+    ])
+    linking_opts([
+        "-m64",
+    ])
+else:
+    compile_opts("-m32")
+    linking_opts("-m32")
+
+if not config("x86_enable_sse_feature"):
+    compile_opts("-mno-sse")

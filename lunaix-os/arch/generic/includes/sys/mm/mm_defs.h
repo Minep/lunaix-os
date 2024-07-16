@@ -6,7 +6,7 @@
 #include "pagetable.h"
 
 #define KSTACK_PAGES            3
-#define KSTACK_SIZE             (KSTACK_PAGES * MEM_PAGE)
+#define KSTACK_SIZE             (KSTACK_PAGES * PAGE_SIZE)
 
 /*
     Regardless architecture we need to draw the line very carefully, and must 

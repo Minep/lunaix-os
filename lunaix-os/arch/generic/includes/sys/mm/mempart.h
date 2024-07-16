@@ -1,11 +1,6 @@
 #ifndef __LUNAIX_ARCH_MEMPART_H
 #define __LUNAIX_ARCH_MEMPART_H
 
-#define MEM_PAGE 0x1000UL
-#define MEM_1M 0x100000UL
-#define MEM_4M 0x400000UL
-#define MEM_HUGE 0x400000UL
-#define MEM_1G 0x40000000UL
 
 #define END_POINT(name) (name + name##_SIZE - 1)
 

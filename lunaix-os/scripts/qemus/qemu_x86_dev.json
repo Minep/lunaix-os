@@ -1,0 +1,58 @@
+{
+    "arch": "$ARCH",
+    "memory": "1G",
+    "machine": "q35",
+    "cpu": {
+        "type": "base",
+        "features": [
+            "rdrand",
+            "clflush",
+            "lm",
+            "nx",
+            "syscall",
+            "mca",
+            "pse36",
+            "pcid",
+            "invpcid",
+            "cmov",
+            "apic"
+        ]
+    },
+    "debug": {
+        "gdb_port": "$GDB_PORT",
+        "traced": [
+            "x86_recv_fault",
+            "ide_dma_cb"
+        ]
+    },
+    "devices": [
+        {
+            "class": "basic_serial",
+            "protocol": "telnet",
+            "addr": ":12345",
+            "logfile": "lunaix_ttyS0.log"
+        },
+        {
+            "class": "rtc",
+            "base": "utc"
+        },
+        {
+            "class": "ahci",
+            "name": "ahci_0",
+            "disks": [
+                {
+                    "type": "ide-cd",
+                    "img": "$KIMG",
+                    "ro": true,
+                    "format": "raw"
+                }
+            ]
+        },
+        {
+            "class": "hmp",
+            "protocol": "telnet",
+            "addr": ":$QMPORT",
+            "logfile": "qm.log"
+        }
+    ]
+}

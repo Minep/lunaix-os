@@ -3,8 +3,8 @@
 
 #include <lunaix/types.h>
 
-#define twimap_index(twimap, type) ((type)((twimap)->index))
-#define twimap_data(twimap, type) ((type)((twimap)->data))
+#define twimap_index(twimap, type) ((type)__ptr((twimap)->index))
+#define twimap_data(twimap, type) ((type)__ptr((twimap)->data))
 
 extern struct v_file_ops twimap_file_ops;
 

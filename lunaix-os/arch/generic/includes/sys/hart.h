@@ -22,9 +22,6 @@ struct exec_param
     struct hart_state* parent_state;
 } compact;
 
-void
-hart_flow_redirect(struct hart_state* state, ptr_t pc, ptr_t sp);
-
 ptr_t
 hart_pc(struct hart_state* state);
 

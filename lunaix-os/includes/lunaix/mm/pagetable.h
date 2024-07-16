@@ -99,25 +99,34 @@ struct __pte;
 typedef struct __pte pte_t;
 
 
+#include <sys/mm/mempart.h>
 #include <sys/mm/pagetable.h>
 #include <sys/cpu.h>
 
-#define _LnTEP_AT(vm_mnt, sz)   ( ((vm_mnt) | L0T_MASK) & ~(sz) )
-#define _L0TEP_AT(vm_mnt)       ( ((vm_mnt) | L0T_MASK) & ~LFT_MASK )
-#define _L1TEP_AT(vm_mnt)       ( ((vm_mnt) | L0T_MASK) & ~L3T_MASK )
-#define _L2TEP_AT(vm_mnt)       ( ((vm_mnt) | L0T_MASK) & ~L2T_MASK )
-#define _L3TEP_AT(vm_mnt)       ( ((vm_mnt) | L0T_MASK) & ~L1T_MASK )
-#define _LFTEP_AT(vm_mnt)       ( ((vm_mnt) | L0T_MASK) & ~L0T_MASK )
+#define VMS_SELF                VMS_SELF_MOUNT
+#define VMS_SELF_L0TI           (__index(VMS_SELF_MOUNT) / L0T_SIZE)
+
+#define _LnT_LEVEL_SIZE(n)      ( L##n##T_SIZE / PAGE_SIZE )
+#define _LFTEP_SELF             ( __index(VMS_SELF) )
+#define _L3TEP_SELF             ( _LFTEP_SELF | (_LFTEP_SELF / _LnT_LEVEL_SIZE(3)) )
+#define _L2TEP_SELF             ( _L3TEP_SELF | (_LFTEP_SELF / _LnT_LEVEL_SIZE(2)) )
+#define _L1TEP_SELF             ( _L2TEP_SELF | (_LFTEP_SELF / _LnT_LEVEL_SIZE(1)) )
+#define _L0TEP_SELF             ( _L1TEP_SELF | (_LFTEP_SELF / _LnT_LEVEL_SIZE(0)) )
+
+#define _L0TEP_AT(vm_mnt)       ( ((vm_mnt) | (_L0TEP_SELF & L0T_MASK)) )
+#define _L1TEP_AT(vm_mnt)       ( ((vm_mnt) | (_L1TEP_SELF & L0T_MASK)) )
+#define _L2TEP_AT(vm_mnt)       ( ((vm_mnt) | (_L2TEP_SELF & L0T_MASK)) )
+#define _L3TEP_AT(vm_mnt)       ( ((vm_mnt) | (_L3TEP_SELF & L0T_MASK)) )
+#define _LFTEP_AT(vm_mnt)       ( ((vm_mnt) | (_LFTEP_SELF & L0T_MASK)) )
 
 #define _VM_OF(ptep)            ( (ptr_t)(ptep) & ~L0T_MASK )
 #define _VM_PFN_OF(ptep)        ( ((ptr_t)(ptep) & L0T_MASK) / sizeof(pte_t) )
-#define VMS_SELF                ( ~L0T_MASK & VMS_MASK )
 
 #define __LnTI_OF(ptep, n)\
-    (_VM_PFN_OF(ptep) * LFT_SIZE / L##n##T_SIZE)
+    ( __index(_VM_PFN_OF(ptep) * LFT_SIZE / L##n##T_SIZE) )
 
 #define __LnTEP(ptep, va, n)\
-    ( (pte_t*)_L##n##TEP_AT(_VM_OF(ptep)) + (((va) & VMS_MASK) / L##n##T_SIZE) )
+    ( (pte_t*)_L##n##TEP_AT(_VM_OF(ptep)) + (__index(va) / L##n##T_SIZE) )
 
 #define __LnTEP_OF(ptep, n)\
     ( (pte_t*)_L##n##TEP_AT(_VM_OF(ptep)) + __LnTI_OF(ptep, n))
@@ -127,12 +136,6 @@ typedef struct __pte pte_t;
 
 #define _has_LnT(n) (L##n##T_SIZE != LFT_SIZE)
 #define LnT_ENABLED(n) _has_LnT(n)
-
-#define ptep_with_level(ptep, lvl_size)                 \
-    ({                                                  \
-        ptr_t __p = _LnTEP_AT(_VM_OF(ptep), lvl_size);  \
-        ((ptr_t)(ptep) & __p) == __p;                   \
-    })
 
 extern pte_t 
 alloc_kpage_at(pte_t* ptep, pte_t pte, int order);
@@ -185,13 +188,13 @@ ptep_vfn(pte_t* ptep)
 static inline ptr_t
 ptep_va(pte_t* ptep, size_t lvl_size)
 {
-    return ((ptr_t)ptep) / sizeof(pte_t) * lvl_size;
+    return __vaddr(ptep_pfn(ptep) * lvl_size);
 }
 
 static inline ptr_t
 ptep_vm_mnt(pte_t* ptep)
 {
-    return _VM_OF(ptep);
+    return __vaddr(_VM_OF(ptep));
 }
 
 /**
@@ -408,7 +411,7 @@ l3te_index(pte_t* ptep) {
 
 static inline pfn_t
 pfn(ptr_t addr) {
-    return (addr / PAGE_SIZE) & VMS_MASK;
+    return __index(addr) / PAGE_SIZE;
 }
 
 static inline size_t
@@ -428,7 +431,7 @@ va_offset(ptr_t addr) {
 
 static inline ptr_t
 page_addr(ptr_t pfn) {
-    return pfn * PAGE_SIZE;
+    return __vaddr(pfn * PAGE_SIZE);
 }
 
 static inline ptr_t
@@ -465,7 +468,7 @@ mkptep_pn(ptr_t vm_mnt, ptr_t pn)
 
 static inline pfn_t
 pfn_at(ptr_t va, size_t lvl_size) {
-    return va / lvl_size;
+    return __index(va) / lvl_size;
 }
 
 
@@ -508,6 +511,24 @@ mkl0tep_va(ptr_t mnt, ptr_t va)
     return mkl0tep(mkptep_va(mnt, va));
 }
 
+static inline pte_t*
+mkl1tep_va(ptr_t mnt, ptr_t va)
+{
+    return mkl1tep(mkptep_va(mnt, va));
+}
+
+static inline pte_t*
+mkl2tep_va(ptr_t mnt, ptr_t va)
+{
+    return mkl2tep(mkptep_va(mnt, va));
+}
+
+static inline pte_t*
+mkl3tep_va(ptr_t mnt, ptr_t va)
+{
+    return mkl3tep(mkptep_va(mnt, va));
+}
+
 static inline bool
 pt_last_level(int level)
 {
@@ -517,13 +538,45 @@ pt_last_level(int level)
 static inline ptr_t
 va_mntpoint(ptr_t va)
 {
-    return _VM_OF(va);
+    return __vaddr(_VM_OF(va));
 }
 
-static inline ptr_t
-va_actual(ptr_t va)
+static inline unsigned int
+va_level_index(ptr_t va, size_t lvl_size)
 {
-    return page_addr(_VM_OF(va) ^ va);
+    return (va / lvl_size) & _PAGE_LEVEL_MASK;
+}
+
+static inline bool
+l0tep_implie(pte_t* ptep, ptr_t addr)
+{
+    return ptep_va(ptep, L0T_SIZE) == __vaddr(addr);
+}
+
+static inline bool
+is_ptep(ptr_t addr)
+{
+    ptr_t mnt = va_mntpoint(addr);
+    return mnt == VMS_MOUNT_1 || mnt == VMS_SELF;
+}
+
+static inline bool
+vmnt_packed(pte_t* ptep)
+{
+    return is_ptep(__ptr(ptep));
+}
+
+static inline bool
+active_vms(ptr_t vmnt)
+{
+    return vmnt == VMS_SELF;
+}
+
+static inline bool
+l0tep_impile_vmnts(pte_t* ptep)
+{
+    return l0tep_implie(ptep, VMS_SELF) ||
+           l0tep_implie(ptep, VMS_MOUNT_1);
 }
 
 #endif /* __LUNAIX_PAGETABLE_H */
