@@ -15,7 +15,7 @@ pthread_create(pthread_t* thread,
 
     extern void th_trampoline();
     ret = do_lunaix_syscall(__SYSCALL_th_create, thread, 
-                            &th_param, th_trampoline, NULL);
+                            &th_param, th_trampoline);
     return ret;
 }
 

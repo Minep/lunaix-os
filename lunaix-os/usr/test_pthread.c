@@ -172,7 +172,7 @@ pthread_test_quit(int param)
     do {                                            \
         printf("** [%s] test start\n", note);       \
         pthread_test_##testn(__VA_ARGS__);      \
-        printf("** [%s] test passed\n");         \
+        printf("** [%s] test passed\n", note);      \
     } while (0)
 
 int main()

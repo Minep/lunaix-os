@@ -134,6 +134,10 @@ create_thread(struct proc_info* proc, bool with_ustack)
     
     th->kstack = kstack;
     th->ustack = ustack_region;
+    
+    if (ustack_region) {
+        th->ustack_top = align_stack(ustack_region->end - 1);
+    }
 
     return th;
 }
@@ -150,11 +154,7 @@ start_thread(struct thread* th, ptr_t entry)
     if (!kernel_addr(entry)) {
         assert(th->ustack);
 
-        ptr_t ustack_top = align_stack(th->ustack->end - 1);
-        ustack_top -= 16;   // pre_allocate a 16 byte for inject parameter
-        hart_user_transfer(&transition, th->kstack, ustack_top, entry);
-
-        th->ustack_top = ustack_top;
+        hart_user_transfer(&transition, th->kstack, th->ustack_top, entry);
     } 
     else {
         hart_kernel_transfer(&transition, th->kstack, entry);

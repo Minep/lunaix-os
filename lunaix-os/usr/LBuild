@@ -4,10 +4,8 @@ sources([
     "signal_demo",
     "cat",
     "stat",
+    "test_pthread"
 ])
-
-if config("arch") == "i386":
-    sources("test_pthread")
 
 compile_opts([
     "-ffreestanding",

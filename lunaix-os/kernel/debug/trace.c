@@ -71,7 +71,7 @@ static char*
 ksym_getstr(struct ksym_entry* sym)
 {
     if (!sym) {
-        return "???";
+        return NULL;
     }
 
     return sym->label;
@@ -121,10 +121,10 @@ trace_walkback(struct trace_record* tb_buffer,
 static inline void
 trace_print_code_entry(ptr_t sym_pc, ptr_t inst_pc, char* sym)
 {
-    if (sym_pc) {
+    if (sym) {
         trace_log("%s+%p", sym, inst_pc - sym_pc);
     } else {
-        trace_log("%s [%p]", sym, sym_pc);
+        trace_log("??? [%p]", inst_pc);
     }
 }
 

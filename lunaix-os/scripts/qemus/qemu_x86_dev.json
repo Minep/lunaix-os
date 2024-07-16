@@ -11,9 +11,7 @@
             "nx",
             "syscall",
             "mca",
-            "mtrr",
             "pse36",
-            "lahf_lm",
             "pcid",
             "invpcid",
             "cmov",
@@ -24,8 +22,7 @@
         "gdb_port": "$GDB_PORT",
         "traced": [
             "x86_recv_fault",
-            "ide_dma_cb",
-            "x86_recv_interrupts_all"
+            "ide_dma_cb"
         ]
     },
     "devices": [
