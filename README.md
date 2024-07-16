@@ -15,7 +15,9 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 如果有意研读LunaixOS的内核代码和其中的设计，或欲开始属于自己的OS开发之道，以下资料可能会对此有用。
 
 + [最新的LunaixOS源代码分析教程](docs/tutorial/0-教程介绍和环境搭建.md)
-+ [内核虚拟内存的详细布局](docs/img/lunaix-os-mem.png)
++ 内核虚拟内存的详细布局
+  + [x86_32](docs/img/lunaix-mem-map/lunaix-mem-x86_32.png)
+  + [x86_64](docs/img/lunaix-mem-map/lunaix-mem-x86_64.png)
 + [LunaixOS启动流程概览](docs/img/boot_sequence.jpeg)
 + LunaixOS总体架构概览（WIP）
 + [作者修改的QEMU](https://github.com/Minep/qemu) (添加了一些额外用于调试的功能)
