@@ -71,7 +71,7 @@ pci_create_device(pciaddr_t loc, ptr_t pci_base, int devinfo)
 }
 
 int
-pci_bind_definition(struct pci_device_def* pcidev_def, int* more)
+pci_bind_definition(struct pci_device_def* pcidev_def, bool* more)
 {
     u32_t class = pcidev_def->dev_class;
     u32_t devid_mask = pcidev_def->ident_mask;
@@ -85,9 +85,9 @@ pci_bind_definition(struct pci_device_def* pcidev_def, int* more)
         return EINVAL;
     }
 
-    *more = 0;
+    *more = false;
 
-    int bind_attempted = 0;
+    bool bind_attempted = 0;
     int errno = 0;
 
     struct device_def* devdef;
@@ -98,22 +98,26 @@ pci_bind_definition(struct pci_device_def* pcidev_def, int* more)
             continue;
         }
 
-        if (class != PCI_DEV_CLASS(pos->class_info)) {
-            continue;
-        }
+        bool matched;
 
-        int matched = (pos->device_info & devid_mask) == devid;
+        if (pcidev_def->test_compatibility) {
+            matched = pcidev_def->test_compatibility(pcidev_def, pos);
+        } 
+        else {
+            matched = (pos->device_info & devid_mask) == devid;
+            matched = matched && class == PCI_DEV_CLASS(pos->class_info);
+        }
 
         if (!matched) {
             continue;
         }
 
         if (bind_attempted) {
-            *more = 1;
+            *more = true;
             break;
         }
 
-        bind_attempted = 1;
+        bind_attempted = true;
         devdef = &pcidev_def->devdef;
         errno = devdef->bind(devdef, &pos->dev);
 
@@ -136,9 +140,10 @@ pci_bind_definition(struct pci_device_def* pcidev_def, int* more)
 int
 pci_bind_definition_all(struct pci_device_def* pcidef)
 {
-    int more = 0, e = 0;
+    int e = 0;
+    bool more = false;
     do {
-        if (!(e = pci_bind_definition(pcidef, &more))) {
+        if ((e = pci_bind_definition(pcidef, &more))) {
             break;
         }
     } while (more);
@@ -201,7 +206,7 @@ pci_probe_bar_info(struct pci_device* device)
 {
     u32_t bar;
     struct pci_base_addr* ba;
-    for (size_t i = 0; i < 6; i++) {
+    for (size_t i = 0; i < PCI_BAR_COUNT; i++) {
         ba = &device->bar[i];
         ba->size = pci_bar_sizing(device, &bar, i + 1);
         if (PCI_BAR_MMIO(bar)) {
@@ -325,6 +330,21 @@ pci_get_device_by_class(u32_t class)
     }
 
     return NULL;
+}
+
+void
+pci_apply_command(struct pci_device* pcidev, pci_reg_t cmd)
+{
+    pci_reg_t rcmd;
+    ptr_t base;
+
+    base = pcidev->cspace_base;
+    rcmd = pci_read_cspace(base, PCI_REG_STATUS_CMD);
+
+    cmd  = cmd & 0xffff;
+    rcmd = (rcmd & 0xffff0000) | cmd;
+
+    pci_write_cspace(base, PCI_REG_STATUS_CMD, rcmd);
 }
 
 static void

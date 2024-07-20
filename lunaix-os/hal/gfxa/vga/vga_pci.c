@@ -76,8 +76,8 @@ vga_pci_bind(struct device_def* devdef, struct device* pcidev_base)
 
     pci_write_cspace(pcidev->cspace_base, PCI_REG_STATUS_CMD, cmd);
 
-    ptr_t fb_mapped = (ptr_t)ioremap(fb->start, FB256K);
-    ptr_t mmio_mapped = (ptr_t)ioremap(mmio->start, mmio->size);
+    ptr_t fb_mapped = ioremap(fb->start, FB256K);
+    ptr_t mmio_mapped = ioremap(mmio->start, mmio->size);
 
     struct vga* vga_state =
       vga_new_state(mmio_mapped + VGA_REG_OFF, fb_mapped, FB256K);

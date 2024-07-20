@@ -1,0 +1,7 @@
+include("char/LConfig")
+
+@Collection
+def hal():
+    """ Lunaix hardware asbtraction layer """
+
+    pass

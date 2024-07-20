@@ -58,6 +58,12 @@
 #define UART_SENT_ALL 0b0010
 #define UART_MODEM_UPDATE 0b0000
 
+#define UART_LCR_RESET \
+            (UART_rLC_STOPB | \
+            UART_rLC_PAREN | \
+            UART_rLC_PAREVN | \
+            UART_rLC_DLAB | 0b11)
+
 struct uart16550
 {
     struct llist_header local_ports;
@@ -220,6 +226,34 @@ int
 uart_general_tx(struct serial_dev* sdev, u8_t* data, size_t len);
 
 void
-uart_general_irq_handler(int iv, struct llist_header* ports);
+uart_handle_irq_overlap(int iv, struct llist_header* ports);
+
+void
+uart_handle_irq(int iv, struct uart16550 *uart);
+
+static inline struct serial_dev*
+uart_create_serial(struct uart16550* uart, struct devclass* class, 
+                         struct llist_header* ports, char* if_ident)
+{
+    llist_append(ports, &uart->local_ports);
+
+    struct serial_dev* sdev = serial_create(class, if_ident);
+    sdev->backend = uart;
+    sdev->write = uart_general_tx;
+    sdev->exec_cmd = uart_general_exec_cmd;
+
+    uart->sdev = sdev;
+
+    uart_setup(uart);
+    uart_setie(uart);
+
+    return sdev;
+}
+
+struct uart16550*
+uart16x50_pmio_create(ptr_t base);
+
+struct uart16550*
+uart16x50_mmio_create(ptr_t base, ptr_t size);
 
 #endif /* __LUNAIX_16550_H */

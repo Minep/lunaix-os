@@ -1,0 +1,7 @@
+include("uart/LConfig")
+
+@Collection
+def char_device():
+    """ Controlling support of character devices """
+
+    add_to_collection(hal)

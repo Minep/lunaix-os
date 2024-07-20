@@ -2,6 +2,7 @@ import time
 
 include("kernel/LConfig")
 include("arch/LConfig")
+include("hal/LConfig")
 
 @Term("Version")
 @ReadOnly

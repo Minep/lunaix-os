@@ -22,7 +22,8 @@
         "gdb_port": "$GDB_PORT",
         "traced": [
             "x86_recv_fault",
-            "ide_dma_cb"
+            "ide_dma_cb",
+            "serial_write"
         ]
     },
     "devices": [
@@ -31,6 +32,14 @@
             "protocol": "telnet",
             "addr": ":12345",
             "logfile": "lunaix_ttyS0.log"
+        },
+        {
+            "class": "pci-serial",
+            "logfile": "ttyPCI0.log"
+        },
+        {
+            "class": "pci-serial",
+            "logfile": "ttyPCI1.log"
         },
         {
             "class": "rtc",

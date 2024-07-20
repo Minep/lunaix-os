@@ -80,13 +80,14 @@ class PCISerialDevice(QEMUPeripherals):
         super().__init__("pci-serial", opt)
 
     def get_qemu_opts(self):
-        name = f"chrdev.{hex(self.__hash__())[2:]}"
-        cmds = [ "pci-serial", f"chardev={name}" ]
+        uniq = hex(self.__hash__())[2:]
+        name = f"chrdev.{uniq}"
+        cmds = [ "pci-serial", f"id=uart.{uniq}", f"chardev={name}" ]
         chrdev = [ "file", f"id={name}" ]
         
         logfile = get_config(self._opt, "logfile", required=True)
         chrdev.append(f"path={logfile}")
-        ()
+
         return [ 
             "-chardev", join_attrs(chrdev),
             "-device", join_attrs(cmds)

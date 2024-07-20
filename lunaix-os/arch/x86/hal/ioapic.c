@@ -38,7 +38,7 @@ ioapic_init()
     acpi_context* acpi_ctx = acpi_get_context();
 
     _ioapic_base =
-      (ptr_t)ioremap(acpi_ctx->madt.ioapic->ioapic_addr & ~0xfff, 4096);
+        ioremap(acpi_ctx->madt.ioapic->ioapic_addr & ~0xfff, 4096);
 }
 
 void
