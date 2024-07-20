@@ -116,9 +116,6 @@ pci16650_binder(struct device_def* def, struct device* dev)
 }
 
 static struct pci_device_def uart_pci_def = {
-    .dev_class = PCI_DEVICE_16x50_UART,
-    .dev_ident = -1,
-    .ident_mask = PCI_MATCH_ANY,
     .devdef = { .class = DEVCLASS(DEVIF_PCI, DEVFN_CHAR, DEV_UART16550),
                 .name = "16550 UART (PCI/MMIO)",
                 .init = pci16550_init,

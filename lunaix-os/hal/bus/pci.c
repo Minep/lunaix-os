@@ -71,17 +71,13 @@ pci_create_device(pciaddr_t loc, ptr_t pci_base, int devinfo)
 }
 
 int
-pci_bind_definition(struct pci_device_def* pcidev_def, bool* more)
+pci_bind_definition(struct pci_device_def* pcidef, bool* more)
 {
-    u32_t class = pcidev_def->dev_class;
-    u32_t devid_mask = pcidev_def->ident_mask;
-    u32_t devid = pcidev_def->dev_ident & devid_mask;
-
-    if (!pcidev_def->devdef.bind) {
+    if (!pcidef->devdef.bind) {
         ERROR("pcidev %xh:%xh.%d is unbindable",
-              pcidev_def->devdef.class.fn_grp,
-              pcidev_def->devdef.class.device,
-              pcidev_def->devdef.class.variant);
+              pcidef->devdef.class.fn_grp,
+              pcidef->devdef.class.device,
+              pcidef->devdef.class.variant);
         return EINVAL;
     }
 
@@ -100,13 +96,8 @@ pci_bind_definition(struct pci_device_def* pcidev_def, bool* more)
 
         bool matched;
 
-        if (pcidev_def->test_compatibility) {
-            matched = pcidev_def->test_compatibility(pcidev_def, pos);
-        } 
-        else {
-            matched = (pos->device_info & devid_mask) == devid;
-            matched = matched && class == PCI_DEV_CLASS(pos->class_info);
-        }
+        assert(pcidef->test_compatibility);
+        matched = pcidef->test_compatibility(pcidef, pos);
 
         if (!matched) {
             continue;
@@ -118,7 +109,7 @@ pci_bind_definition(struct pci_device_def* pcidev_def, bool* more)
         }
 
         bind_attempted = true;
-        devdef = &pcidev_def->devdef;
+        devdef = &pcidef->devdef;
         errno = devdef->bind(devdef, &pos->dev);
 
         if (errno) {
@@ -131,7 +122,7 @@ pci_bind_definition(struct pci_device_def* pcidev_def, bool* more)
             continue;
         }
 
-        pos->binding.def = &pcidev_def->devdef;
+        pos->binding.def = &pcidef->devdef;
     }
 
     return errno;

@@ -9,18 +9,25 @@ ahci_pci_bind(struct device_def* def, struct device* dev)
 {
     struct pci_device* ahci_dev = container_of(dev, struct pci_device, dev);
 
-    struct pci_base_addr* bar6 = &ahci_dev->bar[5];
-    assert_msg(bar6->type & BAR_TYPE_MMIO, "AHCI: BAR#6 is not MMIO.");
+    struct pci_base_addr* bar6 = pci_device_bar(ahci_dev, 5);
+    assert_msg(pci_bar_mmio_space(bar6), "AHCI: BAR#6 is not MMIO.");
 
-    pci_reg_t cmd = pci_read_cspace(ahci_dev->cspace_base, PCI_REG_STATUS_CMD);
+    pci_reg_t cmd = 0;
+    int iv;
 
-    // 禁用传统中断（因为我们使用MSI），启用MMIO访问，允许PCI设备间访问
-    cmd |= (PCI_RCMD_MM_ACCESS | PCI_RCMD_DISABLE_INTR | PCI_RCMD_BUS_MASTER);
+    pci_cmd_set_bus_master(&cmd);
+    pci_cmd_set_mmio(&cmd);
+    pci_cmd_set_msi(&cmd);
+    pci_apply_command(ahci_dev, cmd);
 
-    pci_write_cspace(ahci_dev->cspace_base, PCI_REG_STATUS_CMD, cmd);
-
-    int iv = isrm_ivexalloc(ahci_hba_isr);
-    pci_setup_msi(ahci_dev, iv);
+    if (pci_capability_msi(ahci_dev)) {
+        iv = isrm_ivexalloc(ahci_hba_isr);
+        pci_setup_msi(ahci_dev, iv);
+    }
+    else {
+        iv = pci_intr_irq(ahci_dev);
+        iv = isrm_bindirq(iv, ahci_hba_isr);
+    }
 
     struct ahci_driver_param param = {
         .mmio_base = bar6->start,
@@ -40,12 +47,19 @@ ahci_pci_init(struct device_def* def)
     return pci_bind_definition_all(pcidev_def(def));
 }
 
+static bool
+ahci_pci_compat(struct pci_device_def* def, 
+                struct pci_device* pcidev)
+{
+    return pci_device_class(pcidev) == AHCI_HBA_CLASS;
+}
+
+
 static struct pci_device_def ahcidef = {
-    .dev_class = AHCI_HBA_CLASS,
-    .ident_mask = PCI_MATCH_ANY,
     .devdef = { .class = DEVCLASS(DEVIF_PCI, DEVFN_STORAGE, DEV_SATA),
                 .name = "Generic SATA",
                 .init = ahci_pci_init,
-                .bind = ahci_pci_bind }
+                .bind = ahci_pci_bind },
+    .test_compatibility = ahci_pci_compat
 };
 EXPORT_PCI_DEVICE(ahci, &ahcidef, load_postboot);

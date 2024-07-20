@@ -117,9 +117,6 @@ typedef void* (*pci_drv_init)(struct pci_device*);
 
 struct pci_device_def
 {
-    u32_t dev_class;
-    u32_t dev_ident;
-    u32_t ident_mask;
     struct device_def devdef;
 
     bool (*test_compatibility)(struct pci_device_def*, struct pci_device*);
