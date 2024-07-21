@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #define NUMBUFSIZ 24
 
@@ -195,4 +196,20 @@ __vprintf_internal(char* buffer, const char* fmt, size_t max_len, va_list vargs)
     buffer[ptr++] = '\0';
 
     return ptr;
+}
+
+int
+vsnprintf(char* buffer, unsigned int size, const char* fmt, va_list ap)
+{
+    return __vprintf_internal(buffer, fmt, size, ap);
+}
+
+int
+snprintf(char* buffer, unsigned int size, const char* fmt, ...)
+{
+    va_list l;
+    va_start(l, fmt);
+    int r = __vprintf_internal(buffer, fmt, size, l);
+    va_end(l);
+    return r;
 }

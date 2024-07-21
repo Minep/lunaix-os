@@ -19,13 +19,13 @@ Lunaix provide bunch of headers that **MUST** be implemented.
 + Add implementation to function signature defined in header files under
   `includes/lunaix/generic`
 
-+ Add implementation of syscall dispatching (Reference: `arhc/i386/syscall.S`)  
++ Add implementation of syscall dispatching (Reference: `arhc/x86/syscall.S`)  
 
 + Add implementation of interrupt handler dispatching  (Reference:
-  `arhc/i386/exceptions/intrhnds.S`)  
+  `arhc/x86/exceptions/intrhnds.S`)  
 
 + Add implementation of context switching, signal handling. (Reference:
-  `arhc/i386/exceptions/interrupt.S`)  
+  `arhc/x86/exceptions/interrupt.S`)  
   **TODO: make this procedure more standalone**
 
 ## Preparing the Flows

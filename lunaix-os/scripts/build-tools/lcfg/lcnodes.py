@@ -200,6 +200,7 @@ class LCTermNode(LCFuncNode):
         self._default = None
         self._type = None
         self._rdonly = False
+        self._ready = False
 
         super().__init__(fo, astn)
 
@@ -240,8 +241,11 @@ class LCTermNode(LCFuncNode):
         
         self.__assert_type(val)
         self._value = val
+        
+        self._ready = True
         self.__update_value()
         self._env.dependency().cascade(self)
+        
 
     def set_default(self, val):
         self.__assert_type(val)
@@ -252,6 +256,9 @@ class LCTermNode(LCFuncNode):
 
     def get_value(self):
         return self._value
+    
+    def is_ready(self):
+        return self._ready
     
     def evaluate(self):
         super().evaluate()

@@ -85,15 +85,14 @@ acpi_init(struct device_def* devdef)
 
     size_t entry_n = (rsdt->header.length - sizeof(acpi_sdthdr_t)) >> 2;
     for (size_t i = 0; i < entry_n; i++) {
-        acpi_sdthdr_t* sdthdr =
-          (acpi_sdthdr_t*)((acpi_apic_t**)&(rsdt->entry))[i];
+        acpi_sdthdr_t* sdthdr = __acpi_sdthdr(rsdt->entry[i]);
         switch (sdthdr->signature) {
             case ACPI_MADT_SIG:
-                madt_parse((acpi_madt_t*)sdthdr, ctx);
+                madt_parse(__acpi_madt(sdthdr), ctx);
                 break;
             case ACPI_FADT_SIG:
                 // FADT just a plain structure, no need to parse.
-                ctx->fadt = *(acpi_fadt_t*)sdthdr;
+                ctx->fadt = *__acpi_fadt(sdthdr);
                 break;
             case ACPI_MCFG_SIG:
                 mcfg_parse(sdthdr, ctx);

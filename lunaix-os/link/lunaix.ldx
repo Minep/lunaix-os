@@ -1,0 +1,51 @@
+#define __LD__
+#include "base.ldx"
+
+ENTRY(ENTRY_POINT)
+
+SECTIONS {
+    . = LOAD_OFF;
+
+    #include <linking/boot_secs.ldx>
+
+    /* ---- kernel start ---- */
+
+    . += KEXEC_BASE;
+    
+    PROVIDE(__kexec_text_start = ALIGN(PAGE_GRAN));
+    __kexec_start = ALIGN(PAGE_GRAN);
+    
+    
+    /* kernel executable sections */
+
+    #include "kernel.ldx"
+
+
+    /* link-time allocated array */
+
+    #include "lga.ldx"
+
+
+    /* All other stuff */
+
+    .ksymtable BLOCK(PAGE_GRAN) : AT ( ADDR(.ksymtable) - KEXEC_BASE )
+    {
+        *(.ksymtable)
+    }
+
+    .bss BLOCK(PAGE_GRAN) : AT ( ADDR(.bss) - KEXEC_BASE ) 
+    {
+        *(.bss)
+    }
+
+    .bss.kstack BLOCK(PAGE_GRAN) : AT ( ADDR(.bss.kstack) - KEXEC_BASE )
+    {
+        PROVIDE(__bsskstack_start = .);
+
+        *(.bss.kstack)
+
+        PROVIDE(__bsskstack_end = .);
+    }
+
+    __kexec_end = ALIGN(PAGE_GRAN);
+}

@@ -4,7 +4,7 @@
 #include <lunaix/spike.h>
 
 #include <klibc/string.h>
-#include <sys/mm/mempart.h>
+#include <sys/mm/pagetable.h>
 
 int
 iso9660_open(struct v_inode* this, struct v_file* file)
@@ -83,7 +83,7 @@ done:
 int
 iso9660_read_page(struct v_inode* inode, void* buffer, size_t fpos)
 {
-    return iso9660_read(inode, buffer, MEM_PAGE, fpos);
+    return iso9660_read(inode, buffer, PAGE_SIZE, fpos);
 }
 
 int

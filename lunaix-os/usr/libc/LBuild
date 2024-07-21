@@ -1,0 +1,28 @@
+sources([
+    "src/string.c",
+    "src/termios.c",
+    "src/itoa.c",
+    "src/_vprintf.c",
+    "src/readdir.c",
+    "src/pthread.c",
+    "src/printf.c"
+])
+
+sources([
+    "src/posix/signal.c",
+    "src/posix/mount.c",
+    "src/posix/errno.c",
+    "src/posix/ioctl.c",
+    "src/posix/fcntl.c",
+    "src/posix/dirent.c",
+    "src/posix/unistd.c",
+    "src/posix/mann.c",
+    "src/posix/lunaix.c"
+])
+
+use({
+    env("ARCH"): {
+        "i386": "arch/i386",
+        "x86_64": "arch/x86_64",
+    }
+})

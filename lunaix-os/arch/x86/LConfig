@@ -1,0 +1,34 @@
+
+@Group
+def x86_configurations():
+    
+    add_to_collection(architecture_support)
+
+    @Term
+    def x86_enable_sse_feature():
+        """ 
+            Config whether to allow using SSE feature for certain
+            optimization
+        """
+        
+        type(bool)
+        default(False)
+
+
+    @Term
+    def x86_bl():
+        """
+            Select the bootloader interface
+            
+            Supported interface
+                mb:      multiboot compliant
+                mb2:     multiboot2 compliant
+                none:    do not use any interface
+        """
+
+        type(["mb"])
+        # type(["mb", "mb2", "none"])
+        default("mb")
+
+
+    return v(arch) in ["i386", "x86_64"]

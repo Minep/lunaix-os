@@ -74,6 +74,6 @@
 #define __SYSCALL_th_detach 62
 #define __SYSCALL_th_sigmask 63
 
-#define __SYSCALL_MAX 0x100
+#define __SYSCALL_MAX 0x200
 
 #endif /* __LUNAIX_SYSCALLID_H */

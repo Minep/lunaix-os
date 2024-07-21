@@ -46,8 +46,8 @@ strltrim_safe(char* str)
     return strcpy(str, str + l);
 }
 
-void
-parse_cmdline(char* line, char** cmd, char** arg_part)
+int
+parse_cmdline(char* line, char** args)
 {
     strrtrim(line);
     line = strltrim_safe(line);
@@ -60,12 +60,15 @@ parse_cmdline(char* line, char** cmd, char** arg_part)
         }
         l++;
     }
-    *cmd = line;
-    if (c) {
-        *arg_part = strltrim_safe(line + l);
+
+    args[0] = line;
+    if (c && l) {
+        args[1] = strltrim_safe(line + l);
     } else {
-        *arg_part = NULL;
+        args[1] = NULL;
     }
+
+    return !!l;
 }
 
 void
@@ -108,11 +111,13 @@ sigint_handle(int signum)
 }
 
 void
-sh_exec(const char* name, const char** argv)
+sh_exec(const char** argv)
 {
     static int prev_exit;
+    const char* envp[] = { 0 };
+    char* name = argv[0];
     if (!strcmp(name, "cd")) {
-        chdir(argv[0] ? argv[0] : ".");
+        chdir(argv[1] ? argv[1] : ".");
         sh_printerr();
         return;
     }
@@ -129,7 +134,7 @@ sh_exec(const char* name, const char** argv)
     pid_t p;
     int res;
     if (!(p = fork())) {
-        if (execve(buffer, argv, NULL)) {
+        if (execve(name, argv, envp)) {
             sh_printerr();
         }
         _exit(1);
@@ -152,7 +157,7 @@ sh_loop()
     // stdout (by default, unless user did smth) is the tty we are currently at
     ioctl(stdout, TIOCSPGRP, getpgid());
 
-    char* argv[] = {0, 0};
+    char* argv[] = {0, 0, 0};
 
     while (1) {
         getcwd(pwd, 512);
@@ -167,19 +172,17 @@ sh_loop()
         buf[sz] = '\0';
 
         // currently, this shell only support single argument
-        parse_cmdline(buf, &cmd, &argv[0]);
-
-        if (cmd[0] == 0) {
+        if (!parse_cmdline(buf, argv)) {
             printf("\n");
             goto cont;
         }
 
         // cmd=="exit"
-        if (*(unsigned int*)cmd == 0x74697865U) {
+        if (*(unsigned int*)argv[0] == 0x74697865U) {
             break;
         }
 
-        sh_exec(cmd, (const char**)&argv);
+        sh_exec((const char**)argv);
     cont:
         printf("\n");
     }

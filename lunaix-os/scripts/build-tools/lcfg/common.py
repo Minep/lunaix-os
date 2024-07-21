@@ -1,7 +1,7 @@
 import os.path as path
 import ast, json
 
-from .lcnodes import LCModuleNode
+from .lcnodes import LCModuleNode, LCTermNode
 from .api import (
     ConfigLoadException, 
     Renderable
@@ -75,7 +75,8 @@ class DependencyGraph:
             if current in self._edges:
                 for x in self._edges[current]:
                     q.append(x)
-            current.evaluate()
+            if current != start:
+                current.evaluate()
 
 class ConfigTypeFactory:
     def __init__(self) -> None:
@@ -188,6 +189,14 @@ class LConfigEnvironment(Renderable):
     def lookup_value(self, key):
         return self.__config_val[key]
     
+    def resolve_symbol(self, sym):
+        term_node = self.__node_table[sym]
+        if isinstance(term_node, LCTermNode):
+            if not term_node.is_ready():
+                term_node.evaluate()
+            return term_node.get_value()
+        raise Exception(f"fail to resolve symbol: {sym}, not resolvable")
+        
     def dependency(self):
         return self.__deps_graph
     

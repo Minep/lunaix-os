@@ -26,7 +26,7 @@ class CHeaderConfigProvider(ConfigIOProvider):
             v = self.serialize_value(v)
             if v is None or v is False:
                 result.insert(0, "//")
-            elif not isinstance(v, bool):
+            elif isinstance(v, str):
                 result.append(v)
 
             lines.append(" ".join(result))

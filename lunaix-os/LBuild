@@ -7,3 +7,21 @@ headers([
     "includes",
     "includes/usr"
 ])
+
+# compliation setting
+
+compile_opts([
+    "-ffreestanding",
+    "-fno-pie"
+])
+
+linking_opts([
+    "-nostdlib", 
+    "-nolibc", 
+    "-z noexecstack", 
+    "-no-pie", 
+])
+
+linking_opts([
+    "-Wl,--build-id=none"
+])

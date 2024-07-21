@@ -18,7 +18,8 @@ class LunaBuildFile(Sandbox):
             "config":
                 lambda name: self.read_config(name),
             "use":
-                lambda file: self.import_buildfile(file)
+                lambda file: self.import_buildfile(file),
+            **env.external_func_table()
         })
         
         self.__srcs = []
@@ -30,8 +31,8 @@ class LunaBuildFile(Sandbox):
         
     def resolve(self):
         self.execute(self.__path)
-        self.__env.add_sources(self.__do_process(self.__srcs))
-        self.__env.add_headers(self.__do_process(self.__hdrs))
+        self.__env.add_sources(self.__srcs)
+        self.__env.add_headers(self.__hdrs)
 
     def __do_process(self, list):
         resolved = []
@@ -55,40 +56,44 @@ class LunaBuildFile(Sandbox):
 
     def __resolve_value(self, source):
         resolved = source
-        while not isinstance(resolved, str):
+        while isinstance(resolved, dict):
             if isinstance(resolved, dict):
                 resolved = self.expand_select(resolved)
             else:
                 self.__raise(f"entry with unknown type: {resolved}")
         
-        resolved = resolved.strip()
-        resolved = join_path(self.__dir, resolved)
+        if isinstance(resolved, list):
+            rs = []
+            for file in resolved:
+                file = join_path(self.__dir, file)
+                file = self.__env.to_wspath(file)
+                rs.append(file)
+        else:
+            rs = join_path(self.__dir, resolved)
+            rs = [self.__env.to_wspath(rs)]
 
-        return self.__env.to_wspath(resolved)
+        return rs
     
     def import_buildfile(self, path):
         path = self.__resolve_value(path)
-        path = self.__env.to_wspath(path)
-        
-        if (os.path.isdir(path)):
-            path = os.path.join(path, "LBuild")
-        
-        if not os.path.exists(path):
-            self.__raise("Build file not exist: %s", path)
+        for p in path:
+            if (os.path.isdir(p)):
+                p = os.path.join(p, "LBuild")
+            
+            if not os.path.exists(p):
+                self.__raise("Build file not exist: %s", p)
 
-        if os.path.abspath(path) == os.path.abspath(self.__path):
-            self.__raise("self dependency detected")
+            if os.path.abspath(p) == os.path.abspath(self.__path):
+                self.__raise("self dependency detected")
 
-        LunaBuildFile(self.__env, path).resolve()
+            LunaBuildFile(self.__env, p).resolve()
 
     def export_sources(self, src):
-        if not isinstance(src, list):
-            src = [src]
+        src = self.__resolve_value(src)
         self.__srcs += src
 
     def export_headers(self, hdr):
-        if not isinstance(hdr, list):
-            hdr = [hdr]
+        hdr = self.__resolve_value(hdr)
         self.__hdrs += hdr
 
     def check_config(self, name):

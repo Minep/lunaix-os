@@ -1,3 +1,5 @@
 *.o
 build/
 .vscode/
+
+uexec.ld

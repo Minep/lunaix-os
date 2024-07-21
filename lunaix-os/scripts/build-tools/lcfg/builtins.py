@@ -7,15 +7,18 @@ import os
 def v(env, caller, term):
     node = env.lookup_node(term.__name__)
     env.dependency().add(node, caller)
-    
-    return env.lookup_value(node.get_name())
+    return env.resolve_symbol(node.get_name())
 
 @contextual(caller_type=[LCModuleNode])
 def include(env, caller, file):
     fobj = caller.get_fo()
     path = os.path.dirname(fobj.filename())
+    path = join_path(path, file)
+    
+    if os.path.isdir(path):
+        path = join_path(path, "LConfig")
 
-    env.resolve_module(join_path(path, file))
+    env.resolve_module(path)
 
 @contextual("type", caller_type=[LCTermNode])
 def term_type(env, caller, type):
@@ -30,3 +33,11 @@ def parent(env, caller, ref):
 @contextual(caller_type=[LCTermNode])
 def default(env, caller, val):
     caller.set_default(val)
+
+@contextual(caller_type=[LCTermNode])
+def set_value(env, caller, val):
+    caller.set_value(val)
+
+@builtin()
+def env(env, key, default=None):
+    return os.getenv(key, default)

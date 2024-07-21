@@ -1,4 +1,0 @@
-sources([
-    "elf32bfmt.c",
-    "ldelf32.c"
-])

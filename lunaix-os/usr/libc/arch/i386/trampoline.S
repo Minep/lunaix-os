@@ -18,3 +18,15 @@
         movl $__SYSCALL_sigreturn, %eax
         popl %ebx
         int $33
+
+    .global th_trampoline
+    th_trampoline:
+        movl (%esp), %eax
+        movl 4(%esp), %ebx
+        pushl %ebx
+
+        call *(%eax)
+
+        movl %eax, %ebx
+        movl $__SYSCALL_th_exit, %eax
+        int $33

@@ -41,11 +41,9 @@ void
 __version_rd(struct twimap* map)
 {
     twimap_printf(map,
-                  "LunaixOS version %s (gnu-cc %s) %s %s",
-                  CONFIG_LUNAIX_VER,
-                  __VERSION__,
-                  __DATE__,
-                  __TIME__);
+                  "Lunaix "
+                  CONFIG_LUNAIX_VER
+                  " (gnu-cc " __VERSION__ ") " __DATE__ " " __TIME__);
 }
 
 void

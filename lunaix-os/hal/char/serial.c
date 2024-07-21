@@ -3,11 +3,14 @@
 #include <lunaix/spike.h>
 #include <lunaix/owloysius.h>
 #include <lunaix/status.h>
+#include <lunaix/syslog.h>
 
-#include <sys/mm/mempart.h>
+#include <sys/mm/pagetable.h>
 
 #include <hal/serial.h>
 #include <hal/term.h>
+
+LOG_MODULE("serial")
 
 #define lock_sdev(sdev) device_lock((sdev)->dev)
 #define unlock_sdev(sdev) device_unlock((sdev)->dev)
@@ -162,7 +165,7 @@ __serial_read_async(struct device* dev, void* buf, off_t fpos, size_t len)
 static int
 __serial_read_page(struct device* dev, void* buf, off_t fpos)
 {
-    return serial_readbuf(serial_device(dev), (u8_t*)buf, MEM_PAGE);
+    return serial_readbuf(serial_device(dev), (u8_t*)buf, PAGE_SIZE);
 }
 
 static int
@@ -181,7 +184,7 @@ __serial_write_async(struct device* dev, void* buf, off_t fpos, size_t len)
 static int
 __serial_write_page(struct device* dev, void* buf, off_t fpos)
 {
-    return serial_writebuf(serial_device(dev), (u8_t*)buf, MEM_PAGE);
+    return serial_writebuf(serial_device(dev), (u8_t*)buf, PAGE_SIZE);
 }
 
 static int
@@ -267,9 +270,12 @@ serial_create(struct devclass* class, char* if_ident)
     
     device_grant_capability(dev, cap_meta(tp_cap));
 
-    register_device(dev, class, "s%d", class->variant);
+    register_device(dev, class, "%s%d", if_ident, class->variant);
 
     term_create(dev, if_ident);
+
+    INFO("interface: %s, %xh:%xh.%d", dev->name_val, 
+            class->fn_grp, class->device, class->variant);
 
     class->variant++;
     return sdev;

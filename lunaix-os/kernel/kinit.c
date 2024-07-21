@@ -43,7 +43,7 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     /* Begin kernel bootstrapping sequence */
     boot_begin(bhctx);
 
-    tty_init(ioremap(0xB8000, PAGE_SIZE));
+    tty_init((void*)ioremap(0xB8000, PAGE_SIZE));
     
     /* Setup kernel memory layout and services */
     kmem_init(bhctx);
@@ -92,7 +92,6 @@ kernel_bootstrap(struct boot_handoff* bhctx)
      * and start geting into uspace
      */
     boot_end(bhctx);
-    boot_cleanup();
 
     spawn_lunad();
 }
@@ -122,9 +121,16 @@ void
 kmem_init(struct boot_handoff* bhctx)
 {
     pte_t* ptep = mkptep_va(VMS_SELF, KERNEL_RESIDENT);
+
     ptep = mkl0tep(ptep);
 
+    unsigned int i = ptep_vfn(ptep);
     do {
+        if (l0tep_impile_vmnts(ptep)) {
+            ptep++;
+            continue;
+        }
+
 #if   LnT_ENABLED(1)
         assert(mkl1t(ptep++, 0, KERNEL_DATA));
 #elif LnT_ENABLED(2)
@@ -134,7 +140,7 @@ kmem_init(struct boot_handoff* bhctx)
 #else
         assert(mklft(ptep++, 0, KERNEL_DATA));
 #endif
-    } while (ptep_vfn(ptep) < MAX_PTEN - 2);
+    } while (++i < MAX_PTEN);
 
     // allocators
     cake_init();

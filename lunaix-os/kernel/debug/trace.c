@@ -71,14 +71,14 @@ static char*
 ksym_getstr(struct ksym_entry* sym)
 {
     if (!sym) {
-        return "???";
+        return NULL;
     }
 
     return sym->label;
 }
 
 static inline bool valid_fp(ptr_t ptr) {
-    ptr_t start = ROUNDUP(current_thread->kstack - KSTACK_SIZE, MEM_PAGE);
+    ptr_t start = ROUNDUP(current_thread->kstack - KSTACK_SIZE, PAGE_SIZE);
 
     return (start < ptr && ptr < current_thread->kstack) 
            || arch_valid_fp(ptr);
@@ -121,10 +121,10 @@ trace_walkback(struct trace_record* tb_buffer,
 static inline void
 trace_print_code_entry(ptr_t sym_pc, ptr_t inst_pc, char* sym)
 {
-    if (sym_pc) {
+    if (sym) {
         trace_log("%s+%p", sym, inst_pc - sym_pc);
     } else {
-        trace_log("%s [%p]", sym, sym_pc);
+        trace_log("??? [%p]", inst_pc);
     }
 }
 
@@ -161,7 +161,7 @@ static void
 trace_printswctx(const struct hart_state* hstate, bool from_usr, bool to_usr)
 {
 
-    struct ksym_entry* sym = trace_sym_lookup(hstate->execp->eip);
+    struct ksym_entry* sym = trace_sym_lookup(hart_pc(hstate));
 
     trace_log("^^^^^ --- %s", to_usr ? "user" : "kernel");
     trace_print_transistion_short(hstate);

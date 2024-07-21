@@ -1,20 +1,22 @@
+include lunabuild.mkinc
+
+include $(lbuild_mkinc)
+
 libc_include := $(CURDIR)/includes
 
-ARCH ?= i386
 BUILD_DIR ?= bin
 BUILD_NAME ?= liblunac
 
 src_dirs := src
 src_dirs += arch/$(ARCH)
 
-src_files := $(foreach f, $(src_dirs), $(shell find $(f) -name "*.[cS]"))
-obj_files := $(addsuffix .o, $(src_files))
+obj_files := $(addsuffix .o, $(_LBUILD_SRCS))
 
 build_lib := $(BUILD_DIR)/lib
 build_include := $(BUILD_DIR)/includes
 
 libc_include_opt = $(addprefix -I, $(libc_include))
-global_include_opt = $(addprefix -I, $(INCLUDES))
+global_include_opt = $(addprefix -I, $(INCLUDES) $(_LBUILD_INCS))
 
 check_folders := $(src_dirs)
 check_folders += $(build_lib) $(build_include)
@@ -40,6 +42,7 @@ $(build_lib)/$(BUILD_NAME): $(obj_files)
 	@$(AR) rcs $@ $^
 
 clean:
+	@rm -rf $(lbuild_dir)
 	@rm -f $(obj_files)
 
 headers: $(libc_include)

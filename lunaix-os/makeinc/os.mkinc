@@ -1,5 +1,0 @@
-OS_NAME := lunaix
-OS_ID := LunaixOS
-OS_VER := dev$(shell date +%Y%m%d)
-
-INCLUDES := -Iincludes -Iincludes/usr

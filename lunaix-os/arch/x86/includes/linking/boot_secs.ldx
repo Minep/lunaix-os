@@ -1,0 +1,29 @@
+#ifndef __LUNAIX_BOOT_SECS_LD_INC
+#define __LUNAIX_BOOT_SECS_LD_INC
+
+#include "base_defs.ld.inc"
+
+__kboot_start = .;
+
+.boot.text BLOCK(PAGE_GRAN) : 
+{
+#if defined(CONFIG_X86_BL_MB) || defined(CONFIG_X86_BL_MB2)
+    *(.multiboot)
+#endif
+
+    *(.boot.text)
+}
+
+.boot.bss BLOCK(PAGE_GRAN) : 
+{
+    *(.boot.bss)
+}
+
+.boot.data BLOCK(PAGE_GRAN) : 
+{
+    *(.boot.data)
+}
+
+__kboot_end = ALIGN(PAGE_GRAN);
+
+#endif /* __LUNAIX_BOOT_SECS_LD_INC */

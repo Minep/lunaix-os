@@ -3,9 +3,9 @@
 
 #include "types.h"
 
-struct uthread_info {
-    void* th_stack_top;
-    size_t th_stack_sz;
+struct uthread_param {
+    void* th_handler;
+    void* arg1;
 };
 
 #endif /* __LUNAIX_USR_THREADS_H */

@@ -3,5 +3,5 @@ def kernel_feature():
     """ Config kernel features """
     pass
 
-include("mm/LConfig")
-include("fs/LConfig")
+include("fs")
+include("mm")

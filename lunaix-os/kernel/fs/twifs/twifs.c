@@ -18,7 +18,7 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 
-#include <sys/mm/mempart.h>
+#include <sys/mm/pagetable.h>
 
 static struct twifs_node* fs_root;
 
@@ -92,7 +92,7 @@ __twifs_fwrite(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 int
 __twifs_fwrite_pg(struct v_inode* inode, void* buffer, size_t fpos)
 {
-    return __twifs_fwrite(inode, buffer, MEM_PAGE, fpos);
+    return __twifs_fwrite(inode, buffer, PAGE_SIZE, fpos);
 }
 
 int
@@ -108,7 +108,7 @@ __twifs_fread(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 int
 __twifs_fread_pg(struct v_inode* inode, void* buffer, size_t fpos)
 {
-    return __twifs_fread(inode, buffer, MEM_PAGE, fpos);
+    return __twifs_fread(inode, buffer, PAGE_SIZE, fpos);
 }
 
 struct twifs_node*
