@@ -13,8 +13,12 @@ def v(env, caller, term):
 def include(env, caller, file):
     fobj = caller.get_fo()
     path = os.path.dirname(fobj.filename())
+    path = join_path(path, file)
+    
+    if os.path.isdir(path):
+        path = join_path(path, "LConfig")
 
-    env.resolve_module(join_path(path, file))
+    env.resolve_module(path)
 
 @contextual("type", caller_type=[LCTermNode])
 def term_type(env, caller, type):

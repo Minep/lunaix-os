@@ -40,6 +40,12 @@ intr_routine_general_protection(const struct hart_state* state)
 }
 
 void
+intr_routine_invl_opcode(const struct hart_state* state)
+{
+    __print_panic_msg("invalid opcode", state);
+}
+
+void
 intr_routine_sys_panic(const struct hart_state* state)
 {
 #ifdef CONFIG_ARCH_X86_64
@@ -89,6 +95,7 @@ intr_routine_init()
     isrm_bindiv(FAULT_GENERAL_PROTECTION, intr_routine_general_protection);
     isrm_bindiv(FAULT_PAGE_FAULT, intr_routine_page_fault);
     isrm_bindiv(FAULT_STACK_SEG_FAULT, intr_routine_page_fault);
+    isrm_bindiv(FAULT_INVALID_OPCODE, intr_routine_invl_opcode);
 
     isrm_bindiv(LUNAIX_SYS_PANIC, intr_routine_sys_panic);
     isrm_bindiv(LUNAIX_SCHED, intr_routine_sched);

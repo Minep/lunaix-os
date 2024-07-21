@@ -3,7 +3,7 @@
 
 #include <lunaix/types.h>
 
-void*
+ptr_t
 ioremap(ptr_t paddr, u32_t size);
 
 void

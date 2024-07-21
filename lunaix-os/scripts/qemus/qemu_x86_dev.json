@@ -33,6 +33,14 @@
             "logfile": "lunaix_ttyS0.log"
         },
         {
+            "class": "pci-serial",
+            "logfile": "ttyPCI0.log"
+        },
+        {
+            "class": "pci-serial",
+            "logfile": "ttyPCI1.log"
+        },
+        {
             "class": "rtc",
             "base": "utc"
         },

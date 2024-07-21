@@ -43,7 +43,7 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     /* Begin kernel bootstrapping sequence */
     boot_begin(bhctx);
 
-    tty_init(ioremap(0xB8000, PAGE_SIZE));
+    tty_init((void*)ioremap(0xB8000, PAGE_SIZE));
     
     /* Setup kernel memory layout and services */
     kmem_init(bhctx);

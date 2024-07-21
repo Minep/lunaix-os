@@ -284,6 +284,13 @@ vmap_range(pfn_t start, size_t npages, pte_attr_t prot)
     return vmap_ptes_at(_pte, LFT_SIZE, npages);
 }
 
+static inline void
+vunmap_range(pfn_t start, size_t npages)
+{
+    pte_t* ptep = mkptep_va(VMS_SELF, start);
+    vmm_set_ptes_contig(ptep, null_pte, LFT_SIZE, npages);
+}
+
 
 /**
  * @brief Allocate a page in kernel space.

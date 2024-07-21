@@ -178,9 +178,12 @@ ptr_t boot_text
 remap_kernel()
 {
     ptr_t kmap_pa = to_kphysical(&kpt);
-    for (size_t i = 0; i < sizeof(kpt); i++) {
-        ((u8_t*)kmap_pa)[i] = 0;
-    }
+    
+    asm volatile("movq %1, %%rdi\n"
+                 "rep stosb\n" ::"c"(sizeof(kpt)),
+                 "r"(kmap_pa),
+                 "a"(0)
+                 : "rdi", "memory");
 
     do_remap();
 

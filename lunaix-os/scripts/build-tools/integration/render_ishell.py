@@ -207,7 +207,7 @@ class InteractiveShell(InteractiveRenderer):
     def do_read(self, node_name):
         view, _ = self.resolve(node_name)
         rd_val = view.read(self.__sctx)
-        if not rd_val:
+        if rd_val is None:
             raise ShellException(f"config node {view.label} is not readable")
     
         print(rd_val)

@@ -1,7 +1,8 @@
 import time
 
-include("kernel/LConfig")
-include("arch/LConfig")
+include("kernel")
+include("arch")
+include("hal")
 
 @Term("Version")
 @ReadOnly
