@@ -1,4 +1,6 @@
-include("char/LConfig")
+include("char")
+include("bus")
+include("ahci")
 
 @Collection
 def hal():

@@ -22,8 +22,7 @@
         "gdb_port": "$GDB_PORT",
         "traced": [
             "x86_recv_fault",
-            "ide_dma_cb",
-            "serial_write"
+            "ide_dma_cb"
         ]
     },
     "devices": [

@@ -1,4 +1,4 @@
-include("uart/LConfig")
+include("uart")
 
 @Collection
 def char_device():

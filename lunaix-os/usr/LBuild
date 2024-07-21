@@ -36,3 +36,5 @@ if config("arch") == "x86_64":
 else:
     compile_opts("-m32")
     linking_opts("-m32")
+
+compile_opts("-mno-sse")

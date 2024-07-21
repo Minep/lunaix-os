@@ -254,8 +254,20 @@ pci_intr_irq(struct pci_device* pcidev)
     return PCI_INTR_IRQ(pcidev->intr_info);
 }
 
-
 void
 pci_apply_command(struct pci_device* pcidev, pci_reg_t cmd);
+
+pci_reg_t
+pci_read_cspace(ptr_t base, int offset);
+
+void
+pci_write_cspace(ptr_t base, int offset, pci_reg_t data);
+
+u16_t
+pci_config_msi_data(int vector);
+
+ptr_t
+pci_get_msi_base();
+
 
 #endif /* __LUNAIX_PCI_H */

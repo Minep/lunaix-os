@@ -197,7 +197,7 @@ class QEMUExec:
 
         trace_opts = get_config(debug, "traced", [])
         for trace in trace_opts:
-            cmds += [ "-d", f"trace:{trace}"]
+            cmds += [ "--trace", f"{trace}"]
 
         return cmds
     

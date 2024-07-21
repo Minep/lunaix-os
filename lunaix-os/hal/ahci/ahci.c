@@ -14,7 +14,6 @@
 #include <hal/ahci/scsi.h>
 #include <hal/pci.h>
 
-#include <sys/pci_hba.h>
 #include <sys/port_io.h>
 
 #include <klibc/string.h>

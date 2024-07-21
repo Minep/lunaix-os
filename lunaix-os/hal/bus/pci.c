@@ -9,7 +9,6 @@
  *
  */
 #include <hal/pci.h>
-#include <sys/pci_hba.h>
 
 #include <klibc/string.h>
 #include <lunaix/fs/twifs.h>
