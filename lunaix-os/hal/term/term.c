@@ -16,7 +16,7 @@ static struct term_lcntl* line_controls[] = {[ANSI_LCNTL] =
                                                  &ansi_line_controller};
 #define LCNTL_TABLE_LEN (sizeof(line_controls) / sizeof(struct term_lcntl*))
 
-static struct devclass termdev = DEVCLASS(DEVIF_NON, DEVFN_TTY, DEV_VTERM);
+static struct devclass termdev_class = DEVCLASS(DEVIF_NON, DEVFN_TTY, DEV_VTERM);
 
 struct device* sysconsole = NULL;
 
@@ -85,7 +85,9 @@ term_exec_cmd(struct device* dev, u32_t req, va_list args)
             tios->c_baud = term->iospeed;
         } break;
         case TDEV_TCSETATTR: {
+            struct termport_cap_ops* cap_ops;
             struct termios* tios = va_arg(args, struct termios*);
+
             term->iflags = tios->c_iflag;
             term->oflags = tios->c_oflag;
             term->lflags = tios->c_lflag;
@@ -98,14 +100,16 @@ term_exec_cmd(struct device* dev, u32_t req, va_list args)
                 goto done;
             }
 
+            cap_ops = term->tp_cap->cap_ops;
+
             if (tios->c_baud != term->iospeed) {
                 term->iospeed = tios->c_baud;
 
-                term->tp_cap->set_speed(term->chdev, tios->c_baud);
+                cap_ops->set_speed(term->chdev, tios->c_baud);
             }
 
             if (old_cf != tios->c_cflag) {
-                term->tp_cap->set_cntrl_mode(term->chdev, tios->c_cflag);
+                cap_ops->set_cntrl_mode(term->chdev, tios->c_cflag);
             }
         } break;
         default:
@@ -146,6 +150,7 @@ tdev_do_read(struct device* dev, void* buf, off_t fpos, size_t len)
     lbuf_ref_t current = ref_current(&tdev->line_in);
     bool cont = true;
     size_t rdsz = 0;
+
     while (cont && rdsz < len) {
         if (rbuffer_empty(deref(current))) {
             tdev->line_in.sflags = 0;
@@ -181,18 +186,25 @@ alloc_term_buffer(struct term* terminal, size_t sz_hlf)
 struct term*
 term_create(struct device* chardev, char* suffix)
 {
-    struct term* terminal = vzalloc(sizeof(struct term));
+    struct term* terminal;
+    struct device* tdev;
+    struct capability_meta* termport_cap;
+    struct capability_meta* tios_cap;
 
+    terminal = vzalloc(sizeof(struct term));
     if (!terminal) {
         return NULL;
     }
 
-    terminal->dev = device_allocseq(NULL, terminal);
+    tdev = device_allocseq(NULL, terminal);
+    terminal->dev = tdev;
     terminal->chdev = chardev;
 
-    terminal->dev->ops.read = tdev_do_read;
-    terminal->dev->ops.write = tdev_do_write;
-    terminal->dev->ops.exec_cmd = term_exec_cmd;
+    tdev->ops.read = tdev_do_read;
+    tdev->ops.write = tdev_do_write;
+    tdev->ops.exec_cmd = term_exec_cmd;
+
+    waitq_init(&terminal->line_in_event);
 
     // TODO choice of lcntl can be flexible
     terminal->lcntl = line_controls[ANSI_LCNTL];
@@ -201,18 +213,22 @@ term_create(struct device* chardev, char* suffix)
 
     if (chardev) {
         int cdev_var = DEV_VAR_FROM(chardev->ident.unique);
-        register_device(terminal->dev, &termdev, "tty%s%d", suffix, cdev_var);
+        register_device(tdev, &termdev_class, "tty%s%d", suffix, cdev_var);
     } else {
-        register_device(terminal->dev, &termdev, "tty%d", termdev.variant++);
+        register_device(tdev, &termdev_class, "tty%d", termdev_class.variant++);
     }
 
-    struct capability_meta* termport_cap = device_get_capability(chardev, TERMPORT_CAP);
+    termport_cap = device_get_capability(chardev, TERMPORT_CAP);
     if (termport_cap) {
-        terminal->tp_cap = get_capability(termport_cap, struct termport_capability);
+        terminal->tp_cap = 
+            get_capability(termport_cap, struct termport_capability);
+        
+        assert(terminal->tp_cap->cap_ops);
+        terminal->tp_cap->term = terminal;
     }
 
-    struct capability_meta* term_cap = new_capability_marker(TERMIOS_CAP);
-    device_grant_capability(terminal->dev, term_cap);
+    tios_cap = new_capability_marker(TERMIOS_CAP);
+    device_grant_capability(tdev, tios_cap);
 
     load_default_setting(terminal);
 
@@ -253,6 +269,6 @@ void
 term_sendsig(struct term* tdev, int signal)
 {
     if ((tdev->lflags & _ISIG)) {
-        proc_setsignal(get_process(tdev->fggrp), signal);
+        signal_send(-tdev->fggrp, signal);
     }
 }

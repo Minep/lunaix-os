@@ -3,6 +3,7 @@
 
 #include <lunaix/device.h>
 #include <lunaix/ds/rbuffer.h>
+#include <lunaix/ds/waitq.h>
 #include <lunaix/signal_defs.h>
 
 #include <usr/lunaix/term.h>
@@ -46,12 +47,19 @@ struct term_lcntl
  */
 #define TERMIOS_CAP 0x534f4954U
 
+struct term;
+
+struct termport_cap_ops
+{
+    void (*set_speed)(struct device*, speed_t);
+    void (*set_cntrl_mode)(struct device*, tcflag_t);
+};
+
 struct termport_capability
 {
     CAPABILITY_META;
-
-    void (*set_speed)(struct device*, speed_t);
-    void (*set_cntrl_mode)(struct device*, tcflag_t);
+    struct termport_cap_ops* cap_ops;
+    struct term* term;
 };
 
 struct term
@@ -65,6 +73,7 @@ struct term
     pid_t fggrp;
 
     struct termport_capability* tp_cap;
+    waitq_t line_in_event;
 
     /* -- POSIX.1-2008 compliant fields -- */
     tcflag_t iflags;
@@ -120,5 +129,15 @@ lcntl_transform_inseq(struct term* tdev);
 
 int
 lcntl_transform_outseq(struct term* tdev);
+
+static inline void
+term_cap_set_operations(struct termport_capability* cap, 
+                        struct termport_cap_ops* ops)
+{
+    cap->cap_ops = ops;
+}
+
+void
+term_notify_data_avaliable(struct termport_capability* cap);
 
 #endif /* __LUNAIX_TERM_H */

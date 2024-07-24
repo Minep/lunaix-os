@@ -11,49 +11,29 @@
 static int
 do_read_raw(struct term* tdev)
 {
-    struct device* chdev = tdev->chdev;
+    struct linebuffer* line_in;
+    lbuf_ref_t current_buf;
+    size_t min, sz = 0;
+    time_t t, expr, dt = 0;
+    
+    line_in = &tdev->line_in;
+    current_buf = ref_current(line_in);
 
-    struct linebuffer* line_in = &tdev->line_in;
-    size_t max_lb_sz = line_in->sz_hlf;
+    min = tdev->cc[_VMIN] - 1;
+    t = clock_systime();
+    expr = (tdev->cc[_VTIME] * 100) - 1;
 
-    line_flip(line_in);
-
-    char* inbuffer = line_in->current->buffer;
-    size_t min = tdev->cc[_VMIN] - 1;
-    size_t sz = chdev->ops.read_async(chdev, inbuffer, 0, max_lb_sz);
-    time_t t = clock_systime(), dt = 0;
-    time_t expr = (tdev->cc[_VTIME] * 100) - 1;
-
+    min = MIN(min, (size_t)line_in->sz_hlf);
     while (sz <= min && dt <= expr) {
         // XXX should we held the device lock while we are waiting?
         sched_pass();
         dt = clock_systime() - t;
         t += dt;
 
-        max_lb_sz -= sz;
-
-        // TODO pass a flags to read to indicate it is non blocking ops
-        sz += chdev->ops.read_async(chdev, &inbuffer[sz], 0, max_lb_sz);
+        sz = deref(current_buf)->len;
     }
 
-    rbuffer_puts(line_in->next, inbuffer, sz);
-    line_flip(line_in);
-
     return 0;
-}
-
-static int
-do_read_raw_canno(struct term* tdev)
-{
-    struct device* chdev = tdev->chdev;
-    struct linebuffer* line_in = &tdev->line_in;
-    struct rbuffer* current_buf = line_in->current;
-    int sz = chdev->ops.read(chdev, current_buf->buffer, 0, line_in->sz_hlf);
-
-    current_buf->ptr = sz;
-    current_buf->len = sz;
-
-    return sz;
 }
 
 static int
@@ -66,16 +46,11 @@ term_read_noncano(struct term* tdev)
 static int
 term_read_cano(struct term* tdev)
 {
-    struct device* chdev = tdev->chdev;
-    struct linebuffer* line_in = &tdev->line_in;
-    int size = 0;
+    struct linebuffer* line_in;
 
+    line_in = &tdev->line_in;
     while (!(line_in->sflags & ONSTOP)) {
-        // move all hold-out content to 'next' buffer
-        line_flip(line_in);
-
-        size += do_read_raw_canno(tdev);
-        lcntl_transform_inseq(tdev);
+        pwait(&tdev->line_in_event);
     }
 
     return 0;
@@ -87,6 +62,7 @@ term_read(struct term* tdev)
     if ((tdev->lflags & _ICANON)) {
         return term_read_cano(tdev);
     }
+
     return term_read_noncano(tdev);
 }
 
@@ -124,4 +100,33 @@ term_flush(struct term* tdev)
     }
 
     return count;
+}
+
+void
+term_notify_data_avaliable(struct termport_capability* cap)
+{
+    struct term* term;
+    struct device* term_chrdev;
+    struct linebuffer* line_in;
+    char* buf;
+    int sz;
+
+    term = cap->term;
+    term_chrdev = term->chdev;
+    line_in = &term->line_in;
+    
+    // make room for current buf
+    line_flip(line_in);
+    buf = line_in->current->buffer;
+
+    sz = term_chrdev->ops.read_async(term_chrdev, buf, 0, line_in->sz_hlf);
+    line_in->current->ptr = sz;
+    line_in->current->len = sz;
+
+    if ((term->lflags & _ICANON)) {
+        lcntl_transform_inseq(term);
+        // write all processed to next, and flip back to current
+    }
+
+    pwake_all(&term->line_in_event);
 }

@@ -46,6 +46,10 @@ serial_end_recv(struct serial_dev* sdev)
     mark_device_done_read(sdev->dev);
 
     pwake_one(&sdev->wq_rxdone);
+
+    struct termport_capability* tpcap;
+    tpcap = get_capability(sdev->tp_cap, typeof(*tpcap));
+    term_notify_data_avaliable(tpcap);
 }
 
 void
@@ -241,6 +245,11 @@ __serial_set_cntrl_mode(struct device* dev, tcflag_t cflag)
 
 #define RXBUF_SIZE 512
 
+static struct termport_cap_ops tpcap_ops = {
+    .set_cntrl_mode = __serial_set_cntrl_mode,
+    .set_speed = __serial_set_speed
+};
+
 struct serial_dev*
 serial_create(struct devclass* class, char* if_ident)
 {
@@ -260,8 +269,9 @@ serial_create(struct devclass* class, char* if_ident)
 
     struct termport_capability* tp_cap = 
         new_capability(TERMPORT_CAP, struct termport_capability);
-    tp_cap->set_speed = __serial_set_speed;
-    tp_cap->set_cntrl_mode = __serial_set_cntrl_mode;
+    
+    term_cap_set_operations(tp_cap, &tpcap_ops);
+    sdev->tp_cap = cap_meta(tp_cap);
 
     waitq_init(&sdev->wq_rxdone);
     waitq_init(&sdev->wq_txdone);
