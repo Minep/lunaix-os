@@ -97,6 +97,8 @@ def main():
             do_config(opts, lcfg_env)
         else:
             print("No configuration file detected, skipping...")
+        
+        lcfg_env.update()
         lcfg_env.save(opts.config_save)
         lcfg_env.export()
     else:
