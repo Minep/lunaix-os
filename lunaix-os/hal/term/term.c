@@ -172,6 +172,7 @@ load_default_setting(struct term* tdev)
     tdev->lflags = _ICANON | _IEXTEN | _ISIG | _ECHO | _ECHOE | _ECHONL;
     tdev->iflags = _ICRNL | _IGNBRK;
     tdev->oflags = _ONLCR | _OPOST;
+    tdev->iospeed = _B9600;
     memcpy(tdev->cc, default_cc, _NCCS * sizeof(cc_t));
 }
 

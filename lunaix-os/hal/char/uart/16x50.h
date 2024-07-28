@@ -69,6 +69,7 @@ struct uart16550
     struct llist_header local_ports;
     struct serial_dev* sdev;
     ptr_t base_addr;
+    unsigned int base_clk;
     int iv;
 
     struct
@@ -118,12 +119,12 @@ void
 uart_free(struct uart16550*);
 
 static inline int
-uart_baud_divisor(struct uart16550* uart, int div)
+uart_baud_divisor(struct uart16550* uart, unsigned int div)
 {
     u32_t rlc = uart->read_reg(uart, UART_rLC);
 
     uart->write_reg(uart, UART_rLC, UART_rLC_DLAB | rlc);
-    u8_t ls = (div & 0xff), ms = (div & 0xff00) >> 8;
+    u8_t ls = (div & 0x00ff), ms = (div & 0xff00) >> 8;
 
     uart->write_reg(uart, UART_rLS, ls);
     uart->write_reg(uart, UART_rMS, ms);

@@ -52,6 +52,7 @@ struct term;
 struct termport_cap_ops
 {
     void (*set_speed)(struct device*, speed_t);
+    void (*set_clkbase)(struct device*, unsigned int);
     void (*set_cntrl_mode)(struct device*, tcflag_t);
 };
 
@@ -82,6 +83,7 @@ struct term
     tcflag_t cflags;
     cc_t cc[_NCCS];
     speed_t iospeed;
+    speed_t clkbase;
 };
 
 extern struct device* sysconsole;

@@ -227,7 +227,18 @@ __serial_set_speed(struct device* dev, speed_t speed)
     struct serial_dev* sdev = serial_device(dev);
     lock_sdev(sdev);
 
-    sdev_execmd(sdev, SERIO_SETBRDIV, speed);
+    sdev_execmd(sdev, SERIO_SETBRDRATE, speed);
+
+    unlock_sdev(sdev);
+}
+
+static void
+__serial_set_baseclk(struct device* dev, unsigned int base)
+{
+    struct serial_dev* sdev = serial_device(dev);
+    lock_sdev(sdev);
+
+    sdev_execmd(sdev, SERIO_SETBRDBASE, base);
 
     unlock_sdev(sdev);
 }
@@ -247,13 +258,14 @@ __serial_set_cntrl_mode(struct device* dev, tcflag_t cflag)
 
 static struct termport_cap_ops tpcap_ops = {
     .set_cntrl_mode = __serial_set_cntrl_mode,
+    .set_clkbase = __serial_set_baseclk,
     .set_speed = __serial_set_speed
 };
 
 struct serial_dev*
 serial_create(struct devclass* class, char* if_ident)
 {
-    struct serial_dev* sdev = valloc(sizeof(struct serial_dev));
+    struct serial_dev* sdev = vzalloc(sizeof(struct serial_dev));
     struct device* dev = device_allocseq(dev_meta(serial_cat), sdev);
     dev->ops.read = __serial_read;
     dev->ops.read_page = __serial_read_page;

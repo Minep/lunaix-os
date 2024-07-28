@@ -58,7 +58,7 @@ lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
         }
     }
 
-    while (allow_more && rbuffer_get(raw, &c)) {
+    while (rbuffer_get(raw, &c)) {
 
         if (c == '\r' && ((_if & _ICRNL) || (_of & _OCRNL))) {
             c = '\n';
@@ -147,6 +147,10 @@ lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
         }
 
     put_char:
+        if (!allow_more) {
+            continue;
+        }
+
         if (!out && (_lf & _IEXTEN) && lcntl_slave_put) {
             allow_more = lcntl_slave_put(tdev, lbuf, c);
         } else {

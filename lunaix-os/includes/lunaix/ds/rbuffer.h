@@ -30,11 +30,22 @@ int
 rbuffer_puts(struct rbuffer* rb, char* c, size_t len);
 
 int
-rbuffer_gets(struct rbuffer* rb, char* buf, size_t len);
+rbuffer_gets_opt(struct rbuffer* rb, char* buf, size_t len, bool consumed);
 
 int
 rbuffer_get(struct rbuffer* rb, char* c);
 
+static inline int
+rbuffer_gets(struct rbuffer* rb, char* buf, size_t len)
+{
+    return rbuffer_gets_opt(rb, buf, len, true);
+}
+
+static inline int
+rbuffer_gets_no_consume(struct rbuffer* rb, char* buf, size_t len)
+{
+    return rbuffer_gets_opt(rb, buf, len, false);
+}
 
 static inline void
 rbuffer_clear(struct rbuffer* rb)
@@ -46,6 +57,19 @@ static inline bool
 rbuffer_empty(struct rbuffer* rb)
 {
     return rb->len == 0;
+}
+
+static inline unsigned int
+rbuffer_len(struct rbuffer* rb)
+{
+    return rb->len;
+}
+
+static inline void
+rbuffer_setcontent(struct rbuffer* rb, size_t content_len)
+{
+    rb->ptr = content_len;
+    rb->len = content_len;
 }
 
 static inline bool

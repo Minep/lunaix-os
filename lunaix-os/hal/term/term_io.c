@@ -36,14 +36,7 @@ do_read_raw(struct term* tdev)
     return 0;
 }
 
-static int
-term_read_noncano(struct term* tdev)
-{
-    struct device* chdev = tdev->chdev;
-    return do_read_raw(tdev);
-}
-
-static int
+static inline int
 term_read_cano(struct term* tdev)
 {
     struct linebuffer* line_in;
@@ -63,17 +56,20 @@ term_read(struct term* tdev)
         return term_read_cano(tdev);
     }
 
-    return term_read_noncano(tdev);
+    return do_read_raw(tdev);
 }
 
 int
 term_flush(struct term* tdev)
 {
+    struct device* chardev;
     struct linebuffer* line_out = &tdev->line_out;
     char* xmit_buf = tdev->scratch_pad;
     lbuf_ref_t current_ref = ref_current(line_out);
-
+    
     int count = 0;
+
+    chardev = tdev->chdev;
 
     while (!rbuffer_empty(deref(current_ref))) {
         if ((tdev->oflags & _OPOST)) {
@@ -87,7 +83,7 @@ term_flush(struct term* tdev)
         off_t off = 0;
         int ret = 0;
         while (xmit_len && ret >= 0) {
-            ret = tdev->chdev->ops.write(tdev->chdev, &xmit_buf[off], 0, xmit_len);
+            ret = chardev->ops.write(chardev, &xmit_buf[off], 0, xmit_len);
             xmit_len -= ret;
             off += ret;
             count += ret;
@@ -108,20 +104,21 @@ term_notify_data_avaliable(struct termport_capability* cap)
     struct term* term;
     struct device* term_chrdev;
     struct linebuffer* line_in;
+    lbuf_ref_t current_ref;
     char* buf;
     int sz;
 
     term = cap->term;
     term_chrdev = term->chdev;
     line_in = &term->line_in;
+    current_ref = ref_current(line_in);
     
     // make room for current buf
     line_flip(line_in);
-    buf = line_in->current->buffer;
+    buf = deref(current_ref)->buffer;
 
     sz = term_chrdev->ops.read_async(term_chrdev, buf, 0, line_in->sz_hlf);
-    line_in->current->ptr = sz;
-    line_in->current->len = sz;
+    rbuffer_setcontent(deref(current_ref), sz);
 
     if ((term->lflags & _ICANON)) {
         lcntl_transform_inseq(term);
