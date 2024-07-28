@@ -129,4 +129,10 @@ term_cap_set_operations(struct termport_capability* cap,
 void
 term_notify_data_avaliable(struct termport_capability* cap);
 
+#define termport_default_ops                                    \
+    ({                                                          \
+        extern struct termport_cap_ops default_termport_cap_ops;\
+        &default_termport_cap_ops;                              \
+    })
+
 #endif /* __LUNAIX_TERM_H */

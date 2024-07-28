@@ -148,15 +148,12 @@ tdev_do_read(struct device* dev, void* buf, off_t fpos, size_t len)
     size_t rdsz = 0;
 
     while (cont && rdsz < len) {
-        if (rbuffer_empty(deref(current))) {
-            tdev->line_in.sflags = 0;
-            cont = term_read(tdev);
-        }
-
+        cont = term_read(tdev);
         rdsz += rbuffer_gets(
             deref(current), &((char*)buf)[rdsz], len - rdsz);
     }
-
+    
+    tdev->line_in.sflags = 0;
     return rdsz;
 }
 
