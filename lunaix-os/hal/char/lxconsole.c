@@ -27,6 +27,7 @@
 
 struct console
 {
+    struct capability_meta* tp_cap;
     struct lx_timer* flush_timer;
     struct fifo_buf output;
     struct fifo_buf input;
@@ -90,8 +91,12 @@ __lxconsole_listener(struct input_device* dev)
     }
 
     fifo_putone(&lx_console.input, ttychr);
-    pwake_all(&lx_reader);
 
+    struct termport_capability* tpcap;
+    tpcap = get_capability(lx_console.tp_cap, typeof(*tpcap));
+    term_notify_data_avaliable(tpcap);
+    
+    pwake_all(&lx_reader);
 done:
     return INPUT_EVT_NEXT;
 }
@@ -130,6 +135,14 @@ __tty_read(struct device* dev, void* buf, size_t offset, size_t len)
     pwait(&lx_reader);
 
     return count + fifo_read(&console->input, buf + count, len - count);
+}
+
+int
+__tty_read_async(struct device* dev, void* buf, size_t offset, size_t len)
+{
+    struct console* console = (struct console*)dev->underlay;
+
+    return fifo_read(&console->input, buf, len);
 }
 
 size_t
@@ -279,13 +292,23 @@ lxconsole_spawn_ttydev(struct device_def* devdef)
     tty_dev->ops.write_page = __tty_write_pg;
     tty_dev->ops.read = __tty_read;
     tty_dev->ops.read_page = __tty_read_pg;
+    tty_dev->ops.write_async = __tty_write;
+    tty_dev->ops.read_async = __tty_read_async;
 
     waitq_init(&lx_reader);
     input_add_listener(__lxconsole_listener);
 
+    struct termport_capability* tp_cap;
+
+    tp_cap = new_capability(TERMPORT_CAP, struct termport_capability);
+    term_cap_set_operations(tp_cap, termport_default_ops);
+    
+    lx_console.tp_cap = cap_meta(tp_cap);
+    device_grant_capability(tty_dev, lx_console.tp_cap);
+
     register_device(tty_dev, &devdef->class, "vcon");
 
-    term_create(tty_dev, "FB");
+    term_create(tty_dev, "VCON");
 
     return 0;
 }
@@ -295,5 +318,4 @@ static struct device_def lxconsole_def = {
     .class = DEVCLASS(DEVIF_NON, DEVFN_TTY, DEV_BUILTIN),
     .init = lxconsole_spawn_ttydev
 };
-// FIXME
 EXPORT_DEVICE(lxconsole, &lxconsole_def, load_onboot);

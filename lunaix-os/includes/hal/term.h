@@ -3,6 +3,7 @@
 
 #include <lunaix/device.h>
 #include <lunaix/ds/rbuffer.h>
+#include <lunaix/ds/waitq.h>
 #include <lunaix/signal_defs.h>
 
 #include <usr/lunaix/term.h>
@@ -16,20 +17,14 @@ struct linebuffer
     short sflags;
     short sz_hlf;
 };
-#define LSTATE_EOL (1)
-#define LSTATE_EOF (1 << 1)
-#define LSTATE_SIGRAISE (1 << 2)
+#define LEVT_EOL (1)
+#define LEVT_EOF (1 << 1)
+#define LEVT_SIGRAISE (1 << 2)
 
 typedef struct rbuffer** lbuf_ref_t;
 #define ref_current(lbuf) (&(lbuf)->current)
 #define ref_next(lbuf) (&(lbuf)->next)
 #define deref(bref) (*(bref))
-
-struct term_lcntl
-{
-    struct term* term;
-    int (*process_and_put)(struct term*, struct linebuffer*, char);
-};
 
 /**
  * @brief Communication port capability that a device is supported natively, 
@@ -46,25 +41,33 @@ struct term_lcntl
  */
 #define TERMIOS_CAP 0x534f4954U
 
+struct term;
+
+struct termport_cap_ops
+{
+    void (*set_speed)(struct device*, speed_t);
+    void (*set_clkbase)(struct device*, unsigned int);
+    void (*set_cntrl_mode)(struct device*, tcflag_t);
+};
+
 struct termport_capability
 {
     CAPABILITY_META;
-
-    void (*set_speed)(struct device*, speed_t);
-    void (*set_cntrl_mode)(struct device*, tcflag_t);
+    struct termport_cap_ops* cap_ops;
+    struct term* term;
 };
 
 struct term
 {
     struct device* dev;
     struct device* chdev;
-    struct term_lcntl* lcntl;
     struct linebuffer line_out;
     struct linebuffer line_in;
     char* scratch_pad;
     pid_t fggrp;
 
     struct termport_capability* tp_cap;
+    waitq_t line_in_event;
 
     /* -- POSIX.1-2008 compliant fields -- */
     tcflag_t iflags;
@@ -72,7 +75,11 @@ struct term
     tcflag_t lflags;
     tcflag_t cflags;
     cc_t cc[_NCCS];
+
+    /* -- END POSIX.1-2008 compliant fields -- */
     speed_t iospeed;
+    speed_t clkbase;
+    tcflag_t tflags;    // temp flags
 };
 
 extern struct device* sysconsole;
@@ -82,15 +89,6 @@ term_create(struct device* chardev, char* suffix);
 
 int
 term_bind(struct term* tdev, struct device* chdev);
-
-int
-term_push_lcntl(struct term* tdev, struct term_lcntl* lcntl);
-
-int
-term_pop_lcntl(struct term* tdev);
-
-struct term_lcntl*
-term_get_lcntl(u32_t lcntl_index);
 
 static inline void
 line_flip(struct linebuffer* lbf)
@@ -120,5 +118,21 @@ lcntl_transform_inseq(struct term* tdev);
 
 int
 lcntl_transform_outseq(struct term* tdev);
+
+static inline void
+term_cap_set_operations(struct termport_capability* cap, 
+                        struct termport_cap_ops* ops)
+{
+    cap->cap_ops = ops;
+}
+
+void
+term_notify_data_avaliable(struct termport_capability* cap);
+
+#define termport_default_ops                                    \
+    ({                                                          \
+        extern struct termport_cap_ops default_termport_cap_ops;\
+        &default_termport_cap_ops;                              \
+    })
 
 #endif /* __LUNAIX_TERM_H */
