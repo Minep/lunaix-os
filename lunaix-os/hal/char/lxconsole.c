@@ -318,5 +318,4 @@ static struct device_def lxconsole_def = {
     .class = DEVCLASS(DEVIF_NON, DEVFN_TTY, DEV_BUILTIN),
     .init = lxconsole_spawn_ttydev
 };
-// FIXME
 EXPORT_DEVICE(lxconsole, &lxconsole_def, load_onboot);

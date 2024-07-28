@@ -13,7 +13,6 @@ sources([
     "kinit.c",
     "lunad.c",
     "spike.c",
-    "tty/tty.c",
     "kprint/kp_records.c",
     "kprint/kprintf.c",
     "time/clock.c",
