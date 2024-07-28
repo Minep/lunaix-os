@@ -33,6 +33,8 @@ struct scheduler sched_ctx;
 
 struct cake_pile *proc_pile ,*thread_pile;
 
+#define root_process   (sched_ctx.procs[1])
+
 LOG_MODULE("SCHED")
 
 void
@@ -256,7 +258,6 @@ __DEFINE_LXSYSCALL1(unsigned int, alarm, unsigned int, seconds)
 
     bed->alarm_time = seconds ? now + seconds : 0;
 
-    struct proc_info* root_proc = sched_ctx.procs[0];
     if (llist_empty(&bed->sleepers)) {
         llist_append(&sched_ctx.sleepers, &bed->sleepers);
     }
@@ -435,7 +436,7 @@ commit_process(struct proc_info* process)
     // every process is the child of first process (pid=1)
     if (!process->parent) {
         if (likely(!kernel_process(process))) {
-            process->parent = sched_ctx.procs[1];
+            process->parent = root_process;
         } else {
             process->parent = process;
         }
@@ -472,6 +473,20 @@ destory_thread(struct thread* thread)
     sched_ctx.ttable_len--;
 
     cake_release(thread_pile, thread);
+}
+
+static void
+orphan_children(struct proc_info* proc)
+{
+    struct proc_info *root;
+    struct proc_info *pos, *n;
+
+    root = root_process;
+
+    llist_for_each(pos, n, &proc->children, siblings) {
+        pos->parent = root;
+        llist_append(&root->children, &pos->siblings);
+    }
 }
 
 void 
@@ -519,6 +534,8 @@ delete_process(struct proc_info* proc)
         // terminate and destory all thread unconditionally
         destory_thread(pos);
     }
+
+    orphan_children(proc);
 
     procvm_unmount_release(mm);
 

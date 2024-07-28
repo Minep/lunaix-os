@@ -44,6 +44,9 @@ init_termios(int fd) {
     term.c_oflag = ONLCR | OPOST;
     term.c_cflag = CREAD | CLOCAL | CS8 | CPARENB;
     term.c_cc[VERASE] = 0x7f;
+    
+    cfsetispeed(&term, B9600);
+    cfsetospeed(&term, B9600);
 
     check(tcsetattr(fd, 0, &term));
 

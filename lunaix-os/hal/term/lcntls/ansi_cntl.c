@@ -9,25 +9,18 @@
  * @copyright Copyright (c) 2023
  *
  */
-#include <hal/term.h>
+#include "lcntl.h"
 #include <usr/lunaix/term.h>
 
 #define CTRL_MNEMO(chr) (chr - 'A' + 1)
 
-static inline int
-__ansi_actcontrol(struct term* termdev, struct linebuffer* lbuf, char chr)
+int
+__ansi_actcontrol(struct lcntl_state* state, char chr)
 {
-    struct rbuffer* cooked = lbuf->next;
-    switch (chr) {
-        default:
-            if ((int)chr < 32) {
-                rbuffer_put(cooked, '^');
-                return rbuffer_put(cooked, chr += 64);
-            }
-            break;
+    if (chr < 32 && chr != '\n') {
+        lcntl_put_char(state, '^');
+        return lcntl_put_char(state, chr += 64);
     }
 
-    return rbuffer_put_nof(cooked, chr);
+    return lcntl_put_char(state, chr);
 }
-
-struct term_lcntl ansi_line_controller = {.process_and_put = __ansi_actcontrol};

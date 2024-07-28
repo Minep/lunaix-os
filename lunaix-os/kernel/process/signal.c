@@ -147,8 +147,7 @@ int
 signal_send(pid_t pid, signum_t signum)
 {
     if (signum >= _SIG_NUM) {
-        syscall_result(EINVAL);
-        return -1;
+        return EINVAL;
     }
 
     pid_t sender_pid = __current->pid;
@@ -166,8 +165,7 @@ signal_send(pid_t pid, signum_t signum)
     } else {
         // TODO: send to all process.
         //  But I don't want to support it yet.
-        syscall_result(EINVAL);
-        return -1;
+        return EINVAL;
     }
 
 send_grp: ;
@@ -179,8 +177,7 @@ send_grp: ;
 
 send_single:
     if (proc_terminated(proc)) {
-        syscall_result(EINVAL);
-        return -1;
+        return EINVAL;
     }
 
     proc_setsignal(proc, signum);
@@ -358,7 +355,7 @@ __DEFINE_LXSYSCALL(int, pause)
 
 __DEFINE_LXSYSCALL2(int, kill, pid_t, pid, int, signum)
 {
-    return signal_send(pid, signum);
+    return syscall_result(signal_send(pid, signum));
 }
 
 __DEFINE_LXSYSCALL1(int, sigpending, sigset_t, *sigset)

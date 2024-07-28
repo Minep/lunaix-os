@@ -5,3 +5,10 @@ def char_device():
     """ Controlling support of character devices """
 
     add_to_collection(hal)
+
+    @Term
+    def vga_console():
+        """ Enable VGA console device (text mode only) """
+
+        type(bool)
+        default(True)

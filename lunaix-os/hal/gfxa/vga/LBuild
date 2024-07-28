@@ -3,5 +3,6 @@ sources([
     "vga_gfxm_ops.c",
     "vga.c",
     "vga_mmio_ops.c",
-    "vga_pci.c"
+    "vga_pci.c",
+    "vga_rawtty.c",
 ])

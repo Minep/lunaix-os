@@ -13,7 +13,7 @@ def architecture_support():
         default("i386")
 
         env_val = env("ARCH")
-        if env_val is not None:
+        if env_val:
             set_value(env_val)
 
     @Term

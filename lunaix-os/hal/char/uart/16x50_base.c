@@ -16,6 +16,7 @@ uart_alloc(ptr_t base_addr)
     uart->cntl_save.rie = 0;
 
     uart->base_addr = base_addr;
+    uart->base_clk  = 115200U;
     return uart;
 }
 
@@ -69,9 +70,29 @@ uart_general_exec_cmd(struct serial_dev* sdev, u32_t req, va_list args)
         case SERIO_RXDA:
             uart_clrie(uart);
             break;
-        case SERIO_SETBRDIV:
-            // TODO
-            break;
+        case SERIO_SETBRDRATE:
+            {
+                unsigned int div, rate;
+
+                rate = va_arg(args, speed_t);
+                if (!rate) {
+                    return EINVAL;
+                }
+
+                div  = uart->base_clk / va_arg(args, speed_t);
+                uart_baud_divisor(uart, div);
+                break;
+            }
+        case SERIO_SETBRDBASE:
+            {
+                int clk = va_arg(args, unsigned int);
+                if (!clk) {
+                    return EINVAL;
+                }
+                
+                uart->base_clk = clk;
+                break;
+            }
         case SERIO_SETCNTRLMODE:
             uart_set_control_mode(uart, va_arg(args, tcflag_t));
             break;

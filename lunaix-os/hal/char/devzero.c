@@ -6,14 +6,14 @@
 static int
 __zero_rd_pg(struct device* dev, void* buf, size_t offset)
 {
-    memset(&((u8_t*)buf)[offset], 0, PAGE_SIZE);
+    memset(buf, 0, PAGE_SIZE);
     return PAGE_SIZE;
 }
 
 static int
 __zero_rd(struct device* dev, void* buf, size_t offset, size_t len)
 {
-    memset(&((u8_t*)buf)[offset], 0, len);
+    memset(buf, 0, len);
     return len;
 }
 

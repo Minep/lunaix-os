@@ -4,13 +4,13 @@ sym_types=$1
 bin=$2
 
 nm_out=$(nm -nfbsd "$bin")
-class_info=$(readelf -h "$bin" | grep 'Class:' | awk '{print $2}')
+# class_info=$(readelf -h "$bin" | grep 'Class:' | awk '{print $2}')
 
 allsyms=($nm_out)
 allsyms_len=${#allsyms[@]}
 
 dtype="4byte"
-if [ "$class_info" == 'ELF64' ]; then
+if [ "$ARCH" == 'x86_64' ]; then
     dtype="8byte"
 fi
 

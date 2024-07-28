@@ -114,7 +114,7 @@ class LConfigEnvironment(Renderable):
         super().__init__()
         
         self.__ws_path = path.abspath(workspace)
-        self.__exec_globl = globals()
+        self.__exec_globl = {}
         self.__eval_stack = []
         self.__lc_modules = []
         self.__config_val = {}
