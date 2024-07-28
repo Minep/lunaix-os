@@ -11,30 +11,85 @@
 #include <hal/term.h>
 #include <usr/lunaix/term.h>
 
+#include "lcntl.h"
+
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
 
 static inline void
-raise_sig(struct term* at_term, struct linebuffer* lbuf, int sig)
+init_lcntl_state(struct lcntl_state* state, 
+                 struct term* tdev, enum lcntl_dir direction)
 {
-    term_sendsig(at_term, sig);
-    lbuf->sflags |= LSTATE_SIGRAISE;
+    *state = (struct lcntl_state) {
+        .tdev = tdev,
+        ._lf  = tdev->lflags,
+        ._cf  = tdev->cflags,
+        .direction = direction,
+        .echobuf = tdev->line_out.current,
+    };
+
+    struct linebuffer* lb;
+    if (direction == INBOUND) {
+        state->_if = tdev->iflags;
+        lb = &tdev->line_in;
+    }
+    else {
+        state->_of = tdev->oflags;
+        lb = &tdev->line_out;
+    }
+
+    state->inbuf = lb->current;
+    state->outbuf = lb->next;
+    state->active_line = lb;
 }
 
-static inline int must_inline optimize("-fipa-cp-clone")
-lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
+static inline void
+raise_sig(struct lcntl_state* state, int sig)
 {
-    struct rbuffer* raw = lbuf->current;
-    struct rbuffer* cooked = lbuf->next;
-    struct rbuffer* output = tdev->line_out.current;
+    term_sendsig(state->tdev, sig);
+    lcntl_raise_line_event(state, LEVT_SIGRAISE);
+}
 
-    int i = 0, _if = tdev->iflags & -!out, _of = tdev->oflags & -!!out,
-        _lf = tdev->lflags;
-    int allow_more = 1, latest_eol = cooked->ptr;
+static inline char
+__remap_character(struct lcntl_state* state, char c)
+{
+    if (c == '\r') {
+        if ((state->_if & _ICRNL) || (state->_of & _OCRNL)) {
+            return '\n';
+        }
+    } 
+    else if (c == '\n') {
+        if ((state->_if & _INLCR) || (state->_of & (_ONLRET))) {
+            return '\r';
+        }
+    }
+    else if ('a' <= c && c <= 'z') {
+        if ((state->_if & _IUCLC)) {
+            return c | 0b100000;
+        } else if ((state->_of & _OLCUC)) {
+            return c & ~0b100000;
+        }
+    }
+
+    return c;
+}
+
+static inline void
+lcntl_echo_char(struct lcntl_state* state, char c)
+{
+    rbuffer_put(state->echobuf, c);
+}
+
+int
+__ansi_actcontrol(struct lcntl_state* state, char chr);
+
+static inline int must_inline
+lcntl_transform_seq(struct lcntl_state* state)
+{
+    struct term* tdev = state->tdev;
     char c;
-
-    int (*lcntl_slave_put)(struct term*, struct linebuffer*, char) =
-        tdev->lcntl->process_and_put;
+    int i = 0;
+    bool full = false;
 
 #define EOL tdev->cc[_VEOL]
 #define EOF tdev->cc[_VEOF]
@@ -44,125 +99,115 @@ lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
 #define QUIT tdev->cc[_VQUIT]
 #define SUSP tdev->cc[_VSUSP]
 
-#define putc_safe(rb, chr)                  \
-    ({                                      \
-        if (!rbuffer_put_nof(rb, chr)) {    \
-            break;                          \
-        }                                   \
-    })
+    while (!lcntl_test_flag(state, LCNTLF_STOP)) 
+    {
+        lcntl_unset_flag(state, LCNTLF_SPECIAL_CHAR);
 
-    if (!out) {
-        // Keep all cc's (except VMIN & VTIME) up to L2 cache.
-        for (size_t i = 0; i < _VMIN; i++) {
-            prefetch_rd(&tdev->cc[i], 2);
+        if (!rbuffer_get(state->inbuf, &c)) {
+            break;
         }
-    }
 
-    while (rbuffer_get(raw, &c)) {
-
-        if (c == '\r' && ((_if & _ICRNL) || (_of & _OCRNL))) {
-            c = '\n';
-        } else if (c == '\n') {
-            if ((_if & _INLCR) || (_of & (_ONLRET))) {
-                c = '\r';
-            }
-        }
+        c = __remap_character(state, c);
 
         if (c == '\0') {
-            if ((_if & _IGNBRK)) {
+            if ((state->_if & _IGNBRK)) {
                 continue;
             }
 
-            if ((_if & _BRKINT)) {
-                raise_sig(tdev, lbuf, SIGINT);
+            if ((state->_if & _BRKINT)) {
+                raise_sig(state, SIGINT);
                 break;
             }
         }
 
-        if ('a' <= c && c <= 'z') {
-            if ((_if & _IUCLC)) {
-                c = c | 0b100000;
-            } else if ((_of & _OLCUC)) {
-                c = c & ~0b100000;
-            }
-        }
-
-        if (out) {
+        if (lcntl_outbound(state)) {
             goto do_out;
         }
 
         if (c == '\n') {
-            latest_eol = cooked->ptr + 1;
-            if ((_lf & _ECHONL)) {
-                rbuffer_put(output, c);
+            if (lcntl_check_echo(state, _ECHONL)) {
+                lcntl_echo_char(state, c);
             }
         }
 
         // For input procesing
 
+        lcntl_set_flag(state, LCNTLF_SPECIAL_CHAR);
+
         if (c == '\n' || c == EOL) {
-            lbuf->sflags |= LSTATE_EOL;
-        } else if (c == EOF) {
-            lbuf->sflags |= LSTATE_EOF;
-            rbuffer_clear(raw);
-            break;
-        } else if (c == INTR) {
-            raise_sig(tdev, lbuf, SIGINT);
-        } else if (c == QUIT) {
-            raise_sig(tdev, lbuf, SIGKILL);
-            break;
-        } else if (c == SUSP) {
-            raise_sig(tdev, lbuf, SIGSTOP);
-        } else if (c == ERASE) {
-            if (!rbuffer_erase(cooked))
-                continue;
-        } else if (c == KILL) {
-            // TODO shrink the rbuffer
-        } else {
-            goto keep;
+            lcntl_raise_line_event(state, LEVT_EOL);
         }
-
-        if ((_lf & _ECHOE) && c == ERASE) {
-            rbuffer_put(output, '\x8'); 
-            rbuffer_put(output, ' '); 
-            rbuffer_put(output, '\x8'); 
+        else if (c == EOF) {
+            lcntl_raise_line_event(state, LEVT_EOF);
+            lcntl_set_flag(state, LCNTLF_CLEAR_INBUF);
+            lcntl_set_flag(state, LCNTLF_STOP);
         }
-        if ((_lf & _ECHOK) && c == KILL) {
-            rbuffer_put(output, c);
-            rbuffer_put(output, '\n');
+        else if (c == INTR) {
+            raise_sig(state, SIGINT);
+            lcntl_set_flag(state, LCNTLF_CLEAR_OUTBUF);
         }
-
-        continue;
-
-    keep:
-        if ((_lf & _ECHO)) {
-            rbuffer_put(output, c);
+        else if (c == QUIT) {
+            raise_sig(state, SIGKILL);
+            lcntl_set_flag(state, LCNTLF_CLEAR_OUTBUF);
+            lcntl_set_flag(state, LCNTLF_STOP);
         }
-
-        goto put_char;
-
-    do_out:
-        if (c == '\n' && (_of & _ONLCR)) {
-            putc_safe(cooked, '\r');
+        else if (c == SUSP) {
+            raise_sig(state, SIGSTOP);
         }
-
-    put_char:
-        if (!allow_more) {
+        else if (c == ERASE) {
+            if (rbuffer_erase(state->outbuf) && 
+                lcntl_check_echo(state, _ECHOE)) 
+            {
+                lcntl_echo_char(state, '\x8'); 
+                lcntl_echo_char(state, ' '); 
+                lcntl_echo_char(state, '\x8');
+            }
             continue;
         }
-
-        if (!out && (_lf & _IEXTEN) && lcntl_slave_put) {
-            allow_more = lcntl_slave_put(tdev, lbuf, c);
-        } else {
-            allow_more = rbuffer_put_nof(cooked, c);
+        else if (c == KILL) {
+            lcntl_set_flag(state, LCNTLF_CLEAR_OUTBUF);
         }
+        else {
+            lcntl_unset_flag(state, LCNTLF_SPECIAL_CHAR);
+        }
+
+        if (lcntl_check_echo(state, _ECHOK) && c == KILL) {
+            lcntl_echo_char(state, c);
+            lcntl_echo_char(state, '\n');
+        }
+
+    do_out:
+        if (c == '\n' && (state->_of & _ONLCR)) {
+            full = !rbuffer_put_nof(state->outbuf, '\r');
+        }
+
+        if (!full) {
+            if (lcntl_inbound(state) && (state->_lf & _IEXTEN)) {
+                full = !__ansi_actcontrol(state, c);
+            }
+            else {
+                full = !lcntl_put_char(state, c);
+            }
+        }
+
+        if (lcntl_test_flag(state, LCNTLF_CLEAR_INBUF)) {
+            rbuffer_clear(state->inbuf);
+            lcntl_unset_flag(state, LCNTLF_CLEAR_INBUF);
+        }
+        
+        if (lcntl_test_flag(state, LCNTLF_CLEAR_OUTBUF)) {
+            rbuffer_clear(state->outbuf);
+            lcntl_unset_flag(state, LCNTLF_CLEAR_OUTBUF);
+        }
+
+        i++;
     }
 
-    if (!out && !rbuffer_empty(output) && !(_lf & _NOFLSH)) {
+    if (state->direction != OUTBOUND && !(state->_lf & _NOFLSH)) {
         term_flush(tdev);
     }
 
-    line_flip(lbuf);
+    line_flip(state->active_line);
 
     return i;
 }
@@ -170,11 +215,31 @@ lcntl_transform_seq(struct term* tdev, struct linebuffer* lbuf, bool out)
 int
 lcntl_transform_inseq(struct term* tdev)
 {
-    return lcntl_transform_seq(tdev, &tdev->line_in, false);
+    struct lcntl_state state;
+
+    init_lcntl_state(&state, tdev, INBOUND);
+    return lcntl_transform_seq(&state);
 }
 
 int
 lcntl_transform_outseq(struct term* tdev)
 {
-    return lcntl_transform_seq(tdev, &tdev->line_out, true);
+    struct lcntl_state state;
+
+    init_lcntl_state(&state, tdev, OUTBOUND);
+    return lcntl_transform_seq(&state);
+}
+
+int 
+lcntl_put_char(struct lcntl_state* state, char c)
+{
+    if (lcntl_check_echo(state, _ECHO)) {
+        lcntl_echo_char(state, c);
+    }
+
+    if (!lcntl_test_flag(state, LCNTLF_SPECIAL_CHAR)) {
+        return rbuffer_put_nof(state->outbuf, c);
+    }
+
+    return 1;
 }

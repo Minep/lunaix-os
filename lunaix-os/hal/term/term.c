@@ -8,12 +8,8 @@
 
 #include <usr/lunaix/ioctl_defs.h>
 
-#define ANSI_LCNTL 0
 #define termdev(dev) ((struct term*)(dev)->underlay)
 
-extern struct term_lcntl ansi_line_controller;
-static struct term_lcntl* line_controls[] = {[ANSI_LCNTL] =
-                                                 &ansi_line_controller};
 #define LCNTL_TABLE_LEN (sizeof(line_controls) / sizeof(struct term_lcntl*))
 
 static struct devclass termdev_class = DEVCLASS(DEVIF_NON, DEVFN_TTY, DEV_VTERM);
@@ -206,9 +202,6 @@ term_create(struct device* chardev, char* suffix)
     tdev->ops.exec_cmd = term_exec_cmd;
 
     waitq_init(&terminal->line_in_event);
-
-    // TODO choice of lcntl can be flexible
-    terminal->lcntl = line_controls[ANSI_LCNTL];
 
     alloc_term_buffer(terminal, 1024);
 

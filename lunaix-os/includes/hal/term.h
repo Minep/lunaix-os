@@ -17,20 +17,14 @@ struct linebuffer
     short sflags;
     short sz_hlf;
 };
-#define LSTATE_EOL (1)
-#define LSTATE_EOF (1 << 1)
-#define LSTATE_SIGRAISE (1 << 2)
+#define LEVT_EOL (1)
+#define LEVT_EOF (1 << 1)
+#define LEVT_SIGRAISE (1 << 2)
 
 typedef struct rbuffer** lbuf_ref_t;
 #define ref_current(lbuf) (&(lbuf)->current)
 #define ref_next(lbuf) (&(lbuf)->next)
 #define deref(bref) (*(bref))
-
-struct term_lcntl
-{
-    struct term* term;
-    int (*process_and_put)(struct term*, struct linebuffer*, char);
-};
 
 /**
  * @brief Communication port capability that a device is supported natively, 
@@ -67,7 +61,6 @@ struct term
 {
     struct device* dev;
     struct device* chdev;
-    struct term_lcntl* lcntl;
     struct linebuffer line_out;
     struct linebuffer line_in;
     char* scratch_pad;
@@ -82,8 +75,11 @@ struct term
     tcflag_t lflags;
     tcflag_t cflags;
     cc_t cc[_NCCS];
+
+    /* -- END POSIX.1-2008 compliant fields -- */
     speed_t iospeed;
     speed_t clkbase;
+    tcflag_t tflags;    // temp flags
 };
 
 extern struct device* sysconsole;
@@ -93,15 +89,6 @@ term_create(struct device* chardev, char* suffix);
 
 int
 term_bind(struct term* tdev, struct device* chdev);
-
-int
-term_push_lcntl(struct term* tdev, struct term_lcntl* lcntl);
-
-int
-term_pop_lcntl(struct term* tdev);
-
-struct term_lcntl*
-term_get_lcntl(u32_t lcntl_index);
 
 static inline void
 line_flip(struct linebuffer* lbf)

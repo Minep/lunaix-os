@@ -5,8 +5,8 @@
 
 #include <usr/lunaix/term.h>
 
-#define ONBREAK (LSTATE_EOF | LSTATE_SIGRAISE)
-#define ONSTOP (LSTATE_SIGRAISE | LSTATE_EOL | LSTATE_EOF)
+#define ONBREAK (LEVT_EOF | LEVT_SIGRAISE)
+#define ONSTOP (LEVT_SIGRAISE | LEVT_EOL | LEVT_EOF)
 
 static int
 do_read_raw(struct term* tdev)

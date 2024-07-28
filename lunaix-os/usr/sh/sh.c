@@ -132,6 +132,27 @@ sh_exec(const char** argv)
     waitpid(p, NULL, 0);
 }
 
+static char*
+sanity_filter(char* buf)
+{
+    int off = 0, i = 0;
+    char c;
+    do {
+        c = buf[i];
+        
+        if ((32 <= c && c <= 126) || !c) {
+            buf[i - off] = c;
+        }
+        else {
+            off++;
+        }
+
+        i++;
+    } while(c);
+
+    return buf;
+}
+
 void
 sh_loop()
 {
@@ -157,6 +178,7 @@ sh_loop()
         }
 
         buf[sz] = '\0';
+        sanity_filter(buf);
 
         // currently, this shell only support single argument
         if (!parse_cmdline(buf, argv)) {
