@@ -56,7 +56,7 @@ ext2gd_prepare_gdt(struct v_superblock* vsb)
     ext2sb->nr_gdesc    = nr_gd;
 
     bcache_init_zone(&ext2sb->gd_caches, gdesc_bcache_zone, 
-                ILOG2(64), 0, sizeof(struct ext2b_gdesc), &gdesc_bc_ops);
+                ilog2(64), 0, sizeof(struct ext2b_gdesc), &gdesc_bc_ops);
 
     llist_init_head(&ext2sb->gds);
     llist_init_head(&ext2sb->free_grps_blk);

@@ -47,7 +47,7 @@ typedef int bool;
     })
 
 #define offset(data, off)   \
-            ((void*)&((unsigned char*)data)[off])
+            ((void*)(__ptr(data) + (off)))
 
 #define __ptr(val)      ((ptr_t)(val))
 

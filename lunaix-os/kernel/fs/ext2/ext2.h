@@ -9,6 +9,8 @@
 
 typedef unsigned int ext2_bno_t;
 
+#define ext2_aligned    compact align(4)
+
 struct ext2b_super {
     u32_t s_ino_cnt;
     u32_t s_blk_cnt;
@@ -57,7 +59,7 @@ struct ext2b_super {
         u32_t s_algo_bmp;
     } compact;
 
-} compact;
+} ext2_aligned;
 
 struct ext2b_gdesc
 {
@@ -97,10 +99,10 @@ struct ext2b_inode
                 struct {
                     u32_t ind1;         // prima indirecta
                     u32_t ind23[2];     // secunda et tertia indirecta
-                };
+                } ext2_aligned;
                 u32_t inds[3];
             };
-        } i_block;
+        } ext2_aligned i_block;
         u32_t i_block_arr[15];
     };
 
@@ -110,7 +112,7 @@ struct ext2b_inode
     u32_t i_faddr;
 
     u8_t i_osd2[12];
-} compact align(4);
+} ext2_aligned;
 
 struct ext2b_dirent 
 {
@@ -119,7 +121,7 @@ struct ext2b_dirent
     u8_t name_len;
     u8_t file_type;
     char name[256];
-} align(4) compact;
+} ext2_aligned;
 #define EXT2_DRE(v_dnode) (fsapi_impl_data(v_dnode, struct ext2b_dirent))
 
 

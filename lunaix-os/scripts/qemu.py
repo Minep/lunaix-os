@@ -2,6 +2,9 @@
 
 import subprocess, time, os, re, argparse, json
 from pathlib import PurePosixPath
+import logging
+
+logger = logging.getLogger("auto_qemu")
 
 g_lookup = {}
 
@@ -109,6 +112,10 @@ class AHCIBus(QEMUPeripherals):
             d_ro   = get_config(disk, "ro",     default=False)
             d_fmt  = get_config(disk, "format", default="raw")
             d_id   = f"disk_{i}"
+
+            if not os.path.exists(d_img):
+                logger.warning(f"AHCI bus: {d_img} not exists, disk skipped")
+                continue
             
             cmds += [
                 "-drive", join_attrs([

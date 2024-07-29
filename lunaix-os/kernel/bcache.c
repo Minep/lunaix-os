@@ -53,7 +53,7 @@ bcache_create_zone(char* name)
 
 void
 bcache_init_zone(struct bcache* cache, bcache_zone_t lru, unsigned int log_ways, 
-                   int cap, size_t blk_size, struct bcache_ops* ops)
+                   int cap, unsigned int blk_size, struct bcache_ops* ops)
 {
     // TODO handle cap
     

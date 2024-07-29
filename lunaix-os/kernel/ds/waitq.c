@@ -51,8 +51,11 @@ pwake_all(waitq_t* queue)
     {
         thread = container_of(pos, struct thread, waitqueue);
 
-        assert(thread->state == PS_BLOCKED);
-        thread->state = PS_READY;
+        if (thread->state == PS_BLOCKED) {
+            thread->state = PS_READY;
+        }
+        
+        // already awaken or killed by other event, just remove it
         llist_delete(&pos->waiters);
     }
 }

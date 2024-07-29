@@ -48,9 +48,11 @@ probe_boot_medium()
                     dev->ident.unique,
                     dev->name.value,
                     (char*)volp->vol_id);
-            break;
+            goto done;
         }
     }
+
+    return NULL;
 
 done:
     vfree(volp);

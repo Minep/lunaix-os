@@ -48,6 +48,10 @@ static struct v_file_ops ext2_file_ops = {
     .sync = ext2_sync_inode
 };
 
+#define to_tag(e_ino, val)        \
+        (((val) >> (e_ino)->inds_lgents) | (1 << msbiti))
+#define valid_tag(tag)      ((tag) & (1 << msbiti))
+
 static void
 __btlb_insert(struct v_inode* inode, unsigned int blkid, bbuf_t buf)
 {
@@ -65,7 +69,7 @@ __btlb_insert(struct v_inode* inode, unsigned int blkid, bbuf_t buf)
 
     for (int i = 0; i < BTLB_SETS; i++)
     {
-        if (btlb->buffer[i].tag) {
+        if (valid_tag(btlb->buffer[i].tag)) {
             continue;
         }
 
@@ -80,14 +84,14 @@ __btlb_insert(struct v_inode* inode, unsigned int blkid, bbuf_t buf)
         the whole overhead of LRU eviction stuff. Just a trival
         random eviction will do the fine job
     */
-    cap_sel = hash_32(blkid, ILOG2(BTLB_SETS));
+    cap_sel = hash_32(blkid, ilog2(BTLB_SETS));
     btlbe = &btlb->buffer[cap_sel];
 
     fsblock_put(btlbe->block);
 
 found:
-    btlbe->tag = blkid & ~((1 << e_inode->inds_lgents) - 1);
-    btlbe->block = buf;
+    btlbe->tag = to_tag(e_inode, blkid);
+    btlbe->block = blkbuf_refonce(buf);
 }
 
 static bbuf_t
@@ -100,7 +104,7 @@ __btlb_hit(struct v_inode* inode, unsigned int blkid)
 
     e_inode = EXT2_INO(inode);
     btlb = e_inode->btlb;
-    in_tag = blkid & ~((1 << e_inode->inds_lgents) - 1);
+    in_tag = to_tag(e_inode, blkid);
 
     for (int i = 0; i < BTLB_SETS; i++)
     {
@@ -109,7 +113,7 @@ __btlb_hit(struct v_inode* inode, unsigned int blkid)
             return blkbuf_refonce(btlbe->block);
         }
     }
- 
+
     return NULL;
 }
 
@@ -126,7 +130,7 @@ __btlb_flushall(struct v_inode* inode)
     for (int i = 0; i < BTLB_SETS; i++)
     {
         btlbe = &btlb->buffer[i];
-        if (btlbe->tag) {
+        if (!valid_tag(btlbe->tag)) {
             continue;
         }
 
@@ -336,8 +340,8 @@ __create_inode(struct v_superblock* vsb, struct ext2_gdesc* gd, int inode_idx)
 
     b_inode = (struct ext2b_inode*)blkbuf_data(ino_tab);
     
-    inode            = valloc(sizeof(*inode));
-    inode->btlb      = valloc(sizeof(struct ext2_btlb));
+    inode            = vzalloc(sizeof(*inode));
+    inode->btlb      = vzalloc(sizeof(struct ext2_btlb));
     inode->buf       = ino_tab;
     inode->ino       = &b_inode[ino_tab_off];
     inode->blk_grp   = gd;
@@ -345,7 +349,7 @@ __create_inode(struct v_superblock* vsb, struct ext2_gdesc* gd, int inode_idx)
     ind_ents = sb->block_size / sizeof(int);
     assert(is_pot(ind_ents));
 
-    inode->inds_lgents = ILOG2(ind_ents);
+    inode->inds_lgents = ilog2(ind_ents);
     inode->ino_id = gd->ino_base + inode_idx;
 
     return inode;
@@ -767,6 +771,7 @@ __walk_indirects(struct v_inode* inode, unsigned int pos,
     __btlb_insert(inode, pos, table);
 
 _return:
+    assert(blkbuf_refcounts(table) >= 1);
     assert_fs(table);
     assert_fs(slotref);
 
@@ -784,8 +789,6 @@ ext2db_get(struct v_inode* inode, unsigned int data_pos)
     int errno;
     unsigned int blkid;
     struct walk_state state;
-
-    assert_fs(data_pos < 15);
 
     errno = __walk_indirects(inode, data_pos, &state, false);
     if (errno) {

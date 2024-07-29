@@ -30,7 +30,7 @@
  * https://elixir.bootlin.com/linux/v4.4/source/include/linux/log2.h#L85
  *
  */
-#define ILOG2(x)                                                               \
+#define ilog2(x)                                                               \
     (__builtin_constant_p(x) ? ((x) == 0              ? 0                      \
                                 : ((x) & (1ul << 31)) ? 31                     \
                                 : ((x) & (1ul << 30)) ? 30                     \
@@ -64,7 +64,9 @@
                                 : ((x) & (1ul << 2))  ? 2                      \
                                 : ((x) & (1ul << 1))  ? 1                      \
                                                       : 0)                      \
-                             : (31 - clz(x)))
+                             : (msbiti - clz(x)))
+
+#define llog2(x)   (msbitl - clzl(x))
 
 #ifndef CONFIG_NO_ASSERT
 #define assert(cond)                                                           \

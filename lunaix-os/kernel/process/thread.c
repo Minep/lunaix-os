@@ -49,16 +49,18 @@ __alloc_user_thread_stack(struct proc_info* proc,
 static ptr_t
 __alloc_kernel_thread_stack(struct proc_info* proc, ptr_t vm_mnt)
 {
-    pfn_t kstack_top = leaf_count(KSTACK_AREA_END);
+    pfn_t kstack_top = pfn(KSTACK_AREA_END);
     pfn_t kstack_end = pfn(KSTACK_AREA);
     pte_t* ptep      = mkptep_pn(vm_mnt, kstack_top);
     while (ptep_pfn(ptep) > kstack_end) {
-        ptep -= KSTACK_PAGES + 1;
+        ptep -= KSTACK_PAGES;
 
-        pte_t pte = pte_at(ptep + 1);
+        pte_t pte = pte_at(ptep);
         if (pte_isnull(pte)) {
             goto found;
         }
+
+        ptep--;
     }
 
     WARN("failed to create kernel stack: max stack num reach\n");
@@ -73,8 +75,8 @@ found:;
         return 0;
     }
 
-    set_pte(ptep, guard_pte);
-    ptep_map_leaflet(ptep + 1, mkpte_prot(KERNEL_DATA), leaflet);
+    set_pte(ptep++, guard_pte);
+    ptep_map_leaflet(ptep, mkpte_prot(KERNEL_DATA), leaflet);
 
     ptep += KSTACK_PAGES;
     return align_stack(ptep_va(ptep, LFT_SIZE) - 1);

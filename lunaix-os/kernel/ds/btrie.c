@@ -14,7 +14,6 @@
 #include <lunaix/spike.h>
 
 #define BTRIE_INSERT 1
-#define BITS (sizeof(unsigned long) * 8 - 1)
 
 struct btrie_node*
 __btrie_traversal(struct btrie* root, unsigned long index, int options)
@@ -24,7 +23,7 @@ __btrie_traversal(struct btrie* root, unsigned long index, int options)
     unsigned long i = 0;
     struct btrie_node* tree = root->btrie_root;
 
-    lz = index ? ICEIL(BITS - clz(index), root->order) : 0;
+    lz = index ? ICEIL(msbitl - clzl(index), root->order) : 0;
     lz = lz * root->order;
     bitmask = ((1 << root->order) - 1) << lz;
 

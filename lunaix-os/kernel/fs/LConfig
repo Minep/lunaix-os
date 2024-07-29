@@ -10,7 +10,7 @@ def file_system():
         """ Enable ext2 file system support """
 
         type(bool)
-        default(False)
+        default(True)
     
     @Term
     def fs_iso9660():

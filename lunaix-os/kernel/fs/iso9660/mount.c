@@ -11,7 +11,7 @@ struct cake_pile* drec_cache_pile;
 extern void
 iso9660_init_inode(struct v_superblock* vsb, struct v_inode* inode);
 
-static u32_t
+static size_t
 __iso9660_rd_capacity(struct v_superblock* vsb)
 {
     struct iso_superblock* isovsb = (struct iso_superblock*)vsb->data;

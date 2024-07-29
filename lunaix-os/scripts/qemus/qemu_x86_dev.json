@@ -53,6 +53,11 @@
                     "img": "$KIMG",
                     "ro": true,
                     "format": "raw"
+                },
+                {
+                    "type": "ide-hd",
+                    "img": "$EXT2_TEST_DISC",
+                    "format": "raw"
                 }
             ]
         },

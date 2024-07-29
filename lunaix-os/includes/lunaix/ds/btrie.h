@@ -23,7 +23,7 @@ struct btrie_node
 };
 
 void
-btrie_init(struct btrie* btrie, u32_t trunc_bits);
+btrie_init(struct btrie* btrie, unsigned int order);
 
 void*
 btrie_get(struct btrie* root, unsigned long index);

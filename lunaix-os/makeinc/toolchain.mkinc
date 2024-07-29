@@ -4,7 +4,7 @@ AS := $(CX_PREFIX)as
 AR := $(CX_PREFIX)ar
 LBUILD ?= $(shell realpath ./scripts/build-tools/luna_build.py)
 
-O := -O2
+
 W := -Wall -Wextra -Werror \
 		-Wno-unknown-pragmas \
 		-Wno-unused-function \
@@ -19,7 +19,9 @@ OFLAGS := -fno-omit-frame-pointer
 CFLAGS := -std=gnu99 $(OFLAGS) $(W) -g
 
 ifeq ($(MODE),debug)
-	O = -Og
+	O := -Og
+else
+	O := -O2
 endif
 
 CFLAGS += $(O)

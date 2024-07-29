@@ -134,7 +134,7 @@ sh_exec(const char** argv)
     pid_t p;
     int res;
     if (!(p = fork())) {
-        if (execve(name, argv, envp)) {
+        if (execve(buffer, argv, envp)) {
             sh_printerr();
         }
         _exit(1);

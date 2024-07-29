@@ -62,12 +62,12 @@ __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
     struct leaflet* leaflet;
 
     ptr_t kstack_pn = pfn(current_thread->kstack);
-    kstack_pn -= pfn(KSTACK_SIZE) - 1;
+    kstack_pn -= pfn(KSTACK_SIZE);
 
     // copy the kernel stack
     pte_t* src_ptep = mkptep_pn(VMS_SELF, kstack_pn);
     pte_t* dest_ptep = mkptep_pn(vm_mnt, kstack_pn);
-    for (size_t i = 0; i < pfn(KSTACK_SIZE); i++) {
+    for (size_t i = 0; i <= pfn(KSTACK_SIZE); i++) {
         pte_t p = *src_ptep;
 
         if (pte_isguardian(p)) {

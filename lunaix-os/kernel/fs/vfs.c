@@ -873,10 +873,10 @@ __DEFINE_LXSYSCALL3(int, lseek, int, fd, int, offset, int, options)
     
     switch (options) {
         case FSEEK_CUR:
-            overflow = sadd_overflow((int)file->f_pos, offset, &fpos);
+            overflow = sadd_of((int)file->f_pos, offset, &fpos);
             break;
         case FSEEK_END:
-            overflow = sadd_overflow((int)inode->fsize, offset, &fpos);
+            overflow = sadd_of((int)inode->fsize, offset, &fpos);
             break;
         case FSEEK_SET:
             fpos = offset;

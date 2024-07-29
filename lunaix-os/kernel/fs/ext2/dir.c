@@ -60,8 +60,8 @@ __dirent_realsize(struct ext2b_dirent* dirent)
 }
 
 static int
-__find_free_dirent_slot(struct v_inode* inode, unsigned int size, 
-                        struct ext2_dnode* e_dnode_out, unsigned int *reclen)
+__find_free_dirent_slot(struct v_inode* inode, size_t size, 
+                        struct ext2_dnode* e_dnode_out, size_t *reclen)
 {
     struct ext2_iterator iter;
     struct ext2b_dirent *dir, *prev = NULL;

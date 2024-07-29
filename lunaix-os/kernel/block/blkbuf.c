@@ -14,10 +14,10 @@ LOG_MODULE("blkbuf")
 static bcache_zone_t bb_zone;
 static struct cake_pile* bb_pile;
 
-static inline unsigned int
+static inline u64_t
 __tolba(struct blkbuf_cache* cache, unsigned int blk_id)
 {
-    return (cache->blksize * blk_id) / cache->blkdev->blk_size;
+    return ((u64_t)cache->blksize * (u64_t)blk_id) / cache->blkdev->blk_size;
 }
 
 static void
@@ -94,7 +94,7 @@ __blkbuf_take_slow(struct blkbuf_cache* bc, unsigned int block_id)
     struct blkio_req* req;
     struct vecbuf* vbuf;
     void* data;
-    unsigned int lba;
+    u64_t lba;
 
     data = valloc(bc->blksize);
 

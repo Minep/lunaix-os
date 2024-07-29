@@ -55,7 +55,7 @@ image: $(kbuild_dir) kernel usr/build
 	@cp -r usr/build/* $(os_img_dir)/usr
 	@cp -r $(kbin_dir)/* $(os_img_dir)/boot
 	@grub-mkrescue -o $(kimg) $(os_img_dir)\
-		-- -volid "$(OS_ID) $(OS_VER)" -system_id "$(OS_NAME)" \
+		-- -volid "LUNA" -system_id "Lunaix" \
 		-report_about FAILURE -abort_on FAILURE
 
 usr/build: user

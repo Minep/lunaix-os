@@ -46,7 +46,7 @@ signal_dispatch()
     struct sigact* prev_working = active_signal(current_thread);
     sigset_t mask = psig->sig_mask | (prev_working ? prev_working->sa_mask : 0);
 
-    int sig_selected = 31 - clz(psig->sig_pending & ~mask);
+    int sig_selected = msbiti - clz(psig->sig_pending & ~mask);
     sigset_clear(psig->sig_pending, sig_selected);
 
     if (!sig_selected) {

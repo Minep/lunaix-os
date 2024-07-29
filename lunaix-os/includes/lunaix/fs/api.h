@@ -7,8 +7,8 @@
 
 struct fsapi_vsb_ops
 {
-    u32_t (*read_capacity)(struct v_superblock* vsb);
-    u32_t (*read_usage)(struct v_superblock* vsb);
+    size_t (*read_capacity)(struct v_superblock* vsb);
+    size_t (*read_usage)(struct v_superblock* vsb);
     void (*init_inode)(struct v_superblock* vsb, struct v_inode* inode);
     void (*release)(struct v_superblock* vsb);
 };
