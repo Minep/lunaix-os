@@ -16,16 +16,16 @@ madt_parse(acpi_madt_t* madt, acpi_context* toc)
 
     size_t so_idx = 0;
     while (ics_start < ics_end) {
-        acpi_ics_hdr_t* entry = (acpi_ics_hdr_t*)ics_start;
+        acpi_ics_hdr_t* entry = __acpi_ics_hdr(ics_start);
         switch (entry->type) {
             case ACPI_MADT_LAPIC:
-                toc->madt.apic = (acpi_apic_t*)entry;
+                toc->madt.apic = __acpi_apic(entry);
                 break;
             case ACPI_MADT_IOAPIC:
-                toc->madt.ioapic = (acpi_ioapic_t*)entry;
+                toc->madt.ioapic = __acpi_ioapic(entry);
                 break;
             case ACPI_MADT_INTSO: {
-                acpi_intso_t* intso_tbl = (acpi_intso_t*)entry;
+                acpi_intso_t* intso_tbl = __acpi_intso(entry);
                 toc->madt.irq_exception[intso_tbl->source] = intso_tbl;
                 break;
             }

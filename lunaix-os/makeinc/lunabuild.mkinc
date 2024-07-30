@@ -1,0 +1,28 @@
+lbuild_dir := $(CURDIR)/.builder
+lbuild_config_h := $(lbuild_dir)/configs.h
+lbuild_mkinc := $(lbuild_dir)/lbuild.mkinc
+lconfig_save := $(CURDIR)/.config.json
+
+lbuild_opts := --lconfig-file LConfig
+
+all_lconfigs = $(shell find $(CURDIR) -name "LConfig")
+
+export
+$(lconfig_save): $(all_lconfigs)
+	@echo restarting configuration...
+	@$(LBUILD) --config $(lbuild_opts) --config-save $(lconfig_save)  --force\
+			   -o $(lbuild_dir)/
+
+export
+$(lbuild_config_h): $(lconfig_save)
+	@$(LBUILD) --config $(lbuild_opts) --config-save $(lconfig_save) -o $(@D)
+
+export
+$(lbuild_mkinc): $(lbuild_config_h)
+	@$(LBUILD) LBuild $(lbuild_opts) -o $(@D)
+
+.PHONY: config
+export
+config: $(all_lconfigs)
+	@$(LBUILD) --config $(lbuild_opts) --config-save $(lconfig_save) --force\
+			   -o $(lbuild_dir)/

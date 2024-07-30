@@ -1,9 +1,10 @@
 #include <klibc/string.h>
+#include <lunaix/compiler.h>
 
 #define WS_CHAR(c)                                                             \
     (c == ' ' || c == '\t' || c == '\n' || c == '\f' || c == '\v' || c == '\r')
 
-void
+void weak
 strrtrim(char* str)
 {
     unsigned long l = strlen(str);
@@ -18,7 +19,7 @@ strrtrim(char* str)
     str[l + 1] = '\0';
 }
 
-char*
+char* weak
 strltrim_safe(char* str)
 {
     unsigned long l = 0;

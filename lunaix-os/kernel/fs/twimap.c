@@ -6,9 +6,9 @@
 #include <klibc/strfmt.h>
 #include <klibc/string.h>
 
-#include <sys/mm/mempart.h>
+#include <sys/mm/pagetable.h>
 
-#define TWIMAP_BUFFER_SIZE MEM_PAGE
+#define TWIMAP_BUFFER_SIZE PAGE_SIZE
 
 void
 __twimap_default_reset(struct twimap* map)
@@ -32,7 +32,7 @@ __twimap_file_read(struct v_inode* inode, void* buf, size_t len, size_t fpos)
 static int
 __twimap_file_read_page(struct v_inode* inode, void* buf, size_t fpos)
 {
-    return __twimap_file_read(inode, buf, MEM_PAGE, fpos);
+    return __twimap_file_read(inode, buf, PAGE_SIZE, fpos);
 }
 
 int

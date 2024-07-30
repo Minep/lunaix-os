@@ -7,7 +7,7 @@
 #include <lunaix/status.h>
 #include <lunaix/syslog.h>
 #include <lunaix/trace.h>
-#include <lunaix/pcontext.h>
+#include <lunaix/hart_state.h>
 #include <lunaix/failsafe.h>
 
 #include <sys/mm/mm_defs.h>
@@ -25,23 +25,25 @@ __gather_memaccess_info(struct fault_context* context)
     
     context->mm = vmspace(__current);
 
-    if (mnt < VMS_MOUNT_1) {
+    if (!vmnt_packed(ptep)) {
         refva = (ptr_t)ptep;
         goto done;
     }
 
     context->ptep_fault = true;
-    context->remote_fault = (mnt != VMS_SELF);
+    context->remote_fault = !active_vms(mnt);
     
     if (context->remote_fault && context->mm) {
         context->mm = context->mm->guest_mm;
         assert(context->mm);
     }
 
+    // unpack the ptep to reveal the one true va!
+
 #if LnT_ENABLED(1)
     ptep = (pte_t*)page_addr(ptep_pfn(ptep));
     mnt  = ptep_vm_mnt(ptep);
-    if (mnt < VMS_MOUNT_1) {
+    if (!vmnt_packed(ptep)) {
         refva = (ptr_t)ptep;
         goto done;
     }
@@ -50,7 +52,7 @@ __gather_memaccess_info(struct fault_context* context)
 #if LnT_ENABLED(2)
     ptep = (pte_t*)page_addr(ptep_pfn(ptep));
     mnt  = ptep_vm_mnt(ptep);
-    if (mnt < VMS_MOUNT_1) {
+    if (!vmnt_packed(ptep)) {
         refva = (ptr_t)ptep;
         goto done;
     }
@@ -59,7 +61,7 @@ __gather_memaccess_info(struct fault_context* context)
 #if LnT_ENABLED(3)
     ptep = (pte_t*)page_addr(ptep_pfn(ptep));
     mnt  = ptep_vm_mnt(ptep);
-    if (mnt < VMS_MOUNT_1) {
+    if (!vmnt_packed(ptep)) {
         refva = (ptr_t)ptep;
         goto done;
     }
@@ -68,7 +70,7 @@ __gather_memaccess_info(struct fault_context* context)
     ptep = (pte_t*)page_addr(ptep_pfn(ptep));
     mnt  = ptep_vm_mnt(ptep);
     
-    assert(mnt < VMS_MOUNT_1);
+    assert(!vmnt_packed(ptep));
     refva = (ptr_t)ptep;
 
 done:
@@ -108,7 +110,7 @@ __prepare_fault_context(struct fault_context* fault)
 
     fault->resolving = pte_mkloaded(fault->resolving);
     fault->kernel_vmfault = kernel_vmfault;
-    fault->kernel_access  = kernel_context(fault->ictx);
+    fault->kernel_access  = kernel_context(fault->hstate);
 
     return true;
 }
@@ -174,14 +176,17 @@ __handle_anon_region(struct fault_context* fault)
 static void
 __handle_named_region(struct fault_context* fault)
 {
+    int errno = 0;
     struct mm_region* vmr = fault->vmr;
     struct v_file* file = vmr->mfile;
+    struct v_file_ops * fops = file->ops;
 
     pte_t pte       = fault->resolving;
     ptr_t fault_va  = page_aligned(fault->fault_va);
 
     u32_t mseg_off  = (fault_va - vmr->start);
     u32_t mfile_off = mseg_off + vmr->foff;
+    size_t mapped_len = vmr->flen;
 
     // TODO Potentially we can get different order of leaflet here
     struct leaflet* region_part = alloc_leaflet(0);
@@ -189,7 +194,25 @@ __handle_named_region(struct fault_context* fault)
     pte = pte_setprot(pte, region_pteprot(vmr));
     ptep_map_leaflet(fault->fault_ptep, pte, region_part);
 
-    int errno = file->ops->read_page(file->inode, (void*)fault_va, mfile_off);
+    if (mseg_off < mapped_len) {
+        mapped_len = MIN(mapped_len - mseg_off, PAGE_SIZE);
+    }
+    else {
+        mapped_len = 0;
+    }
+
+    if (mapped_len == PAGE_SIZE) {
+        errno = fops->read_page(file->inode, (void*)fault_va, mfile_off);
+    }
+    else {
+        leaflet_wipe(region_part);
+        
+        if (mapped_len) {
+            errno = fops->read(file->inode, 
+                    (void*)fault_va, mapped_len, mfile_off);
+        }
+    }
+
     if (errno < 0) {
         ERROR("fail to populate page (%d)", errno);
 
@@ -208,7 +231,7 @@ static void
 __handle_kernel_page(struct fault_context* fault)
 {
     // we must ensure only ptep fault is resolvable
-    if (fault->fault_va < VMS_MOUNT_1) {
+    if (!is_ptep(fault->fault_va)) {
         return;
     }
     
@@ -265,7 +288,7 @@ __fail_to_resolve(struct fault_context* fault)
         failsafe_diagnostic();
     }
 
-    trace_printstack_isr(fault->ictx);
+    trace_printstack_isr(fault->hstate);
     
     thread_setsignal(current_thread, _SIGSEGV);
 
@@ -316,15 +339,15 @@ done:
 }
 
 void
-intr_routine_page_fault(const isr_param* param)
+intr_routine_page_fault(const struct hart_state* hstate)
 {
-    if (param->depth > 10) {
+    if (hstate->depth > 10) {
         // Too many nested fault! we must messed up something
         // XXX should we failed silently?
         spin();
     }
 
-    struct fault_context fault = { .ictx = param };
+    struct fault_context fault = { .hstate = hstate };
 
     if (!__prepare_fault_context(&fault)) {
         __fail_to_resolve(&fault);
@@ -341,4 +364,6 @@ intr_routine_page_fault(const isr_param* param)
             leaflet_return(fault.prealloc);
         }
     }
+
+    tlb_flush_kernel(fault.fault_va);
 }

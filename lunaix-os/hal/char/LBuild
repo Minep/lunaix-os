@@ -1,0 +1,10 @@
+use("uart")
+
+sources([
+    "devnull.c",
+    "serial.c",
+    "devzero.c",
+])
+
+if config("vga_console"):
+    sources("lxconsole.c")

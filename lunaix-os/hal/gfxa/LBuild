@@ -1,0 +1,5 @@
+use("vga")
+
+sources([
+    "gfxm.c"
+])

@@ -38,14 +38,50 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
     pte_t* ptep_kernel  = mkl0tep(mkptep_va(src_mnt, KERNEL_RESIDENT));
 
     // Build the self-reference on dest vms
-    pte_t* ptep_sms     = mkptep_va(VMS_SELF, (ptr_t)ptep_dest);
-    pte_t* ptep_ssm     = mkptep_va(VMS_SELF, (ptr_t)ptep_sms);
+
+    /* 
+     *        -- What the heck are ptep_ssm and ptep_sms ? --
+     *      
+     *      ptep_dest point to the pagetable itself that is mounted
+     *          at dest_mnt (or simply mnt): 
+     *              mnt -> self -> self -> self -> L0TE@offset
+     * 
+     *      ptep_sms shallowed the recursion chain:
+     *              self -> mnt -> self -> self -> L0TE@self
+     * 
+     *      ptep_ssm shallowed the recursion chain:
+     *              self -> self -> mnt -> self -> L0TE@self
+     *      
+     *      Now, here is the problem, back to x86_32, the translation is 
+     *      a depth-3 recursion:
+     *              L0T -> LFT -> Page
+     *      
+     *      So ptep_ssm will terminate at mnt and give us a leaf
+     *      slot for allocate a fresh page table for mnt:
+     *              self -> self -> L0TE@mnt
+     * 
+     *      but in x86_64 translation has extra two more step:
+     *              L0T -> L1T -> L2T -> LFT -> Page
+     *      
+     *      So we must continue push down.... 
+     *      ptep_sssms shallowed the recursion chain:
+     *              self -> self -> self -> mnt  -> L0TE@self
+     * 
+     *      ptep_ssssm shallowed the recursion chain:
+     *              self -> self -> self -> self -> L0TE@mnt
+     * 
+     *      Note: PML4: 2 extra steps
+     *            PML5: 3 extra steps
+    */
+    pte_t* ptep_ssm     = mkl0tep_va(VMS_SELF, dest_mnt);
+    pte_t* ptep_sms     = mkl1tep_va(VMS_SELF, dest_mnt) + VMS_SELF_L0TI;
     pte_t  pte_sms      = mkpte_prot(KERNEL_DATA);
 
     pte_sms = alloc_kpage_at(ptep_ssm, pte_sms, 0);
     set_pte(ptep_sms, pte_sms);    
     
     tlb_flush_kernel((ptr_t)dest_mnt);
+    tlb_flush_kernel((ptr_t)ptep_sms);
 
     if (only_kernel) {
         ptep = ptep_kernel;
@@ -89,7 +125,7 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
         }
         
     cont:
-        if (ptep_vfn(ptep) == MAX_PTEN - 1) {
+        while (ptep_vfn(ptep) == MAX_PTEN - 1) {
             assert(level > 0);
             ptep = ptep_step_out(ptep);
             ptep_dest = ptep_step_out(ptep_dest);
@@ -105,8 +141,14 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
     assert(ptep_dest == ptepd_kernel);
     
     // Carry over the kernel (exclude last two entry)
-    while (ptep_vfn(ptep) < MAX_PTEN - 2) {
+    unsigned int i = ptep_vfn(ptep);
+    while (i++ < MAX_PTEN) {
         pte_t pte = *ptep;
+
+        if (l0tep_impile_vmnts(ptep)) {
+            goto _cont;
+        }
+
         assert(!pte_isnull(pte));
 
         // Ensure it is a next level pagetable,
@@ -117,12 +159,13 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
 
         set_pte(ptep_dest, pte);
         leaflet_borrow(leaflet);
-        
+    
+    _cont:
         ptep++;
         ptep_dest++;
     }
 
-    return pte_paddr(*(ptep_dest + 1));
+    return pte_paddr(pte_sms);
 }
 
 static void
@@ -130,6 +173,7 @@ vmsfree(ptr_t vm_mnt)
 {
     struct leaflet* leaflet;
     pte_t* ptep_head    = mkl0tep(mkptep_va(vm_mnt, 0));
+    pte_t* ptep_self    = mkl0tep(mkptep_va(vm_mnt, VMS_SELF));
     pte_t* ptep_kernel  = mkl0tep(mkptep_va(vm_mnt, KERNEL_RESIDENT));
 
     int level = 0;
@@ -158,7 +202,7 @@ vmsfree(ptr_t vm_mnt)
         }
 
     cont:
-        if (ptep_vfn(ptep) == MAX_PTEN - 1) {
+        while (ptep_vfn(ptep) == MAX_PTEN - 1) {
             ptep = ptep_step_out(ptep);
             leaflet = pte_leaflet_aligned(pte_at(ptep));
             
@@ -171,7 +215,7 @@ vmsfree(ptr_t vm_mnt)
         ptep++;
     }
 
-    leaflet = pte_leaflet_aligned(ptep_head[MAX_PTEN - 1]);
+    leaflet = pte_leaflet_aligned(pte_at(ptep_self));
     leaflet_return(leaflet);
 }
 
@@ -279,7 +323,7 @@ procvm_mount_self(struct proc_mm* mm)
 void
 procvm_unmount_self(struct proc_mm* mm)
 {
-    assert(mm->vm_mnt == VMS_SELF);
+    assert(active_vms(mm->vm_mnt));
 
     mm->vm_mnt = 0;
 }
@@ -291,7 +335,7 @@ procvm_enter_remote(struct remote_vmctx* rvmctx, struct proc_mm* mm,
     ptr_t vm_mnt = mm->vm_mnt;
     assert(vm_mnt);
     
-    pfn_t size_pn = pfn(size + MEM_PAGE);
+    pfn_t size_pn = pfn(size + PAGE_SIZE);
     assert(size_pn < REMOTEVM_MAX_PAGES);
 
     struct mm_region* region = region_get(&mm->regions, remote_base);

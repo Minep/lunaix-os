@@ -1,0 +1,11 @@
+@Term
+def arch():
+    """
+        set the ISA target
+    """
+    type(["i386", "x86_64", "aarch64", "rv64"])
+    default("i386")
+
+    env_val = env("ARCH")
+    if env_val is not None:
+        set_value(env_val)

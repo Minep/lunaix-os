@@ -68,7 +68,10 @@ void
 boot_end(struct boot_handoff*);
 
 void
-boot_cleanup();
+boot_begin_arch_reserve(struct boot_handoff*);
+
+void
+boot_clean_arch_reserve(struct boot_handoff*);
 
 static inline bool
 free_memregion(struct boot_mmapent* mmapent)

@@ -1,7 +1,7 @@
 #include <klibc/string.h>
 #include <lunaix/types.h>
 
-const char*
+const char* weak
 strchr(const char* str, int character)
 {
     char c = (char)character;

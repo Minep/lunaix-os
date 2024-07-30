@@ -1,0 +1,34 @@
+include("x86/LConfig")
+
+@Collection
+def architecture_support():
+    """
+        Config ISA related features
+    """
+
+    @Term
+    def arch():
+        """ Config ISA support """
+        type(["i386", "x86_64", "aarch64", "rv64"])
+        default("i386")
+
+        env_val = env("ARCH")
+        if env_val:
+            set_value(env_val)
+
+    @Term
+    @ReadOnly
+    def arch_bits():
+        type(["64", "32"])
+        match v(arch):
+            case "i386": 
+                default("32")
+            case "aarch64": 
+                default("64")
+            case "rv64": 
+                default("64")
+            case "x86_64": 
+                default("64")
+            case _:
+                default("32")
+        

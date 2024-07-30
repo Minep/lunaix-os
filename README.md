@@ -12,52 +12,72 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 
 ## 1. 一些实用资源
 
-如果有意研读LunaixOS的内核代码和其中的设计，以下资料可能会对此有用。
+如果有意研读LunaixOS的内核代码和其中的设计，或欲开始属于自己的OS开发之道，以下资料可能会对此有用。
 
 + [最新的LunaixOS源代码分析教程](docs/tutorial/0-教程介绍和环境搭建.md)
-+ [内核虚拟内存的详细布局](docs/img/lunaix-os-mem.png)
++ 内核虚拟内存的详细布局
+  + [x86_32](docs/img/lunaix-mem-map/lunaix-mem-x86_32.png)
+  + [x86_64](docs/img/lunaix-mem-map/lunaix-mem-x86_64.png)
 + [LunaixOS启动流程概览](docs/img/boot_sequence.jpeg)
 + LunaixOS总体架构概览（WIP）
++ [作者修改的QEMU](https://github.com/Minep/qemu) (添加了一些额外用于调试的功能)
 
 ## 2. 当前进度以及支持的功能
 
-该操作系统支持x86架构，运行在保护模式中，采用宏内核架构，目前仅支持单核心。架构与内核的解耦合工作正在进行中。
+Lunaix内核具有支持多种不同的指令集架构的能力，目前支持如下：
 
-在下述列表中，则列出目前所支持的所用功能和特性。列表项按照项目时间戳进行升序排列。
++ x86_32
++ x86_64
+
+Lunaix全部特性一览：
 
 + 使用Multiboot进行引导启动
+  + Multiboot 1
+  + Multiboot 2 (WIP)
 + APIC/IOAPIC作为中断管理器和计时器
 + ACPI
 + 虚拟内存
-+ 内存管理与按需分页
-+ 键盘输入
+  + 架构中性设计
+  + 按需分页
+  + Copy-on-Write
++ 内存管理
 + 进程模型
-+ 54个常见的Linux/POSIX系统调用（[附录1](#appendix1)）
-+ 用户模式
++ 61个常见的Linux/POSIX系统调用（[附录1](#appendix1)）
++ 用户/内核态隔离
 + 信号机制
 + PCI 3.0
 + PCIe 1.1 (WIP)
-+ Serial ATA AHCI
-+ 文件系统
++ 块设备驱动
+  + Serial ATA AHCI
+    + ATA设备
+    + ATAPI封装的SCSI协议
++ 文件系统（POSIX.1-2008, section 5 & 10）
   + 虚拟文件系统
+  + 内核态文件系统（twifs, Lunaix自己的sysfs）
+  + 设备文件系统（devfs, Lunaix自己的udev）
+  + 进程文件系统（procfs）
   + ISO9660
-    + 原生
-    + Rock Ridge拓展
+    + ECMA-119
+    + IEEE P1282（Rock Ridge拓展）
 + 远程GDB串口调试 (COM1@9600Bd)
 + 用户程序加载与执行
-+ 动态链接 (WIP)
 + 通用设备抽象层
-+ 通用图形设备抽象层
-  + 标准VGA实现
-+ 虚拟终端设备接口（兼容 POSIX.1-2008）
+  + 架构中性的设备支持位于：`lunaix-os/hal`
+    + 16550 UART
+    + ACPI （不完全实现）
+  + 架构耦合的设备支持位于：`lunaix-os/arch/<ARCH>/hal`
+    + x86
+      + APIC/IOAPIC 组合
+      + MC146818 RTC
+      + i8042 PS/2
+      + RNG（使用`rdrand`）
++ 通用图形设备抽象层 (Draft)
+  + 参考：`lunaix-os/hal/gfxa`
++ 虚拟终端设备接口（POSIX.1-2008, section 11）
+  + 参考：`lunaix-os/hal/term`
 + 线程模型
-
-已经测试过的环境：
-
-+ QEMU (>=7.0.0)
-+ Bochs（SATA功能不支持）
-+ Virtualbox
-+ Dell G3 3779
+  + 用户线程支持（pthread系列）
+  + 内核线程支持（抢占式内核设计）
 
 ## 3. 目录结构
 
@@ -69,6 +89,8 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 
 ## 4. 编译与构建
 
+**！如果想要立刻构建并运行，请参考4.6！**
+
 构建该项目需要满足以下条件：
 
 + gcc 工具链
@@ -78,7 +100,7 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 
 ### 4.1 使用 GNU CC 工具链
 
-正如同大多数OS一样，LunaixOS 是一个混合了 C 和汇编的产物。这就意味着你得要使用一些标准的C编译器来构建Lunaix。在这里，我推荐使用 GNU CC 工具链来进行构建。至于其他的工具链，如llvm，也可以去尝试，但对此我就不能作任何的保证了。
+正如同大多数OS一样，LunaixOS 是一个混合了 C 和汇编的产物。这就意味着你得要使用一些标准的C编译器来构建Lunaix。在这里，我推荐使用 GNU CC 工具链来进行构建。因为Lunaix 在编写时使用了大量的GNU CC 相关编译器属性修饰 (`__attribute__`) 。假若使用其他工具链，如LLVM，我对此就不能做出任何保证了。
 
 如果你使用的是基于 x86 指令集的Linux系统，不论是64位还是32位，**其本机自带的gcc就足以编译Lunaix**。 当然了，如果说你的平台是其他非x86的，你也可以指定使用某个针对x86_32的gcc套件来进行交叉编译——在`make`时通过`CX_PREFIX`变量来指定gcc套件的前缀。如下例所示，我们可以在任意平台上，如risc-v，单独使用一个面向x86_32的gcc来进行交叉编译：
 
@@ -86,31 +108,46 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 make CX_PREFIX=i686-linux-gnu- all
 ```
 
-由于目前Lunaix仅支持x86_32微架构， `CX_PREFIX` 指向的gcc必须具有针对x86_32架构进行交叉编译的能力。
-
 ### 4.2 Docker镜像
 
 对于开发环境，本项目也提供了Docker镜像封装。开箱即用，无需配置，非常适合懒人或惜时者。详细使用方法请转到：[Lunaix OSDK项目](https://github.com/Minep/os-devkit)。
 
 ### 4.3 构建选项
 
+
 假若条件满足，那么可以直接执行`make all`进行构建，完成后可在生成的`build`目录下找到可引导的iso。
 
 本项目支持的make命令：
 | 命令                     | 用途                                            |
 | ------------------------ | ----------------------------------------------- |
-| `make all`               | 构建镜像（`-O2`，但禁用CSE相关的优化项 **※** ） |
-| `make instable`          | 构建镜像（`-O2`，开启CSE相关优化）              |
-| `make all-debug`         | 构建适合调试用的镜像（`-Og`）                   |
-| `make run`               | 使用QEMU运行build目录下的镜像                   |
-| `make debug-qemu`        | 构建并使用QEMU进行调试                          |
-| `make debug-bochs`       | 构建并使用Bochs进行调试                         |
-| `make debug-qemu-vscode` | 用于vscode整合                                  |
-| `make clean`             | 删除build目录                                   |
+| `make all`               | 等价于 `make image` |
+| `make image`             | 构建ISO镜像，可直接启动，使用ISO9660文件系统         |
+| `make kernel`            | 构建内核ELF镜像，无法直接启动，需要引导程序        |
+| `make clean`             | 删除构建缓存，用于重新构建               |
+| `make config`            | 配置Lunaix                                   |
 
-**※：由于在`-O2`模式下，GCC会进行CSE优化，这导致LunaixOS会出现一些非常奇怪、离谱的bug，从而影响到基本运行。具体原因有待调查。**
+与make命令配套的环境变量，Lunaix的makefile会自动检测这些环境变量，以更改构建行为
 
-### 4.4 设置内核启动参数
++ `MODE={debug|release}` 使用debug模式构建（-Og）或者release模式（-O2）
++ `ARCH=<isa>` 为指定的指令集架构编译Lunaix。 所使用的配置选项均为选定架构默认，该环境变量
+  存在的目的就是方便用户进行快速编译，而无需钻研Lunaix的种种配置项。
+
+### 4.4 Lunaix的功能配置
+
+Lunaix是一个可配置的内核，允许用户在编译前选择应当包含或移除的功能。
+
+使用`make config`来进行基于命令行的交互配置。呈现方式采用Shell的形式，所有的配置项按照类似于文件树的形式组织，如单个配置项为一个“文件”，多个配置项组成的配置组为一个目录，呈现形式为方括号`[]`包裹起来的项目。在提示符中输入`usage`并回车可以查看具体的使用方法。
+
+一个最常用的配置可能就是`architecture_support/arch`了，也就是配置Lunaix所面向的指令集。比如，编译一个在x86_64平台上运行的Lunaix，在提示符中输入（**注意等号两侧的空格，这是不能省略的**）：
+
+```
+/architecture_support/arch = x86_64
+```
+
+之后输入`exit`保存并推出。而后正常编译。
+
+
+### 4.5 设置内核启动参数
 
 在 make 的时候通过`CMDLINE`变量可以设置内核启动参数列表。该列表可以包含多个参数，通过一个或多个空格来分割。每个参数可以为键值对 `<key>=<val>` 或者是开关标志位 `<flag>`。目前 Lunaix 支持以下参数：
 
@@ -128,47 +165,25 @@ console=/dev/ttyFB0
 
 **注意：** 根据操作系统和键盘布局的不同，telnet客户端对一些关键键位的映射（如退格，回车）可能有所差别（如某些版本的Linux会将退格键映射为`0x7f`，也就是ASCII的`<DEL>`字符，而非我们熟知`0x08`）。如果读者想要通过串口方式把玩Lunaix，请修改`usr/init/init.c`里面的终端初始化代码，将`VERASE`设置为正确的映射（修改方式可以参考 POSIX termios 的使用方式。由于Lunaix的终端接口的实现是完全兼容POSIX的，读者可以直接去查阅Linux自带的帮助`man termios`，无需作任何的转换）
 
+### 4.6 测试与体验 Lunaix
+
+用户可以使用脚本`live_debug.sh` 来快速运行Lunaix。 该脚本自动按照默认的选项构建Lunaix，而后调用 `scripts/qemu.py` 根据配置文件生成QEMU启动参数
+（配置文件位于`scripts/qemus/`）
+
+由于该脚本的主要用途是方便作者进行调试，所以在QEMU窗口打开后还需要进行以下动作：
+
+1. 使用telnet连接到`localhost:12345`，这里是Lunaix进行标准输入输出所使用的UART映射（QEMU为guest提供UART实现，并将其利用telnet协议重定向到宿主机）
+2. 在GDB窗口中输入`c`然后回车，此时Lunaix开始运行。这样做的目的是允许在QEMU进行模拟前，事先打好感兴趣的断点。
+
+该脚本的运行需要设置 `ARCH=<isa>` 环境变量，其值需要与编译时制定的值一致。
+
 ## 5. 运行，分支以及 Issue
 
-### 5.1 虚拟磁盘（非必须）
-
-你可以绑定一个虚拟磁盘镜像，可以使用如下命令快速创建一个：
-
-```bash
-qemu-img create -f vdi machine/disk0.vdi 128M
-```
-
-如果你想要使用别的磁盘镜像，需要修改`configs/make-debug-tool`
-
-找到这一行：
-
-```
--drive id=disk,file="machine/disk0.vdi",if=none \
-```
-
-然后把`machine/disk0.vdi`替换成你的磁盘路径。
-
-有很多办法去创建一个虚拟磁盘，比如[qemu-img](https://qemu-project.gitlab.io/qemu/system/images.html)。
-
-### 5.2 代码稳定性
+### 5.1 代码稳定性
 
 主分支一般是稳定的。因为在大多数情况下，我都会尽量保证本机运行无误后，push到该分支中。至于其他的分支，则是作为标记或者是开发中的功能。前者标记用分支一般会很快删掉；后者开发分支不能保证稳定性，这些分支的代码有可能没有经过测试，但可以作为Lunaix当前开发进度的参考。
 
 该系统是经过虚拟机和真机测试。如果发现在使用`make all`之后，虚拟机中运行报错，则一般是编译器优化问题。这个问题笔者一般很快就会修复，如果你使用别的版本的gcc（笔者版本11.2），出现了此问题，欢迎提issue。请参考[附录3：Issue的提交](#appendix3)
-
-下面列出一些可能会出现的问题。
-
-#### 问题#1： QEMU下8042控制器提示找不到
-
-这是QEMU配置ACPI时的一个bug，在7.0.0版中修复了。
-
-#### 问题#2：多进程运行时，偶尔会出现General Protection错误
-
-这很大概率是出现了竞态条件。虽然是相当不可能的。但如果出现了，还是请提issue。
-
-#### 问题#3：Bochs无法运行，提示找不到AHCI控制器
-
-正常，**因为Bochs不支持SATA**。请使用QEMU或VirtualBox。
 
 ## 6. 调试 Lunaix 内核
 
@@ -189,7 +204,15 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 
 ## 7. 参考教程
 
-**没有！！** 本教程以及该操作系统均为原创，没有基于任何市面上现行的操作系统开发教程，且并非是基于任何的开源内核的二次开发。
+#### 没有！！
+
+本教程以及该操作系统的所有的架构设计与实现**均为原创**。
+
+对此，作者可以保证，该项目是做到了三个 “没有”：
+
++ **没有** 参考任何现行的，关于操作系统开发的，教程或书籍。
++ **没有** 参考任何开源内核的源代码（包括Linux）
++ **没有** 基于任何开源内核的二次开发行为。
 
 为了制作LunaixOS，作者耗费大量时间和精力钻研技术文档，手册，理论书籍以及现行工业标准，从而尽量保证了知识的一手性。（这样一来，读者和听众们也算是拿到了二手的知识，而不是三手，四手，甚至n手的知识）。
 
@@ -227,7 +250,7 @@ qemu-img create -f vdi machine/disk0.vdi 128M
 
 #### 网站
 
-+ [OSDev](https://wiki.osdev.org/Main_Page) - 杂七杂八的参考，很多过来人的经验。作者主要用于上古资料查询以及收集；技术文献，手册，标准的粗略总结；以及开发环境/工具链的搭建。
++ [OSDev](https://wiki.osdev.org/Main_Page) - 杂七杂八的参考，很多过来人的经验。作者主要用于上古资料查询以及收集；技术文献，手册，标准的粗略总结；以及开发环境/工具链的搭建。当然，上面的内容假设了x86_32架构的生态，对于其他的ISA支持，该网站便失去了其价值了。
 + [FreeVGA](http://www.osdever.net/FreeVGA/home.htm) - 98年的资源！关于VGA编程技术的宝藏网站。
 + GNU CC 和 GNU LD 的官方文档。
 + [PCI Lookup](https://www.pcilookup.com/) - PCI设备编号查询

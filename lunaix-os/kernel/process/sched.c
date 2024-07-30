@@ -1,7 +1,6 @@
 #include <sys/abi.h>
 #include <sys/mm/mempart.h>
 
-#include <hal/intc.h>
 #include <sys/cpu.h>
 
 #include <lunaix/fs/taskfs.h>
@@ -18,8 +17,10 @@
 #include <lunaix/status.h>
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
-#include <lunaix/pcontext.h>
+#include <lunaix/hart_state.h>
 #include <lunaix/kpreempt.h>
+
+#include <lunaix/generic/isrm.h>
 
 #include <klibc/string.h>
 
@@ -31,6 +32,8 @@ volatile struct thread* current_thread = &empty_thread_obj;
 struct scheduler sched_ctx;
 
 struct cake_pile *proc_pile ,*thread_pile;
+
+#define root_process   (sched_ctx.procs[1])
 
 LOG_MODULE("SCHED")
 
@@ -207,7 +210,7 @@ schedule()
     sched_ctx.procs_index = to_check->process->pid;
 
 done:
-    intc_notify_eos(0);
+    isrm_notify_eos(0);
     run(to_check);
 
     fail("unexpected return from scheduler");
@@ -255,7 +258,6 @@ __DEFINE_LXSYSCALL1(unsigned int, alarm, unsigned int, seconds)
 
     bed->alarm_time = seconds ? now + seconds : 0;
 
-    struct proc_info* root_proc = sched_ctx.procs[0];
     if (llist_empty(&bed->sleepers)) {
         llist_append(&sched_ctx.sleepers, &bed->sleepers);
     }
@@ -389,7 +391,7 @@ alloc_process()
     proc->created = clock_systime();
     proc->pgid = proc->pid;
 
-    proc->sigreg = vzalloc(sizeof(struct sigregister));
+    proc->sigreg = vzalloc(sizeof(struct sigregistry));
     proc->fdtable = vzalloc(sizeof(struct v_fdtable));
 
     proc->mm = procvm_create(proc);
@@ -434,7 +436,7 @@ commit_process(struct proc_info* process)
     // every process is the child of first process (pid=1)
     if (!process->parent) {
         if (likely(!kernel_process(process))) {
-            process->parent = sched_ctx.procs[1];
+            process->parent = root_process;
         } else {
             process->parent = process;
         }
@@ -473,6 +475,20 @@ destory_thread(struct thread* thread)
     cake_release(thread_pile, thread);
 }
 
+static void
+orphan_children(struct proc_info* proc)
+{
+    struct proc_info *root;
+    struct proc_info *pos, *n;
+
+    root = root_process;
+
+    llist_for_each(pos, n, &proc->children, siblings) {
+        pos->parent = root;
+        llist_append(&root->children, &pos->siblings);
+    }
+}
+
 void 
 delete_process(struct proc_info* proc)
 {
@@ -509,7 +525,7 @@ delete_process(struct proc_info* proc)
 
     vfree(proc->fdtable);
 
-    signal_free_registers(proc->sigreg);
+    signal_free_registry(proc->sigreg);
 
     procvm_mount(mm);
     
@@ -518,6 +534,8 @@ delete_process(struct proc_info* proc)
         // terminate and destory all thread unconditionally
         destory_thread(pos);
     }
+
+    orphan_children(proc);
 
     procvm_unmount_release(mm);
 

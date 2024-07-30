@@ -1,0 +1,27 @@
+ENTRY(_start)
+
+#ifdef CONFIG_ARCH_X86_64
+#   define EXEC_START 0x0000008000000000
+#else
+#   define EXEC_START 0x400000
+#endif
+
+SECTIONS {
+    . = EXEC_START;
+
+    .text BLOCK(4K) : {
+        *(.text)
+    }
+
+    .data BLOCK(4K) : {
+        *(.data)
+    }
+
+    .ro.data BLOCK(4K) : {
+        *(.ro.data)
+    }
+
+    .bss BLOCK(4K) : {
+        *(.bss)
+    }
+}

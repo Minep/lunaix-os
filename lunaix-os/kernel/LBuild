@@ -1,0 +1,20 @@
+use("block")
+use("debug")
+use("device")
+use("ds")
+use("exe")
+use("fs")
+use("mm")
+use("process")
+
+sources([
+    "boot_helper.c",
+    "kcmd.c",
+    "kinit.c",
+    "lunad.c",
+    "spike.c",
+    "kprint/kp_records.c",
+    "kprint/kprintf.c",
+    "time/clock.c",
+    "time/timer.c"
+])

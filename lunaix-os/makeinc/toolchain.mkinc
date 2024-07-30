@@ -2,11 +2,8 @@ CC := $(CX_PREFIX)gcc
 CC := $(CX_PREFIX)gcc
 AS := $(CX_PREFIX)as
 AR := $(CX_PREFIX)ar
+LBUILD ?= $(shell realpath ./scripts/build-tools/luna_build.py)
 
-STRIP_OSDEP_CC := -ffreestanding -fno-pie
-STRIP_OSDEP_LD := -nostdlib -nolibc -z noexecstack -no-pie -Wl,--build-id=none
-
-ARCH_OPT := -m32 -D__ARCH_IA32
 O := -O2
 W := -Wall -Wextra -Werror \
 		-Wno-unknown-pragmas \
@@ -17,25 +14,16 @@ W := -Wall -Wextra -Werror \
 		-Wno-discarded-qualifiers\
 		-Werror=incompatible-pointer-types
 
-OFLAGS := -fno-gcse\
-		  -fno-gcse-lm\
-		  -fno-cse-follow-jumps\
-		  -fno-cse-skip-blocks\
-		  -fno-optimize-strlen\
-		  -fno-inline-functions-called-once \
-		  -fno-inline-small-functions \
-		  -fno-indirect-inlining\
-		  -fno-omit-frame-pointer
+OFLAGS := -fno-omit-frame-pointer
 
-CFLAGS := $(ARCH_OPT) -std=gnu99 $(OFLAGS) $(W)
+CFLAGS := -std=gnu99 $(OFLAGS) $(W) -g
 
-ifeq ($(BUILD_MODE),debug)
+ifeq ($(MODE),debug)
 	O = -Og
-	CFLAGS += -g
 endif
 
-CFLAGS += $(O) $(STRIP_OSDEP_CC)
+CFLAGS += $(O)
 
-LDFLAGS := $(ARCH_OPT) $(O) $(STRIP_OSDEP_LD)
+LDFLAGS := $(O)
 
 MKFLAGS := --no-print-directory

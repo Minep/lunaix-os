@@ -3,7 +3,8 @@
 
 #include <sys/abi.h>
 
-#define _preemptible __attribute__((section(".kf.preempt")))
+#define _preemptible \
+        __attribute__((section(".kf.preempt"))) no_inline
 
 #define ensure_preempt_caller()                                 \
     do {                                                        \

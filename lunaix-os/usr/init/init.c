@@ -36,11 +36,17 @@ init_termios(int fd) {
     term.c_oflag = ONLCR | OPOST;
     term.c_cflag = CREAD | CLOCAL | CS8 | CPARENB;
     term.c_cc[VERASE] = 0x7f;
+    
+    cfsetispeed(&term, B9600);
+    cfsetospeed(&term, B9600);
 
     check(tcsetattr(fd, 0, &term));
 
     return 0;
 }
+
+const char* sh_argv[] = { "/usr/bin/sh", 0  };
+const char* sh_envp[] = {  0  };
 
 int
 main(int argc, const char** argv)
@@ -64,7 +70,9 @@ main(int argc, const char** argv)
     pid_t pid;
     int err = 0;
     if (!(pid = fork())) {
-        err = execve("/usr/bin/sh", NULL, NULL);
+
+        
+        err = execve(sh_argv[0], sh_argv, sh_envp);
         printf("fail to execute (%d)\n", errno);
         _exit(err);
     }

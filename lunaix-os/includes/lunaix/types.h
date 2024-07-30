@@ -5,8 +5,6 @@
 #include <stdarg.h>
 #include <usr/lunaix/types.h>
 
-#define PACKED __attribute__((packed))
-
 // TODO: WTERMSIG
 
 // TODO: replace the integer type with these. To make thing more portable.
@@ -14,13 +12,17 @@
 typedef unsigned char u8_t;
 typedef unsigned short u16_t;
 typedef unsigned int u32_t;
-typedef unsigned long long u64_t;
 typedef unsigned long ptr_t;
+typedef unsigned long reg_t;
+
+#ifndef CONFIG_ARCH_BITS_64
+typedef unsigned long long u64_t;
+#else
+typedef unsigned long u64_t;
+#endif
 
 typedef int pid_t;
 typedef signed long ssize_t;
-// typedef unsigned long size_t;
-// typedef unsigned long off_t;
 
 typedef unsigned int cpu_t;
 
@@ -43,5 +45,9 @@ typedef int bool;
         const typeof(((type*)0)->member)* __mptr = (ptr);                      \
         (ptr) ? (type*)((char*)__mptr - offsetof(type, member)) : 0;           \
     })
+
+#define __ptr(val)      ((ptr_t)(val))
+
+typedef va_list* sc_va_list;
 
 #endif /* __LUNAIX_TYPES_H */

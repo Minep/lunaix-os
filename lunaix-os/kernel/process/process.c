@@ -105,7 +105,7 @@ spawn_process_usr(struct thread** created, char* path,
         goto fail;
     }
 
-    struct exec_container container;
+    struct exec_host container;
     exec_init_container(&container, main_thread, VMS_MOUNT_1, argv, envp);
     if ((errno = exec_load_byname(&container, path))) {
         goto fail;

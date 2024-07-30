@@ -1,0 +1,6 @@
+default=0
+timeout=0
+
+menuentry "lunaix" {
+	multiboot /boot/kernel.bin $KCMD
+}

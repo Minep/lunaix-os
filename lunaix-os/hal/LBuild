@@ -1,0 +1,9 @@
+use("acpi")
+use("ahci")
+use("char")
+use("gfxa")
+use("rtc")
+use("term")
+use("timer")
+use("bus")
+

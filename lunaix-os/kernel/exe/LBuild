@@ -1,0 +1,5 @@
+use("elf-generic")
+
+sources([
+    "exec.c"
+])

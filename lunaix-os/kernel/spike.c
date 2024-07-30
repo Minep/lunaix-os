@@ -1,6 +1,6 @@
 #include <klibc/strfmt.h>
 #include <lunaix/spike.h>
-#include <lunaix/pcontext.h>
+#include <lunaix/hart_state.h>
 #include <lunaix/syslog.h>
 #include <lunaix/trace.h>
 #include <lunaix/failsafe.h>

@@ -1,0 +1,35 @@
+
+@Collection
+def bus_if():
+    """ System/platform bus interface """
+
+    add_to_collection(hal)
+
+    @Term
+    def pci_enable():
+        """ Peripheral Component Interconnect (PCI) Bus """
+        type(bool)
+        default(True)
+
+    @Term
+    def pcie_ext():
+        """ Enable support of PCI-Express extension """
+        type(bool)
+        default(False)
+
+        return v(pci_enable)
+
+    @Term
+    def pci_pmio():
+        """ Use port-mapped I/O interface for controlling PCI """
+        type(bool)
+
+        has_pcie = v(pcie_ext)
+        is_x86 = v(arch) in [ "i386", "x86_64" ]
+
+        default(not has_pcie)
+        
+        if not is_x86 or has_pcie:
+            set_value(False)
+
+        return is_x86 and v(pci_enable)

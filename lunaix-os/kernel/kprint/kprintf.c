@@ -1,6 +1,7 @@
 #include <lunaix/fs/twifs.h>
 #include <lunaix/fs/twimap.h>
 #include <lunaix/syscall.h>
+#include <lunaix/syscall_utils.h>
 #include <lunaix/syslog.h>
 #include <lunaix/device.h>
 #include <lunaix/owloysius.h>
@@ -39,17 +40,23 @@ shift_level(const char* str, int* level)
 }
 
 static inline void
+kprintf_put(int level, const char* buf, size_t sz)
+{
+    kprec_put(&kprecs, level, buf, sz);
+
+    if (likely(sysconsole)) {
+        sysconsole->ops.write(sysconsole, buf, 0, sz);
+    }
+}
+
+static inline void
 kprintf_ml(const char* component, int level, const char* fmt, va_list args)
 {
     char* buf = &tmp_buf[MAX_BUFSZ_HLF];
     ksnprintf(buf, MAX_BUFSZ_HLF, "%s: %s\n", component, fmt);
 
     size_t sz = ksnprintfv(tmp_buf, buf, MAX_BUFSZ_HLF, args);
-    kprec_put(&kprecs, level, tmp_buf, sz);
-
-    if (likely(sysconsole)) {
-        sysconsole->ops.write(sysconsole, tmp_buf, 0, sz);
-    }
+    kprintf_put(level, tmp_buf, sz);
 }
 
 void
@@ -100,7 +107,8 @@ kprintf_dump_logs() {
     }
 }
 
-__DEFINE_LXSYSCALL3(void, syslog, int, level, const char*, fmt, va_list, args)
+__DEFINE_LXSYSCALL3(void, syslog, int, level, 
+                    const char*, buf, unsigned int, size)
 {
-    kprintf_ml("syslog", level, fmt, args);
+    kprintf_put(level, buf, size);
 }

@@ -61,7 +61,7 @@ rbuffer_puts(struct rbuffer* rb, char* buf, size_t len)
 }
 
 int
-rbuffer_gets(struct rbuffer* rb, char* buf, size_t len)
+rbuffer_gets_opt(struct rbuffer* rb, char* buf, size_t len, bool consumed)
 {
     if (!len || !rb->len)
         return 0;
@@ -79,7 +79,9 @@ rbuffer_gets(struct rbuffer* rb, char* buf, size_t len)
         memcpy(&buf[-nlen], &rb->buffer[ptr_start], nlen);
     }
 
-    rb->len -= nlen;
+    if (consumed) {
+        rb->len -= nlen;
+    }
 
     return nlen;
 }

@@ -11,6 +11,11 @@ iso_inspect/
 unused/
 __pycache__/
 
+.builder/
+.config.json
+
+link/lunaix.ld
+
 .gdb_history
 
 **.o

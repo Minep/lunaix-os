@@ -1,0 +1,6 @@
+@Collection
+def kernel_feature():
+    """ Config kernel features """
+    pass
+
+include("mm")

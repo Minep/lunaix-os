@@ -292,10 +292,14 @@ device_alert_poller(struct device* dev, int poll_evt)
     iopoll_wake_pollers(&dev->pollers);
 }
 
-__DEFINE_LXSYSCALL3(int, ioctl, int, fd, int, req, va_list, args)
+__DEFINE_LXSYSCALL3(int, ioctl, int, fd, int, req, sc_va_list, _args)
 {
     int errno = -1;
     struct v_fd* fd_s;
+    va_list args;
+
+    convert_valist(&args, _args);
+
     if ((errno &= vfs_getfd(fd, &fd_s))) {
         goto done;
     }

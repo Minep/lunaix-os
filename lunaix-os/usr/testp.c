@@ -6,26 +6,32 @@
 #include <unistd.h>
 
 void
-test_serial()
+test_serial(char* dev, int wr)
 {
-    int fd = open("/dev/ttyS0", FO_WRONLY);
+    int fd = open(dev, FO_WRONLY);
     if (fd < 0) {
-        printf("ttyS0 not accessable (%d)\n", errno);
+        printf("tty %s not accessable (%d)\n", dev, errno);
         return;
     }
 
-    char buf[32];
     int sz = 0;
+    char buf[256];
 
-    printf("ttyS0 input: ");
+    if (!wr) {
+        printf("tty input: ");
 
-    if ((sz = read(fd, buf, 31)) < 0) {
-        printf("write to ttyS0 failed (%d)\n", errno);
+        if ((sz = read(fd, buf, 31)) < 0) {
+            printf("read to tty failed (%d)\n", errno);
+        }
+
+        buf[sz] = 0;
+
+        printf("%s", buf);
     }
-
-    buf[sz] = 0;
-
-    printf("%s", buf);
+    else {
+        int size = snprintf(buf, 256, "serial test: %s", dev);
+        write(fd, buf, size);
+    }
 
     close(fd);
 }
@@ -33,18 +39,14 @@ test_serial()
 int
 main(int argc, char* argv[])
 {
-    if (argc <= 1) {
+    if (argc != 2) {
+        printf("usage: testp path_to_dev\n");
         return 1;
     }
 
     char* target = argv[1];
 
-    if (!strcmp(target, "serial")) {
-        test_serial();
-    } else {
-        printf("unknown test: %s\n", target);
-        return 1;
-    }
+    test_serial(target, 1);
 
     return 0;
 }

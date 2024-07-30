@@ -49,7 +49,7 @@ struct iso_vol
     u8_t type;
     u8_t std_id[5]; // CD001
     u8_t version;
-} PACKED;
+} compact;
 
 struct iso_vol_boot
 {
@@ -57,7 +57,7 @@ struct iso_vol_boot
     u8_t sys_id[32];
     u8_t boot_id[32];
     u8_t reserved; // align to data line width
-} PACKED;
+} compact;
 
 struct iso_datetime
 {
@@ -69,21 +69,21 @@ struct iso_datetime
     u8_t sec[2];
     u8_t ms[2];
     u8_t gmt;
-} PACKED;
+} compact;
 
 // 32bits both-byte-order integer
 typedef struct iso_bbo32
 {
     u32_t le; // little-endian
     u32_t be; // big-endian
-} PACKED iso_bbo32_t;
+} compact iso_bbo32_t;
 
 // 16bits both-byte-order integer
 typedef struct iso_bbo16
 {
     u16_t le; // little-endian
     u16_t be; // big-endian
-} PACKED iso_bbo16_t;
+} compact iso_bbo16_t;
 
 // (8.4) Describe a primary volume space
 struct iso_vol_primary
@@ -114,7 +114,7 @@ struct iso_vol_primary
     struct iso_datetime ex_time; // expiration
     struct iso_datetime ef_time; // effective
     u8_t fstruct_ver;            // file structure version, don't care!
-} PACKED;                        // size 1124
+} compact;                        // size 1124
 
 // Layout for Supplementary Vol. is almost identical to primary vol.
 // We ignore it for now. (see section 8.5, table 6)
@@ -128,14 +128,14 @@ struct iso_partition
     u8_t part_id[32];
     iso_bbo32_t part_addr;
     iso_bbo32_t part_size;
-} PACKED;
+} compact;
 
 // (6.10.4) MDU with variable record
 struct iso_var_mdu
 {
     u8_t len;
     u8_t content[0];
-} PACKED;
+} compact;
 
 struct iso_datetime2
 {
@@ -146,7 +146,7 @@ struct iso_datetime2
     u8_t min;
     u8_t sec;
     u8_t gmt;
-} PACKED;
+} compact;
 
 // (9.1) Directory Record [Embedded into Variable MDU]
 struct iso_drecord
@@ -160,7 +160,7 @@ struct iso_drecord
     u8_t gap_sz; // size of gap if FU is interleaved.
     iso_bbo16_t vol_seq;
     struct iso_var_mdu name;
-} PACKED;
+} compact;
 
 struct iso_xattr
 {
@@ -183,7 +183,7 @@ struct iso_xattr
     u8_t payload[0];
     // There is also a escape sequence after payload,
     // It however marked as optional, hence we ignore it.
-} PACKED;
+} compact;
 
 ///
 /// -------- IEEE P1281 SUSP ---------
@@ -197,7 +197,7 @@ struct isosu_base
     u16_t signature;
     u8_t length;
     u8_t version;
-} PACKED;
+} compact;
 
 struct isosu_er
 {
@@ -207,7 +207,7 @@ struct isosu_er
     u8_t src_len;
     u8_t ext_ver;
     u8_t id_des_src[0];
-} PACKED;
+} compact;
 
 ///
 /// -------- Rock Ridge Extension --------
@@ -234,35 +234,35 @@ struct isorr_px
     iso_bbo32_t uid;
     iso_bbo32_t gid;
     iso_bbo32_t sn;
-} PACKED;
+} compact;
 
 struct isorr_pn
 {
     struct isosu_base header;
     iso_bbo32_t dev_hi;
     iso_bbo32_t dev_lo;
-} PACKED;
+} compact;
 
 struct isorr_sl
 {
     struct isosu_base header;
     u8_t flags;
     char symlink[0];
-} PACKED;
+} compact;
 
 struct isorr_nm
 {
     struct isosu_base header;
     u8_t flags;
     char name[0];
-} PACKED;
+} compact;
 
 struct isorr_tf
 {
     struct isosu_base header;
     u8_t flags;
     char times[0];
-} PACKED;
+} compact;
 
 ///
 /// -------- VFS integration ---------

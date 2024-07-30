@@ -1,6 +1,7 @@
 #ifndef __LUNAIX_SIGNAL_H
 #define __LUNAIX_SIGNAL_H
 
+#include <lunaix/types.h>
 #include <usr/lunaix/signal_defs.h>
 
 #define _SIG_NUM 16
@@ -35,7 +36,7 @@ struct sigact
     pid_t sender;
 };
 
-struct sigregister {
+struct sigregistry {
     struct sigact* signals[_SIG_NUM];
 };
 
@@ -54,15 +55,15 @@ void
 signal_dup_context(struct sigctx* dest_ctx);
 
 void
-signal_dup_registers(struct sigregister* dest_reg);
+signal_dup_registry(struct sigregistry* dest_reg);
 
 void
 signal_reset_context(struct sigctx* sigctx);
 
 void
-signal_reset_register(struct sigregister* sigreg);
+signal_reset_registry(struct sigregistry* sigreg);
 
 void
-signal_free_registers(struct sigregister* sigreg);
+signal_free_registry(struct sigregistry* sigreg);
 
 #endif /* __LUNAIX_SIGNAL_H */

@@ -14,6 +14,8 @@
 #define unreachable             __builtin_unreachable()
 #define no_inline               __attribute__((noinline))
 
+#define defualt                 weak
+
 #define clz(bits)               __builtin_clz(bits)
 #define sadd_overflow(a, b, of) __builtin_sadd_overflow(a, b, of)
 #define umul_overflow(a, b, of) __builtin_umul_overflow(a, b, of)
@@ -32,7 +34,8 @@
 #define cacheline_align         align(cacheline_size)
 
 #define export_symbol(domain, namespace, symbol)\
-    typeof(symbol)* must_emit __SYMEXPORT_Z##domain##_N##namespace##_S##symbol = &(symbol)
+    typeof(symbol)* must_emit __SYMEXPORT_Z##domain##_N##namespace##_S##symbol \
+         = &(symbol)
 
 inline static void noret
 spin()

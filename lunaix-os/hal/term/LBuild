@@ -1,0 +1,8 @@
+sources([
+    "term.c",
+    "console.c",
+    "term_io.c",
+    "default_ops.c",
+    "lcntls/ansi_cntl.c",
+    "lcntls/lcntl.c",
+])

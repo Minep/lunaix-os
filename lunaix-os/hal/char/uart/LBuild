@@ -1,0 +1,11 @@
+sources([
+    "16x50_base.c",
+    "16x50_pmio.c",
+    "16x50_mmio.c",
+])
+
+if config("xt_16x50"):
+    sources("16x50_isa.c")
+
+if config("pci_16x50"):
+    sources("16x50_pci.c")

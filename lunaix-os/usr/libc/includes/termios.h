@@ -89,12 +89,20 @@ static inline speed_t cfgetospeed(const struct termios* termios) { return termio
 
 static inline int cfsetispeed(struct termios* termios, speed_t baud)
 {
+    if (baud > B38400) {
+        return -1;
+    }
+
     termios->c_baud = baud;
     return 0;
 }
 
 static inline int cfsetospeed(struct termios* termios, speed_t baud)
 {
+    if (baud > B38400) {
+        return -1;
+    }
+
     termios->c_baud = baud;
     return 0;
 }
@@ -109,6 +117,5 @@ static inline int cfsetospeed(struct termios* termios, speed_t baud)
 int     tcgetattr(int, struct termios *);
 int     tcsendbreak(int, int);
 int     tcsetattr(int, int, const struct termios *);
-
 
 #endif /* __LUNAIX_TERMIOS_H */

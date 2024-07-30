@@ -30,4 +30,14 @@
 #define MS_INVALIDATE 0x4
 #define MS_INVALIDATE_ALL 0x8
 
+struct usr_mmap_param
+{
+    void* addr;
+    unsigned long length;
+    int proct;
+    int flags;
+    int fd;
+    unsigned long offset;
+};
+
 #endif /* __LUNAIX_MANN_FLAGS_H */

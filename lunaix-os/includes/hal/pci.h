@@ -38,8 +38,10 @@
 #define PCI_BAR_TYPE(x) ((x) & 0x6)
 #define PCI_BAR_ADDR_MM(x) ((x) & ~0xf)
 #define PCI_BAR_ADDR_IO(x) ((x) & ~0x3)
+#define PCI_BAR_COUNT 6
 
-#define PCI_MSI_ADDR(msi_base) ((msi_base) + 4)
+#define PCI_MSI_ADDR_LO(msi_base) ((msi_base) + 4)
+#define PCI_MSI_ADDR_HI(msi_base) ((msi_base) + 8)
 #define PCI_MSI_DATA(msi_base, offset) ((msi_base) + 8 + offset)
 #define PCI_MSI_MASK(msi_base, offset) ((msi_base) + 0xc + offset)
 
@@ -115,10 +117,9 @@ typedef void* (*pci_drv_init)(struct pci_device*);
 
 struct pci_device_def
 {
-    u32_t dev_class;
-    u32_t dev_ident;
-    u32_t ident_mask;
     struct device_def devdef;
+
+    bool (*test_compatibility)(struct pci_device_def*, struct pci_device*);
 };
 #define pcidev_def(dev_def_ptr)                                                \
     container_of((dev_def_ptr), struct pci_device_def, devdef)
@@ -169,12 +170,104 @@ void
 pci_probe_bar_info(struct pci_device* device);
 
 void
+pci_setup_msi(struct pci_device* device, int vector);
+
+void
 pci_probe_msi_info(struct pci_device* device);
 
 int
-pci_bind_definition(struct pci_device_def* pcidev_def, int* more);
+pci_bind_definition(struct pci_device_def* pcidev_def, bool* more);
 
 int
 pci_bind_definition_all(struct pci_device_def* pcidef);
+
+static inline unsigned int
+pci_device_vendor(struct pci_device* pcidev)
+{
+    return PCI_DEV_VENDOR(pcidev->device_info);
+}
+
+static inline unsigned int
+pci_device_devid(struct pci_device* pcidev)
+{
+    return PCI_DEV_DEVID(pcidev->device_info);
+}
+
+static inline unsigned int
+pci_device_class(struct pci_device* pcidev)
+{
+    return PCI_DEV_CLASS(pcidev->class_info);
+}
+
+static inline struct pci_base_addr*
+pci_device_bar(struct pci_device* pcidev, int index)
+{
+    return &pcidev->bar[index];
+}
+
+static inline void
+pci_cmd_set_mmio(pci_reg_t* cmd)
+{
+    *cmd |= PCI_RCMD_MM_ACCESS;
+}
+
+
+static inline void
+pci_cmd_set_pmio(pci_reg_t* cmd)
+{
+    *cmd |= PCI_RCMD_IO_ACCESS;
+}
+
+static inline void
+pci_cmd_set_msi(pci_reg_t* cmd)
+{
+    *cmd |= PCI_RCMD_DISABLE_INTR;
+}
+
+static inline void
+pci_cmd_set_bus_master(pci_reg_t* cmd)
+{
+    *cmd |= PCI_RCMD_BUS_MASTER;
+}
+
+static inline void
+pci_cmd_set_fast_b2b(pci_reg_t* cmd)
+{
+    *cmd |= PCI_RCMD_FAST_B2B;
+}
+
+static inline bool
+pci_bar_mmio_space(struct pci_base_addr* bar)
+{
+    return (bar->type & BAR_TYPE_MMIO);
+}
+
+static inline bool
+pci_capability_msi(struct pci_device* pcidev)
+{
+    return !!pcidev->msi_loc;
+}
+
+static inline int
+pci_intr_irq(struct pci_device* pcidev)
+{
+    return PCI_INTR_IRQ(pcidev->intr_info);
+}
+
+void
+pci_apply_command(struct pci_device* pcidev, pci_reg_t cmd);
+
+pci_reg_t
+pci_read_cspace(ptr_t base, int offset);
+
+void
+pci_write_cspace(ptr_t base, int offset, pci_reg_t data);
+
+u16_t
+pci_config_msi_data(int vector);
+
+ptr_t
+pci_get_msi_base();
+
 
 #endif /* __LUNAIX_PCI_H */

@@ -298,6 +298,12 @@ struct pcache_pg
     u32_t len;
 };
 
+static inline bool
+check_itype_any(struct v_inode* inode, unsigned int type_mask)
+{
+    return !!(inode->itype & type_mask) || !type_mask;
+}
+
 void
 fsm_init();
 

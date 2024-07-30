@@ -1,0 +1,10 @@
+if config("ahci_enable"):
+    sources([
+        "ahci_pci.c",
+        "hbadev_export.c",
+        "ahci.c",
+        "utils.c",
+        "io_event.c",
+        "atapi.c",
+        "ata.c"
+    ])
