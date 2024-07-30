@@ -4,7 +4,6 @@ sources([
     "devnull.c",
     "serial.c",
     "devzero.c",
+    "lxconsole.c",
+    "chargame.c",
 ])
-
-if config("vga_console"):
-    sources("lxconsole.c")
