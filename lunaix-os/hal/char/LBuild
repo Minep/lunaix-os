@@ -7,4 +7,9 @@ sources([
 ])
 
 if config("vga_console"):
+
     sources("lxconsole.c")
+
+if config("chargame_console"):
+    
+    sources("chargame.c")
