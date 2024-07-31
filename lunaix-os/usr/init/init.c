@@ -67,7 +67,7 @@ main(int argc, const char** argv)
     must_mount(NULL, "/dev", "devfs", 0);
     must_mount(NULL, "/sys", "twifs", MNT_RO);
     must_mount(NULL, "/task", "taskfs", MNT_RO);
-    maybe_mount("/dev/block/sdb", "/mnt/disk", "ext2", MNT_RO);
+    maybe_mount("/dev/block/sdb", "/mnt/disk", "ext2", 0);
 
     int fd = check(open("/dev/tty", 0));
 
@@ -80,8 +80,6 @@ main(int argc, const char** argv)
     pid_t pid;
     int err = 0;
     if (!(pid = fork())) {
-
-        
         err = execve(sh_argv[0], sh_argv, sh_envp);
         printf("fail to execute (%d)\n", errno);
         _exit(err);

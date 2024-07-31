@@ -139,7 +139,7 @@ blkio_bindctx(struct blkio_req* req, struct blkio_context* ctx)
 static inline void
 blkio_setread(struct blkio_req* req)
 {
-    if ((req->flags | BLKIO_PENDING)) {
+    if ((req->flags & BLKIO_PENDING)) {
         return;
     }
     
@@ -155,7 +155,7 @@ blkio_setread(struct blkio_req* req)
 static inline void
 blkio_setwrite(struct blkio_req* req)
 {
-    if ((req->flags | BLKIO_PENDING)) {
+    if ((req->flags & BLKIO_PENDING)) {
         return;
     }
 

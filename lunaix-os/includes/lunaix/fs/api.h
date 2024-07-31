@@ -144,6 +144,13 @@ fsapi_dnode_setdector(struct v_dnode* dnode,
     dnode->destruct = free_cb;
 }
 
+static inline struct v_inode*
+fsapi_dnode_parent(struct v_dnode* dnode)
+{
+    assert(dnode->parent);
+    return dnode->parent->inode;
+}
+
 static inline void
 fsapi_dir_report(struct dir_context *dctx, 
                  const char *name, const int len, const int dtype)
@@ -162,14 +169,14 @@ fsapi_dir_report(struct dir_context *dctx,
  * @return bbuf_t 
  */
 static inline bbuf_t
-fsblock_take(struct v_superblock* vsb, unsigned int block_id)
+fsblock_get(struct v_superblock* vsb, unsigned int block_id)
 {
     return blkbuf_take(vsb->blks, block_id);
 }
 
 /**
  * @brief put the block back into cache, must to pair with
- *        fsblock_take. Otherwise memory leakage will occur.
+ *        fsblock_get. Otherwise memory leakage will occur.
  * 
  * @param blkbuf 
  */
@@ -177,6 +184,13 @@ static inline void
 fsblock_put(bbuf_t blkbuf)
 {
     return blkbuf_put(blkbuf);
+}
+
+
+static inline bbuf_t
+fsblock_take(bbuf_t blk)
+{
+    return blkbuf_refonce(blk);
 }
 
 static inline unsigned int

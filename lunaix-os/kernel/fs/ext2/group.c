@@ -112,7 +112,7 @@ __try_load_bitmap(struct v_superblock* vsb,
     flist_entry = &gd->free_list_sel[type];
 
     blk_id = ext2_datablock(vsb, bmp_blk_id);
-    buf    = fsblock_take(vsb, blk_id);
+    buf    = fsblock_get(vsb, blk_id);
     if (blkbuf_errbuf(buf)) {
         return false;
     }
@@ -152,7 +152,7 @@ ext2gd_take(struct v_superblock* vsb,
     part = ext2sb->gdt_frag[blk_id];
     if (!part) {
         blk_id = ext2_datablock(vsb, blk_id + 1);
-        part   = fsblock_take(vsb, blk_id);
+        part   = fsblock_get(vsb, blk_id);
         if (!part) {
             return EIO;
         }
@@ -250,20 +250,22 @@ ext2bmp_alloc_one(struct ext2_bmp* e_bmp)
     assert(e_bmp->raw);
     
     u8_t cell;
-    int slot;
+    int slot, next_free;
 
     if (!valid_bmp_slot(e_bmp->next_free)) {
         return ALLOC_FAIL;
     }
     
     slot = 0;
-    cell = e_bmp->bmp[e_bmp->next_free];
+    next_free = e_bmp->next_free;
+    cell = e_bmp->bmp[next_free];
     assert(cell != 0xff);
 
-    while ((cell & (1 << slot++)))
+    while ((cell & (1 << slot++)));
 
     cell |= (1 << --slot);
-    slot += (e_bmp->next_free * 8);
+    slot += (next_free * 8);
+    e_bmp->bmp[next_free] = cell;
 
     if (cell == 0xff) {
         __ext2bmp_update_next_free_cell(e_bmp);

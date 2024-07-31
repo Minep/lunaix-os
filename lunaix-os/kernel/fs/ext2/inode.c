@@ -91,7 +91,7 @@ __btlb_insert(struct v_inode* inode, unsigned int blkid, bbuf_t buf)
 
 found:
     btlbe->tag = to_tag(e_inode, blkid);
-    btlbe->block = blkbuf_refonce(buf);
+    btlbe->block = fsblock_take(buf);
 }
 
 static bbuf_t
@@ -110,7 +110,7 @@ __btlb_hit(struct v_inode* inode, unsigned int blkid)
     {
         btlbe = &btlb->buffer[i];
         if (btlbe->tag == in_tag) {
-            return blkbuf_refonce(btlbe->block);
+            return fsblock_take(btlbe->block);
         }
     }
 
@@ -333,7 +333,7 @@ __create_inode(struct v_superblock* vsb, struct ext2_gdesc* gd, int inode_idx)
     ino_tab_sel = inode_idx / tab_partlen;
     ino_tab_off = inode_idx % tab_partlen;
 
-    ino_tab = fsblock_take(vsb, gd->info->bg_ino_tab + ino_tab_sel);
+    ino_tab = fsblock_get(vsb, gd->info->bg_ino_tab + ino_tab_sel);
     if (blkbuf_errbuf(ino_tab)) {
         return NULL;
     }
@@ -386,7 +386,7 @@ ext2ino_get(struct v_superblock* vsb,
     b_inode = inode->ino;
 
     if (b_inode->i_block.ind1) {
-        inode->ind_ord1 = fsblock_take(vsb, b_inode->i_block.ind1);
+        inode->ind_ord1 = fsblock_get(vsb, b_inode->i_block.ind1);
         
         if (blkbuf_errbuf(inode->ind_ord1)) {
             vfree(inode->btlb);
@@ -478,7 +478,7 @@ __free_blk_recusrive(struct v_superblock *vsb, struct ext2_inode* inode,
     unsigned int* tab;
     unsigned int max_ents, blk;
 
-    buf = fsblock_take(vsb, ext2_datablock(vsb, ind_tab));
+    buf = fsblock_get(vsb, ext2_datablock(vsb, ind_tab));
     if (blkbuf_errbuf(buf)) {
         return EIO;
     }
@@ -603,24 +603,27 @@ int
 ext2_link(struct v_inode* this, struct v_dnode* new_name)
 {
     int errno = 0;
+    struct v_inode* parent;
     struct ext2_inode* e_ino;
     struct ext2_dnode* e_dno;
     struct ext2b_dirent dirent;
-
-    e_ino = EXT2_INO(this);
+    
+    e_ino  = EXT2_INO(this);
+    parent = fsapi_dnode_parent(new_name);
 
     ext2dr_setup_dirent(&dirent, new_name);
     ext2ino_linkto(e_ino, &dirent);
     
-    errno = ext2dr_insert(this, &dirent, &e_dno);
+    errno = ext2dr_insert(parent, &dirent, &e_dno);
     if (errno) {
-        return errno;
+        goto done;
     }
 
     new_name->data = e_dno;
     vfs_assign_inode(new_name, this);
-    
-    return 0;
+
+done:
+    return errno;
 }
 
 int
@@ -699,7 +702,7 @@ __walk_indirects(struct v_inode* inode, unsigned int pos,
     if (pos < 12) {
         index = pos;
         slotref = &b_inode->i_block_arr[pos];
-        table = blkbuf_refonce(e_inode->buf);
+        table = fsblock_take(e_inode->buf);
         inds = 0;
         goto _return;
     }
@@ -731,7 +734,7 @@ __walk_indirects(struct v_inode* inode, unsigned int pos,
     mask = ((1 << stride) - 1) << shifts;
 
     slotref = &b_inode->i_block.inds[inds - 1];
-    table = blkbuf_refonce(e_inode->buf);
+    table = fsblock_take(e_inode->buf);
 
     for (; level < inds; level++)
     {
@@ -749,7 +752,7 @@ __walk_indirects(struct v_inode* inode, unsigned int pos,
             fsblock_dirty(table);
         }
         else {
-            next_table = fsblock_take(vsb, next);
+            next_table = fsblock_get(vsb, next);
         }
 
         fsblock_put(table);
@@ -802,7 +805,7 @@ ext2db_get(struct v_inode* inode, unsigned int data_pos)
         return NULL;
     }
 
-    return fsblock_take(inode->sb, blkid);
+    return fsblock_get(inode->sb, blkid);
 }
 
 int
@@ -818,7 +821,7 @@ ext2db_acquire(struct v_inode* inode, unsigned int data_pos, bbuf_t* out)
     }
     if (*state.slot_ref) {
         fsblock_put(state.table);
-        buf = fsblock_take(inode->sb, *state.slot_ref);
+        buf = fsblock_get(inode->sb, *state.slot_ref);
         goto done;
     }
 
@@ -866,7 +869,7 @@ ext2db_alloc(struct v_inode* inode, bbuf_t* out)
     free_ino_idx += gd->base;
     free_ino_idx = ext2_datablock(vsb, free_ino_idx);
     
-    bbuf_t buf = fsblock_take(vsb, free_ino_idx);
+    bbuf_t buf = fsblock_get(vsb, free_ino_idx);
     if (blkbuf_errbuf(buf)) {
         return EIO;
     }

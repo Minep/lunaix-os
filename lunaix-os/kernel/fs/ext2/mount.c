@@ -144,7 +144,6 @@ static void
 ext2_init()
 {
     struct filesystem* fs = fsm_new_fs("ext2", -1);
-    fs->types |= FSTYPE_ROFS;
     fs->mount = ext2_mount;
     fs->unmount = ext2_umount;
 

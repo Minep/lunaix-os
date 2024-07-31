@@ -611,7 +611,11 @@ __vfs_try_locate_file(const char* path,
         goto done;
     }
 
-    errno = 0;
+    errno = vfs_check_writable(fdir);
+    if (errno) {
+        goto done;
+    }
+
     floc->fresh = true;
 
     file = vfs_d_alloc(fdir, &name);

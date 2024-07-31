@@ -4,7 +4,8 @@ sources([
     "signal_demo",
     "cat",
     "stat",
-    "test_pthread"
+    "test_pthread",
+    "file_test"
 ])
 
 compile_opts([

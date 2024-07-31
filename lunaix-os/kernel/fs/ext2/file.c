@@ -2,8 +2,8 @@
 #include <lunaix/mm/page.h>
 #include "ext2.h"
 
-#define blkpos(e_sb, fpos) (fpos / e_sb->block_size)
-#define blkoff(e_sb, fpos) (fpos / e_sb->block_size)
+#define blkpos(e_sb, fpos) ((fpos) / (e_sb)->block_size)
+#define blkoff(e_sb, fpos) ((fpos) % (e_sb)->block_size)
 
 int
 ext2_open_inode(struct v_inode* inode, struct v_file* file)
@@ -154,7 +154,7 @@ ext2_inode_write(struct v_inode *inode, void *buffer, size_t len, size_t fpos)
         memcpy(offset(blkbuf_data(buf), blk_off), buffer, size);
         buffer = offset(buffer, size);
 
-        fpos += blk_off;
+        fpos += size;
         acc += size;
     }
 

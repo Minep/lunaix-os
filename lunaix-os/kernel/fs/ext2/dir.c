@@ -40,12 +40,12 @@ __find_dirent_byname(struct v_inode* inode, struct hstr* name,
 
 done:
     e_dnode_out->self = (struct ext2_dnode_sub) {
-        .buf = blkbuf_refonce(iter.sel_buf),
+        .buf = fsblock_take(iter.sel_buf),
         .dirent = dir
     };
 
     e_dnode_out->prev = (struct ext2_dnode_sub) {
-        .buf = blkbuf_refonce(prev_buf),
+        .buf = fsblock_take(prev_buf),
         .dirent = prev
     };
 
@@ -93,23 +93,26 @@ __find_free_dirent_slot(struct v_inode* inode, size_t size,
             prev = dir;
             rec += dir->rec_len;
             total_rec += dir->rec_len;
-        } while(rec >= iter.blksz);
+        } while(rec < iter.blksz);
 
-        prev_buf = iter.sel_buf;
+        if (likely(prev_buf)) {
+            fsblock_put(prev_buf);
+        }
+        
+        prev_buf = fsblock_take(iter.sel_buf);
     }
 
 _break2:
 
     e_dnode_out->prev = (struct ext2_dnode_sub) {
-        .buf = blkbuf_refonce(prev_buf),
+        .buf = fsblock_take(prev_buf),
         .dirent = prev
     };
 
     
     if (!found) {
-        // if prev is the last, rec_len must be un-aligned
-        //  since it points to blksz - 1
-        assert_fs(!aligned_reclen(prev));
+        // if prev is the last, rec must point to the end of block
+        assert_fs(rec == iter.blksz);
         ext2db_itend(&iter);
         return itstate_sel(&iter, 1);
     }
@@ -120,7 +123,7 @@ _break2:
     dir = (struct ext2b_dirent*)offset(iter.data, rec);
     
     e_dnode_out->self = (struct ext2_dnode_sub) {
-        .buf = blkbuf_refonce(iter.sel_buf),
+        .buf = fsblock_take(iter.sel_buf),
         .dirent = dir
     };
 
@@ -395,6 +398,7 @@ ext2dr_insert(struct v_inode* this, struct ext2b_dirent* dirent,
     size_t size, new_reclen, old_reclen;
     struct ext2_inode* e_self;
     struct ext2_dnode*  e_dno;
+    struct ext2b_dirent* prev_dirent;
 
     e_self = EXT2_INO(this);
     e_dno  = vzalloc(sizeof(*e_dno));
@@ -405,15 +409,19 @@ ext2dr_insert(struct v_inode* this, struct ext2b_dirent* dirent,
         goto failed;
     }
 
-    old_reclen = e_dno->prev.dirent->rec_len;
+    prev_dirent = e_dno->prev.dirent;
+    old_reclen = prev_dirent->rec_len;
+    new_reclen = old_reclen;
 
     if (errno > 0) {
+        // prev is last record
         bbuf_t buf;
         if ((errno = ext2db_alloc(this, &buf))) {
             goto failed;
         }
 
-        new_reclen = e_dno->prev.dirent->rec_len + 1;
+        new_reclen = __dirent_realsize(prev_dirent);
+        new_reclen = ROUNDUP(new_reclen);
         e_dno->self = (struct ext2_dnode_sub) {
             .buf = buf,
             .dirent = block_buffer(buf, struct ext2b_dirent)
@@ -440,7 +448,7 @@ ext2dr_insert(struct v_inode* this, struct ext2b_dirent* dirent,
 
     dirent->rec_len = old_reclen - new_reclen - size;
 
-    e_dno->prev.dirent->rec_len = new_reclen;
+    prev_dirent->rec_len = new_reclen;
     memcpy(e_dno->self.dirent, dirent, size);
 
     fsblock_dirty(e_dno->prev.buf);
@@ -452,6 +460,8 @@ ext2dr_insert(struct v_inode* this, struct ext2b_dirent* dirent,
     else {
         *e_dno_out = e_dno;
     }
+
+    return errno;
 
 failed:
     __destruct_ext2_dnode(e_dno);
