@@ -37,10 +37,6 @@ __blkbuf_sync_callback(struct blkio_req* req)
         ERROR("sync failed: io error, 0x%x", req->errcode);
         return;
     }
-
-    if (!llist_empty(&buf->dirty)) {
-        llist_delete(&buf->dirty);
-    }
 }
 
 static void
@@ -88,7 +84,7 @@ static struct bcache_ops cache_ops = {
 };
 
 static bbuf_t
-__blkbuf_take_slow(struct blkbuf_cache* bc, unsigned int block_id)
+__blkbuf_take_slow_lockness(struct blkbuf_cache* bc, unsigned int block_id)
 {
     struct blk_buf* buf;
     struct blkio_req* req;
@@ -137,6 +133,7 @@ blkbuf_create(struct block_dev* blkdev, unsigned int blk_size)
 
     bcache_init_zone(&bb_cache->cached, bb_zone, 3, -1, blk_size, &cache_ops);
     llist_init_head(&bb_cache->dirty);
+    mutex_init(&bb_cache->lock);
 
     return bb_cache;
 }
@@ -145,11 +142,16 @@ bbuf_t
 blkbuf_take(struct blkbuf_cache* bc, unsigned int block_id)
 {
     bcobj_t cobj;
+    mutex_lock(&bc->lock);
     if (bcache_tryget(&bc->cached, block_id, &cobj)) {
+        mutex_unlock(&bc->lock);
         return (bbuf_t)bcached_data(cobj);
     }
 
-    return __blkbuf_take_slow(bc, block_id);
+    bbuf_t buf = __blkbuf_take_slow_lockness(bc, block_id);
+    
+    mutex_unlock(&bc->lock);
+    return buf;
 }
 
 void
@@ -176,9 +178,13 @@ blkbuf_dirty(bbuf_t buf)
     bbuf = ((struct blk_buf*)buf);
     bc = bcache_holder_embed(bbuf->cobj, struct blkbuf_cache, cached);
     
+    mutex_lock(&bc->lock);
+    
     if (llist_empty(&bbuf->dirty)) {
         llist_append(&bc->dirty, &bbuf->dirty);
     }
+
+    mutex_unlock(&bc->lock);
 }
 
 static inline void
@@ -190,6 +196,8 @@ __schedule_sync_event(struct blk_buf* bbuf, bool wait)
 
     blkio_setwrite(blkio);
     blkio_commit(blkio, wait ? BLKIO_WAIT : BLKIO_NOWAIT);
+
+    llist_delete(&bbuf->dirty);
 }
 
 void
@@ -206,9 +214,13 @@ blkbuf_syncall(struct blkbuf_cache* bc, bool async)
 {
     struct blk_buf *pos, *n;
 
+    mutex_lock(&bc->lock);
+
     llist_for_each(pos, n, &bc->dirty, dirty) {
         __schedule_sync_event(pos, !async);
     }
+
+    mutex_unlock(&bc->lock);
 
     if (async) {
         return true;

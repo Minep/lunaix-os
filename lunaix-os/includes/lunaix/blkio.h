@@ -5,6 +5,7 @@
 #include <lunaix/buffer.h>
 #include <lunaix/ds/llist.h>
 #include <lunaix/ds/waitq.h>
+#include <lunaix/ds/mutex.h>
 #include <lunaix/types.h>
 
 #define BLKIO_WRITE 0x1
@@ -54,7 +55,27 @@ struct blkio_context
     u32_t state;
     u32_t busy;
     void* driver;
+
+    mutex_t lock;
 };
+
+static inline void
+blkio_lock(struct blkio_context* contex)
+{
+    mutex_lock(&contex->lock);
+}
+
+static inline void
+blkio_unlock(struct blkio_context* contex)
+{
+    mutex_unlock(&contex->lock);
+}
+
+static inline bool
+blkio_stalled(struct blkio_context* contex)
+{
+    return !contex->busy;
+}
 
 void
 blkio_init();

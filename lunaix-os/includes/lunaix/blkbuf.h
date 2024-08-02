@@ -4,6 +4,7 @@
 #include <lunaix/blkio.h>
 #include <lunaix/bcache.h>
 #include <lunaix/block.h>
+#include <lunaix/ds/mutex.h>
 
 struct blkbuf_cache
 {
@@ -15,6 +16,7 @@ struct blkbuf_cache
     };
     struct llist_header dirty;
     struct block_dev* blkdev;
+    mutex_t lock;
 };
 
 struct blk_buf {

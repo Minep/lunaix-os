@@ -70,6 +70,7 @@ blkio_newctx(req_handler handler)
     ctx->handle_one = handler;
 
     llist_init_head(&ctx->queue);
+    mutex_init(&ctx->lock);
 
     return ctx;
 }
@@ -86,7 +87,6 @@ blkio_commit(struct blkio_req* req, int options)
 
     assert(req->io_ctx);
 
-    ctx = req->io_ctx;
     req->flags |= BLKIO_PENDING;
     
     if ((options & BLKIO_WAIT)) {
@@ -97,8 +97,13 @@ blkio_commit(struct blkio_req* req, int options)
         req->flags &= ~BLKIO_SHOULD_WAIT;
     }
 
-    llist_append(&ctx->queue, &req->reqs);
+    ctx = req->io_ctx;
 
+    blkio_lock(ctx);
+    
+    llist_append(&ctx->queue, &req->reqs);
+    
+    blkio_unlock(ctx);
     // if the pipeline is not running (e.g., stalling). Then we should schedule
     // one immediately and kick it started.
     // NOTE: Possible race condition between blkio_commit and pwait.
@@ -119,7 +124,7 @@ blkio_commit(struct blkio_req* req, int options)
          completed before we do pwait, causing the thread hanged indefinitely
     */
 
-    if (!ctx->busy) {
+    if (blkio_stalled(ctx)) {
         if ((options & BLKIO_WAIT)) {
             blkio_schedule(ctx);
             try_wait();
@@ -134,7 +139,19 @@ blkio_commit(struct blkio_req* req, int options)
 void
 blkio_schedule(struct blkio_context* ctx)
 {
+    // stall the pipeline if ctx is locked by others.
+    // we must not try to hold the lock in this case, as
+    //  blkio_schedule will be in irq context most of the
+    //  time, we can't afford the waiting there.
+    if (mutex_on_hold(&ctx->lock)) {
+        return;
+    }
+
+    // will always successed when in irq context
+    blkio_lock(ctx);
+
     if (llist_empty(&ctx->queue)) {
+        blkio_unlock(ctx);
         return;
     }
 
@@ -143,6 +160,8 @@ blkio_schedule(struct blkio_context* ctx)
 
     head->flags |= BLKIO_BUSY;
     ctx->busy++;
+
+    blkio_unlock(ctx);
 
     ctx->handle_one(head);
 }
