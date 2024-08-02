@@ -4,6 +4,7 @@
 #include <lunaix/fs.h>
 #include <lunaix/fcntl_defs.h>
 #include <lunaix/blkbuf.h>
+#include <klibc/string.h>
 
 struct fsapi_vsb_ops
 {
@@ -30,12 +31,6 @@ fsapi_set_inode_initiator(struct v_superblock* vsb, inode_init inode_initiator)
     vsb->ops.init_inode = inode_initiator;
 }
 
-static inline void
-fsapi_set_block_size(struct v_superblock* vsb, size_t block_size)
-{
-    vsb->blksize = block_size;
-}
-
 static inline size_t
 fsapi_block_size(struct v_superblock* vsb)
 {
@@ -52,14 +47,37 @@ fsapi_set_vsb_ops(struct v_superblock* vsb, struct fsapi_vsb_ops* basic_ops)
 }
 
 static inline void
-fsapi_complete_vsb(struct v_superblock* vsb, void* cfs_sb)
+fsapi_complete_vsb_setup(struct v_superblock* vsb, void* cfs_sb)
 {
     assert_fs(vsb->ops.init_inode);
     assert_fs(vsb->ops.read_capacity);
     assert_fs(vsb->blksize);
+    assert_fs(vsb->blks);
 
     vsb->data = cfs_sb;
-    vsb->blks = blkbuf_create(block_dev(vsb->dev), vsb->blksize);
+}
+
+static inline void
+fsapi_begin_vsb_setup(struct v_superblock* vsb, size_t blksz)
+{
+    assert(!vsb->blks);
+    assert(blksz);
+    
+    vsb->blksize = blksz;
+    vsb->blks = blkbuf_create(block_dev(vsb->dev), blksz);
+}
+
+static inline void
+fsapi_reset_vsb(struct v_superblock* vsb)
+{
+    assert(vsb->blks);
+    blkbuf_release(vsb->blks);
+
+    vsb->blks = NULL;
+    vsb->data = NULL;
+    vsb->blksize = 0;
+    vsb->root->mnt->flags = 0;
+    memset(&vsb->ops, 0, sizeof(vsb->ops));
 }
 
 static inline bool

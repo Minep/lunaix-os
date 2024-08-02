@@ -45,7 +45,7 @@ ext2gd_prepare_gdt(struct v_superblock* vsb)
     struct ext2_sbinfo* ext2sb;
 
     ext2sb = EXT2_SB(vsb);
-    sb = &ext2sb->raw;
+    sb = ext2sb->raw;
     
     nr_gd_pb = ext2sb->block_size / sizeof(struct ext2b_gdesc);
     nr_gd    = ICEIL(sb->s_blk_cnt, sb->s_blk_per_grp);
@@ -96,12 +96,12 @@ __try_load_bitmap(struct v_superblock* vsb,
 
     if (type == GDESC_INO_SEL) {
         bmp_blk_id = gd->info->bg_ino_map;
-        bmp_size = ext2sb->raw.s_ino_per_grp;
+        bmp_size = ext2sb->raw->s_ino_per_grp;
         bmp = &gd->ino_bmp;
     }
     else if (type == GDESC_BLK_SEL) {
         bmp_blk_id = gd->info->bg_blk_map;
-        bmp_size = ext2sb->raw.s_blk_per_grp;
+        bmp_size = ext2sb->raw->s_blk_per_grp;
         bmp = &gd->blk_bmp;
     }
     else {
@@ -166,8 +166,8 @@ ext2gd_take(struct v_superblock* vsb,
     *gd = (struct ext2_gdesc) {
         .info = &block_buffer(part, struct ext2b_gdesc)[blk_off],
         .buf  = part,
-        .base = index * ext2sb->raw.s_blk_per_grp,
-        .ino_base = index * ext2sb->raw.s_ino_per_grp
+        .base = index * ext2sb->raw->s_blk_per_grp,
+        .ino_base = index * ext2sb->raw->s_ino_per_grp
     };
 
     *out = gd;

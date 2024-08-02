@@ -120,9 +120,9 @@ __find_free_dirent_slot(struct v_inode* inode, size_t size,
     unsigned int dir_size;
 
     dir_size = ROUNDUP(__dirent_realsize(dir), 4);
-    rec = total_rec + dir_size;
     *reclen = dir_size;
 
+    rec = total_rec + dir_size;
     dir = (struct ext2b_dirent*)offset(iter.data, rec);
     
     e_dnode_out->self = (struct ext2_dnode_sub) {
@@ -432,10 +432,10 @@ ext2dr_insert(struct v_inode* this, struct ext2b_dirent* dirent,
     }
 
     /*
-                       +--------+
-                       |  prev  |
                    --- +--------+
-                    ^      ^
+                    ^  |  prev  |
+                    |  +--------+
+                    |      ^
                     |      |  new_reclen
                     |      v
                     |  +--------+  \
@@ -449,7 +449,7 @@ ext2dr_insert(struct v_inode* this, struct ext2b_dirent* dirent,
                        +--------+
     */
 
-    old_reclen -= new_reclen + size;
+    old_reclen -= new_reclen;
     dirent->rec_len = ROUNDUP(old_reclen, sizeof(int));
 
     prev_dirent->rec_len = new_reclen;

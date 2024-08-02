@@ -60,13 +60,14 @@ ext2gd_alloc_slot(struct ext2_gdesc* gd, int type_sel)
 
     if (type_sel == GDESC_INO_SEL) {
         gd->info->bg_free_ino_cnt--;
-        sb->raw.s_free_ino_cnt--;
+        sb->raw->s_free_ino_cnt--;
     } else {
         gd->info->bg_free_blk_cnt--;
-        sb->raw.s_free_blk_cnt--;
+        sb->raw->s_free_blk_cnt--;
     }
 
-    fsblock_dirty(gd->buf);    
+    fsblock_dirty(gd->buf);
+    fsblock_dirty(sb->buf);
     return alloc;
 }
 
@@ -87,11 +88,12 @@ ext2gd_free_slot(struct ext2_gdesc* gd, int type_sel, int slot)
 
     if (type_sel == GDESC_INO_SEL) {
         gd->info->bg_free_ino_cnt++;
-        sb->raw.s_free_ino_cnt++;
+        sb->raw->s_free_ino_cnt++;
     } else {
         gd->info->bg_free_blk_cnt++;
-        sb->raw.s_free_blk_cnt++;
+        sb->raw->s_free_blk_cnt++;
     }
 
     fsblock_dirty(gd->buf);
+    fsblock_dirty(sb->buf);
 }

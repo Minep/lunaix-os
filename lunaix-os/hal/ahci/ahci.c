@@ -255,6 +255,7 @@ hba_bind_vbuf(struct hba_cmdh* cmdh, struct hba_cmdt* cmdt, struct vecbuf* vbuf)
     do {
         assert_msg(i < HBA_MAX_PRDTE, "HBA: Too many PRDTEs");
         assert_msg(pos->buf.size <= 0x400000U, "HBA: Buffer too big");
+        assert_msg(pos->buf.size, "HBA: expect a non-zero buffer size");
 
         cmdt->entries[i++] =
           (struct hba_prdte){ .data_base = vmm_v2p((ptr_t)pos->buf.buffer),

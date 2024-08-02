@@ -174,6 +174,12 @@ blkio_when_completed(struct blkio_req* req, blkio_cb on_completed)
     req->completed = on_completed;
 }
 
+static inline bool
+blkio_is_pending(struct blkio_req* req)
+{
+    return (req->flags & BLKIO_PENDING);
+}
+
 /**
  * @brief Mark request to be freed-on-completion (FOC)
  * 

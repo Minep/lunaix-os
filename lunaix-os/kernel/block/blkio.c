@@ -79,7 +79,7 @@ blkio_commit(struct blkio_req* req, int options)
 {
     struct blkio_context* ctx;
 
-    if ((req->flags & BLKIO_PENDING)) {
+    if (blkio_is_pending(req)) {
         // prevent double submition
         return;
     }

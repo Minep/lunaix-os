@@ -6,10 +6,15 @@
 #define blkoff(e_sb, fpos) ((fpos) % (e_sb)->block_size)
 
 static inline void
-update_eino_after_write(struct v_inode *inode, int fpos)
+touch_ext2_inode(struct v_inode* inode)
 {
-    inode->fsize = fpos;
-    ext2ino_update(inode);
+    inode->atime = clock_unixtime();
+}
+
+static inline void
+update_eino_after_write(struct v_inode *inode)
+{
+    inode->mtime = clock_unixtime();
 }
 
 int
@@ -35,6 +40,8 @@ done:
         return 0;
     }
 
+    touch_ext2_inode(inode);
+    
     vfree(e_file);
     file->data = NULL;
     return errno;
@@ -44,6 +51,8 @@ int
 ext2_close_inode(struct v_file* file)
 {
     ext2ino_update(file->inode);
+    blkbuf_syncall(file->inode->sb->blks, true);
+
     vfree(file->data);
     return 0;
 }
@@ -168,7 +177,7 @@ ext2_inode_write(struct v_inode *inode, void *buffer, size_t len, size_t fpos)
         acc += size;
     }
 
-    update_eino_after_write(inode, fpos);
+    update_eino_after_write(inode);
 
     return (int)acc;
 }

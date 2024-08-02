@@ -338,10 +338,10 @@ __create_inode(struct v_superblock* vsb, struct ext2_gdesc* gd, int ino_index)
     struct ext2b_inode* b_inode;
     struct ext2_inode* inode;
     unsigned int ino_tab_sel, ino_tab_off, 
-                 tab_partlen, ind_ents;
+                 tab_partlen, ind_ents, inds_blks;
 
     sb = gd->sb;
-    tab_partlen = sb->block_size / sb->raw.s_ino_size;
+    tab_partlen = sb->block_size / sb->raw->s_ino_size;
     ino_tab_sel = ino_index / tab_partlen;
     ino_tab_off = ino_index % tab_partlen;
 
@@ -357,6 +357,12 @@ __create_inode(struct v_superblock* vsb, struct ext2_gdesc* gd, int ino_index)
     inode->buf       = ino_tab;
     inode->ino       = &b_inode[ino_tab_off];
     inode->blk_grp   = gd;
+
+    if (b_inode->i_blocks) {
+        inds_blks = b_inode->i_blocks - ICEIL(b_inode->i_size, 512);
+        inds_blks = inds_blks / (sb->block_size / 512);
+        inode->indirect_blocks = inds_blks;
+    }
 
     ind_ents = sb->block_size / sizeof(int);
     assert(is_pot(ind_ents));
@@ -377,13 +383,13 @@ ext2ino_get(struct v_superblock* vsb,
     struct ext2b_inode* b_inode;
     unsigned int blkgrp_id, ino_rel_id;
     unsigned int tab_partlen;
-    unsigned int ind_ents;
+    unsigned int ind_ents, prima_ind;
     int errno = 0;
     
     sb = EXT2_SB(vsb);
 
-    blkgrp_id   = to_fsblock_id(ino) / sb->raw.s_ino_per_grp;
-    ino_rel_id  = to_fsblock_id(ino) % sb->raw.s_ino_per_grp;
+    blkgrp_id   = to_fsblock_id(ino) / sb->raw->s_ino_per_grp;
+    ino_rel_id  = to_fsblock_id(ino) % sb->raw->s_ino_per_grp;
 
     if ((errno = ext2gd_take(vsb, blkgrp_id, &gd))) {
         return errno;
@@ -393,20 +399,23 @@ ext2ino_get(struct v_superblock* vsb,
     if (!inode) {
         return EIO;
     }
-
+    
     b_inode = inode->ino;
+    prima_ind = b_inode->i_block.ind1;
+    *out = inode;
 
-    if (b_inode->i_block.ind1) {
-        inode->ind_ord1 = fsblock_get(vsb, b_inode->i_block.ind1);
-        
-        if (blkbuf_errbuf(inode->ind_ord1)) {
-            vfree(inode->btlb);
-            vfree(inode);
-            return EIO;
-        }
+    if (prima_ind) {
+        return errno;
     }
 
-    *out = inode;
+    inode->ind_ord1 = fsblock_get(vsb, prima_ind);
+    if (blkbuf_errbuf(inode->ind_ord1)) {
+        vfree(inode->btlb);
+        vfree(inode);
+        *out = NULL;
+        return EIO;
+    }
+
     return errno;
 }
 
@@ -459,7 +468,7 @@ __free_block_at(struct v_superblock *vsb, unsigned int block_pos)
     }
 
     sb = EXT2_SB(vsb);
-    gd_index = block_pos / sb->raw.s_blk_per_grp;
+    gd_index = block_pos / sb->raw->s_blk_per_grp;
 
     if ((errno = ext2gd_take(vsb, gd_index, &gd))) {
         return errno;
@@ -563,8 +572,18 @@ __update_inode_access_metadata(struct ext2b_inode* b_ino,
     b_ino->i_ctime = inode->ctime;
     b_ino->i_atime = inode->atime;
     b_ino->i_mtime = inode->mtime;
-    b_ino->i_size  = inode->fsize;
-    b_ino->i_blocks = ICEIL(inode->fsize, 512);
+}
+
+static inline void
+__update_inode_size(struct ext2_inode* e_ino, unsigned int size)
+{
+    struct ext2b_inode* b_ino;
+
+    b_ino = e_ino->ino;
+    b_ino->i_size  = size;
+
+    b_ino->i_blocks = ICEIL(size, 512);
+    b_ino->i_blocks += e_ino->indirect_blocks;
 }
 
 int
@@ -665,6 +684,7 @@ ext2ino_update(struct v_inode* inode)
     
     e_ino = EXT2_INO(inode);
     __update_inode_access_metadata(e_ino->ino, inode);
+    __update_inode_size(e_ino, inode->fsize);
 
     fsblock_dirty(e_ino->buf);
 }
@@ -759,6 +779,7 @@ __walk_indirects(struct v_inode* inode, unsigned int pos,
                 return errno;
             }
 
+            e_inode->indirect_blocks++;
             *slotref = fsblock_id(next_table);
             fsblock_dirty(table);
         }

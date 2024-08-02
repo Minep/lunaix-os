@@ -36,7 +36,7 @@ static size_t
 ext2_rd_capacity(struct v_superblock* vsb)
 {
     struct ext2_sbinfo* sb = fsapi_impl_data(vsb, struct ext2_sbinfo);
-    return sb->raw.s_blk_cnt * fsapi_block_size(vsb);
+    return sb->raw->s_blk_cnt * fsapi_block_size(vsb);
 }
 
 static void
@@ -50,7 +50,7 @@ static size_t
 ext2_rd_usage(struct v_superblock* vsb)
 {
     struct ext2_sbinfo* sb = fsapi_impl_data(vsb, struct ext2_sbinfo);
-    size_t used = sb->raw.s_free_blk_cnt - sb->raw.s_blk_cnt;
+    size_t used = sb->raw->s_free_blk_cnt - sb->raw->s_blk_cnt;
     return used * fsapi_block_size(vsb);
 }
 
@@ -68,17 +68,22 @@ ext2_mount(struct v_superblock* vsb, struct v_dnode* mnt)
     struct ext2_sbinfo* ext2sb;
     struct ext2b_super* rawsb;
     struct v_inode* root_inode;
+    bbuf_t buf;
+    size_t block_size;
     int errno = 0;
 
     bdev = fsapi_blockdev(vsb);
     ext2sb = vzalloc(sizeof(*ext2sb));
-    rawsb = &ext2sb->raw;
+    rawsb = vzalloc(sizeof(*rawsb));
 
     errno = bdev->ops.read(bdev, rawsb, EXT2_PRIME_SB_OFF, sizeof(*rawsb));
     if (errno < 0) {
         goto failed;
     }
 
+    block_size = EXT2_BASE_BLKSZ << rawsb->s_log_blk_size;
+    fsapi_begin_vsb_setup(vsb, block_size);
+    
     if (rawsb->s_magic != EXT2_SUPER_MAGIC) {
         ERROR("invalid magic: 0x%x", rawsb->s_magic);
         goto unsupported;
@@ -94,8 +99,6 @@ ext2_mount(struct v_superblock* vsb, struct v_dnode* mnt)
         fsapi_set_readonly_mount(vsb);
     }
 
-    size_t block_size = EXT2_BASE_BLKSZ << rawsb->s_log_blk_size;
-
     if (block_size > PAGE_SIZE) {
         ERROR("block size must not greater than page size");
         goto unsupported;
@@ -105,24 +108,37 @@ ext2_mount(struct v_superblock* vsb, struct v_dnode* mnt)
     ext2sb->block_size = block_size;
     ext2sb->vsb = vsb;
     ext2sb->read_only = fsapi_readonly_mount(vsb);
+    ext2sb->raw = rawsb;
 
-    fsapi_set_block_size(vsb, block_size);
     fsapi_set_vsb_ops(vsb, &vsb_ops);
-    fsapi_complete_vsb(vsb, ext2sb);
+    fsapi_complete_vsb_setup(vsb, ext2sb);
 
     ext2gd_prepare_gdt(vsb);
-    
     root_inode = vfs_i_alloc(vsb);
 
     ext2ino_fill(root_inode, EXT2_ROOT_INO);
     vfs_assign_inode(mnt, root_inode);
 
+    // replace the superblock raw buffer with bcache managed one
+    buf = fsblock_get(vsb, ext2_datablock(vsb, 0));
+    if (block_size == EXT2_BASE_BLKSZ) {
+        ext2sb->raw = blkbuf_data(buf);
+    }
+    else {
+        ext2sb->raw = offset(blkbuf_data(buf), EXT2_BASE_BLKSZ);
+    }
+
+    ext2sb->buf = buf;
+    vfree(rawsb);
     return 0;
 
 unsupported:
     errno = ENOTSUP;
 
 failed:
+    vfree(ext2sb);
+    vfree(rawsb);
+    fsapi_reset_vsb(vsb);
     return errno;
 }
 

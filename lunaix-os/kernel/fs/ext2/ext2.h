@@ -160,11 +160,11 @@ struct ext2_sbinfo
     struct device* bdev;
     struct v_superblock* vsb;
     
-    struct ext2b_super raw;
+    struct ext2b_super* raw;
     bbuf_t* gdt_frag;
     struct bcache gd_caches;
     
-    bbuf_t sb_buf;
+    bbuf_t buf;
 
     struct {
         struct llist_header gds;
@@ -231,6 +231,7 @@ struct ext2_inode
     bbuf_t buf;                  // partial inotab that holds this inode
     unsigned int inds_lgents;       // log2(# of block in an indirection level)
     unsigned int ino_id;
+    unsigned int indirect_blocks;
 
     struct ext2b_inode* ino;        // raw ext2 inode
     struct ext2_btlb* btlb;         // block-TLB
@@ -302,7 +303,7 @@ struct ext2_file
 static inline unsigned int
 ext2_datablock(struct v_superblock* vsb, unsigned int id)
 {
-    return EXT2_SB(vsb)->raw.s_first_data_cnt + id;
+    return EXT2_SB(vsb)->raw->s_first_data_cnt + id;
 }
 
 

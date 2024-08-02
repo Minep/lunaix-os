@@ -184,9 +184,15 @@ blkbuf_dirty(bbuf_t buf)
 static inline void
 __schedule_sync_event(struct blk_buf* bbuf, bool wait)
 {
-    blkio_setwrite(bbuf->breq);
-    blkio_commit(bbuf->breq, 
-                 wait ? BLKIO_WAIT : BLKIO_NOWAIT);
+    struct blkio_req* blkio;
+
+    blkio = bbuf->breq;
+    if (blkio_is_pending(blkio)) {
+        return;
+    }
+
+    blkio_setwrite(blkio);
+    blkio_commit(blkio, wait ? BLKIO_WAIT : BLKIO_NOWAIT);
 }
 
 void
