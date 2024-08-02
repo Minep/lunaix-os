@@ -6,7 +6,8 @@ sources([
     "stat",
     "test_pthread",
     "file_test",
-    "maze"
+    "maze",
+    "mkdir",
 ])
 
 compile_opts([

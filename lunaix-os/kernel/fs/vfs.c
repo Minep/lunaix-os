@@ -259,7 +259,13 @@ vfs_pclose(struct v_file* file, pid_t pid)
     if (file->ref_count > 1) {
         atomic_fetch_sub(&file->ref_count, 1);
     } 
-    else if (!(errno = file->ops->close(file))) {
+    else {
+        
+        pcache_commit_all(file->inode);
+        if ((errno = file->ops->close(file))) {
+            return errno;
+        }
+
         atomic_fetch_sub(&file->dnode->ref_count, 1);
         file->inode->open_count--;
 
@@ -285,7 +291,6 @@ vfs_pclose(struct v_file* file, pid_t pid)
         }
         mnt_chillax(file->dnode->mnt);
 
-        pcache_commit_all(file->inode);
         cake_release(file_pile, file);
     }
     return errno;

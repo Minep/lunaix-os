@@ -6,20 +6,12 @@
 void
 pwait(waitq_t* queue)
 {
-    assert(current_thread);
     // prevent race condition.
     cpu_disable_interrupt();
 
-    waitq_t* current_wq = &current_thread->waitqueue;
-    assert(llist_empty(&current_wq->waiters));
+    prepare_to_wait(queue);
+    try_wait();
 
-    llist_append(&queue->waiters, &current_wq->waiters);
-
-    block_current_thread();
-    sched_pass();
-
-    // In case of SIGINT-forced awaken
-    llist_delete(&current_wq->waiters);
     cpu_enable_interrupt();
 }
 
@@ -58,4 +50,30 @@ pwake_all(waitq_t* queue)
         // already awaken or killed by other event, just remove it
         llist_delete(&pos->waiters);
     }
+}
+
+void
+prepare_to_wait(waitq_t* queue)
+{
+    assert(current_thread);
+    
+    waitq_t* current_wq = &current_thread->waitqueue;
+    assert(llist_empty(&current_wq->waiters));
+
+    llist_append(&queue->waiters, &current_wq->waiters);
+}
+
+void
+try_wait()
+{
+    waitq_t* current_wq = &current_thread->waitqueue;
+    if (waitq_empty(current_wq)) {
+        return;
+    }
+    
+    block_current_thread();
+    sched_pass();
+
+    // In case of SIGINT-forced awaken
+    llist_delete(&current_wq->waiters);
 }

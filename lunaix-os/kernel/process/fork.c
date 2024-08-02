@@ -149,6 +149,8 @@ done:
 pid_t
 dup_proc()
 {
+    cpu_disable_interrupt();
+    
     struct proc_info* pcb = alloc_process();
     if (!pcb) {
         syscall_result(ENOMEM);

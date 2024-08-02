@@ -54,6 +54,7 @@ ext2_close_inode(struct v_file* file)
     blkbuf_syncall(file->inode->sb->blks, true);
 
     vfree(file->data);
+    file->data = NULL;
     return 0;
 }
 

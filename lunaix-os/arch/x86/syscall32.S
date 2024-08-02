@@ -108,7 +108,9 @@
         pushl   8(%ebx)       /* ecx - #2 arg */
         pushl   4(%ebx)       /* ebx - #1 arg */
         
+        sti
         call    *(%eax)
+        cli
 
         addl    $20, %esp      /* remove the parameters from stack */
         

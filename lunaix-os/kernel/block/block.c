@@ -53,6 +53,7 @@ __block_commit(struct blkio_context* blkio, struct blkio_req* req, int flags)
     int errno;
     
     blkio_bindctx(req, blkio);
+    blkio_mark_nfoc(req);
     blkio_commit(req, flags);
 
     if ((errno = req->errcode)) {

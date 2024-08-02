@@ -12,13 +12,13 @@
 
 #define BLKIO_BUSY 0x4
 #define BLKIO_PENDING 0x8
+// Free on complete
+#define BLKIO_FOC 0x10
+#define BLKIO_SHOULD_WAIT 0x20
 
 #define BLKIO_WAIT 0x1
 #define BLKIO_NOWAIT 0
 #define BLKIO_NOASYNC 0x2
-
-// Free on complete
-#define BLKIO_FOC 0x10
 
 #define BLKIO_SCHED_IDEL 0x1
 

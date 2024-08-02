@@ -113,7 +113,9 @@
         movq    irdi(%rbx), %rcx    /* rdi -> rcx #4 arg */
         movq    irsi(%rbx), %r8     /* rsi -> r8  #5 arg */
         
+        sti
         call    *(%rax)
+        cli
         
         movq    %rax, irax(%rbx)    /* save the return value */
         

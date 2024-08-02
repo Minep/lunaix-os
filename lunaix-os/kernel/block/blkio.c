@@ -88,6 +88,15 @@ blkio_commit(struct blkio_req* req, int options)
 
     ctx = req->io_ctx;
     req->flags |= BLKIO_PENDING;
+    
+    if ((options & BLKIO_WAIT)) {
+        req->flags |= BLKIO_SHOULD_WAIT;
+        prepare_to_wait(&req->wait);
+    }
+    else {
+        req->flags &= ~BLKIO_SHOULD_WAIT;
+    }
+
     llist_append(&ctx->queue, &req->reqs);
 
     // if the pipeline is not running (e.g., stalling). Then we should schedule
@@ -101,16 +110,24 @@ blkio_commit(struct blkio_req* req, int options)
     // As we don't want to overwhelming the interrupt context and also keep the
     // request RTT as small as possible, hence #1 is preferred.
 
+    /*
+        FIXME
+        Potential racing here.
+        happened when blkio is committed at high volumn, while the
+         block device has very little latency.
+        This is particular serious for non-async blkio, it could
+         completed before we do pwait, causing the thread hanged indefinitely
+    */
+
     if (!ctx->busy) {
         if ((options & BLKIO_WAIT)) {
-            cpu_disable_interrupt();
             blkio_schedule(ctx);
-            pwait(&req->wait);
+            try_wait();
             return;
         }
         blkio_schedule(ctx);
     } else if ((options & BLKIO_WAIT)) {
-        pwait(&req->wait);
+        try_wait();
     }
 }
 
@@ -125,7 +142,7 @@ blkio_schedule(struct blkio_context* ctx)
     llist_delete(&head->reqs);
 
     head->flags |= BLKIO_BUSY;
-    head->io_ctx->busy++;
+    ctx->busy++;
 
     ctx->handle_one(head);
 }
@@ -140,7 +157,10 @@ blkio_complete(struct blkio_req* req)
 
     // Wake all blocked processes on completion,
     //  albeit should be no more than one process in everycase (by design)
-    pwake_all(&req->wait);
+    if ((req->flags & BLKIO_SHOULD_WAIT)) {
+        assert(!waitq_empty(&req->wait));
+        pwake_all(&req->wait);
+    }
 
     if (req->errcode) {
         WARN("request completed with error. (errno=0x%x, ctx=%p)",

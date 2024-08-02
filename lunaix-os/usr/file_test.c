@@ -41,7 +41,6 @@ main(int argc, const char* argv[])
         sz2 += write(fd, "\n\n", 2);
     }
 
-    fsync(fd);
     close(fd);
     close(fdrand);
 

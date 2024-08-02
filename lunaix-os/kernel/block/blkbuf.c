@@ -187,9 +187,6 @@ __schedule_sync_event(struct blk_buf* bbuf, bool wait)
     struct blkio_req* blkio;
 
     blkio = bbuf->breq;
-    if (blkio_is_pending(blkio)) {
-        return;
-    }
 
     blkio_setwrite(blkio);
     blkio_commit(blkio, wait ? BLKIO_WAIT : BLKIO_NOWAIT);

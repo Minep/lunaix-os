@@ -265,6 +265,7 @@ __translate_vfs_itype(unsigned int v_itype)
     }
     else if (check_itype(v_itype, VFS_IFDIR)) {
         e_itype = IMODE_IFDIR;
+        e_itype |= IMODE_UEX;
     }
     else if (check_itype(v_itype, VFS_IFSEQDEV)) {
         e_itype = IMODE_IFCHR;
@@ -706,10 +707,11 @@ ext2ino_update(struct v_inode* inode)
  *        during the walk by allocating and chaining indirect block.
  *        It require the file system is mounted writable.
  * 
- * @param inode 
- * @param pos 
- * @param state 
- * @param resolve 
+ * @param inode     inode to walk
+ * @param pos       flattened data block position to be located
+ * @param state     contain the walk result
+ * @param resolve   whether to auto allocate the indirection structure during 
+ *                  walk if `pos` is not exist.
  * @return int 
  */
 static int
