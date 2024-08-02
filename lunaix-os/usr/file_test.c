@@ -25,19 +25,21 @@ main(int argc, const char* argv[])
 
     fd = _open(argv[1], O_RDWR | O_CREAT);
     fdrand = _open("/dev/rand", O_RDONLY);
-
-    size = read(fdrand, buffer, BUFSIZE);
-
-    for (int i = 0; i < size; i++)
-    {
-        buffer[i] = (char)((buffer[i] % 94) + 33);
-    }
-
-    buffer[size - 1] = 0;
     
-    sz2 = write(fd, buffer, size - 1);
-    sz2 += write(fd, "\n\n", 2);
-    sz2 += write(fd, buffer, size - 1);
+    for (int i = 0; i < 100; i++)
+    {
+        printf("write to file: (round) {%d}/100\n", i + 1);
+        
+        size = read(fdrand, buffer, BUFSIZE);
+        printf(">>> read random chars: %d\n", size);
+        for (int i = 0; i < size; i++)
+        {
+            buffer[i] = (char)((unsigned char)(buffer[i] % 94U) + 33U);
+        }
+        
+        sz2 += write(fd, buffer, size);
+        sz2 += write(fd, "\n\n", 2);
+    }
 
     fsync(fd);
     close(fd);

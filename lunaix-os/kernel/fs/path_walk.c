@@ -120,6 +120,8 @@ __vfs_walk(struct v_dnode* start,
         current_level = dnode;
         current_inode = current_level->inode;
 
+        assert(current_inode);
+        
         if (check_symlink_node(current_inode) &&
             !(walk_options & VFS_WALK_NOFOLLOW)) {
             const char* link;

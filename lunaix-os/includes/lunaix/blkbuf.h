@@ -32,11 +32,18 @@ typedef void* bbuf_t;
         bbuf_t bb_##name;             \
     }
 
-#define INVL_BUFFER      0xdeadc0de;
+#define INVL_BUFFER      0xdeadc0de
+
+#define bbuf_null        ((bbuf_t)0)
 
 static inline bool
 blkbuf_errbuf(bbuf_t buf) {
     return (ptr_t)buf == INVL_BUFFER;
+}
+
+static inline bool
+blkbuf_nullbuf(bbuf_t buf) {
+    return buf == bbuf_null;
 }
 
 static inline unsigned int

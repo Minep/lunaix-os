@@ -9,7 +9,9 @@
 
 typedef unsigned int ext2_bno_t;
 
-#define ext2_aligned    compact align(4)
+#define ext2_aligned            compact align(4)
+#define to_ext2ino_id(fsblock_id)       ((fsblock_id) + 1)
+#define to_fsblock_id(ext2_ino)         ((ext2_ino) - 1)
 
 struct ext2b_super {
     u32_t s_ino_cnt;
@@ -161,6 +163,8 @@ struct ext2_sbinfo
     struct ext2b_super raw;
     bbuf_t* gdt_frag;
     struct bcache gd_caches;
+    
+    bbuf_t sb_buf;
 
     struct {
         struct llist_header gds;
@@ -418,6 +422,12 @@ ext2dr_itbegin(struct ext2_iterator* iter, struct v_inode* inode);
 
 void
 ext2dr_itend(struct ext2_iterator* iter);
+
+static inline bool
+ext2dr_itdrain(struct ext2_iterator* iter)
+{
+    return iter->pos > iter->end_pos;
+}
 
 bool
 ext2dr_itnext(struct ext2_iterator* iter);

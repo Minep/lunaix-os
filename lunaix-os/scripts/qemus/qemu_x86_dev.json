@@ -1,6 +1,7 @@
 {
     "arch": "$ARCH",
     "memory": "1G",
+    "ncpu": 1,
     "machine": "q35",
     "cpu": {
         "type": "base",

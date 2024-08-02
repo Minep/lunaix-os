@@ -168,7 +168,7 @@ blkbuf_put(bbuf_t buf)
 void
 blkbuf_dirty(bbuf_t buf)
 {
-    assert(!blkbuf_errbuf(buf));
+    assert(buf && !blkbuf_errbuf(buf));
 
     struct blk_buf* bbuf;
     struct blkbuf_cache* bc;

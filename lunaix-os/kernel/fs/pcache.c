@@ -5,6 +5,9 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 #include <lunaix/bcache.h>
+#include <lunaix/syslog.h>
+
+LOG_MODULE("pcache")
 
 #define pcache_obj(bcache) container_of(bcache, struct pcache, cache)
 
@@ -155,8 +158,8 @@ pcache_write(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
     bcobj_t obj;
 
     pcache = inode->pg_cache;
-
-    while (fpos < page_upaligned(end) && errno >= 0) {
+    
+    while (fpos < end && errno >= 0) {
         tag = pfn(fpos);
         off = va_offset(fpos);
         wr_cnt = MIN(end - fpos, PAGE_SIZE - off);
@@ -175,8 +178,8 @@ pcache_write(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
                 return errno;
             }
         }
-
-        memcpy(pg->data, data, wr_cnt);
+        
+        memcpy(offset(pg->data, off), data, wr_cnt);
         pcache_set_dirty(pcache, pg);
 
         if (obj) {
@@ -186,11 +189,11 @@ pcache_write(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
         }
 
 cont:
-        data += wr_cnt;
-        fpos = page_aligned(fpos + PAGE_SIZE);
+        data  = offset(data, wr_cnt);
+        fpos += wr_cnt;
     }
 
-    return errno < 0 ? errno : (int)((fpos + len) - end);
+    return errno < 0 ? errno : (int)(len - (end - fpos));
 }
 
 int

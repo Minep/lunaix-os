@@ -43,10 +43,13 @@ int
 ext2gd_alloc_slot(struct ext2_gdesc* gd, int type_sel) 
 {
     struct ext2_bmp* bmp;
+    struct ext2_sbinfo *sb;
     int alloc;
     
+    sb = gd->sb;
     bmp = &gd->bmps[type_sel];
     alloc = ext2bmp_alloc_one(bmp);
+    
     if (alloc < 0) {
         return alloc;
     }
@@ -57,11 +60,13 @@ ext2gd_alloc_slot(struct ext2_gdesc* gd, int type_sel)
 
     if (type_sel == GDESC_INO_SEL) {
         gd->info->bg_free_ino_cnt--;
+        sb->raw.s_free_ino_cnt--;
     } else {
         gd->info->bg_free_blk_cnt--;
+        sb->raw.s_free_blk_cnt--;
     }
 
-    fsblock_dirty(gd->buf);
+    fsblock_dirty(gd->buf);    
     return alloc;
 }
 
@@ -69,9 +74,11 @@ void
 ext2gd_free_slot(struct ext2_gdesc* gd, int type_sel, int slot)
 {
     struct llist_header *free_ent, *free_list;
+    struct ext2_sbinfo *sb;
 
     ext2bmp_free_one(&gd->bmps[type_sel], slot);
 
+    sb = gd->sb;
     free_ent  = &gd->free_list_sel[slot];
     free_list = &gd->sb->free_list_sel[slot];
     if (llist_empty(free_ent)) {
@@ -80,8 +87,10 @@ ext2gd_free_slot(struct ext2_gdesc* gd, int type_sel, int slot)
 
     if (type_sel == GDESC_INO_SEL) {
         gd->info->bg_free_ino_cnt++;
+        sb->raw.s_free_ino_cnt++;
     } else {
         gd->info->bg_free_blk_cnt++;
+        sb->raw.s_free_blk_cnt++;
     }
 
     fsblock_dirty(gd->buf);

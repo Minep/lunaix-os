@@ -211,7 +211,7 @@ class QEMUExec:
     def get_qemu_general_opts(self):
         return [
             "-m", get_config(self._opt, "memory", required=True),
-            "-smp", get_config(self._opt, "ncpu", default=1)
+            "-smp", str(get_config(self._opt, "ncpu", default=1))
         ]
 
     def add_peripheral(self, peripheral):
@@ -222,6 +222,7 @@ class QEMUExec:
         qemu_path = os.path.join(qemu_dir_override, qemu_path)
         cmds = [
             qemu_path,
+            *self.get_qemu_general_opts(),
             *self.get_qemu_arch_opts(),
             *self.get_qemu_debug_opts()
         ]
@@ -279,7 +280,4 @@ def main():
     q.start(arg_opt.qemu_dir)
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(e)
+    main()

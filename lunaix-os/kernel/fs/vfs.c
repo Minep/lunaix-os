@@ -571,6 +571,24 @@ struct file_locator {
     bool fresh;
 };
 
+/**
+ * @brief unlock the file locator (floc) if possible.
+ *        If the file to be located if not exists, and
+ *        any FLOC_*MKNAME flag is set, then the parent
+ *        dnode will be locked until the file has been properly
+ *        finalised by subsequent logic.
+ * 
+ * @param floc 
+ */
+static inline void
+__floc_try_unlock(struct file_locator* floc)
+{
+    if (floc->fresh) {
+        assert(floc->dir);
+        unlock_dnode(floc->dir);
+    }
+}
+
 static int
 __vfs_try_locate_file(const char* path,
                       struct file_locator* floc,
@@ -624,6 +642,8 @@ __vfs_try_locate_file(const char* path,
         return ENOMEM;
     }
 
+    lock_dnode(fdir);
+
     vfs_dcache_add(fdir, file);
 
 done:
@@ -661,8 +681,11 @@ vfs_do_open(const char* path, int options)
         errno = __vfs_mknod(dentry->inode, file, VFS_IFFILE, NULL);
         if (errno) {
             vfs_d_free(file);
+            __floc_try_unlock(&floc);
             return errno;
         }
+
+        __floc_try_unlock(&floc);
     }
 
 
@@ -1222,6 +1245,8 @@ __DEFINE_LXSYSCALL2(int, link, const char*, oldpath, const char*, newpath)
         goto done;
     }
 
+    __floc_try_unlock(&floc);
+
     to_link = floc.file;
     errno = __vfs_try_locate_file(newpath, &floc, FLOC_MKNAME);
     if (!errno) {
@@ -1235,6 +1260,7 @@ __DEFINE_LXSYSCALL2(int, link, const char*, oldpath, const char*, newpath)
     }
 
 done:
+    __floc_try_unlock(&floc);
     return DO_STATUS(errno);
 }
 
@@ -1361,6 +1387,7 @@ __DEFINE_LXSYSCALL2(
     unlock_inode(f_ino);
 
 done:
+    __floc_try_unlock(&floc);
     return DO_STATUS(errno);
 }
 

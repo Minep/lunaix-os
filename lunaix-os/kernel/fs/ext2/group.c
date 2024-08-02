@@ -272,7 +272,7 @@ ext2bmp_alloc_one(struct ext2_bmp* e_bmp)
     }
 
     fsblock_dirty(e_bmp->raw);
-    return slot + 1;
+    return slot;
 }
 
 void

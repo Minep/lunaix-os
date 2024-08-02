@@ -13,6 +13,16 @@
 #define IMODE_IFCHR     0x2000
 #define IMODE_IFFIFO    0x1000
 
+#define IMODE_URD       0x0100
+#define IMODE_UWR       0x0080
+#define IMODE_UEX       0x0040
+#define IMODE_GRD       0x0020
+#define IMODE_GWR       0x0010
+#define IMODE_GEX       0x0008
+#define IMODE_ORD       0x0004
+#define IMODE_OWR       0x0002
+#define IMODE_OEX       0x0001
+
 struct walk_state
 {
     unsigned int* slot_ref;
@@ -267,6 +277,8 @@ __translate_vfs_itype(unsigned int v_itype)
         e_itype |= IMODE_IFLNK;
     }
 
+    // FIXME we keep this until we have our own user manager
+    e_itype |= (IMODE_URD | IMODE_GRD | IMODE_ORD);
     return e_itype;
 }
 
@@ -319,7 +331,7 @@ ext2ino_fill(struct v_inode* inode, ino_t ino_id)
 }
 
 static struct ext2_inode*
-__create_inode(struct v_superblock* vsb, struct ext2_gdesc* gd, int inode_idx)
+__create_inode(struct v_superblock* vsb, struct ext2_gdesc* gd, int ino_index)
 {
     bbuf_t ino_tab;
     struct ext2_sbinfo* sb;
@@ -330,8 +342,8 @@ __create_inode(struct v_superblock* vsb, struct ext2_gdesc* gd, int inode_idx)
 
     sb = gd->sb;
     tab_partlen = sb->block_size / sb->raw.s_ino_size;
-    ino_tab_sel = inode_idx / tab_partlen;
-    ino_tab_off = inode_idx % tab_partlen;
+    ino_tab_sel = ino_index / tab_partlen;
+    ino_tab_off = ino_index % tab_partlen;
 
     ino_tab = fsblock_get(vsb, gd->info->bg_ino_tab + ino_tab_sel);
     if (blkbuf_errbuf(ino_tab)) {
@@ -350,7 +362,7 @@ __create_inode(struct v_superblock* vsb, struct ext2_gdesc* gd, int inode_idx)
     assert(is_pot(ind_ents));
 
     inode->inds_lgents = ilog2(ind_ents);
-    inode->ino_id = gd->ino_base + inode_idx;
+    inode->ino_id = gd->ino_base + to_ext2ino_id(ino_index);
 
     return inode;
 }
@@ -370,9 +382,8 @@ ext2ino_get(struct v_superblock* vsb,
     
     sb = EXT2_SB(vsb);
 
-    ino -= 1;
-    blkgrp_id   = ino / sb->raw.s_ino_per_grp;
-    ino_rel_id  = ino % sb->raw.s_ino_per_grp;
+    blkgrp_id   = to_fsblock_id(ino) / sb->raw.s_ino_per_grp;
+    ino_rel_id  = to_fsblock_id(ino) % sb->raw.s_ino_per_grp;
 
     if ((errno = ext2gd_take(vsb, blkgrp_id, &gd))) {
         return errno;
@@ -413,7 +424,7 @@ ext2ino_alloc(struct v_superblock* vsb,
         free_ino_idx = ext2gd_alloc_inode(gd);
     }
 
-    // locality alloc failed, try entire fs
+    // locality hinted alloc failed, try entire fs
     if (!valid_bmp_slot(free_ino_idx)) {
         free_ino_idx = ext2ino_alloc_slot(vsb, &gd);
     }
@@ -546,14 +557,14 @@ ext2ino_free(struct v_superblock* vsb, struct ext2_inode* inode)
 }
 
 static void
-__update_inode_metadata(struct ext2b_inode* b_ino, 
+__update_inode_access_metadata(struct ext2b_inode* b_ino, 
                         struct v_inode* inode)
 {
     b_ino->i_ctime = inode->ctime;
     b_ino->i_atime = inode->atime;
     b_ino->i_mtime = inode->mtime;
     b_ino->i_size  = inode->fsize;
-
+    b_ino->i_blocks = ICEIL(inode->fsize, 512);
 }
 
 int
@@ -575,7 +586,7 @@ ext2ino_make(struct v_superblock* vsb, unsigned int itype,
     
     __ext2ino_fill_common(inode, e_ino->ino_id);
 
-    __update_inode_metadata(b_ino, inode);
+    __update_inode_access_metadata(b_ino, inode);
     b_ino->i_mode  = __translate_vfs_itype(itype);
 
     fsapi_inode_settype(inode, itype);
@@ -653,7 +664,7 @@ ext2ino_update(struct v_inode* inode)
     struct ext2_inode* e_ino;
     
     e_ino = EXT2_INO(inode);
-    __update_inode_metadata(e_ino->ino, inode);
+    __update_inode_access_metadata(e_ino->ino, inode);
 
     fsblock_dirty(e_ino->buf);
 }
@@ -813,15 +824,17 @@ ext2db_acquire(struct v_inode* inode, unsigned int data_pos, bbuf_t* out)
 {
     int errno = 0;
     bbuf_t buf;
+    unsigned int block_id;
     struct walk_state state;
 
     errno = __walk_indirects(inode, data_pos, &state, true);
     if (errno) {
         return errno;
     }
-    if (*state.slot_ref) {
-        fsblock_put(state.table);
-        buf = fsblock_get(inode->sb, *state.slot_ref);
+
+    block_id = *state.slot_ref;
+    if (block_id) {
+        buf = fsblock_get(inode->sb, block_id);
         goto done;
     }
 
@@ -834,6 +847,8 @@ ext2db_acquire(struct v_inode* inode, unsigned int data_pos, bbuf_t* out)
     fsblock_dirty(state.table);
 
 done:
+    fsblock_put(state.table);
+
     if (blkbuf_errbuf(buf)) {
         return EIO;
     }
@@ -868,6 +883,7 @@ ext2db_alloc(struct v_inode* inode, bbuf_t* out)
 
     free_ino_idx += gd->base;
     free_ino_idx = ext2_datablock(vsb, free_ino_idx);
+    free_ino_idx = to_ext2ino_id(free_ino_idx);
     
     bbuf_t buf = fsblock_get(vsb, free_ino_idx);
     if (blkbuf_errbuf(buf)) {

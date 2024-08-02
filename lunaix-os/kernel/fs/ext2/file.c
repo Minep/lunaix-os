@@ -5,6 +5,13 @@
 #define blkpos(e_sb, fpos) ((fpos) / (e_sb)->block_size)
 #define blkoff(e_sb, fpos) ((fpos) % (e_sb)->block_size)
 
+static inline void
+update_eino_after_write(struct v_inode *inode, int fpos)
+{
+    inode->fsize = fpos;
+    ext2ino_update(inode);
+}
+
 int
 ext2_open_inode(struct v_inode* inode, struct v_file* file)
 {
@@ -154,11 +161,14 @@ ext2_inode_write(struct v_inode *inode, void *buffer, size_t len, size_t fpos)
         memcpy(offset(blkbuf_data(buf), blk_off), buffer, size);
         buffer = offset(buffer, size);
 
+        fsblock_dirty(buf);
+        fsblock_put(buf);
+
         fpos += size;
         acc += size;
     }
 
-    // TODO update metadata
+    update_eino_after_write(inode, fpos);
 
     return (int)acc;
 }
