@@ -43,4 +43,7 @@ tty_clear_line(int line_num);
 void
 tty_put_str_at(char* str, int x, int y);
 
+void
+tty_set_cursor(u8_t x, u8_t y);
+
 #endif /* __LUNAIX_TTY_H */

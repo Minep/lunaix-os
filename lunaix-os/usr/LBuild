@@ -5,7 +5,8 @@ sources([
     "cat",
     "stat",
     "test_pthread",
-    "file_test"
+    "file_test",
+    "maze"
 ])
 
 compile_opts([
