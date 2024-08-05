@@ -194,8 +194,8 @@ thread_stats_update(bool inbound, bool voluntary)
     struct thread_stats* stats;
     time_t now;
 
-    now = clock_systime();
-    stats   = &current_thread->stats;
+    now   = clock_systime();
+    stats = &current_thread->stats;
 
     stats->at_user = !kernel_context(current_thread->hstate);
 

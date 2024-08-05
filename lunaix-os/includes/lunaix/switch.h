@@ -26,6 +26,10 @@ struct signpost_result
  *        This function might never return if the decision is made to give up
  *        this switching.
  * 
+ *        NOTE: This function might have side effects, it can only be
+ *         called within the twilight zone of context restore. (after entering
+ *         do_switch and before returning from exception)
+ * 
  * @return ptr_t
  */
 ptr_t
@@ -51,7 +55,6 @@ giveup_switch(struct signpost_result* res)
     res->mode  = SWITCH_MODE_GIVEUP;
     res->stack = 0;
 }
-
 
 #endif
 #endif /* __LUNAIX_SWITCH_H */
