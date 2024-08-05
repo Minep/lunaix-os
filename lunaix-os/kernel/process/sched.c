@@ -62,6 +62,7 @@ run(struct thread* thread)
     set_current_executing(thread);
 
     switch_context();
+
     fail("unexpected return from switching");
 }
 
@@ -102,11 +103,20 @@ cleanup_detached_threads() {
     cpu_enable_interrupt();
 }
 
-int
+bool
 can_schedule(struct thread* thread)
 {
     if (!thread) {
         return 0;
+    }
+
+    if (proc_terminated(thread)) {
+        return false;
+    }
+
+    if (preempt_check_stalled(thread)) {
+        thread_flags_set(thread, TH_STALLED);
+        return true;
     }
 
     if (unlikely(kernel_process(thread->process))) {
@@ -119,6 +129,7 @@ can_schedule(struct thread* thread)
     if ((thread->state & PS_PAUSED)) {
         return !!(sh->sig_pending & ~1);
     }
+
     if ((thread->state & PS_BLOCKED)) {
         return sigset_test(sh->sig_pending, _SIGINT);
     }
@@ -128,8 +139,9 @@ can_schedule(struct thread* thread)
         // all other threads are also SIGSTOP (as per POSIX-2008.1)
         // In which case, the entire process is stopped.
         thread->state = PS_STOPPED;
-        return 0;
+        return false;
     }
+    
     if (sigset_test(sh->sig_pending, _SIGCONT)) {
         thread->state = PS_READY;
     }
@@ -176,7 +188,7 @@ schedule()
     assert(sched_ctx.ptable_len && sched_ctx.ttable_len);
 
     // 上下文切换相当的敏感！我们不希望任何的中断打乱栈的顺序……
-    cpu_disable_interrupt();
+    no_preemption();
 
     if (!(current_thread->state & ~PS_RUNNING)) {
         current_thread->state = PS_READY;
@@ -219,7 +231,10 @@ done:
 void
 sched_pass()
 {
-    cpu_enable_interrupt();
+    no_preemption();
+    current_thread->stats.last_reentry = clock_systime();
+    
+    set_preemption();
     cpu_trap_sched();
 }
 
@@ -323,7 +338,7 @@ repeat:
         return 0;
     }
     // 放弃当前的运行机会
-    sched_pass();
+    yield_current();
     goto repeat;
 
 done:

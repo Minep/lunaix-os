@@ -2,17 +2,53 @@
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/spike.h>
+#include <lunaix/kpreempt.h>
+
+static inline void must_inline
+__try_wait(bool check_stall) 
+{
+    unsigned int nstall;
+    waitq_t* current_wq = &current_thread->waitqueue;
+    if (waitq_empty(current_wq)) {
+        return;
+    }
+    
+    block_current_thread();
+
+    if (!check_stall) {
+        // if we are not checking stall, we give up voluntarily
+        yield_current();
+    } else {
+        // otherwise, treat it as being preempted by kernel
+        preempt_current();
+    }
+
+    // In case of SIGINT-forced awaken
+    llist_delete(&current_wq->waiters);
+}
+
+static inline void must_inline
+__pwait(waitq_t* queue, bool check_stall)
+{
+    // prevent race condition.
+    no_preemption();
+
+    prepare_to_wait(queue);
+    __try_wait(check_stall);
+
+    set_preemption();
+}
 
 void
 pwait(waitq_t* queue)
 {
-    // prevent race condition.
-    cpu_disable_interrupt();
+    __pwait(queue, false);
+}
 
-    prepare_to_wait(queue);
-    try_wait();
-
-    cpu_enable_interrupt();
+void
+pwait_check_stall(waitq_t* queue)
+{
+    __pwait(queue, true);
 }
 
 void
@@ -66,14 +102,11 @@ prepare_to_wait(waitq_t* queue)
 void
 try_wait()
 {
-    waitq_t* current_wq = &current_thread->waitqueue;
-    if (waitq_empty(current_wq)) {
-        return;
-    }
-    
-    block_current_thread();
-    sched_pass();
+    __try_wait(false);
+}
 
-    // In case of SIGINT-forced awaken
-    llist_delete(&current_wq->waiters);
+void
+try_wait_check_stall()
+{
+    __try_wait(true);
 }

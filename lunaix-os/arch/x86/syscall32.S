@@ -107,12 +107,11 @@
         pushl   12(%ebx)      /* edx - #3 arg */
         pushl   8(%ebx)       /* ecx - #2 arg */
         pushl   4(%ebx)       /* ebx - #1 arg */
+        pushl    (%eax)
         
-        sti
-        call    *(%eax)
-        cli
+        call    dispatch_syscall
 
-        addl    $20, %esp      /* remove the parameters from stack */
+        addl    $24, %esp      /* remove the parameters from stack */
         
         popl    %ebx
         movl    %eax, (%ebx)    /* save the return value */

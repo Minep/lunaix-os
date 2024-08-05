@@ -127,12 +127,12 @@ blkio_commit(struct blkio_req* req, int options)
     if (blkio_stalled(ctx)) {
         if ((options & BLKIO_WAIT)) {
             blkio_schedule(ctx);
-            try_wait();
+            try_wait_check_stall();
             return;
         }
         blkio_schedule(ctx);
     } else if ((options & BLKIO_WAIT)) {
-        try_wait();
+        try_wait_check_stall();
     }
 }
 

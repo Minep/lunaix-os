@@ -31,3 +31,24 @@ def debug_and_testing():
         """
         type(bool)
         default(False)
+
+    @Term("Report on stalled thread")
+    def check_stall():
+        """
+        Check and report on any thread that spend too much time in kernel.
+        """
+
+        type(bool)
+        default(True)
+        
+    @Term("Max kernel time allowance")
+    def stall_timeout():
+        """
+        Set the maximum time (in seconds) spent in kernel before considered
+        to be stalled.
+        """
+
+        type(int)
+        default(10)
+
+        return v(check_stall)

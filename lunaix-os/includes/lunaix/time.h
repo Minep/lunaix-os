@@ -22,6 +22,24 @@ typedef struct
     u8_t second;
 } datetime_t;
 
+static inline ticks_t
+ticks_seconds(unsigned int seconds)
+{
+    return seconds * 1000;
+}
+
+static inline ticks_t
+ticks_minutes(unsigned int min)
+{
+    return ticks_seconds(min * 60);
+}
+
+static inline ticks_t
+ticks_msecs(unsigned int ms)
+{
+    return ms;
+}
+
 static inline time_t
 datetime_tounix(datetime_t* dt)
 {

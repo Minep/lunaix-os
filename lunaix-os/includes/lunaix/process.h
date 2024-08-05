@@ -50,10 +50,16 @@
 #define proc_runnable(proc) (!(proc)->state || !(((proc)->state) & ~PS_Rn))
 
 
-#define TH_DETACHED 0b0001
+#define TH_DETACHED         0b00000001
+#define TH_STALLED          0b00000010
 
 #define thread_detached(th) ((th)->flags & TH_DETACHED)
 #define detach_thread(th) ((th)->flags |= TH_DETACHED)
+
+#define thread_flags_set(th, flag)      ((th)->flags |= (flag))
+#define thread_flags_clear(th, flag)    ((th)->flags &= ~(flag))
+#define thread_flags_test(th, flag)     ((th)->flags & (flag))
+#define thread_flags_test_all(th, flag) (((th)->flags & (flag)) == (flag))
 
 struct proc_sig
 {
@@ -70,6 +76,34 @@ struct haybed {
     struct llist_header sleepers;
     time_t wakeup_time;
     time_t alarm_time;
+};
+
+struct thread_stats
+{
+    // number of times the thread entering kernel space involuntarily
+    unsigned long entry_count_invol;
+    // number of times the thread entering kernel space voluntarily
+    unsigned long entry_count_vol;
+    
+    // number of times the thread is preempted in kerenl space
+    unsigned long kpreempt_count;
+
+    // timestamp of last time kernel entry
+    time_t last_entry;
+    // timestamp of last time kernel reentry
+    time_t last_reentry;
+
+    // timestamp of last time kernel leave
+    time_t last_leave;
+    // timestamp of last time the thread is resumed
+    time_t last_resume;
+    
+    union {
+        struct {
+            bool at_user;
+        };
+        int flags;
+    };
 };
 
 struct thread
@@ -98,6 +132,8 @@ struct thread
         ptr_t kstack;               // process local kernel stack
         struct mm_region* ustack;   // process local user stack (NULL for kernel thread)
     };
+
+    struct thread_stats stats;
 
     struct haybed sleep;
 
@@ -380,6 +416,48 @@ proc_setsignal(struct proc_info* proc, signum_t signum);
 
 void
 thread_setsignal(struct thread* thread, signum_t signum);
+
+void
+thread_stats_update(bool inbound, bool voluntary);
+
+static inline void
+thread_stats_update_entering(bool voluntary)
+{
+    thread_stats_update(true, voluntary);
+}
+
+static inline void
+thread_stats_update_leaving()
+{
+    thread_stats_update(false, true);
+}
+
+static inline void
+thread_stats_update_kpreempt()
+{
+    current_thread->stats.kpreempt_count++;
+}
+
+static inline void
+thread_stats_reset_kpreempt()
+{
+    current_thread->stats.kpreempt_count = 0;
+}
+
+static inline ticks_t
+thread_stats_kernel_elapse(struct thread* thread)
+{
+    return clock_systime() - thread->stats.last_reentry;
+}
+
+static inline ticks_t
+thread_stats_user_elapse(struct thread* thread)
+{
+    struct thread_stats* stats;
+    stats = &thread->stats;
+
+    return stats->last_entry - stats->last_leave;
+}
 
 
 #endif /* __LUNAIX_PROCESS_H */

@@ -1,6 +1,6 @@
 #include <lunaix/ds/mutex.h>
 #include <lunaix/process.h>
-#include <lunaix/sched.h>
+#include <lunaix/kpreempt.h>
 
 static inline bool must_inline
 __mutex_check_owner(mutex_t* mutex)
@@ -12,7 +12,7 @@ static inline void must_inline
 __mutext_lock(mutex_t* mutex)
 {
     while (atomic_load(&mutex->lk)) {
-        sched_pass();
+        preempt_current();
     }
 
     atomic_fetch_add(&mutex->lk, 1);

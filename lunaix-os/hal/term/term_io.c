@@ -1,7 +1,7 @@
 #include <hal/term.h>
 
 #include <lunaix/clock.h>
-#include <lunaix/sched.h>
+#include <lunaix/kpreempt.h>
 
 #include <usr/lunaix/term.h>
 
@@ -26,7 +26,7 @@ do_read_raw(struct term* tdev)
     min = MIN(min, (size_t)line_in->sz_hlf);
     while (sz <= min && dt <= expr) {
         // XXX should we held the device lock while we are waiting?
-        sched_pass();
+        yield_current();
         dt = clock_systime() - t;
         t += dt;
 

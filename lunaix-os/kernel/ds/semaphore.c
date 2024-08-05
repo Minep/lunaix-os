@@ -1,5 +1,5 @@
 #include <lunaix/ds/semaphore.h>
-#include <lunaix/sched.h>
+#include <lunaix/kpreempt.h>
 
 void
 sem_init(struct sem_t* sem, unsigned int initial)
@@ -12,7 +12,7 @@ sem_wait(struct sem_t* sem)
 {
     while (!atomic_load(&sem->counter)) {
         // FIXME: better thing like wait queue
-        sched_pass();
+        preempt_current();
     }
     atomic_fetch_sub(&sem->counter, 1);
 }

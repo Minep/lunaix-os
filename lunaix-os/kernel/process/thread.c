@@ -5,6 +5,7 @@
 #include <lunaix/mm/mmap.h>
 #include <lunaix/mm/page.h>
 #include <lunaix/syslog.h>
+#include <lunaix/kpreempt.h>
 
 #include <usr/lunaix/threads.h>
 
@@ -187,9 +188,58 @@ thread_find(struct proc_info* proc, tid_t tid)
     return NULL;
 }
 
+void
+thread_stats_update(bool inbound, bool voluntary)
+{
+    struct thread_stats* stats;
+    time_t now;
+
+    now = clock_systime();
+    stats   = &current_thread->stats;
+
+    if (!inbound) {
+        stats->at_user = !kernel_context(current_thread->hstate);
+        
+        if (kernel_process(current_thread->process) || 
+            stats->at_user)
+        {
+            // leave to user
+            stats->last_leave = now;
+        }
+        else {
+            // leave to kernel, effectively reentry
+            stats->last_reentry = now;
+        }
+
+        stats->last_resume = now;
+        return;
+    }
+
+    stats->at_user = false;
+    stats->last_reentry = now;
+
+    if (kernel_context(current_thread->hstate))
+    {
+        thread_stats_update_kpreempt(voluntary);
+        return;
+    }
+
+    if (!voluntary) {
+        stats->entry_count_invol++;
+    }
+    else {
+        stats->entry_count_vol++;
+    }
+
+    thread_stats_reset_kpreempt();
+    stats->last_entry = now;
+}
+
 __DEFINE_LXSYSCALL3(int, th_create, tid_t*, tid, 
                         struct uthread_param*, thparam, void*, entry)
 {
+    no_preemption();
+
     struct thread* th = create_thread(__current, true);
     if (!th) {
         return EAGAIN;
@@ -234,13 +284,14 @@ __DEFINE_LXSYSCALL2(int, th_join, tid_t, tid, void**, val_ptr)
     }
 
     while (!proc_terminated(th)) {
-        sched_pass();
+        yield_current();
     }
 
     if (val_ptr) {
         *val_ptr = (void*)th->exit_val;
     }
 
+    no_preemption();
     destory_thread(th);
 
     return 0;
