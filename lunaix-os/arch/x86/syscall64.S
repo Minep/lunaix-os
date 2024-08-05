@@ -106,16 +106,14 @@
         ret
 
     1:
-
-        movq    irbx(%rbx), %rdi    /* rbx -> rdi #1 arg */
-        movq    ircx(%rbx), %rsi    /* rcx -> rsi #2 arg */
-        movq    irdx(%rbx), %rdx    /* rdx -> rdx #3 arg */
-        movq    irdi(%rbx), %rcx    /* rdi -> rcx #4 arg */
-        movq    irsi(%rbx), %r8     /* rsi -> r8  #5 arg */
+        movq    (%rax),     %rdi
+        movq    irbx(%rbx), %rsi    /* rbx -> rsi #1 arg */
+        movq    ircx(%rbx), %rdx    /* rcx -> rdx #2 arg */
+        movq    irdx(%rbx), %rcx    /* rdx -> rcx #3 arg */
+        movq    irdi(%rbx), %r8     /* rdi -> r8  #4 arg */
+        movq    irsi(%rbx), %r9     /* rsi -> r9  #5 arg */
         
-        sti
-        call    *(%rax)
-        cli
+        call    dispatch_syscall
         
         movq    %rax, irax(%rbx)    /* save the return value */
         

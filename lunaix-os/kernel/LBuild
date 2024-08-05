@@ -15,8 +15,9 @@ sources([
     "spike.c",
     "lrud.c",
     "bcache.c",
+    "syscall.c",
     "kprint/kp_records.c",
     "kprint/kprintf.c",
     "time/clock.c",
-    "time/timer.c"
+    "time/timer.c",
 ])

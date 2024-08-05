@@ -6,6 +6,8 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
 #include <lunaix/mm/valloc.h>
+#include <lunaix/switch.h>
+#include <lunaix/kpreempt.h>
 
 #include <klibc/string.h>
 
@@ -28,17 +30,19 @@ signal_terminate(int caused_by)
 }
 
 // Referenced in kernel/asm/x86/interrupt.S
-void*
-signal_dispatch()
+void
+signal_dispatch(struct signpost_result* result)
 {
+    continue_switch(result);
+
     if (kernel_process(__current)) {
         // signal is undefined under 'kernel process'
-        return 0;
+        return;
     }
 
     if (!pending_sigs(current_thread)) {
         // 没有待处理信号
-        return 0;
+        return;
     }
 
     struct sigregistry* sigreg = __current->sigreg;
@@ -51,24 +55,23 @@ signal_dispatch()
 
     if (!sig_selected) {
         // SIG0 is reserved
-        return 0;
+        return;
     }
 
     struct sigact* action = sigreg->signals[sig_selected];
     if (!action || !action->sa_actor) {
         if (sigset_test(TERMSIG, sig_selected)) {
             signal_terminate(sig_selected);
-            schedule();
-            // never return
+            giveup_switch(result);
         }
-        return 0;
+        return;
     }
 
     ptr_t ustack = current_thread->ustack_top;
     ptr_t ustack_start = current_thread->ustack->start;
     if ((int)(ustack - ustack_start) < (int)sizeof(struct proc_sig)) {
         // 用户栈没有空间存放信号上下文
-        return 0;
+        return;
     }
 
     struct proc_sig* sigframe =
@@ -82,7 +85,7 @@ signal_dispatch()
 
     sigactive_push(current_thread, sig_selected);
 
-    return sigframe;
+    redirect_switch(result, __ptr(sigframe));
 }
 
 static inline void must_inline
@@ -347,7 +350,7 @@ __DEFINE_LXSYSCALL2(int, sys_sigaction, int, signum, struct sigaction*, action)
 __DEFINE_LXSYSCALL(int, pause)
 {
     pause_current_thread();
-    sched_pass();
+    yield_current();
 
     syscall_result(EINTR);
     return -1;
@@ -371,7 +374,7 @@ __DEFINE_LXSYSCALL1(int, sigsuspend, sigset_t, *mask)
     sigctx->sig_mask = (*mask) & ~UNMASKABLE;
 
     pause_current_thread();
-    sched_pass();
+    yield_current();
 
     sigctx->sig_mask = tmp;
     return -1;

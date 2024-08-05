@@ -5,6 +5,7 @@
 #include <lunaix/mm/mmap.h>
 #include <lunaix/mm/page.h>
 #include <lunaix/syslog.h>
+#include <lunaix/kpreempt.h>
 
 #include <usr/lunaix/threads.h>
 
@@ -95,7 +96,7 @@ thread_release_mem(struct thread* thread)
     pte_t* ptep = mkptep_va(vm_mnt, thread->kstack);
     leaflet = pte_leaflet(*ptep);
     
-    ptep -= KSTACK_PAGES - 1;
+    ptep -= KSTACK_PAGES;
     set_pte(ptep, null_pte);
     ptep_unmap_leaflet(ptep + 1, leaflet);
 
@@ -187,9 +188,60 @@ thread_find(struct proc_info* proc, tid_t tid)
     return NULL;
 }
 
+void
+thread_stats_update(bool inbound, bool voluntary)
+{
+    struct thread_stats* stats;
+    time_t now;
+
+    now   = clock_systime();
+    stats = &current_thread->stats;
+
+    stats->at_user = !kernel_context(current_thread->hstate);
+
+    if (!inbound) {
+        if (kernel_process(current_thread->process) || 
+            stats->at_user)
+        {
+            // exiting to user or kernel (kernel thread only), how graceful
+            stats->last_leave = now;
+        }
+        else {
+            // exiting to kernel, effectively reentry
+            stats->last_reentry = now;
+        }
+
+        stats->last_resume = now;
+        return;
+    }
+
+    stats->last_reentry = now;
+
+    if (!stats->at_user)
+    {
+        // entering from kernel, it is a kernel preempt
+        thread_stats_update_kpreempt();
+        return;
+    }
+
+    // entering from user space, a clean entrance.
+
+    if (!voluntary) {
+        stats->entry_count_invol++;
+    }
+    else {
+        stats->entry_count_vol++;
+    }
+
+    thread_stats_reset_kpreempt();
+    stats->last_entry = now;
+}
+
 __DEFINE_LXSYSCALL3(int, th_create, tid_t*, tid, 
                         struct uthread_param*, thparam, void*, entry)
 {
+    no_preemption();
+
     struct thread* th = create_thread(__current, true);
     if (!th) {
         return EAGAIN;
@@ -234,13 +286,14 @@ __DEFINE_LXSYSCALL2(int, th_join, tid_t, tid, void**, val_ptr)
     }
 
     while (!proc_terminated(th)) {
-        sched_pass();
+        yield_current();
     }
 
     if (val_ptr) {
         *val_ptr = (void*)th->exit_val;
     }
 
+    no_preemption();
     destory_thread(th);
 
     return 0;

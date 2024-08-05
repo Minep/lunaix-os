@@ -33,7 +33,13 @@ void
 try_wait();
 
 void
+try_wait_check_stall();
+
+void
 pwait(waitq_t* queue);
+
+void
+pwait_check_stall(waitq_t* queue);
 
 void
 pwake_one(waitq_t* queue);

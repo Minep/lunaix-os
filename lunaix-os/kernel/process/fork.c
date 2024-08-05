@@ -8,6 +8,7 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
 #include <lunaix/signal.h>
+#include <lunaix/kpreempt.h>
 
 #include <sys/abi.h>
 #include <sys/mm/mm_defs.h>
@@ -149,7 +150,7 @@ done:
 pid_t
 dup_proc()
 {
-    cpu_disable_interrupt();
+    no_preemption();
     
     struct proc_info* pcb = alloc_process();
     if (!pcb) {

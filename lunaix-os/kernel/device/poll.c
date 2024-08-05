@@ -7,6 +7,7 @@
 #include <lunaix/spike.h>
 #include <lunaix/syscall.h>
 #include <lunaix/syscall_utils.h>
+#include <lunaix/kpreempt.h>
 
 #define MAX_POLLER_COUNT 16
 
@@ -153,7 +154,7 @@ static void
 __wait_until_event()
 {
     block_current_thread();
-    sched_pass();
+    yield_current();
 }
 
 void
