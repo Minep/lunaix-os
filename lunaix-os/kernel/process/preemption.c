@@ -15,25 +15,30 @@ preempt_check_stalled(struct thread* th)
 
     if (thread_flags_test(th, TH_STALLED))
     {
-        // alrady stalled or marked as never stall, no need to concern
+        // alrady stalled, no need to concern
         return false;
     }
 
-    if (!th->stats.kpreempt_count) {
-        return false;
-    }
-
-    if (th->stats.at_user) {
-        return false;
-    }
-
-    ticks_t total_elapsed;
     struct thread_stats* stats;
-
     stats   = &current_thread->stats;
 
+    if (!stats->kpreempt_count) {
+        return false;
+    }
+
+    if (stats->at_user) {
+        return false;
+    }
+
+#if defined(CONFIG_STALL_MAX_PREEMPTS) && CONFIG_STALL_MAX_PREEMPTS
+    if (stats->kpreempt_count > CONFIG_STALL_MAX_PREEMPTS) {
+        return true;
+    }
+#endif
+
+    ticks_t total_elapsed;
+
     total_elapsed = thread_stats_kernel_elapse(th);
-    total_elapsed = total_elapsed * th->stats.kpreempt_count;
     return total_elapsed > ticks_seconds(CONFIG_STALL_TIMEOUT);
 }
 

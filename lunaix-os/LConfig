@@ -52,3 +52,17 @@ def debug_and_testing():
         default(10)
 
         return v(check_stall)
+    
+    @Term("Max number of preemptions")
+    def stall_max_preempts():
+        """
+        Set the maximum number of preemptions that a task can take
+        before it is considered to be stucked in some loops.
+
+        Setting it to 0 disable this check
+        """
+
+        type(int)
+        default(0)
+
+        return v(check_stall)

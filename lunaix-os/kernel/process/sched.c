@@ -228,16 +228,6 @@ done:
     fail("unexpected return from scheduler");
 }
 
-void
-sched_pass()
-{
-    no_preemption();
-    current_thread->stats.last_reentry = clock_systime();
-    
-    set_preemption();
-    cpu_trap_sched();
-}
-
 __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
 {
     if (!seconds) {
@@ -320,6 +310,7 @@ _wait(pid_t wpid, int* status, int options)
     }
 
     wpid = wpid ? wpid : -__current->pgid;
+
 repeat:
     llist_for_each(proc, n, &__current->children, siblings)
     {

@@ -96,7 +96,7 @@ thread_release_mem(struct thread* thread)
     pte_t* ptep = mkptep_va(vm_mnt, thread->kstack);
     leaflet = pte_leaflet(*ptep);
     
-    ptep -= KSTACK_PAGES - 1;
+    ptep -= KSTACK_PAGES;
     set_pte(ptep, null_pte);
     ptep_unmap_leaflet(ptep + 1, leaflet);
 
@@ -197,17 +197,17 @@ thread_stats_update(bool inbound, bool voluntary)
     now = clock_systime();
     stats   = &current_thread->stats;
 
+    stats->at_user = !kernel_context(current_thread->hstate);
+
     if (!inbound) {
-        stats->at_user = !kernel_context(current_thread->hstate);
-        
         if (kernel_process(current_thread->process) || 
             stats->at_user)
         {
-            // leave to user
+            // exiting to user or kernel (kernel thread only), how graceful
             stats->last_leave = now;
         }
         else {
-            // leave to kernel, effectively reentry
+            // exiting to kernel, effectively reentry
             stats->last_reentry = now;
         }
 
@@ -215,14 +215,16 @@ thread_stats_update(bool inbound, bool voluntary)
         return;
     }
 
-    stats->at_user = false;
     stats->last_reentry = now;
 
-    if (kernel_context(current_thread->hstate))
+    if (!stats->at_user)
     {
-        thread_stats_update_kpreempt(voluntary);
+        // entering from kernel, it is a kernel preempt
+        thread_stats_update_kpreempt();
         return;
     }
+
+    // entering from user space, a clean entrance.
 
     if (!voluntary) {
         stats->entry_count_invol++;
