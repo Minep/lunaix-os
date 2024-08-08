@@ -1,5 +1,6 @@
 #include <lunaix/fs/taskfs.h>
 #include <lunaix/fs/twimap.h>
+#include <lunaix/fs/api.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
@@ -169,6 +170,12 @@ taskfs_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
     return taskfs_mknod(mount_point, 0, 0, VFS_IFDIR);
 }
 
+int
+taskfs_unmount(struct v_superblock* vsb)
+{
+    return 0;
+}
+
 void
 taskfs_invalidate(pid_t pid)
 {
@@ -224,10 +231,11 @@ export_task_attr();
 void
 taskfs_init()
 {
-    struct filesystem* taskfs = fsm_new_fs("taskfs", 5);
-    taskfs->mount = taskfs_mount;
-
-    fsm_register(taskfs);
+    struct filesystem* fs;
+    fs = fsapi_fs_declare("taskfs", FSTYPE_PSEUDO);
+    
+    fsapi_fs_set_mntops(fs, taskfs_mount, taskfs_unmount);
+    fsapi_fs_finalise(fs);
 
     attr_export_table = vcalloc(ATTR_TABLE_LEN, sizeof(struct hbucket));
 

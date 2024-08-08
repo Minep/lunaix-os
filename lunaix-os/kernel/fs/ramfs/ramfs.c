@@ -141,17 +141,6 @@ ramfs_unmount(struct v_superblock* vsb)
     return 0;
 }
 
-void
-ramfs_init()
-{
-    struct filesystem* ramfs = fsm_new_fs("ramfs", -1);
-    ramfs->mount = ramfs_mount;
-    ramfs->unmount = ramfs_unmount;
-
-    fsm_register(ramfs);
-}
-EXPORT_FILE_SYSTEM(ramfs, ramfs_init);
-
 int
 ramfs_mksymlink(struct v_inode* this, const char* target)
 {
@@ -208,6 +197,17 @@ ramfs_unlink(struct v_inode* this, struct v_dnode* name)
 
     return 0;
 }
+
+static void
+ramfs_init()
+{
+    struct filesystem* fs;
+    fs = fsapi_fs_declare("ramfs", FSTYPE_PSEUDO);
+    
+    fsapi_fs_set_mntops(fs, ramfs_mount, ramfs_unmount);
+    fsapi_fs_finalise(fs);
+}
+EXPORT_FILE_SYSTEM(ramfs, ramfs_init);
 
 const struct v_inode_ops ramfs_inode_ops = { .mkdir = ramfs_mkdir,
                                              .rmdir = default_inode_rmdir,

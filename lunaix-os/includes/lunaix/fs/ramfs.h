@@ -16,7 +16,4 @@ struct ram_inode
 
 #define RAM_INODE(data) ((struct ram_inode*)(data))
 
-void
-ramfs_init();
-
 #endif /* __LUNAIX_RAMFS_H */

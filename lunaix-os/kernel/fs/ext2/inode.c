@@ -999,6 +999,10 @@ ext2ino_resizing(struct v_inode* inode, size_t new_size)
     __update_inode_size(e_ino, new_size);
     fsblock_dirty(e_ino->buf);
 
+    if (check_symlink_node(inode)) {
+        return 0;
+    }
+
     if (oldsize < new_size) {
         return 0;
     }

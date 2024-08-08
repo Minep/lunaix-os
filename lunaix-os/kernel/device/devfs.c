@@ -197,10 +197,11 @@ devfs_unmount(struct v_superblock* vsb)
 void
 devfs_init()
 {
-    struct filesystem* fs = fsm_new_fs("devfs", 5);
-    fsm_register(fs);
-    fs->mount = devfs_mount;
-    fs->unmount = devfs_unmount;
+    struct filesystem* fs;
+    fs = fsapi_fs_declare("devfs", FSTYPE_PSEUDO);
+    
+    fsapi_fs_set_mntops(fs, devfs_mount, devfs_unmount);
+    fsapi_fs_finalise(fs);
 }
 EXPORT_FILE_SYSTEM(devfs, devfs_init);
 

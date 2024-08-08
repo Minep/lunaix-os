@@ -19,7 +19,10 @@ struct fsapi_vsb_ops
 static inline struct device* 
 fsapi_blockdev(struct v_superblock* vsb) 
 {
-    assert_fs(vsb->dev);
+    if (!(vsb->fs->types & FSTYPE_PSEUDO)) {
+        assert_fs(vsb->dev);
+    }
+    
     return vsb->dev;
 }
 
@@ -265,6 +268,34 @@ fsapi_handle_pseudo_dirent(struct v_file* file, struct dir_context* dctx)
     }
     
     return false;
+}
+
+static inline struct filesystem*
+fsapi_fs_declare(const char* name, unsigned int type)
+{
+    struct filesystem* fs;
+
+    fs = fsm_new_fs(name, -1);
+    assert_fs(fs);
+
+    fs->types = type;
+    return fs;
+}
+
+static inline void
+fsapi_fs_set_mntops(struct filesystem* fs, 
+                    mntops_mnt mnt, mntops_umnt umnt)
+{
+    fs->mount = mnt;
+    fs->unmount = umnt;
+}
+
+static inline void
+fsapi_fs_finalise(struct filesystem* fs)
+{
+    assert_fs(fs->mount);
+    assert_fs(fs->unmount);
+    fsm_register(fs);
 }
 
 #endif /* __LUNAIX_FSAPI_H */

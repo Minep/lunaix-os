@@ -50,7 +50,8 @@
 
 #define VFS_PATH_DELIM '/'
 
-#define FSTYPE_ROFS 0x1
+#define FSTYPE_ROFS     0b00000001
+#define FSTYPE_PSEUDO   0x00000010
 
 #define TEST_FD(fd) (fd >= 0 && fd < VFS_MAX_FD)
 
@@ -98,6 +99,9 @@ extern struct hstr vfs_ddot;
 extern struct hstr vfs_dot;
 extern struct v_dnode* vfs_sysroot;
 
+typedef int (*mntops_mnt)(struct v_superblock* vsb, struct v_dnode* mount_point);
+typedef int (*mntops_umnt)(struct v_superblock* vsb);
+
 struct filesystem
 {
     struct llist_header fs_flat;
@@ -105,8 +109,8 @@ struct filesystem
     struct hstr fs_name;
     u32_t types;
     int fs_id;
-    int (*mount)(struct v_superblock* vsb, struct v_dnode* mount_point);
-    int (*unmount)(struct v_superblock* vsb);
+    mntops_mnt mount;
+    mntops_umnt unmount;
 };
 
 struct v_superblock

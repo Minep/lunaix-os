@@ -1,10 +1,10 @@
 #include <lunaix/block.h>
-#include <lunaix/fs.h>
-#include "iso9660.h"
+#include <lunaix/fs/api.h>
 #include <lunaix/mm/valloc.h>
+#include <lunaix/mm/cake.h>
 #include <lunaix/spike.h>
 
-#include <lunaix/mm/cake.h>
+#include "iso9660.h"
 
 struct cake_pile* drec_cache_pile;
 
@@ -108,14 +108,13 @@ iso9660_unmount(struct v_superblock* vsb)
 void
 iso9660_init()
 {
+    struct filesystem* fs;
+    fs = fsapi_fs_declare("iso9660", FSTYPE_ROFS);
+    
+    fsapi_fs_set_mntops(fs, iso9660_mount, iso9660_unmount);
+    fsapi_fs_finalise(fs);
+ 
     drec_cache_pile =
       cake_new_pile("iso_drec", sizeof(struct iso_drecache), 1, 0);
-
-    struct filesystem* fs = fsm_new_fs("iso9660", -1);
-    fs->types |= FSTYPE_ROFS;
-    fs->mount = iso9660_mount;
-    fs->unmount = iso9660_unmount;
-
-    fsm_register(fs);
 }
 EXPORT_FILE_SYSTEM(iso9660, iso9660_init);

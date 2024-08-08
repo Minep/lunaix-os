@@ -159,12 +159,12 @@ ext2_umount(struct v_superblock* vsb)
 static void
 ext2_init()
 {
-    struct filesystem* fs = fsm_new_fs("ext2", -1);
-    fs->mount = ext2_mount;
-    fs->unmount = ext2_umount;
+    struct filesystem* fs;
+    fs = fsapi_fs_declare("ext2", 0);
+
+    fsapi_fs_set_mntops(fs, ext2_mount, ext2_umount);
+    fsapi_fs_finalise(fs);
 
     gdesc_bcache_zone = bcache_create_zone("ext2_gdesc");
-
-    fsm_register(fs);
 }
 EXPORT_FILE_SYSTEM(ext2fs, ext2_init);

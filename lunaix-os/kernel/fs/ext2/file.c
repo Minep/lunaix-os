@@ -21,7 +21,7 @@ ext2_open_inode(struct v_inode* inode, struct v_file* file)
         goto done;
     }
 
-    // TODO anything for regular file?
+    // XXX anything for regular file?
 
 done:
     if (!errno) {
@@ -74,7 +74,7 @@ ext2_seek_inode(struct v_file* file, size_t offset)
         return ext2dr_seek(file, offset);
     }
 
-    //TODO
+    // nothing to do, seek on file pos handled by vfs
     return 0;
 }
 
@@ -293,6 +293,9 @@ ext2_set_symlink(struct v_inode *this, const char *target)
 
     strncpy(e_ino->symlink, target, new_len);
     strncpy(link, target, new_len);
+
+    ext2ino_update(this);
+    ext2ino_resizing(this, new_len);
 
     if (buf) {
         fsblock_put(buf);

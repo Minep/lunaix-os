@@ -80,6 +80,12 @@ __twifs_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
 }
 
 int
+__twifs_unmount(struct v_superblock* vsb)
+{
+    return 0;
+}
+
+int
 __twifs_fwrite(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 {
     struct twifs_node* twi_node = (struct twifs_node*)inode->data;
@@ -246,16 +252,13 @@ twifs_dir_node(struct twifs_node* parent, const char* fmt, ...)
 void
 twifs_init()
 {
+    struct filesystem* fs;
+    fs = fsapi_fs_declare("twifs", FSTYPE_PSEUDO | FSTYPE_ROFS);
+    
+    fsapi_fs_set_mntops(fs, __twifs_mount, __twifs_unmount);
+    fsapi_fs_finalise(fs);
+
     twi_pile = cake_new_pile("twifs_node", sizeof(struct twifs_node), 1, 0);
-
-    struct filesystem* twifs = vzalloc(sizeof(struct filesystem));
-    twifs->fs_name = HSTR("twifs", 5);
-    twifs->mount = __twifs_mount;
-    twifs->types = FSTYPE_ROFS;
-    twifs->fs_id = 0;
-
-    fsm_register(twifs);
-
     fs_root = twifs_dir_node(NULL, NULL, 0, 0);
 }
 EXPORT_FILE_SYSTEM(twifs, twifs_init);

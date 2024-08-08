@@ -1,5 +1,5 @@
 #include <lunaix/foptions.h>
-#include <lunaix/fs.h>
+#include <lunaix/fs/api.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
@@ -157,8 +157,12 @@ vfs_mount_at(const char* fs_name,
         return ENODEV;
     }
 
-    if (fs->types == FSTYPE_ROFS) {
+    if ((fs->types & FSTYPE_ROFS)) {
         options |= MNT_RO;
+    }
+
+    if (!(fs->types & FSTYPE_PSEUDO) && !device) {
+        return ENODEV;
     }
 
     int errno = 0;
