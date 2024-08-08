@@ -23,14 +23,6 @@
 #define IMODE_OWR       0x0002
 #define IMODE_OEX       0x0001
 
-struct walk_state
-{
-    unsigned int* slot_ref;
-    bbuf_t table;
-    int indirections;
-    int level;
-};
-
 static struct v_inode_ops ext2_inode_ops = {
     .dir_lookup = ext2dr_lookup,
     .open  = ext2_open_inode,
@@ -41,7 +33,8 @@ static struct v_inode_ops ext2_inode_ops = {
     .rename = ext2_rename,
     .link = ext2_link,
     .unlink = ext2_unlink,
-    .create = ext2_create
+    .create = ext2_create,
+    .sync = ext2_sync_inode
 };
 
 static struct v_file_ops ext2_file_ops = {
@@ -55,7 +48,7 @@ static struct v_file_ops ext2_file_ops = {
     
     .readdir = ext2dr_read,
     .seek = ext2_seek_inode,
-    .sync = ext2_sync_inode
+    .sync = ext2_file_sync
 };
 
 #define to_tag(e_ino, val)        \
@@ -63,9 +56,8 @@ static struct v_file_ops ext2_file_ops = {
 #define valid_tag(tag)      ((tag) & (1 << msbiti))
 
 static void
-__btlb_insert(struct v_inode* inode, unsigned int blkid, bbuf_t buf)
+__btlb_insert(struct ext2_inode* e_inode, unsigned int blkid, bbuf_t buf)
 {
-    struct ext2_inode* e_inode;
     struct ext2_btlb* btlb;
     struct ext2_btlb_entry* btlbe = NULL;
     unsigned int cap_sel;
@@ -74,7 +66,6 @@ __btlb_insert(struct v_inode* inode, unsigned int blkid, bbuf_t buf)
         return;
     }
 
-    e_inode = EXT2_INO(inode);
     btlb = e_inode->btlb;
 
     for (int i = 0; i < BTLB_SETS; i++)
@@ -105,36 +96,42 @@ found:
 }
 
 static bbuf_t
-__btlb_hit(struct v_inode* inode, unsigned int blkid)
+__btlb_hit(struct ext2_inode* e_inode, unsigned int blkid)
 {
-    struct ext2_inode* e_inode;
     struct ext2_btlb* btlb;
     struct ext2_btlb_entry* btlbe = NULL;
-    unsigned int in_tag;
+    unsigned int in_tag, ref_cnts;
 
-    e_inode = EXT2_INO(inode);
     btlb = e_inode->btlb;
     in_tag = to_tag(e_inode, blkid);
 
     for (int i = 0; i < BTLB_SETS; i++)
     {
         btlbe = &btlb->buffer[i];
-        if (btlbe->tag == in_tag) {
-            return fsblock_take(btlbe->block);
+
+        if (btlbe->tag != in_tag) {
+            continue;
         }
+        
+        ref_cnts = blkbuf_refcounts(btlbe->block);
+        if (!ref_cnts) {
+            btlbe->tag = 0;
+            btlbe->block = bbuf_null;
+            break;
+        }
+
+        return fsblock_take(btlbe->block);
     }
 
     return NULL;
 }
 
 static void
-__btlb_flushall(struct v_inode* inode)
+__btlb_flushall(struct ext2_inode* e_inode)
 {
-    struct ext2_inode* e_inode;
     struct ext2_btlb* btlb;
     struct ext2_btlb_entry* btlbe = NULL;
 
-    e_inode = EXT2_INO(inode);
     btlb = e_inode->btlb;
 
     for (int i = 0; i < BTLB_SETS; i++)
@@ -233,7 +230,7 @@ ext2_destruct_inode(struct v_inode* inode)
 
     e_inode = EXT2_INO(inode);
 
-    __btlb_flushall(inode);
+    __btlb_flushall(e_inode);
 
     fsblock_put(e_inode->ind_ord1);
     fsblock_put(e_inode->buf);
@@ -405,7 +402,7 @@ ext2ino_get(struct v_superblock* vsb,
     prima_ind = b_inode->i_block.ind1;
     *out = inode;
 
-    if (prima_ind) {
+    if (!prima_ind) {
         return errno;
     }
 
@@ -468,6 +465,8 @@ __free_block_at(struct v_superblock *vsb, unsigned int block_pos)
         return 0;
     }
 
+    block_pos = ext2_datablock(vsb, block_pos);
+
     sb = EXT2_SB(vsb);
     gd_index = block_pos / sb->raw->s_blk_per_grp;
 
@@ -483,85 +482,100 @@ __free_block_at(struct v_superblock *vsb, unsigned int block_pos)
 }
 
 static int
-__free_blk_recusrive(struct v_superblock *vsb, struct ext2_inode* inode, 
-                     unsigned int ind_tab, int level, int max_level)
+__free_recurisve_from(struct v_superblock *vsb, struct ext2_inode* inode,
+                      struct walk_stack* stack, int depth)
 {
-    if (!ind_tab) {
+    bbuf_t tab;
+    int idx, len, errno;
+    u32_t* db_tab;
+
+    int ind_entries = 1 << inode->inds_lgents;
+    int max_len[] = { 15, ind_entries, ind_entries, ind_entries }; 
+
+    u32_t* tables  = stack->tables;
+    u32_t* indices = stack->indices;
+
+    if (depth > MAX_INDS_DEPTH || !tables[depth]) {
         return 0;
     }
 
-    if (unlikely(level >= max_level)) {
-        return 0;
-    }
+    idx = indices[depth];
+    len = max_len[depth];
+    tab = fsblock_get(vsb, ext2_datablock(vsb, tables[depth]));
 
-    int errno = 0;
-    bbuf_t buf;
-    unsigned int* tab;
-    unsigned int max_ents, blk;
-
-    buf = fsblock_get(vsb, ext2_datablock(vsb, ind_tab));
-    if (blkbuf_errbuf(buf)) {
+    if (blkbuf_errbuf(tab)) {
         return EIO;
     }
+
+    db_tab = blkbuf_data(tab);
+    if (depth == 0) {
+        int offset = offsetof(struct ext2b_inode, i_block_arr);
+        db_tab = offset(db_tab, offset);
+    }
     
-    tab = (unsigned int*)blkbuf_data(buf);
-    max_ents = 1 << inode->inds_lgents;
-    for (unsigned int i = 0; i < max_ents; i++) 
+    errno = 0;
+    indices[depth] = 0;
+
+    for (; idx < len; idx++)
     {
-        blk = tab[i];
-        if (!blk) {
+        u32_t db_id = db_tab[idx];
+
+        if (!db_id) {
             continue;
         }
 
-        if (level == max_level - 1) {
-            __free_block_at(vsb, blk);
-            continue;
+        if (depth >= MAX_INDS_DEPTH) {
+            goto cont;
         }
 
-        errno = __free_blk_recusrive(vsb, inode, blk, level + 1, max_level);
+        tables[depth] = db_id;
+        errno = __free_recurisve_from(vsb, inode, stack, depth + 1);
         if (errno) {
             break;
         }
 
-        tab[i] = 0;
+cont:
+        __free_block_at(vsb, db_id);
+        db_tab[idx] = 0;
     }
 
-    fsblock_dirty(buf);
+    fsblock_dirty(tab);
+    fsblock_put(tab);
     return errno;
 }
 
 int
-ext2ino_free(struct v_superblock* vsb, struct ext2_inode* inode)
+ext2ino_free(struct v_inode* inode)
 {
     int errno = 0;
+    unsigned int ino_slot;
+    struct ext2_inode*  e_ino;
+    struct ext2_gdesc*  e_gd;
     struct ext2b_inode* b_ino;
     struct ext2_sbinfo* sb;
 
-    sb = EXT2_SB(vsb);
-    b_ino = inode->ino;
+    sb    = EXT2_SB(inode->sb);
+    e_ino = EXT2_INO(inode);
+    b_ino = e_ino->ino;
+    e_gd  = e_ino->blk_grp;
 
     assert_fs(b_ino->i_lnk_cnt > 0);
-
-    fsblock_dirty(inode->buf);
+    fsblock_dirty(e_ino->buf);
 
     b_ino->i_lnk_cnt--;
     if (b_ino->i_lnk_cnt >= 1) {
         return 0;
     }
 
-    int i, j = 0;
-    for (i = 0; i < 12 && !errno; i++, j++) {
-        errno = __free_block_at(vsb, b_ino->i_block.directs[i]);
-    }
+    ext2ino_resizing(inode, 0);
 
-    for (i = 0; i < 3 && !errno; i++, j++) {
-        int block = b_ino->i_block.inds[i];
-        errno = __free_blk_recusrive(vsb, inode, block, 0, i + 1);
-    }
+    ino_slot = e_ino->ino_id;
+    ino_slot = to_fsblock_id(ino_slot - e_gd->base);
+    ext2gd_free_inode(e_ino->blk_grp, ino_slot);
 
-    for (i = 0; i < j; i++) {
-        b_ino->i_block_arr[i] = 0;
-    }
+    ext2_destruct_inode(inode);
+
+    inode->data = NULL;
 
     return errno;
 }
@@ -669,13 +683,14 @@ ext2_unlink(struct v_inode* this, struct v_dnode* name)
 
     assert_fs(e_dno);
     assert_fs(e_dno->self.dirent->inode == e_ino->ino_id);
-
+    
     errno = ext2dr_remove(e_dno);
     if (errno) {
         return errno;
     }
 
-    return ext2ino_free(this->sb, e_ino);
+    vfree(e_dno);
+    return ext2ino_free(this);
 }
 
 void
@@ -685,13 +700,19 @@ ext2ino_update(struct v_inode* inode)
     
     e_ino = EXT2_INO(inode);
     __update_inode_access_metadata(e_ino->ino, inode);
-    __update_inode_size(e_ino, inode->fsize);
 
     fsblock_dirty(e_ino->buf);
 }
 
 /* ******************* Data Blocks ******************* */
 
+static inline void
+__walkstate_set_stack(struct walk_state* state, int depth,
+                      bbuf_t tab, unsigned int index)
+{
+    state->stack.tables[depth] = fsblock_id(tab);
+    state->stack.indices[depth] = index;
+}
 
 /**
  * @brief Walk the indrection chain given the position of data block
@@ -716,7 +737,7 @@ ext2ino_update(struct v_inode* inode)
  */
 static int
 __walk_indirects(struct v_inode* inode, unsigned int pos,
-                 struct walk_state* state, bool resolve)
+                 struct walk_state* state, bool resolve, bool full_walk)
 {
     int errno;
     int inds, stride, shifts, level;
@@ -756,7 +777,7 @@ __walk_indirects(struct v_inode* inode, unsigned int pos,
     }
 
     // bTLB cache the last level indirect block
-    if ((table = __btlb_hit(inode, pos))) {
+    if (!full_walk && (table = __btlb_hit(e_inode, pos))) {
         level = inds;
         index = pos & ((1 << stride) - 1);
         slotref = &block_buffer(table, u32_t)[index];
@@ -766,11 +787,14 @@ __walk_indirects(struct v_inode* inode, unsigned int pos,
     shifts = stride * (inds - 1);
     mask = ((1 << stride) - 1) << shifts;
 
+    index   = 12 + inds - 1;
     slotref = &b_inode->i_block.inds[inds - 1];
-    table = fsblock_take(e_inode->buf);
+    table   = fsblock_take(e_inode->buf);
 
     for (; level < inds; level++)
     {
+        __walkstate_set_stack(state, level, table, index);
+
         next = *slotref;
         if (!next) {
             if (!resolve) {
@@ -778,6 +802,7 @@ __walk_indirects(struct v_inode* inode, unsigned int pos,
             }
 
             if ((errno = ext2db_alloc(inode, &next_table))) {
+                fsblock_put(table);
                 return errno;
             }
 
@@ -799,13 +824,14 @@ __walk_indirects(struct v_inode* inode, unsigned int pos,
         assert(shifts >= 0);
 
         index = (pos & mask) >> shifts;
+
         slotref = &block_buffer(table, u32_t)[index];
 
         shifts -= stride;
         mask  = mask >> stride;
     }
 
-    __btlb_insert(inode, pos, table);
+    __btlb_insert(e_inode, pos, table);
 
 _return:
     assert(blkbuf_refcounts(table) >= 1);
@@ -817,6 +843,8 @@ _return:
     state->level = level;
     state->indirections = inds;
 
+    __walkstate_set_stack(state, level, table, index);
+
     return 0;
 }
 
@@ -827,14 +855,17 @@ ext2db_get(struct v_inode* inode, unsigned int data_pos)
     unsigned int blkid;
     struct walk_state state;
 
-    errno = __walk_indirects(inode, data_pos, &state, false);
+    ext2walk_init_state(&state);
+
+    errno = __walk_indirects(inode, data_pos, &state, false, false);
     if (errno) {
         return (bbuf_t)INVL_BUFFER;
     }
 
-    fsblock_put(state.table);
-
     blkid = *state.slot_ref;
+    
+    ext2walk_free_state(&state);
+    
     if (!blkid) {
         return NULL;
     }
@@ -850,7 +881,9 @@ ext2db_acquire(struct v_inode* inode, unsigned int data_pos, bbuf_t* out)
     unsigned int block_id;
     struct walk_state state;
 
-    errno = __walk_indirects(inode, data_pos, &state, true);
+    ext2walk_init_state(&state);
+
+    errno = __walk_indirects(inode, data_pos, &state, true, false);
     if (errno) {
         return errno;
     }
@@ -863,6 +896,7 @@ ext2db_acquire(struct v_inode* inode, unsigned int data_pos, bbuf_t* out)
 
     errno = ext2db_alloc(inode, &buf);
     if (errno) {
+        ext2walk_free_state(&state);
         return errno;
     }
 
@@ -870,7 +904,7 @@ ext2db_acquire(struct v_inode* inode, unsigned int data_pos, bbuf_t* out)
     fsblock_dirty(state.table);
 
 done:
-    fsblock_put(state.table);
+    ext2walk_free_state(&state);
 
     if (blkbuf_errbuf(buf)) {
         return EIO;
@@ -942,4 +976,43 @@ ext2db_free(struct v_inode* inode, bbuf_t buf)
     fsblock_put(buf);
 
     return 0;
+}
+
+int
+ext2ino_resizing(struct v_inode* inode, size_t new_size)
+{
+    int errno;
+    unsigned int pos;
+    size_t oldsize;
+    struct walk_state state;
+    struct ext2_inode*  e_ino;
+    struct ext2b_inode* b_ino;
+
+    e_ino = EXT2_INO(inode);
+    b_ino = e_ino->ino;
+    oldsize = b_ino->i_size;
+
+    if (oldsize == new_size) {
+        return 0;
+    }
+
+    __update_inode_size(e_ino, new_size);
+    fsblock_dirty(e_ino->buf);
+
+    if (oldsize < new_size) {
+        return 0;
+    }
+
+    ext2walk_init_state(&state);
+
+    pos   = new_size / fsapi_block_size(inode->sb);
+    errno = __walk_indirects(inode, pos, &state, false, true);
+    if (errno) {
+        return errno;
+    }
+
+    errno = __free_recurisve_from(inode->sb, e_ino, &state.stack, 0);
+
+    ext2walk_free_state(&state);
+    return errno;
 }

@@ -14,8 +14,9 @@ static int
 __find_dirent_byname(struct v_inode* inode, struct hstr* name, 
                      struct ext2_dnode* e_dnode_out)
 {
+    int errno = 0;
     struct ext2_iterator iter;
-    struct ext2b_dirent *dir, *prev = NULL;
+    struct ext2b_dirent *dir = NULL, *prev = NULL;
     bbuf_t prev_buf = NULL;
 
     ext2dr_itbegin(&iter, inode);
@@ -24,23 +25,23 @@ __find_dirent_byname(struct v_inode* inode, struct hstr* name,
         dir = iter.dirent;
 
         if (dir->name_len != name->len) {
-            continue;
+            goto cont;
         }
 
         if (strneq(dir->name, name->value, name->len)) {
             goto done;
         }
 
+cont:        
         prev = dir;
-        
         if (prev_buf) {
             fsblock_put(prev_buf);
         }
         prev_buf = fsblock_take(iter.sel_buf);
     }
-
-    ext2dr_itend(&iter);
-    return itstate_sel(&iter, ENOENT);
+    
+    errno = ENOENT;
+    goto _ret;
 
 done:
     e_dnode_out->self = (struct ext2_dnode_sub) {
@@ -52,9 +53,11 @@ done:
         .buf = fsblock_take(prev_buf),
         .dirent = prev
     };
-
+    
+_ret:
+    fsblock_put(prev_buf);
     ext2dr_itend(&iter);
-    return 0;
+    return itstate_sel(&iter, errno);
 }
 
 static size_t
@@ -147,15 +150,6 @@ __destruct_ext2_dnode(struct ext2_dnode* e_dno)
     fsblock_put(e_dno->prev.buf);
     fsblock_put(e_dno->self.buf);
     vfree(e_dno);
-}
-
-static void
-ext2dr_dnode_destruct(struct v_dnode* dnode)
-{
-    struct ext2_dnode* e_dno;
-
-    e_dno = EXT2_DNO(dnode);
-    __destruct_ext2_dnode(e_dno);
 }
 
 static inline bool
@@ -290,6 +284,18 @@ ext2dr_open(struct v_inode* this, struct v_file* file)
 }
 
 int
+ext2dr_close(struct v_inode* this, struct v_file* file)
+{
+    struct ext2_file* e_file;
+
+    e_file = EXT2_FILE(file);
+
+    ext2dr_itend(&e_file->iter);
+
+    return 0;
+}
+
+int
 ext2dr_lookup(struct v_inode* inode, struct v_dnode* dnode)
 {
     int errno;
@@ -328,28 +334,16 @@ __dir_filetype(struct ext2b_dirent* dir)
     unsigned int type;
 
     type = dir->file_type;
-
-    if (type == FT_REG) {
-        return VFS_IFFILE;
-    }
     
     if (type == FT_DIR) {
-        return VFS_IFDIR;
-    }
-    
-    if (type == FT_BLK) {
-        return VFS_IFVOLDEV;
-    }
-    
-    if (type == FT_CHR) {
-        return VFS_IFSEQDEV;
+        return DT_DIR;
     }
     
     if (type == FT_SYM) {
-        return VFS_IFSYMLINK;
+        return DT_SYMLINK;
     }
 
-    return VFS_IFDEV;
+    return DT_FILE;
 }
 
 int
@@ -521,11 +515,9 @@ ext2_rmdir(struct v_inode* this, struct v_dnode* dnode)
 {
     int errno;
     struct v_inode* self;
-    struct ext2_inode* e_self;
     struct ext2_dnode* e_dno;
 
     self = dnode->inode;
-    e_self = EXT2_INO(self);
     e_dno  = EXT2_DNO(dnode);
 
     if (__check_special(dnode)) {
@@ -536,7 +528,7 @@ ext2_rmdir(struct v_inode* this, struct v_dnode* dnode)
         return ENOTEMPTY;
     }
 
-    if ((errno = ext2ino_free(self->sb, e_self))) {
+    if ((errno = ext2ino_free(self))) {
         return errno;
     }
 
@@ -598,12 +590,12 @@ ext2_mkdir(struct v_inode* this, struct v_dnode* dnode)
     return 0;
 
 cleanup:
-    ext2ino_free(this->sb, e_created);
+    ext2ino_free(i_created);
     __destruct_ext2_dnode(e_dno);
 
 cleanup1:
     dnode->data = NULL;
-    ext2ino_free(this->sb, e_created);
+    ext2ino_free(i_created);
     vfs_i_free(i_created);
 
     return errno;

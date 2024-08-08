@@ -5,18 +5,6 @@
 #define blkpos(e_sb, fpos) ((fpos) / (e_sb)->block_size)
 #define blkoff(e_sb, fpos) ((fpos) % (e_sb)->block_size)
 
-static inline void
-touch_ext2_inode(struct v_inode* inode)
-{
-    inode->atime = clock_unixtime();
-}
-
-static inline void
-update_eino_after_write(struct v_inode *inode)
-{
-    inode->mtime = clock_unixtime();
-}
-
 int
 ext2_open_inode(struct v_inode* inode, struct v_file* file)
 {
@@ -39,8 +27,6 @@ done:
     if (!errno) {
         return 0;
     }
-
-    touch_ext2_inode(inode);
     
     vfree(e_file);
     file->data = NULL;
@@ -51,7 +37,10 @@ int
 ext2_close_inode(struct v_file* file)
 {
     ext2ino_update(file->inode);
-    blkbuf_syncall(file->inode->sb->blks, true);
+
+    if (check_directory_node(file->inode)) {
+        ext2dr_close(file->inode, file);
+    }
 
     vfree(file->data);
     file->data = NULL;
@@ -59,16 +48,23 @@ ext2_close_inode(struct v_file* file)
 }
 
 int
-ext2_sync_inode(struct v_file* file)
+ext2_sync_inode(struct v_inode* inode)
 {
     // TODO
     // a modification to an inode may involves multiple
     //  blkbuf scattering among different groups.
     // For now, we just sync everything, until we figure out
     //  a way to track each dirtied blkbuf w.r.t inode
-    blkbuf_syncall(file->inode->sb->blks, false);
+    ext2ino_resizing(inode, inode->fsize);
+    blkbuf_syncall(inode->sb->blks, false);
 
     return 0;
+}
+
+int
+ext2_file_sync(struct v_file* file)
+{
+    return ext2_sync_inode(file->inode);
 }
 
 int
@@ -177,8 +173,6 @@ ext2_inode_write(struct v_inode *inode, void *buffer, size_t len, size_t fpos)
         fpos += size;
         acc += size;
     }
-
-    update_eino_after_write(inode);
 
     return (int)acc;
 }

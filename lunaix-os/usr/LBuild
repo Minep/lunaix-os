@@ -8,6 +8,7 @@ sources([
     "file_test",
     "maze",
     "mkdir",
+    "rm",
 ])
 
 compile_opts([

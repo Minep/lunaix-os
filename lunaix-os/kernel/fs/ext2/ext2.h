@@ -300,6 +300,25 @@ struct ext2_file
 };
 #define EXT2_FILE(v_file) (fsapi_impl_data(v_file, struct ext2_file))
 
+
+#define MAX_INDS_DEPTH  4
+
+struct walk_stack
+{
+    unsigned int tables[MAX_INDS_DEPTH];
+    unsigned int indices[MAX_INDS_DEPTH];
+};
+
+struct walk_state
+{
+    unsigned int* slot_ref;
+    bbuf_t table;
+    int indirections;
+    int level;
+
+    struct walk_stack stack;
+};
+
 static inline unsigned int
 ext2_datablock(struct v_superblock* vsb, unsigned int id)
 {
@@ -325,6 +344,9 @@ ext2ino_make(struct v_superblock* vsb, unsigned int itype,
 
 void
 ext2ino_update(struct v_inode* inode);
+
+int
+ext2ino_resizing(struct v_inode* inode, size_t new_size);
 
 static inline void
 ext2ino_linkto(struct ext2_inode* e_ino, struct ext2b_dirent* dirent)
@@ -375,6 +397,20 @@ ext2db_acquire(struct v_inode* inode, unsigned int data_pos, bbuf_t* out);
 
 void
 ext2db_free_pos(struct v_inode* inode, unsigned int block_pos);
+
+/* ************* Walker ************* */
+
+static inline void
+ext2walk_init_state(struct walk_state* state)
+{
+    *state = (struct walk_state) { };
+}
+
+static inline void
+ext2walk_free_state(struct walk_state* state)
+{
+    fsblock_put(state->table);
+}
 
 /* ************* Iterator ************* */
 
@@ -443,6 +479,9 @@ int
 ext2dr_open(struct v_inode* this, struct v_file* file);
 
 int
+ext2dr_close(struct v_inode* this, struct v_file* file);
+
+int
 ext2dr_seek(struct v_file* file, size_t offset);
 
 int
@@ -475,7 +514,10 @@ int
 ext2_close_inode(struct v_file* file);
 
 int
-ext2_sync_inode(struct v_file* file);
+ext2_sync_inode(struct v_inode* inode);
+
+int
+ext2_file_sync(struct v_file* file);
 
 int
 ext2_inode_read(struct v_inode *inode, void *buffer, size_t len, size_t fpos);
@@ -595,8 +637,7 @@ ext2db_alloc(struct v_inode* inode, bbuf_t* out);
  * @return int 
  */
 int
-ext2ino_free(struct v_superblock* vsb, 
-                 struct ext2_inode* inode);
+ext2ino_free(struct v_inode* inode);
 
 /**
  * @brief Free a data block

@@ -20,7 +20,7 @@ preempt_check_stalled(struct thread* th)
     }
 
     struct thread_stats* stats;
-    stats   = &current_thread->stats;
+    stats   = &th->stats;
 
     if (!stats->kpreempt_count) {
         return false;
@@ -37,8 +37,8 @@ preempt_check_stalled(struct thread* th)
 #endif
 
     ticks_t total_elapsed;
-
     total_elapsed = thread_stats_kernel_elapse(th);
+
     return total_elapsed > ticks_seconds(CONFIG_STALL_TIMEOUT);
 }
 

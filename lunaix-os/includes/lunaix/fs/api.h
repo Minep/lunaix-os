@@ -6,6 +6,8 @@
 #include <lunaix/blkbuf.h>
 #include <klibc/string.h>
 
+#include <usr/lunaix/dirent_defs.h>
+
 struct fsapi_vsb_ops
 {
     size_t (*read_capacity)(struct v_superblock* vsb);

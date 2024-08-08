@@ -35,8 +35,8 @@ __schedule_away()
 {
     current_thread->stats.last_reentry = clock_systime();
     
-    set_preemption();
     cpu_trap_sched();
+    set_preemption();
 }
 
 /**

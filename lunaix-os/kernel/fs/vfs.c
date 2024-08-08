@@ -115,6 +115,19 @@ __dcache_hash(struct v_dnode* parent, u32_t* hash)
     return &dnode_cache[_hash & VFS_HASH_MASK];
 }
 
+static inline int
+__sync_inode_nolock(struct v_inode* inode)
+{
+    pcache_commit_all(inode);
+
+    int errno = ENOTSUP;
+    if (inode->ops->sync) {
+        errno = inode->ops->sync(inode);
+    }
+
+    return errno;
+}
+
 struct v_dnode*
 vfs_dcache_lookup(struct v_dnode* parent, struct hstr* str)
 {
@@ -255,44 +268,57 @@ vfs_link(struct v_dnode* to_link, struct v_dnode* name)
 int
 vfs_pclose(struct v_file* file, pid_t pid)
 {
+    struct v_inode* inode;
     int errno = 0;
+    
     if (file->ref_count > 1) {
         atomic_fetch_sub(&file->ref_count, 1);
+        return 0;
     } 
-    else {
-        
-        pcache_commit_all(file->inode);
-        if ((errno = file->ops->close(file))) {
-            return errno;
-        }
+    
+    inode = file->inode;
 
-        atomic_fetch_sub(&file->dnode->ref_count, 1);
-        file->inode->open_count--;
+    /*
+     * Prevent dead lock.
+     * This happened when process is terminated while blocking on read.
+     * In that case, the process is still holding the inode lock and it
+         will never get released.
+     * The unlocking should also include ownership check.
+     *
+     * To see why, consider two process both open the same file both with
+     * fd=x.
+     *      Process A: busy on reading x
+     *      Process B: do nothing with x
+     * Assuming that, after a very short time, process B get terminated
+     * while process A is still busy in it's reading business. By this
+     * design, the inode lock of this file x is get released by B rather
+     * than A. And this will cause a probable race condition on A if other
+     * process is writing to this file later after B exit.
+    */
 
-        /*
-         * Prevent dead lock.
-         * This happened when process is terminated while blocking on read.
-         * In that case, the process is still holding the inode lock and it
-             will never get released.
-         * The unlocking should also include ownership check.
-         *
-         * To see why, consider two process both open the same file both with
-         * fd=x.
-         *      Process A: busy on reading x
-         *      Process B: do nothing with x
-         * Assuming that, after a very short time, process B get terminated
-         * while process A is still busy in it's reading business. By this
-         * design, the inode lock of this file x is get released by B rather
-         * than A. And this will cause a probable race condition on A if other
-         * process is writing to this file later after B exit.
-         */
-        if (mutex_on_hold(&file->inode->lock)) {
-            mutex_unlock_for(&file->inode->lock, pid);
-        }
-        mnt_chillax(file->dnode->mnt);
-
-        cake_release(file_pile, file);
+    if (mutex_on_hold(&inode->lock)) {
+        mutex_unlock_for(&inode->lock, pid);
     }
+
+    lock_inode(inode);
+
+    pcache_commit_all(inode);
+    if ((errno = file->ops->close(file))) {
+        goto unlock;
+    }
+
+    atomic_fetch_sub(&file->dnode->ref_count, 1);
+    inode->open_count--;
+
+    if (!inode->open_count) {
+        __sync_inode_nolock(inode);
+    }
+
+    mnt_chillax(file->dnode->mnt);
+    cake_release(file_pile, file);
+
+unlock:
+    unlock_inode(inode);
     return errno;
 }
 
@@ -309,6 +335,18 @@ vfs_free_fd(struct v_fd* fd)
 }
 
 int
+vfs_isync(struct v_inode* inode)
+{
+    lock_inode(inode);
+
+    int errno = __sync_inode_nolock(inode);
+
+    unlock_inode(inode);
+
+    return errno;
+}
+
+int
 vfs_fsync(struct v_file* file)
 {
     int errno;
@@ -316,18 +354,7 @@ vfs_fsync(struct v_file* file)
         return errno;
     }
 
-    lock_inode(file->inode);
-
-    pcache_commit_all(file->inode);
-
-    errno = ENOTSUP;
-    if (file->ops->sync) {
-        errno = file->ops->sync(file);
-    }
-
-    unlock_inode(file->inode);
-
-    return errno;
+    return vfs_isync(file->inode);
 }
 
 int
