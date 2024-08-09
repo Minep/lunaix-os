@@ -11,7 +11,7 @@
         __base = (base);                                                       \
         if (__builtin_constant_p(__base) && is_pot(__base)) {                  \
             __mod = n & (__base - 1);                                          \
-            n >>= ILOG2(__base);                                               \
+            n >>= ilog2(__base);                                               \
         } else {                                                               \
             asm("" : "=a"(__low), "=d"(__high) : "A"(n));                      \
             __upper = __high;                                                  \

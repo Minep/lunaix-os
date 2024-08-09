@@ -43,8 +43,11 @@ typedef int bool;
 #define container_of(ptr, type, member)                                        \
     ({                                                                         \
         const typeof(((type*)0)->member)* __mptr = (ptr);                      \
-        (ptr) ? (type*)((char*)__mptr - offsetof(type, member)) : 0;           \
+        ((ptr_t)ptr != 0UL) ? (type*)((char*)__mptr - offsetof(type, member)) : 0;           \
     })
+
+#define offset(data, off)   \
+            ((void*)(__ptr(data) + (off)))
 
 #define __ptr(val)      ((ptr_t)(val))
 

@@ -87,7 +87,7 @@ ppage_addr(struct ppage* page) {
 
 static inline unsigned int
 count_order(size_t page_count) {
-    unsigned int po = ILOG2(page_count);
+    unsigned int po = ilog2(page_count);
     assert(!(page_count % (1 << po)));
     return po;
 }

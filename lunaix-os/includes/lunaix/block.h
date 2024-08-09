@@ -48,6 +48,12 @@ typedef u64_t partition_t;
 typedef u32_t bdev_t;
 typedef void (*devfs_exporter)(struct block_dev* bdev, void* fsnode);
 
+static inline struct block_dev*
+block_dev(struct device* dev) 
+{
+    return (struct block_dev*)dev->underlay;
+}
+
 void
 block_init();
 

@@ -28,9 +28,6 @@ sched_init();
 void noret
 schedule();
 
-void
-sched_pass();
-
 void noret
 run(struct thread* thread);
 

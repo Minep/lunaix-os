@@ -12,6 +12,7 @@ make CMDLINE=${default_cmd} ARCH=${ARCH} MODE=${MODE:-debug} image -j5 || exit -
     -v KIMG=build/lunaix.iso \
     -v QMPORT=${hmp_port} \
     -v GDB_PORT=${gdb_port} \
+    -v EXT2_TEST_DISC=machine/test_part.ext2 \
     -v ARCH=${ARCH} &
 
 QMPORT=${hmp_port} gdb build/bin/kernel.bin -ex "target remote localhost:${gdb_port}"

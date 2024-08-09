@@ -31,6 +31,9 @@ strchr(const char* str, int character);
 int
 streq(const char* a, const char* b);
 
+int
+strneq(const char* a, const char* b, unsigned long n);
+
 void
 strrtrim(char* str);
 

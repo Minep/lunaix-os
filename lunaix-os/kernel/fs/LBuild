@@ -1,6 +1,11 @@
 use("twifs")
 use("ramfs")
-use("iso9660")
+
+if configured("fs_iso9660"):
+    use("iso9660")
+
+if configured("fs_ext2"):
+    use("ext2")
 
 sources([
     "twimap.c",
@@ -14,3 +19,4 @@ sources([
     "fs_export.c",
     "probe_boot.c"
 ])
+

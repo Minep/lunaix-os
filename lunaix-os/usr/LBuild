@@ -5,7 +5,10 @@ sources([
     "cat",
     "stat",
     "test_pthread",
-    "maze"
+    "file_test",
+    "maze",
+    "mkdir",
+    "rm",
 ])
 
 compile_opts([

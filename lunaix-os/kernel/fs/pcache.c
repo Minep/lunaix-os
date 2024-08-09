@@ -4,26 +4,40 @@
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
+#include <lunaix/bcache.h>
+#include <lunaix/syslog.h>
 
-#define PCACHE_DIRTY 0x1
+LOG_MODULE("pcache")
 
-static struct lru_zone* pcache_zone;
+#define pcache_obj(bcache) container_of(bcache, struct pcache, cache)
 
-static int
-__pcache_try_evict(struct lru_node* obj)
+void pcache_release_page(struct pcache* pcache, struct pcache_pg* page);
+void pcache_set_dirty(struct pcache* pcache, struct pcache_pg* pg);
+
+static bcache_zone_t pagecached_zone = NULL;
+
+static void
+__pcache_sync(struct bcache* bc, unsigned long tag, void* data)
 {
-    struct pcache_pg* page = container_of(obj, struct pcache_pg, lru);
-    pcache_invalidate(page->holder, page);
-    return 1;
+    struct pcache* cache;
+
+    cache = pcache_obj(bc);
+    pcache_commit(cache->master, (struct pcache_pg*)data);
 }
 
 static void
-pcache_free_page(void* va)
+__pcache_try_release(struct bcache* bc, void* data)
 {
-    pte_t* ptep = mkptep_va(VMS_SELF, (ptr_t)va);
-    pte_t pte = pte_at(ptep);
-    leaflet_return(pte_leaflet(pte));
+    struct pcache_pg* page;
+    
+    page = (struct pcache_pg*)data;
+    pcache_release_page(pcache_obj(bc), page);
 }
+
+static struct bcache_ops cache_ops = {
+    .release_on_evict = __pcache_try_release,
+    .sync_cached = __pcache_sync
+};
 
 static void*
 pcache_alloc_page()
@@ -44,24 +58,31 @@ pcache_alloc_page()
     return (void*)va;
 }
 
+static void
+pcache_free_page(void* va)
+{
+    pte_t* ptep = mkptep_va(VMS_SELF, (ptr_t)va);
+    pte_t pte = pte_at(ptep);
+    leaflet_return(pte_leaflet(pte));
+}
+
 void
 pcache_init(struct pcache* pcache)
 {
-    btrie_init(&pcache->tree, PAGE_SHIFT);
-    llist_init_head(&pcache->dirty);
-    llist_init_head(&pcache->pages);
+    if (unlikely(!pagecached_zone)) {
+        pagecached_zone = bcache_create_zone("pcache");
+    }
 
-    pcache_zone = lru_new_zone(__pcache_try_evict);
+    llist_init_head(&pcache->dirty);
+
+    bcache_init_zone(&pcache->cache, pagecached_zone, 4, -1, 
+                     sizeof(struct pcache_pg), &cache_ops);
 }
 
 void
 pcache_release_page(struct pcache* pcache, struct pcache_pg* page)
 {
-    pcache_free_page(page->pg);
-
-    llist_delete(&page->pg_list);
-
-    btrie_remove(&pcache->tree, page->fpos);
+    pcache_free_page(page->data);
 
     vfree(page);
 
@@ -69,27 +90,18 @@ pcache_release_page(struct pcache* pcache, struct pcache_pg* page)
 }
 
 struct pcache_pg*
-pcache_new_page(struct pcache* pcache, u32_t index)
+pcache_new_page(struct pcache* pcache)
 {
-    struct pcache_pg* ppg = vzalloc(sizeof(struct pcache_pg));
-    void* pg = pcache_alloc_page();
-
-    if (!ppg || !pg) {
-        lru_evict_one(pcache_zone);
-        if (!ppg && !(ppg = vzalloc(sizeof(struct pcache_pg)))) {
-            return NULL;
-        }
-
-        if (!pg && !(pg = pcache_alloc_page())) {
-            return NULL;
-        }
+    struct pcache_pg* ppg;
+    void* data_page;
+    
+    data_page = pcache_alloc_page();
+    if (!data_page) {
+        return NULL;
     }
 
-    ppg->pg = pg;
-    ppg->holder = pcache;
-
-    llist_append(&pcache->pages, &ppg->pg_list);
-    btrie_set(&pcache->tree, index, ppg);
+    ppg = vzalloc(sizeof(struct pcache_pg));
+    ppg->data = data_page;
 
     return ppg;
 }
@@ -97,142 +109,156 @@ pcache_new_page(struct pcache* pcache, u32_t index)
 void
 pcache_set_dirty(struct pcache* pcache, struct pcache_pg* pg)
 {
-    if (!(pg->flags & PCACHE_DIRTY)) {
-        pg->flags |= PCACHE_DIRTY;
-        pcache->n_dirty++;
-        llist_append(&pcache->dirty, &pg->dirty_list);
+    if (pg->dirty) {
+        return;
     }
+
+    pg->dirty = true;
+    pcache->n_dirty++;
+    llist_append(&pcache->dirty, &pg->dirty_list);
 }
 
-int
-pcache_get_page(struct pcache* pcache,
-                u32_t index,
-                u32_t* offset,
-                struct pcache_pg** page)
+static bcobj_t
+__getpage_and_lock(struct pcache* pcache, unsigned int tag, 
+                   struct pcache_pg** page)
 {
-    struct pcache_pg* pg = btrie_get(&pcache->tree, index);
-    int is_new = 0;
-    u32_t mask = ((1 << pcache->tree.truncated) - 1);
-    *offset = index & mask;
-    if (!pg && (pg = pcache_new_page(pcache, index))) {
-        pg->fpos = index & ~mask;
-        pcache->n_pages++;
-        is_new = 1;
+    bcobj_t cobj;
+    struct pcache_pg* pg;
+
+    if (bcache_tryget(&pcache->cache, tag, &cobj))
+    {
+        *page = (struct pcache_pg*)bcached_data(cobj);
+        return cobj;
     }
-    if (pg)
-        lru_use_one(pcache_zone, &pg->lru);
+
+    pg = pcache_new_page(pcache);
+    if (pg) {
+        pg->index = tag;
+    }
+
     *page = pg;
-    return is_new;
+
+    return NULL;
+}
+
+static inline int
+__fill_page(struct v_inode* inode, struct pcache_pg* pg, unsigned int index)
+{
+    return inode->default_fops->read_page(inode, pg->data, page_addr(index));
 }
 
 int
 pcache_write(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
 {
     int errno = 0;
-    u32_t pg_off, buf_off = 0;
-    struct pcache* pcache = inode->pg_cache;
+    unsigned int tag, off, wr_cnt;
+    unsigned int end = fpos + len;
+    struct pcache* pcache;
     struct pcache_pg* pg;
+    bcobj_t obj;
 
-    while (buf_off < len && errno >= 0) {
-        u32_t wr_bytes = MIN(PAGE_SIZE - pg_off, len - buf_off);
+    pcache = inode->pg_cache;
+    
+    while (fpos < end && errno >= 0) {
+        tag = pfn(fpos);
+        off = va_offset(fpos);
+        wr_cnt = MIN(end - fpos, PAGE_SIZE - off);
 
-        int new_page = pcache_get_page(pcache, fpos, &pg_off, &pg);
+        obj = __getpage_and_lock(pcache, tag, &pg);
 
-        if (new_page) {
-            // Filling up the page
-            errno = inode->default_fops->read_page(inode, pg->pg, pg->fpos);
-
-            if (errno < 0) {
-                break;
-            }
-            if (errno < (int)PAGE_SIZE) {
-                // EOF
-                len = MIN(len, buf_off + errno);
-            }
-        } else if (!pg) {
-            errno = inode->default_fops->write(inode, data, wr_bytes, fpos);
-            continue;
+        if (!obj && !pg) {
+            errno = inode->default_fops->write(inode, data, fpos, wr_cnt);
+            goto cont;
         }
 
-        memcpy(pg->pg + pg_off, (data + buf_off), wr_bytes);
+        // new page and unaligned write, then prepare for partial override
+        if (!obj && wr_cnt != PAGE_SIZE) {
+            errno = __fill_page(inode, pg, tag);
+            if (errno < 0) {
+                return errno;
+            }
+        }
+        
+        memcpy(offset(pg->data, off), data, wr_cnt);
         pcache_set_dirty(pcache, pg);
 
-        pg->len = pg_off + wr_bytes;
-        buf_off += wr_bytes;
-        fpos += wr_bytes;
+        if (obj) {
+            bcache_return(obj);
+        } else {
+            bcache_put(&pcache->cache, tag, pg);
+        }
+
+cont:
+        data  = offset(data, wr_cnt);
+        fpos += wr_cnt;
     }
 
-    return errno < 0 ? errno : (int)buf_off;
+    return errno < 0 ? errno : (int)(len - (end - fpos));
 }
 
 int
 pcache_read(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
 {
-    u32_t pg_off, buf_off = 0, new_pg = 0;
     int errno = 0;
-    struct pcache* pcache = inode->pg_cache;
+    unsigned int tag, off, rd_cnt;
+    unsigned int end = fpos + len, size = 0;
+    struct pcache* pcache;
     struct pcache_pg* pg;
+    bcobj_t obj;
 
-    while (buf_off < len) {
-        int new_page = pcache_get_page(pcache, fpos, &pg_off, &pg);
-        if (new_page) {
-            // Filling up the page
-            errno = inode->default_fops->read_page(inode, pg->pg, pg->fpos);
+    pcache = inode->pg_cache;
 
+    while (fpos < page_upaligned(end)) {
+        tag = pfn(fpos);
+        off = va_offset(fpos);
+
+        obj = __getpage_and_lock(pcache, tag, &pg);
+
+        if (!obj) {
+            errno = __fill_page(inode, pg, tag);
             if (errno < 0) {
-                break;
-            }
-            if (errno < (int)PAGE_SIZE) {
-                // EOF
-                len = MIN(len, buf_off + errno);
+                return errno;
             }
 
-            pg->len = errno;
-        } else if (!pg) {
-            errno = inode->default_fops->read(
-              inode, (data + buf_off), len - buf_off, pg->fpos);
-            buf_off = len;
-            break;
+            end -= (PAGE_SIZE - errno);
         }
 
-        u32_t rd_bytes = MIN(pg->len - pg_off, len - buf_off);
+        rd_cnt = MIN(end - fpos, PAGE_SIZE - off);
+        memcpy(data, pg->data + off, rd_cnt);
 
-        if (!rd_bytes)
-            break;
+        if (obj) {
+            bcache_return(obj);
+        } else {
+            bcache_put(&pcache->cache, tag, pg);
+        }
 
-        memcpy((data + buf_off), pg->pg + pg_off, rd_bytes);
-
-        buf_off += rd_bytes;
-        fpos += rd_bytes;
+        data += rd_cnt;
+        size += rd_cnt;
+        fpos = page_aligned(fpos + PAGE_SIZE);
     }
 
-    return errno < 0 ? errno : (int)buf_off;
+    return errno < 0 ? errno : (int)size;
 }
 
 void
 pcache_release(struct pcache* pcache)
 {
-    struct pcache_pg *pos, *n;
-    llist_for_each(pos, n, &pcache->pages, pg_list)
-    {
-        lru_remove(pcache_zone, &pos->lru);
-        vfree(pos);
-    }
-
-    btrie_release(&pcache->tree);
+    bcache_free(&pcache->cache);
 }
 
 int
 pcache_commit(struct v_inode* inode, struct pcache_pg* page)
 {
-    if (!(page->flags & PCACHE_DIRTY)) {
+    if (!page->dirty) {
         return 0;
     }
 
-    int errno = inode->default_fops->write_page(inode, page->pg, page->fpos);
-
+    int errno;
+    unsigned int fpos = page_addr(page->index);
+    
+    errno = inode->default_fops->write_page(inode, page->data, fpos);
     if (!errno) {
-        page->flags &= ~PCACHE_DIRTY;
+        page->dirty = false;
         llist_delete(&page->dirty_list);
         inode->pg_cache->n_dirty--;
     }
@@ -243,22 +269,14 @@ pcache_commit(struct v_inode* inode, struct pcache_pg* page)
 void
 pcache_commit_all(struct v_inode* inode)
 {
-    if (!inode->pg_cache) {
+    struct pcache* cache = inode->pg_cache;
+    if (!cache) {
         return;
     }
 
-    struct pcache* cache = inode->pg_cache;
     struct pcache_pg *pos, *n;
-
     llist_for_each(pos, n, &cache->dirty, dirty_list)
     {
         pcache_commit(inode, pos);
     }
-}
-
-void
-pcache_invalidate(struct pcache* pcache, struct pcache_pg* page)
-{
-    pcache_commit(pcache->master, page);
-    pcache_release_page(pcache, page);
 }

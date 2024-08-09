@@ -3,4 +3,5 @@ def kernel_feature():
     """ Config kernel features """
     pass
 
+include("fs")
 include("mm")

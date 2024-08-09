@@ -11,6 +11,8 @@
 #include <lunaix/ds/lru.h>
 #include <lunaix/ds/mutex.h>
 #include <lunaix/status.h>
+#include <lunaix/spike.h>
+#include <lunaix/bcache.h>
 
 #include <stdatomic.h>
 
@@ -19,15 +21,12 @@
 #define VFS_NAME_MAXLEN 128
 #define VFS_MAX_FD 32
 
-#define VFS_IFDIR F_DIR
-#define VFS_IFFILE F_FILE
-#define VFS_IFDEV (F_DEV | F_FILE)
-#define VFS_IFSEQDEV (F_SEQDEV | F_FILE)
-#define VFS_IFVOLDEV (F_VOLDEV | F_FILE)
-#define VFS_IFSYMLINK (F_SYMLINK | F_FILE)
-
-#define VFS_DEVFILE(type) ((type) & F_DEV)
-#define VFS_DEVTYPE(type) ((type) & ((F_SEQDEV | F_VOLDEV) ^ F_DEV))
+#define VFS_IFFILE       F_FILE
+#define VFS_IFDIR       (F_FILE | F_DIR    )
+#define VFS_IFDEV       (F_FILE | F_DEV    )
+#define VFS_IFSYMLINK   (F_FILE | F_SYMLINK)
+#define VFS_IFVOLDEV    (F_FILE | F_SVDEV  )
+#define VFS_IFSEQDEV    VFS_IFDEV
 
 // Walk, mkdir if component encountered is non-exists.
 #define VFS_WALK_MKPARENT 0x1
@@ -51,7 +50,8 @@
 
 #define VFS_PATH_DELIM '/'
 
-#define FSTYPE_ROFS 0x1
+#define FSTYPE_ROFS     0b00000001
+#define FSTYPE_PSEUDO   0x00000010
 
 #define TEST_FD(fd) (fd >= 0 && fd < VFS_MAX_FD)
 
@@ -77,6 +77,9 @@
         lru_use_one(dnode_lru, &dnode->lru);                                   \
     })
 
+#define assert_fs(cond) assert_p(cond, "FS")
+#define fail_fs(msg) fail_p(msg, "FS")
+
 typedef u32_t inode_t;
 
 struct v_dnode;
@@ -96,6 +99,9 @@ extern struct hstr vfs_ddot;
 extern struct hstr vfs_dot;
 extern struct v_dnode* vfs_sysroot;
 
+typedef int (*mntops_mnt)(struct v_superblock* vsb, struct v_dnode* mount_point);
+typedef int (*mntops_umnt)(struct v_superblock* vsb);
+
 struct filesystem
 {
     struct llist_header fs_flat;
@@ -103,8 +109,8 @@ struct filesystem
     struct hstr fs_name;
     u32_t types;
     int fs_id;
-    int (*mount)(struct v_superblock* vsb, struct v_dnode* mount_point);
-    int (*unmount)(struct v_superblock* vsb);
+    mntops_mnt mount;
+    mntops_umnt unmount;
 };
 
 struct v_superblock
@@ -113,20 +119,22 @@ struct v_superblock
     struct device* dev;
     struct v_dnode* root;
     struct filesystem* fs;
+    struct blkbuf_cache* blks;
     struct hbucket* i_cache;
     void* data;
+    unsigned int ref_count;
     size_t blksize;
     struct
     {
-        u32_t (*read_capacity)(struct v_superblock* vsb);
-        u32_t (*read_usage)(struct v_superblock* vsb);
+        size_t (*read_capacity)(struct v_superblock* vsb);
+        size_t (*read_usage)(struct v_superblock* vsb);
         void (*init_inode)(struct v_superblock* vsb, struct v_inode* inode);
+        void (*release)(struct v_superblock* vsb);
     } ops;
 };
 
 struct dir_context
 {
-    int index;
     void* cb_data;
     void (*read_complete_callback)(struct dir_context* dctx,
                                    const char* name,
@@ -149,26 +157,33 @@ struct v_file_ops
     int (*read_page)(struct v_inode* inode, void* pg, size_t fpos);
 
     int (*readdir)(struct v_file* file, struct dir_context* dctx);
-    int (*seek)(struct v_inode* inode, size_t offset); // optional
+    int (*seek)(struct v_file* file, size_t offset);
     int (*close)(struct v_file* file);
     int (*sync)(struct v_file* file);
 };
 
 struct v_inode_ops
 {
-    int (*create)(struct v_inode* this, struct v_dnode* dnode);
+    int (*create)(struct v_inode* this, struct v_dnode* dnode, 
+                  unsigned int itype);
+    
     int (*open)(struct v_inode* this, struct v_file* file);
     int (*sync)(struct v_inode* this);
+
     int (*mkdir)(struct v_inode* this, struct v_dnode* dnode);
-    int (*rmdir)(struct v_inode* this, struct v_dnode* dir);
-    int (*unlink)(struct v_inode* this);
+    int (*rmdir)(struct v_inode* this, struct v_dnode* dnode);
+    int (*unlink)(struct v_inode* this, struct v_dnode* name);
     int (*link)(struct v_inode* this, struct v_dnode* new_name);
+
     int (*read_symlink)(struct v_inode* this, const char** path_out);
     int (*set_symlink)(struct v_inode* this, const char* target);
+    
     int (*dir_lookup)(struct v_inode* this, struct v_dnode* dnode);
+
     int (*rename)(struct v_inode* from_inode,
                   struct v_dnode* from_dnode,
                   struct v_dnode* to_dnode);
+
     int (*getxattr)(struct v_inode* this,
                     struct v_xattr_entry* entry); // optional
     int (*setxattr)(struct v_inode* this,
@@ -192,6 +207,7 @@ struct v_file
     struct llist_header* f_list;
     u32_t f_pos;
     atomic_ulong ref_count;
+    void* data;
     struct v_file_ops* ops; // for caching
 };
 
@@ -269,6 +285,8 @@ struct v_dnode
     atomic_ulong ref_count;
 
     void* data;
+
+    void (*destruct)(struct v_dnode* dnode);
 };
 
 struct v_fdtable
@@ -279,8 +297,7 @@ struct v_fdtable
 struct pcache
 {
     struct v_inode* master;
-    struct btrie tree;
-    struct llist_header pages;
+    struct bcache cache;
     struct llist_header dirty;
     u32_t n_dirty;
     u32_t n_pages;
@@ -288,14 +305,17 @@ struct pcache
 
 struct pcache_pg
 {
-    struct llist_header pg_list;
     struct llist_header dirty_list;
-    struct lru_node lru;
-    struct pcache* holder;
-    void* pg;
-    u32_t flags;
-    u32_t fpos;
-    u32_t len;
+
+    union {
+        struct {
+            bool dirty:1;
+        };
+        u32_t flags;
+    };
+
+    void* data;
+    unsigned int index;
 };
 
 static inline bool
@@ -395,6 +415,35 @@ vfs_sb_alloc();
 void
 vfs_sb_free(struct v_superblock* sb);
 
+void
+vfs_sb_ref(struct v_superblock* sb);
+
+#define vfs_assign_sb(sb_accessor, sb)      \
+    ({                                      \
+        if (sb_accessor) {                \
+            vfs_sb_free(sb_accessor);       \
+        }                                   \
+        vfs_sb_ref(((sb_accessor) = (sb))); \
+    })
+
+static inline void
+vfs_i_assign_sb(struct v_inode* inode, struct v_superblock* sb)
+{
+    vfs_assign_sb(inode->sb, sb);
+}
+
+static inline void
+vfs_d_assign_sb(struct v_dnode* dnode, struct v_superblock* sb)
+{
+    vfs_assign_sb(dnode->super_block, sb);
+}
+
+static inline void
+vfs_vmnt_assign_sb(struct v_mount* vmnt, struct v_superblock* sb)
+{
+    vfs_assign_sb(vmnt->super_block, sb);
+}
+
 struct v_dnode*
 vfs_d_alloc();
 
@@ -436,21 +485,6 @@ vfs_get_path(struct v_dnode* dnode, char* buf, size_t size, int depth);
 
 void
 pcache_init(struct pcache* pcache);
-
-void
-pcache_release_page(struct pcache* pcache, struct pcache_pg* page);
-
-struct pcache_pg*
-pcache_new_page(struct pcache* pcache, u32_t index);
-
-void
-pcache_set_dirty(struct pcache* pcache, struct pcache_pg* pg);
-
-int
-pcache_get_page(struct pcache* pcache,
-                u32_t index,
-                u32_t* offset,
-                struct pcache_pg** page);
 
 int
 pcache_write(struct v_inode* inode, void* data, u32_t len, u32_t fpos);
@@ -525,7 +559,7 @@ int
 default_file_close(struct v_file* file);
 
 int
-default_file_seek(struct v_inode* inode, size_t offset);
+default_file_seek(struct v_file* file, size_t offset);
 
 int
 default_inode_open(struct v_inode* this, struct v_file* file);
@@ -544,5 +578,68 @@ xattr_getcache(struct v_inode* inode, struct hstr* name);
 
 void
 xattr_addcache(struct v_inode* inode, struct v_xattr_entry* xattr);
+
+
+/* --- misc stuff --- */
+
+#define check_itype(to_check, itype)    \
+    (((to_check) & (itype)) == (itype))
+
+/**
+ * @brief Check if node represent a regular file (nothing but a file)
+ * 
+ * @param inode 
+ * @return true 
+ * @return false 
+ */
+static inline bool
+check_regfile_node(struct v_inode* inode)
+{
+    return inode->itype == VFS_IFFILE;
+}
+
+/**
+ * @brief Check if node represent a file.
+ *        This is basically everything within file system (dir, dev, etc.)
+ * 
+ * @param inode 
+ * @return true 
+ * @return false 
+ */
+static inline bool
+check_file_node(struct v_inode* inode)
+{
+    return check_itype(inode->itype, VFS_IFFILE);
+}
+
+static inline bool
+check_directory_node(struct v_inode* inode)
+{
+    return check_itype(inode->itype, VFS_IFDIR);
+}
+
+static inline bool
+check_device_node(struct v_inode* inode)
+{
+    return check_itype(inode->itype, VFS_IFDEV);
+}
+
+static inline bool
+check_seqdev_node(struct v_inode* inode)
+{
+    return check_device_node(inode);
+}
+
+static inline bool
+check_voldev_node(struct v_inode* inode)
+{
+    return check_itype(inode->itype, VFS_IFVOLDEV);
+}
+
+static inline bool
+check_symlink_node(struct v_inode* inode)
+{
+    return check_itype(inode->itype, VFS_IFSYMLINK);
+}
 
 #endif /* __LUNAIX_VFS_H */

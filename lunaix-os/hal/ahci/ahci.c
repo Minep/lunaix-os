@@ -255,6 +255,7 @@ hba_bind_vbuf(struct hba_cmdh* cmdh, struct hba_cmdt* cmdt, struct vecbuf* vbuf)
     do {
         assert_msg(i < HBA_MAX_PRDTE, "HBA: Too many PRDTEs");
         assert_msg(pos->buf.size <= 0x400000U, "HBA: Buffer too big");
+        assert_msg(pos->buf.size, "HBA: expect a non-zero buffer size");
 
         cmdt->entries[i++] =
           (struct hba_prdte){ .data_base = vmm_v2p((ptr_t)pos->buf.buffer),
@@ -410,6 +411,7 @@ int
 ahci_identify_device(struct hba_device* device)
 {
     // 用于重新识别设备（比如在热插拔的情况下）
+    // FIXME this is not right...
     vfree(device);
     return ahci_init_device(device->port);
 }

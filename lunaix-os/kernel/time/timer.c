@@ -123,6 +123,7 @@ timer_update()
 
     if (sched_ticks_counter >= sched_ticks) {
         sched_ticks_counter = 0;
+        thread_stats_update_entering(false);
         schedule();
     }
 }

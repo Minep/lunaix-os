@@ -8,22 +8,24 @@ rng_fill(void* data, size_t len)
 {
 #ifdef CONFIG_ARCH_X86_64
     asm volatile("1:\n"
-                 "rdrand %%rax\n"
-                 "movq   %%rax, (%0)\n"
-                 "addq   $8, %%rax\n"
                  "subq   $8, %1\n"
+                 "rdrand %%rax\n"
+                 "movq   %%rax, (%0, %1, 1)\n"
+                 "addq   $8, %%rax\n"
+                 "testq  %1, %1\n"
                  "jnz    1b" 
                  ::
                  "r"((ptr_t)data),
                  "r"((len & ~0x7))
                  : 
-                 "%eax");
+                 "rax");
 #else
     asm volatile("1:\n"
-                 "rdrand %%eax\n"
-                 "movl %%eax, (%0)\n"
-                 "addl $4, %%eax\n"
                  "subl $4, %1\n"
+                 "rdrand %%eax\n"
+                 "movl %%eax, (%0, %1, 1)\n"
+                 "addl $4, %%eax\n"
+                 "testl  %1, %1\n"
                  "jnz 1b" 
                  ::
                  "r"((ptr_t)data),

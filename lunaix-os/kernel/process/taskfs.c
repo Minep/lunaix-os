@@ -1,5 +1,6 @@
 #include <lunaix/fs/taskfs.h>
 #include <lunaix/fs/twimap.h>
+#include <lunaix/fs/api.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
@@ -52,17 +53,21 @@ taskfs_readdir(struct v_file* file, struct dir_context* dctx)
 {
     struct v_inode* inode = file->inode;
     pid_t pid = inode->id >> 16;
-    int counter = 0;
+    unsigned int counter = 0;
 
     if ((inode->id & COUNTER_MASK)) {
         return ENOTDIR;
+    }
+
+    if (fsapi_handle_pseudo_dirent(file, dctx)) {
+        return 1;
     }
 
     if (pid) {
         struct task_attribute *pos, *n;
         llist_for_each(pos, n, &attributes, siblings)
         {
-            if (counter == dctx->index) {
+            if (counter == file->f_pos) {
                 dctx->read_complete_callback(
                   dctx, pos->key_val, VFS_NAME_MAXLEN, DT_FILE);
                 return 1;
@@ -76,7 +81,7 @@ taskfs_readdir(struct v_file* file, struct dir_context* dctx)
     struct proc_info *root = get_process(pid), *pos, *n;
     llist_for_each(pos, n, &root->tasks, tasks)
     {
-        if (counter == dctx->index) {
+        if (counter == file->f_pos) {
             ksnprintf(name, VFS_NAME_MAXLEN, "%d", pos->pid);
             dctx->read_complete_callback(dctx, name, VFS_NAME_MAXLEN, DT_DIR);
             return 1;
@@ -165,6 +170,12 @@ taskfs_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
     return taskfs_mknod(mount_point, 0, 0, VFS_IFDIR);
 }
 
+int
+taskfs_unmount(struct v_superblock* vsb)
+{
+    return 0;
+}
+
 void
 taskfs_invalidate(pid_t pid)
 {
@@ -220,10 +231,11 @@ export_task_attr();
 void
 taskfs_init()
 {
-    struct filesystem* taskfs = fsm_new_fs("taskfs", 5);
-    taskfs->mount = taskfs_mount;
-
-    fsm_register(taskfs);
+    struct filesystem* fs;
+    fs = fsapi_fs_declare("taskfs", FSTYPE_PSEUDO);
+    
+    fsapi_fs_set_mntops(fs, taskfs_mount, taskfs_unmount);
+    fsapi_fs_finalise(fs);
 
     attr_export_table = vcalloc(ATTR_TABLE_LEN, sizeof(struct hbucket));
 

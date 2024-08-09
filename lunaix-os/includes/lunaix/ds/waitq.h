@@ -27,7 +27,19 @@ waitq_cancel_wait(waitq_t* waitq)
 }
 
 void
+prepare_to_wait(waitq_t* waitq);
+
+void
+try_wait();
+
+void
+try_wait_check_stall();
+
+void
 pwait(waitq_t* queue);
+
+void
+pwait_check_stall(waitq_t* queue);
 
 void
 pwake_one(waitq_t* queue);

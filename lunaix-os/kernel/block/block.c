@@ -51,7 +51,10 @@ static int
 __block_commit(struct blkio_context* blkio, struct blkio_req* req, int flags)
 {
     int errno;
-    blkio_commit(blkio, req, flags);
+    
+    blkio_bindctx(req, blkio);
+    blkio_mark_nfoc(req);
+    blkio_commit(req, flags);
 
     if ((errno = req->errcode)) {
         errno = -errno;
@@ -66,8 +69,9 @@ int
 __block_read(struct device* dev, void* buf, size_t offset, size_t len)
 {
     int errno;
-    struct block_dev* bdev = (struct block_dev*)dev->underlay;
-    size_t bsize = bdev->blk_size, rd_block = offset / bsize + bdev->start_lba,
+    struct block_dev* bdev = block_dev(dev);
+    size_t bsize = bdev->blk_size, 
+           rd_block = offset / bsize + bdev->start_lba,
            r = offset % bsize, rd_size = 0;
 
     if (!(len = MIN(len, ((size_t)bdev->end_lba - rd_block + 1) * bsize))) {
@@ -109,7 +113,7 @@ __block_read(struct device* dev, void* buf, size_t offset, size_t len)
 int
 __block_write(struct device* dev, void* buf, size_t offset, size_t len)
 {
-    struct block_dev* bdev = (struct block_dev*)dev->underlay;
+    struct block_dev* bdev = block_dev(dev);
     size_t bsize = bdev->blk_size, wr_block = offset / bsize + bdev->start_lba,
            r = offset % bsize, wr_size = 0;
 
@@ -153,7 +157,7 @@ int
 __block_read_page(struct device* dev, void* buf, size_t offset)
 {
     struct vecbuf* vbuf = NULL;
-    struct block_dev* bdev = (struct block_dev*)dev->underlay;
+    struct block_dev* bdev = block_dev(dev);
 
     u32_t lba = offset / bdev->blk_size + bdev->start_lba;
     u32_t rd_lba = MIN(lba + PAGE_SIZE / bdev->blk_size, bdev->end_lba);
@@ -180,7 +184,7 @@ int
 __block_write_page(struct device* dev, void* buf, size_t offset)
 {
     struct vecbuf* vbuf = NULL;
-    struct block_dev* bdev = (struct block_dev*)dev->underlay;
+    struct block_dev* bdev = block_dev(dev);
 
     u32_t lba = offset / bdev->blk_size + bdev->start_lba;
     u32_t wr_lba = MIN(lba + PAGE_SIZE / bdev->blk_size, bdev->end_lba);

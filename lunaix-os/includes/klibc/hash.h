@@ -17,7 +17,7 @@ strhash_32(const char* str, u32_t truncate_to);
  * @param val
  * @return u32_t
  */
-inline u32_t
+static inline u32_t
 hash_32(const u32_t val, u32_t truncate_to)
 {
     return (val * 0x61C88647u) >> (HASH_SIZE_BITS - truncate_to);

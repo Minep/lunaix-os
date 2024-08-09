@@ -29,6 +29,12 @@ void
 mutex_unlock(mutex_t* mutex);
 
 void
+mutex_lock_nested(mutex_t* mutex);
+
+void
+mutex_unlock_nested(mutex_t* mutex);
+
+void
 mutex_unlock_for(mutex_t* mutex, pid_t pid);
 
 #endif /* __LUNAIX_MUTEX_H */

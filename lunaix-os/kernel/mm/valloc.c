@@ -5,24 +5,18 @@
 
 #define CLASS_LEN(class) (sizeof(class) / sizeof(class[0]))
 
-static char piles_names[][PILE_NAME_MAXLEN] = {"valloc_8",
-                                               "valloc_16",
-                                               "valloc_32",
-                                               "valloc_64",
-                                               "valloc_128",
-                                               "valloc_256",
-                                               "valloc_512",
-                                               "valloc_1k",
-                                               "valloc_2k",
-                                               "valloc_4k",
-                                               "valloc_8k"};
+static char piles_names[][PILE_NAME_MAXLEN] = 
+{
+    "valloc_8",   "valloc_16",  "valloc_32",  "valloc_64",
+    "valloc_128", "valloc_256", "valloc_512", "valloc_1k",
+    "valloc_2k",  "valloc_4k",  "valloc_8k"  
+};
 
-static char piles_names_dma[][PILE_NAME_MAXLEN] = {"valloc_dma_128",
-                                                   "valloc_dma_256",
-                                                   "valloc_dma_512",
-                                                   "valloc_dma_1k",
-                                                   "valloc_dma_2k",
-                                                   "valloc_dma_4k"};
+static char piles_names_dma[][PILE_NAME_MAXLEN] = 
+{
+    "valloc_dma_128", "valloc_dma_256", "valloc_dma_512",
+    "valloc_dma_1k",  "valloc_dma_2k",  "valloc_dma_4k"
+};
 
 static struct cake_pile* piles[CLASS_LEN(piles_names)];
 static struct cake_pile* piles_dma[CLASS_LEN(piles_names_dma)];
@@ -49,7 +43,7 @@ __valloc(unsigned int size,
          size_t len,
          size_t boffset)
 {
-    size_t i = ILOG2(size);
+    size_t i = ilog2(size);
     i += (size - (1 << i) != 0);
     i -= boffset;
 
@@ -88,7 +82,7 @@ void*
 vcalloc(unsigned int size, unsigned int count)
 {
     unsigned int alloc_size;
-    if (umul_overflow(size, count, &alloc_size)) {
+    if (umul_of(size, count, &alloc_size)) {
         return 0;
     }
 
