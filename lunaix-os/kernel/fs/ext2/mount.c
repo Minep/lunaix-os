@@ -8,29 +8,32 @@
 
 LOG_MODULE("EXT2")
 
-#define EXT2_SUPER_MAGIC 0xef53
-#define EXT2_BASE_BLKSZ 1024
-#define EXT2_PRIME_SB_OFF EXT2_BASE_BLKSZ
+#define EXT2_COMPRESSION    0x0001
+#define EXT2_FILETYPE       0x0002
+#define EXT2_JOURNAL        0x0004
+#define EXT2_METABG         0x0008
 
-#define EXT2_REQFEAT_COMPRESSION 0x0001
-#define EXT2_REQFEAT_FILETYPE    0x0002
-#define EXT2_REQFEAT_JOURNAL     0x0004
-#define EXT2_REQFEAT_METABG      0x0008
+#define EXT2_SPARSESB       0x0001
+#define EXT2_LARGEFLE       0x0002
+#define EXT2_BTREEDIR       0x0004
 
-#define EXT2_ROFEAT_SPARSESB    0x0001
-#define EXT2_ROFEAT_LARGEFLE    0x0002
-#define EXT2_ROFEAT_BTREEDIR    0x0004
+#define EXT2_SUPER_MAGIC            0xef53
+#define EXT2_BASE_BLKSZ             1024
+#define EXT2_PRIME_SB_OFF           EXT2_BASE_BLKSZ
 
-#define EXT2_IMPL_REQFEAT (EXT2_REQFEAT_FILETYPE)
-#define EXT2_IMPL_ROFEAT (EXT2_ROFEAT_SPARSESB)
+// current support for incompatible features
+#define EXT2_IMPL_REQFEAT           (EXT2_FILETYPE)
 
-#define EXT2_ROOT_INO 2
+// current support for readonly feature
+#define EXT2_IMPL_ROFEAT            (EXT2_SPARSESB)
 
-#define compatible_mount(feat) \
-        (((feat) | EXT2_IMPL_REQFEAT) == EXT2_IMPL_REQFEAT)
+#define EXT2_ROOT_INO               to_ext2ino_id(1)
 
-#define readonly_mount(feat) \
-        (((feat) | EXT2_IMPL_ROFEAT) != EXT2_IMPL_ROFEAT)
+#define check_compat_mnt(feat) \
+        (!((feat) & ~EXT2_IMPL_REQFEAT))
+
+#define check_compat_mnt_ro_fallback(feat) \
+        (((feat) & ~EXT2_IMPL_ROFEAT))
 
 static size_t
 ext2_rd_capacity(struct v_superblock* vsb)
@@ -61,6 +64,71 @@ struct fsapi_vsb_ops vsb_ops = {
     .release = __vsb_release
 };
 
+static inline unsigned int
+__translate_feature(struct ext2b_super* sb)
+{
+    unsigned int feature = 0;
+    unsigned int req, opt, ro;
+
+    req = sb->s_required_feat;
+    opt = sb->s_optional_feat;
+    ro  = sb->s_ro_feat;
+
+    if ((req & EXT2_COMPRESSION)) {
+        feature |= FEAT_COMPRESSION;
+    }
+
+    if ((req & EXT2_FILETYPE)) {
+        feature |= FEAT_FILETYPE;
+    }
+
+    if ((ro & EXT2_SPARSESB)) {
+        feature |= FEAT_SPARSE_SB;
+    }
+
+    if ((ro & EXT2_LARGEFLE)) {
+        feature |= FEAT_LARGE_FILE;
+    }
+
+    return feature;
+}
+
+static bool
+__check_mount(struct v_superblock* vsb, struct ext2b_super* sb)
+{
+    unsigned int req, opt, ro;
+
+    req = sb->s_required_feat;
+    opt = sb->s_optional_feat;
+    ro  = sb->s_ro_feat;
+    
+    if (sb->s_magic != EXT2_SUPER_MAGIC) {
+        ERROR("invalid magic: 0x%x", sb->s_magic);
+        return false;
+    }
+
+    if (!check_compat_mnt(req)) 
+    {
+        ERROR("unsupported feature: 0x%x, mount refused", req);
+        return false;
+    }
+
+    if (check_compat_mnt_ro_fallback(ro)) 
+    {
+        WARN("unsupported feature: 0x%x, mounted as readonly", ro);
+        fsapi_set_readonly_mount(vsb);
+    }
+
+#ifndef CONFIG_ARCH_BITS_64
+    if ((ro & EXT2_LARGEFLE)) {
+        WARN("large file not supported on 32bits machine");
+        fsapi_set_readonly_mount(vsb);
+    }
+#endif
+
+    return true;
+}
+
 static int 
 ext2_mount(struct v_superblock* vsb, struct v_dnode* mnt)
 {
@@ -71,6 +139,7 @@ ext2_mount(struct v_superblock* vsb, struct v_dnode* mnt)
     bbuf_t buf;
     size_t block_size;
     int errno = 0;
+    unsigned int req_feat;
 
     bdev = fsapi_blockdev(vsb);
     ext2sb = vzalloc(sizeof(*ext2sb));
@@ -84,24 +153,14 @@ ext2_mount(struct v_superblock* vsb, struct v_dnode* mnt)
     block_size = EXT2_BASE_BLKSZ << rawsb->s_log_blk_size;
     fsapi_begin_vsb_setup(vsb, block_size);
     
-    if (rawsb->s_magic != EXT2_SUPER_MAGIC) {
-        ERROR("invalid magic: 0x%x", rawsb->s_magic);
+    if (!__check_mount(vsb, rawsb)) {
         goto unsupported;
-    }
-
-    if (!compatible_mount(rawsb->s_required_feat)) {
-        ERROR("unsupported feature, mount refused");
-        goto unsupported;
-    }
-
-    if (readonly_mount(rawsb->s_required_feat)) {
-        WARN("unsupported feature, mounted as readonly");
-        fsapi_set_readonly_mount(vsb);
     }
 
     if (block_size > PAGE_SIZE) {
         ERROR("block size must not greater than page size");
-        goto unsupported;
+        errno = EINVAL;
+        goto failed;
     }
 
     ext2sb->bdev = bdev;
@@ -109,13 +168,14 @@ ext2_mount(struct v_superblock* vsb, struct v_dnode* mnt)
     ext2sb->vsb = vsb;
     ext2sb->read_only = fsapi_readonly_mount(vsb);
     ext2sb->raw = rawsb;
+    ext2sb->all_feature = __translate_feature(rawsb);
 
     fsapi_set_vsb_ops(vsb, &vsb_ops);
     fsapi_complete_vsb_setup(vsb, ext2sb);
 
     ext2gd_prepare_gdt(vsb);
-    root_inode = vfs_i_alloc(vsb);
 
+    root_inode = vfs_i_alloc(vsb);
     ext2ino_fill(root_inode, EXT2_ROOT_INO);
     vfs_assign_inode(mnt, root_inode);
 

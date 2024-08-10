@@ -322,18 +322,61 @@ ext2dr_lookup(struct v_inode* inode, struct v_dnode* dnode)
     return 0;
 }
 
+#define FT_NUL  0
 #define FT_REG  1
 #define FT_DIR  2
 #define FT_CHR  3
 #define FT_BLK  4
 #define FT_SYM  7
+#define check_imode(val, imode)     (((val) & (imode)) == (imode)) 
 
-static unsigned int
-__dir_filetype(struct ext2b_dirent* dir)
+static inline unsigned int
+__imode_to_filetype(unsigned int imode)
 {
+    if (check_imode(imode, IMODE_IFLNK)) {
+        return FT_SYM;
+    }
+
+    if (check_imode(imode, IMODE_IFBLK)) {
+        return FT_BLK;
+    }
+
+    if (check_imode(imode, IMODE_IFCHR)) {
+        return FT_CHR;
+    }
+
+    if (check_imode(imode, IMODE_IFDIR)) {
+        return FT_DIR;
+    }
+
+    if (check_imode(imode, IMODE_IFREG)) {
+        return FT_REG;
+    }
+
+    return FT_NUL;
+}
+
+static int
+__dir_filetype(struct v_superblock* vsb, struct ext2b_dirent* dir)
+{
+    int errno;
     unsigned int type;
 
-    type = dir->file_type;
+    if (ext2_feature(vsb, FEAT_FILETYPE)) {
+        type = dir->file_type;
+    }
+    else {
+        struct ext2_fast_inode e_fino;
+
+        errno = ext2ino_get_fast(vsb, dir->inode, &e_fino);
+        if (errno) {
+            return errno;
+        }
+
+        type = __imode_to_filetype(e_fino.ino->i_mode);
+
+        fsblock_put(e_fino.buf);
+    }
     
     if (type == FT_DIR) {
         return DT_DIR;
@@ -352,8 +395,11 @@ ext2dr_read(struct v_file *file, struct dir_context *dctx)
     struct ext2_file* e_file;
     struct ext2b_dirent* dir;
     struct ext2_iterator* iter;
+    struct v_superblock* vsb;
+    int dirtype;
 
     e_file = EXT2_FILE(file);
+    vsb    = file->inode->sb;
     iter   = &e_file->iter;
 
     if (!ext2dr_itnext(&e_file->iter)) {
@@ -361,7 +407,12 @@ ext2dr_read(struct v_file *file, struct dir_context *dctx)
     }
 
     dir = e_file->iter.dirent;
-    fsapi_dir_report(dctx, dir->name, dir->name_len, __dir_filetype(dir));
+    dirtype =  __dir_filetype(vsb, dir);
+    if (dirtype < 0) {
+        return dirtype;
+    }
+
+    fsapi_dir_report(dctx, dir->name, dir->name_len, dirtype);
     
     return 1;
 }
@@ -451,19 +502,19 @@ ext2dr_insert(struct v_inode* this, struct ext2b_dirent* dirent,
     }
 
     /*
-                   --- +--------+
-                    ^  |  prev  |
-                    |  +--------+
-                    |      ^
-                    |      |  new_reclen
-                    |      v
-                    |  +--------+  \
-                    |  | dirent |  size 
-        old_reclen  |  +--------+  /
-                    |      ^
-                    |      |  dirent.reclen
-                    v      v
-                   --- +--------+
+                   --- +--------+ ---
+                    ^  |  prev  |  |
+                    |  +--------+  |
+                    |              |   new_reclen
+                    |              |
+                    |              v
+                    |  +--------+ ---  -
+                    |  | dirent |  |   | size
+        old_reclen  |  +--------+  |   - 
+                    |              |   dirent.reclen
+                    |              |
+                    v              v
+                   --- +--------+ ---
                        |  next  |
                        +--------+
     */
@@ -507,6 +558,8 @@ ext2dr_remove(struct ext2_dnode* e_dno)
     fsblock_dirty(dir_prev->buf);
     fsblock_dirty(dir->buf);
 
+    __destruct_ext2_dnode(e_dno);
+
     return 0;
 }
 
@@ -540,12 +593,9 @@ __d_insert(struct v_inode* parent, struct v_inode* self,
            struct ext2b_dirent* dirent,
            struct hstr* name, struct ext2_dnode** e_dno_out)
 {
-    *dirent = (struct ext2b_dirent){
-        .inode    = self->id,
-        .name_len = name->len    
-    };
-    strncpy(dirent->name, name->value, name->len);
-
+    ext2dr_setup_dirent(dirent, self, name);
+    
+    dirent->inode = self->id;
     return ext2dr_insert(parent, dirent, e_dno_out);
 }
 
@@ -590,7 +640,6 @@ ext2_mkdir(struct v_inode* this, struct v_dnode* dnode)
     return 0;
 
 cleanup:
-    ext2ino_free(i_created);
     __destruct_ext2_dnode(e_dno);
 
 cleanup1:
@@ -602,13 +651,21 @@ cleanup1:
 }
 
 void
-ext2dr_setup_dirent(struct ext2b_dirent* dirent, struct v_dnode* dnode)
+ext2dr_setup_dirent(struct ext2b_dirent* dirent, 
+                    struct v_inode* inode, struct hstr* name)
 {
-    struct hstr* name = &dnode->name;
+    unsigned int imode;
+    
+    imode = EXT2_INO(inode)->ino->i_mode;
     *dirent = (struct ext2b_dirent){
-        .name_len = name->len    
+        .name_len = name->len
     };
+    
     strncpy(dirent->name, name->value, name->len);
+
+    if (ext2_feature(inode->sb, FEAT_FILETYPE)) {
+        dirent->file_type = __imode_to_filetype(imode);
+    }
 }
 
 int
@@ -616,11 +673,19 @@ ext2_rename(struct v_inode* from_inode, struct v_dnode* from_dnode,
             struct v_dnode* to_dnode)
 {
     int errno;
+    struct v_inode* to_parent;
 
-    errno = ext2_unlink(from_inode, from_dnode);
+    if (EXT2_DNO(to_dnode)) {
+        errno = ext2_unlink(to_dnode->inode, to_dnode);
+        if (errno) {
+            return errno;
+        }
+    }
+
+    errno = ext2_link(from_inode, to_dnode);
     if (errno) {
         return errno;
     }
 
-    return ext2_link(from_inode, to_dnode);;
+    return ext2_unlink(from_inode, from_dnode);
 }

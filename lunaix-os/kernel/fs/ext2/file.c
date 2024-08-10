@@ -79,17 +79,20 @@ ext2_seek_inode(struct v_file* file, size_t offset)
 }
 
 int
-ext2_inode_read(struct v_inode *inode, void *buffer, size_t len, size_t fpos)
+ext2_inode_read(struct v_inode *inode, 
+                void *buffer, size_t len, size_t fpos)
 {
     struct ext2_sbinfo* e_sb;
     struct ext2_iterator iter;
     struct ext2b_inode* b_ino;
+    struct ext2_inode* e_ino;
     unsigned int off;
     unsigned int end;
     unsigned int sz = 0, blksz, movsz;
     
-    e_sb = EXT2_SB(inode->sb);
-    b_ino = EXT2_INO(inode)->ino;
+    e_sb  = EXT2_SB(inode->sb);
+    e_ino = EXT2_INO(inode);
+    b_ino = e_ino->ino;
     blksz = e_sb->block_size;
     end = fpos + len;
 
@@ -108,7 +111,7 @@ ext2_inode_read(struct v_inode *inode, void *buffer, size_t len, size_t fpos)
     }
 
     ext2db_itend(&iter);
-    return itstate_sel(&iter, MIN(sz, b_ino->i_size));
+    return itstate_sel(&iter, MIN(sz, e_ino->isize));
 }
 
 int
@@ -116,6 +119,7 @@ ext2_inode_read_page(struct v_inode *inode, void *buffer, size_t fpos)
 {
     struct ext2_sbinfo* e_sb;
     struct ext2_iterator iter;
+    struct ext2_inode*  e_ino;
     struct ext2b_inode* b_ino;
     unsigned int blk_start, n, 
                  transfer_sz, total_sz = 0;
@@ -123,7 +127,8 @@ ext2_inode_read_page(struct v_inode *inode, void *buffer, size_t fpos)
     assert(!va_offset(fpos));
 
     e_sb = EXT2_SB(inode->sb);
-    b_ino = EXT2_INO(inode)->ino;
+    e_ino = EXT2_INO(inode);
+    b_ino = e_ino->ino;
     
     blk_start = fpos / e_sb->block_size;
     n = PAGE_SIZE / e_sb->block_size;
@@ -140,11 +145,12 @@ ext2_inode_read_page(struct v_inode *inode, void *buffer, size_t fpos)
     }
     
     ext2db_itend(&iter);
-    return itstate_sel(&iter, MIN(total_sz, b_ino->i_size));
+    return itstate_sel(&iter, MIN(total_sz, e_ino->isize));
 }
 
 int
-ext2_inode_write(struct v_inode *inode, void *buffer, size_t len, size_t fpos)
+ext2_inode_write(struct v_inode *inode, 
+                 void *buffer, size_t len, size_t fpos)
 {
     int errno;
     unsigned int acc, blk_off, end, size;
@@ -196,7 +202,7 @@ __readlink_symlink(struct v_inode *this, char* path)
     struct ext2_inode* e_ino;
     
     e_ino = EXT2_INO(this);
-    size  = e_ino->ino->i_size;
+    size  = e_ino->isize;
     if (size <= SYMLNK_INPLACE) {
         link = (char*) e_ino->ino->i_block_arr;
         strncpy(path, link, size);
@@ -225,7 +231,7 @@ ext2_get_symlink(struct v_inode *this, const char **path_out)
     struct ext2_inode* e_ino;
     
     e_ino = EXT2_INO(this);
-    size  = e_ino->ino->i_size;
+    size  = e_ino->isize;
 
     if (!size) {
         return ENOENT;
@@ -256,7 +262,7 @@ ext2_set_symlink(struct v_inode *this, const char *target)
     struct ext2_inode* e_ino;
     
     e_ino = EXT2_INO(this);
-    size = e_ino->ino->i_size;
+    size = e_ino->isize;
     new_len = strlen(target);
 
     if (new_len > this->sb->blksize) {
@@ -271,7 +277,8 @@ ext2_set_symlink(struct v_inode *this, const char *target)
     link = (char*) e_ino->ino->i_block_arr;
 
     // if new size is shrinked to inplace range
-    if (size > SYMLNK_INPLACE && new_len <= SYMLNK_INPLACE) {
+    if (size > SYMLNK_INPLACE && new_len <= SYMLNK_INPLACE) 
+    {
         ext2db_free_pos(this, 0);
     }
     

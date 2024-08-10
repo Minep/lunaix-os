@@ -5,24 +5,6 @@
 
 #include "ext2.h"
 
-#define IMODE_IFSOCK    0xc000
-#define IMODE_IFLNK     0xA000
-#define IMODE_IFREG     0x8000
-#define IMODE_IFBLK     0x6000
-#define IMODE_IFDIR     0x4000
-#define IMODE_IFCHR     0x2000
-#define IMODE_IFFIFO    0x1000
-
-#define IMODE_URD       0x0100
-#define IMODE_UWR       0x0080
-#define IMODE_UEX       0x0040
-#define IMODE_GRD       0x0020
-#define IMODE_GWR       0x0010
-#define IMODE_GEX       0x0008
-#define IMODE_ORD       0x0004
-#define IMODE_OWR       0x0002
-#define IMODE_OEX       0x0001
-
 static struct v_inode_ops ext2_inode_ops = {
     .dir_lookup = ext2dr_lookup,
     .open  = ext2_open_inode,
@@ -149,14 +131,14 @@ __btlb_flushall(struct ext2_inode* e_inode)
 void
 ext2db_itbegin(struct ext2_iterator* iter, struct v_inode* inode)
 {
-    struct ext2b_inode* b_ino;
+    struct ext2_inode* e_ino;
 
-    b_ino = EXT2_INO(inode)->ino;
+    e_ino = EXT2_INO(inode);
     *iter = (struct ext2_iterator){
         .pos = 0,
         .inode = inode,
         .blksz = inode->sb->blksize,
-        .end_pos = ICEIL(b_ino->i_size, inode->sb->blksize)
+        .end_pos = ICEIL(e_ino->isize, inode->sb->blksize)
     };
 }
 
@@ -220,16 +202,12 @@ ext2db_itnext(struct ext2_iterator* iter)
 void
 ext2ino_init(struct v_superblock* vsb, struct v_inode* inode)
 {
-    // Perhaps we dont need this at all...
+    // Placeholder, to make vsb happy
 }
 
-void
-ext2_destruct_inode(struct v_inode* inode)
+static void
+__destruct_ext2_inode(struct ext2_inode* e_inode)
 {
-    struct ext2_inode* e_inode;
-
-    e_inode = EXT2_INO(inode);
-
     __btlb_flushall(e_inode);
 
     fsblock_put(e_inode->ind_ord1);
@@ -240,6 +218,17 @@ ext2_destruct_inode(struct v_inode* inode)
     vfree_safe(e_inode->symlink);
     vfree(e_inode->btlb);
     vfree(e_inode);
+}
+
+static void
+ext2_destruct_inode(struct v_inode* inode)
+{
+    struct ext2_inode* e_inode;
+
+    e_inode = EXT2_INO(inode);
+
+    assert(e_inode);
+    __destruct_ext2_inode(e_inode);
 }
 
 static inline void
@@ -300,7 +289,7 @@ ext2ino_fill(struct v_inode* inode, ino_t ino_id)
     b_ino = e_ino->ino;
     ino_id = e_ino->ino_id;
 
-    fsapi_inode_setsize(inode, b_ino->i_size);
+    fsapi_inode_setsize(inode, e_ino->isize);
     
     fsapi_inode_settime(inode, b_ino->i_ctime, 
                                b_ino->i_mtime, 
@@ -328,15 +317,29 @@ ext2ino_fill(struct v_inode* inode, ino_t ino_id)
     return 0;
 }
 
-static struct ext2_inode*
-__create_inode(struct v_superblock* vsb, struct ext2_gdesc* gd, int ino_index)
+static int
+__get_group_desc(struct v_superblock* vsb, int ino, 
+                 struct ext2_gdesc** gd_out)
+{
+    unsigned int blkgrp_id;
+    struct ext2_sbinfo* sb;
+    
+    sb = EXT2_SB(vsb);
+
+    blkgrp_id = to_fsblock_id(ino) / sb->raw->s_ino_per_grp;
+    return ext2gd_take(vsb, blkgrp_id, gd_out);
+}
+
+static struct ext2b_inode*
+__get_raw_inode(struct v_superblock* vsb, struct ext2_gdesc* gd, 
+                bbuf_t* buf_out, int ino_index)
 {
     bbuf_t ino_tab;
     struct ext2_sbinfo* sb;
     struct ext2b_inode* b_inode;
-    struct ext2_inode* inode;
-    unsigned int ino_tab_sel, ino_tab_off, 
-                 tab_partlen, ind_ents, inds_blks;
+    unsigned int ino_tab_sel, ino_tab_off, tab_partlen;
+
+    assert(buf_out);
 
     sb = gd->sb;
     tab_partlen = sb->block_size / sb->raw->s_ino_size;
@@ -349,16 +352,45 @@ __create_inode(struct v_superblock* vsb, struct ext2_gdesc* gd, int ino_index)
     }
 
     b_inode = (struct ext2b_inode*)blkbuf_data(ino_tab);
+    b_inode = &b_inode[ino_tab_off];
+    
+    *buf_out = ino_tab;
+    
+    return b_inode;
+}
+
+static struct ext2_inode*
+__create_inode(struct v_superblock* vsb, struct ext2_gdesc* gd, int ino_index)
+{
+    bbuf_t ino_tab;
+    struct ext2_sbinfo* sb;
+    struct ext2b_inode* b_inode;
+    struct ext2_inode* inode;
+    unsigned int ind_ents;
+    size_t inds_blks;
+
+    sb = gd->sb;
+    b_inode = __get_raw_inode(vsb, gd, &ino_tab, ino_index);
+    if (!b_inode) {
+        return NULL;
+    }
     
     inode            = vzalloc(sizeof(*inode));
     inode->btlb      = vzalloc(sizeof(struct ext2_btlb));
     inode->buf       = ino_tab;
-    inode->ino       = &b_inode[ino_tab_off];
+    inode->ino       = b_inode;
     inode->blk_grp   = gd;
+    inode->isize     = b_inode->i_size;
+
+    if (ext2_feature(vsb, FEAT_LARGE_FILE)) {
+        inode->isize |= (size_t)((u64_t)(b_inode->i_size_h32) << 32);
+    }
 
     if (b_inode->i_blocks) {
-        inds_blks = b_inode->i_blocks - ICEIL(b_inode->i_size, 512);
-        inds_blks = inds_blks / (sb->block_size / 512);
+        inds_blks  = (size_t)b_inode->i_blocks;
+        inds_blks -= ICEIL(inode->isize, 512);
+        inds_blks /= (sb->block_size / 512);
+
         inode->indirect_blocks = inds_blks;
     }
 
@@ -372,27 +404,51 @@ __create_inode(struct v_superblock* vsb, struct ext2_gdesc* gd, int ino_index)
 }
 
 int
+ext2ino_get_fast(struct v_superblock* vsb, 
+                 unsigned int ino, struct ext2_fast_inode* fast_ino)
+{
+    int errno;
+    bbuf_t ino_tab;
+    struct ext2_gdesc* gd;
+    struct ext2_sbinfo* sb;
+    struct ext2b_inode* b_inode;
+    unsigned int ino_rel_id;
+
+    sb = EXT2_SB(vsb);
+    errno = __get_group_desc(vsb, ino, &gd);
+    if (errno) {
+        return errno;
+    }
+
+    ino_rel_id  = to_fsblock_id(ino) % sb->raw->s_ino_per_grp;
+    b_inode = __get_raw_inode(vsb, gd, &ino_tab, ino_rel_id);
+
+    fast_ino->buf = ino_tab;
+    fast_ino->ino = b_inode;
+
+    return 0;
+}
+
+int
 ext2ino_get(struct v_superblock* vsb, 
-               unsigned int ino, struct ext2_inode** out)
+            unsigned int ino, struct ext2_inode** out)
 {
     struct ext2_sbinfo* sb;
     struct ext2_inode* inode;
     struct ext2_gdesc* gd;
     struct ext2b_inode* b_inode;
-    unsigned int blkgrp_id, ino_rel_id;
+    unsigned int ino_rel_id;
     unsigned int tab_partlen;
     unsigned int ind_ents, prima_ind;
     int errno = 0;
     
     sb = EXT2_SB(vsb);
 
-    blkgrp_id   = to_fsblock_id(ino) / sb->raw->s_ino_per_grp;
-    ino_rel_id  = to_fsblock_id(ino) % sb->raw->s_ino_per_grp;
-
-    if ((errno = ext2gd_take(vsb, blkgrp_id, &gd))) {
+    if ((errno = __get_group_desc(vsb, ino, &gd))) {
         return errno;
     }
 
+    ino_rel_id  = to_fsblock_id(ino) % sb->raw->s_ino_per_grp;
     inode = __create_inode(vsb, gd, ino_rel_id);
     if (!inode) {
         return EIO;
@@ -573,7 +629,7 @@ ext2ino_free(struct v_inode* inode)
     ino_slot = to_fsblock_id(ino_slot - e_gd->base);
     ext2gd_free_inode(e_ino->blk_grp, ino_slot);
 
-    ext2_destruct_inode(inode);
+    __destruct_ext2_inode(e_ino);
 
     inode->data = NULL;
 
@@ -590,12 +646,23 @@ __update_inode_access_metadata(struct ext2b_inode* b_ino,
 }
 
 static inline void
-__update_inode_size(struct ext2_inode* e_ino, unsigned int size)
+__update_inode_size(struct v_inode* inode, size_t size)
 {
     struct ext2b_inode* b_ino;
+    struct ext2_inode*  e_ino;
 
+    e_ino = EXT2_INO(inode);
     b_ino = e_ino->ino;
-    b_ino->i_size  = size;
+
+    e_ino->isize = size;
+    
+    if (ext2_feature(inode->sb, FEAT_LARGE_FILE)) {
+        b_ino->i_size_l32 = (unsigned int)size;
+        b_ino->i_size_h32 = (unsigned int)((u64_t)size >> 32);
+    }
+    else {
+        b_ino->i_size  = size;
+    }
 
     b_ino->i_blocks = ICEIL(size, 512);
     b_ino->i_blocks += e_ino->indirect_blocks;
@@ -656,7 +723,7 @@ ext2_link(struct v_inode* this, struct v_dnode* new_name)
     e_ino  = EXT2_INO(this);
     parent = fsapi_dnode_parent(new_name);
 
-    ext2dr_setup_dirent(&dirent, new_name);
+    ext2dr_setup_dirent(&dirent, this, &new_name->name);
     ext2ino_linkto(e_ino, &dirent);
     
     errno = ext2dr_insert(parent, &dirent, &e_dno);
@@ -689,7 +756,6 @@ ext2_unlink(struct v_inode* this, struct v_dnode* name)
         return errno;
     }
 
-    vfree(e_dno);
     return ext2ino_free(this);
 }
 
@@ -990,13 +1056,13 @@ ext2ino_resizing(struct v_inode* inode, size_t new_size)
 
     e_ino = EXT2_INO(inode);
     b_ino = e_ino->ino;
-    oldsize = b_ino->i_size;
+    oldsize = e_ino->isize;
 
     if (oldsize == new_size) {
         return 0;
     }
 
-    __update_inode_size(e_ino, new_size);
+    __update_inode_size(inode, new_size);
     fsblock_dirty(e_ino->buf);
 
     if (check_symlink_node(inode)) {

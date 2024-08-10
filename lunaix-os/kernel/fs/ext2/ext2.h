@@ -7,11 +7,35 @@
 #include <lunaix/ds/hashtable.h>
 #include <lunaix/ds/lru.h>
 
-typedef unsigned int ext2_bno_t;
+#define FEAT_COMPRESSION      0b00000001
+#define FEAT_RESIZE_INO       0b00000010
+#define FEAT_FILETYPE         0b00000100
+#define FEAT_SPARSE_SB        0b00001000
+#define FEAT_LARGE_FILE       0b00010000
 
-#define ext2_aligned            compact align(4)
+#define IMODE_IFSOCK          0xC000
+#define IMODE_IFLNK           0xA000
+#define IMODE_IFREG           0x8000
+#define IMODE_IFBLK           0x6000
+#define IMODE_IFDIR           0x4000
+#define IMODE_IFCHR           0x2000
+#define IMODE_IFFIFO          0x1000
+
+#define IMODE_URD             0x0100
+#define IMODE_UWR             0x0080
+#define IMODE_UEX             0x0040
+#define IMODE_GRD             0x0020
+#define IMODE_GWR             0x0010
+#define IMODE_GEX             0x0008
+#define IMODE_ORD             0x0004
+#define IMODE_OWR             0x0002
+#define IMODE_OEX             0x0001
+
+#define ext2_aligned                    compact align(4)
 #define to_ext2ino_id(fsblock_id)       ((fsblock_id) + 1)
 #define to_fsblock_id(ext2_ino)         ((ext2_ino) - 1)
+
+extern bcache_zone_t gdesc_bcache_zone;
 
 struct ext2b_super {
     u32_t s_ino_cnt;
@@ -79,7 +103,10 @@ struct ext2b_inode
 {
     u16_t i_mode;
     u16_t i_uid;
-    u32_t i_size;
+    union {
+        u32_t i_size;
+        u32_t i_size_l32;
+    };
 
     u32_t i_atime;
     u32_t i_ctime;
@@ -110,7 +137,10 @@ struct ext2b_inode
 
     u32_t i_gen;
     u32_t i_file_acl;
-    u32_t i_dir_acl;
+    union {
+        u32_t i_dir_acl;
+        u32_t i_size_h32;
+    };
     u32_t i_faddr;
 
     u8_t i_osd2[12];
@@ -156,6 +186,7 @@ struct ext2_sbinfo
     unsigned int block_size;
     unsigned int nr_gdesc_pb;
     unsigned int nr_gdesc;
+    unsigned int all_feature;
 
     struct device* bdev;
     struct v_superblock* vsb;
@@ -226,12 +257,19 @@ struct ext2_btlb
     struct ext2_btlb_entry buffer[BTLB_SETS];
 };
 
+struct ext2_fast_inode
+{
+    struct ext2b_inode* ino;
+    bbuf_t buf;
+};
+
 struct ext2_inode
 {
     bbuf_t buf;                  // partial inotab that holds this inode
     unsigned int inds_lgents;       // log2(# of block in an indirection level)
     unsigned int ino_id;
-    unsigned int indirect_blocks;
+    size_t indirect_blocks;
+    size_t isize;
 
     struct ext2b_inode* ino;        // raw ext2 inode
     struct ext2_btlb* btlb;         // block-TLB
@@ -240,6 +278,7 @@ struct ext2_inode
     union {
         struct {
             /*
+                (future)
                 dirent fragmentation degree, we will perform
                 full reconstruction on dirent table when this goes too high.
             */
@@ -287,9 +326,9 @@ struct ext2_iterator
         unsigned int flags;
     };
 
-    unsigned int pos;
+    size_t pos;
     unsigned int blksz;
-    unsigned int end_pos;
+    size_t end_pos;
     bbuf_t sel_buf;
 };
 
@@ -325,6 +364,11 @@ ext2_datablock(struct v_superblock* vsb, unsigned int id)
     return EXT2_SB(vsb)->raw->s_first_data_cnt + id;
 }
 
+static inline bool
+ext2_feature(struct v_superblock* vsb, unsigned int feat)
+{
+    return !!(EXT2_SB(vsb)->all_feature & feat);
+}
 
 /* ************   Inodes   ************ */
 
@@ -334,6 +378,10 @@ ext2ino_init(struct v_superblock* vsb, struct v_inode* inode);
 int
 ext2ino_get(struct v_superblock* vsb, 
                unsigned int ino, struct ext2_inode** out);
+
+int
+ext2ino_get_fast(struct v_superblock* vsb, 
+                 unsigned int ino, struct ext2_fast_inode* fast_ino);
 
 int
 ext2ino_fill(struct v_inode* inode, ino_t ino_id);
@@ -502,7 +550,8 @@ ext2_rename(struct v_inode* from_inode, struct v_dnode* from_dnode,
             struct v_dnode* to_dnode);
 
 void
-ext2dr_setup_dirent(struct ext2b_dirent* dirent, struct v_dnode* dnode);
+ext2dr_setup_dirent(struct ext2b_dirent* dirent, 
+                    struct v_inode* inode, struct hstr* name);
 
 
 /* ************   Files   ************ */
@@ -654,8 +703,5 @@ ext2ino_alloc_slot(struct v_superblock* vsb, struct ext2_gdesc** gd_out);
 int
 ext2db_alloc_slot(struct v_superblock* vsb, struct ext2_gdesc** gd_out);
 
-
-
-extern bcache_zone_t gdesc_bcache_zone;
 
 #endif /* __LUNAIX_EXT2_H */
