@@ -33,6 +33,8 @@ struct serial_dev
     struct rbuffer rxbuf;
     int wr_len;
 
+    struct capability_meta* tp_cap;
+
     /**
      * @brief Write buffer to TX. The return code indicate
      * the transaction is either done in synced mode (TX_DONE) or will be

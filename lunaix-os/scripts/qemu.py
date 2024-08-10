@@ -2,6 +2,9 @@
 
 import subprocess, time, os, re, argparse, json
 from pathlib import PurePosixPath
+import logging
+
+logger = logging.getLogger("auto_qemu")
 
 g_lookup = {}
 
@@ -80,13 +83,14 @@ class PCISerialDevice(QEMUPeripherals):
         super().__init__("pci-serial", opt)
 
     def get_qemu_opts(self):
-        name = f"chrdev.{hex(self.__hash__())[2:]}"
-        cmds = [ "pci-serial", f"chardev={name}" ]
+        uniq = hex(self.__hash__())[2:]
+        name = f"chrdev.{uniq}"
+        cmds = [ "pci-serial", f"id=uart.{uniq}", f"chardev={name}" ]
         chrdev = [ "file", f"id={name}" ]
         
         logfile = get_config(self._opt, "logfile", required=True)
         chrdev.append(f"path={logfile}")
-        ()
+
         return [ 
             "-chardev", join_attrs(chrdev),
             "-device", join_attrs(cmds)
@@ -108,6 +112,10 @@ class AHCIBus(QEMUPeripherals):
             d_ro   = get_config(disk, "ro",     default=False)
             d_fmt  = get_config(disk, "format", default="raw")
             d_id   = f"disk_{i}"
+
+            if not os.path.exists(d_img):
+                logger.warning(f"AHCI bus: {d_img} not exists, disk skipped")
+                continue
             
             cmds += [
                 "-drive", join_attrs([
@@ -196,14 +204,14 @@ class QEMUExec:
 
         trace_opts = get_config(debug, "traced", [])
         for trace in trace_opts:
-            cmds += [ "-d", f"trace:{trace}"]
+            cmds += [ "--trace", f"{trace}"]
 
         return cmds
     
     def get_qemu_general_opts(self):
         return [
             "-m", get_config(self._opt, "memory", required=True),
-            "-smp", get_config(self._opt, "ncpu", default=1)
+            "-smp", str(get_config(self._opt, "ncpu", default=1))
         ]
 
     def add_peripheral(self, peripheral):
@@ -214,6 +222,7 @@ class QEMUExec:
         qemu_path = os.path.join(qemu_dir_override, qemu_path)
         cmds = [
             qemu_path,
+            *self.get_qemu_general_opts(),
             *self.get_qemu_arch_opts(),
             *self.get_qemu_debug_opts()
         ]
@@ -271,7 +280,4 @@ def main():
     q.start(arg_opt.qemu_dir)
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(e)
+    main()

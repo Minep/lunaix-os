@@ -14,14 +14,31 @@ strcpy(char* dest, const char* src)
     return &dest[i];
 }
 
+/**
+ * @brief strcpy with constrain on numbers of character.
+ *        this version is smarter than stdc, it will automatically
+ *        handle the null-terminator.
+ * 
+ * @param dest 
+ * @param src 
+ * @param n 
+ * @return char* 
+ */
 char* weak
 strncpy(char* dest, const char* src, unsigned long n)
 {
     char c;
     unsigned int i = 0;
-    while ((c = src[i]) && i <= n)
+    while (i <= n && (c = src[i]))
         dest[i++] = c;
-    while (i <= n)
-        dest[i++] = 0;
+
+    if (!(n < i && src[i - 1])) {
+        while (i <= n)
+            dest[i++] = 0;
+    }
+    else {
+        dest[i - 1] = 0;
+    }
+    
     return dest;
 }

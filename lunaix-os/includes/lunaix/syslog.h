@@ -29,6 +29,8 @@
         va_end(args);                                                          \
     }
 
+#define printk(fmt, ...) kprintf_v(__FILE__, fmt, ##__VA_ARGS__)
+
 #define DEBUG(fmt, ...) kprintf(KDEBUG fmt, ##__VA_ARGS__)
 #define INFO(fmt, ...) kprintf(KINFO fmt, ##__VA_ARGS__)
 #define WARN(fmt, ...) kprintf(KWARN fmt, ##__VA_ARGS__)
@@ -41,4 +43,7 @@
 
 void
 kprintf_m(const char* component, const char* fmt, va_list args);
+
+void
+kprintf_v(const char* component, const char* fmt, ...);
 #endif /* __LUNAIX_SYSLOG_H */

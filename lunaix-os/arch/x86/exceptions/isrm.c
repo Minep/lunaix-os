@@ -51,6 +51,11 @@ __ivalloc_within(size_t a, size_t b, isr_cb handler)
             k++;
         }
 
+        if (j == 8) {
+            j = 0;
+            continue;
+        }
+
         if (k > b) {
             break;
         }

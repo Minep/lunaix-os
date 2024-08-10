@@ -28,7 +28,7 @@ proceed:
     if (!hba->base[HBA_RIS])
         return;
 
-    u32_t port_num = 31 - clz(hba->base[HBA_RIS]);
+    u32_t port_num = msbiti - clz(hba->base[HBA_RIS]);
     struct hba_port* port = hba->ports[port_num];
     struct hba_cmd_context* cmdctx = &port->cmdctx;
     u32_t processed = port->regs[HBA_RPxCI] ^ cmdctx->tracked_ci;
@@ -48,7 +48,7 @@ proceed:
         goto done;
     }
 
-    u32_t slot = 31 - clz(processed);
+    u32_t slot = msbiti - clz(processed);
     struct hba_cmd_state* cmdstate = cmdctx->issued[slot];
 
     if (!cmdstate) {

@@ -3,11 +3,14 @@
 #include <lunaix/spike.h>
 #include <lunaix/owloysius.h>
 #include <lunaix/status.h>
+#include <lunaix/syslog.h>
 
 #include <sys/mm/pagetable.h>
 
 #include <hal/serial.h>
 #include <hal/term.h>
+
+LOG_MODULE("serial")
 
 #define lock_sdev(sdev) device_lock((sdev)->dev)
 #define unlock_sdev(sdev) device_unlock((sdev)->dev)
@@ -43,6 +46,10 @@ serial_end_recv(struct serial_dev* sdev)
     mark_device_done_read(sdev->dev);
 
     pwake_one(&sdev->wq_rxdone);
+
+    struct termport_capability* tpcap;
+    tpcap = get_capability(sdev->tp_cap, typeof(*tpcap));
+    term_notify_data_avaliable(tpcap);
 }
 
 void
@@ -220,7 +227,18 @@ __serial_set_speed(struct device* dev, speed_t speed)
     struct serial_dev* sdev = serial_device(dev);
     lock_sdev(sdev);
 
-    sdev_execmd(sdev, SERIO_SETBRDIV, speed);
+    sdev_execmd(sdev, SERIO_SETBRDRATE, speed);
+
+    unlock_sdev(sdev);
+}
+
+static void
+__serial_set_baseclk(struct device* dev, unsigned int base)
+{
+    struct serial_dev* sdev = serial_device(dev);
+    lock_sdev(sdev);
+
+    sdev_execmd(sdev, SERIO_SETBRDBASE, base);
 
     unlock_sdev(sdev);
 }
@@ -238,10 +256,16 @@ __serial_set_cntrl_mode(struct device* dev, tcflag_t cflag)
 
 #define RXBUF_SIZE 512
 
+static struct termport_cap_ops tpcap_ops = {
+    .set_cntrl_mode = __serial_set_cntrl_mode,
+    .set_clkbase = __serial_set_baseclk,
+    .set_speed = __serial_set_speed
+};
+
 struct serial_dev*
 serial_create(struct devclass* class, char* if_ident)
 {
-    struct serial_dev* sdev = valloc(sizeof(struct serial_dev));
+    struct serial_dev* sdev = vzalloc(sizeof(struct serial_dev));
     struct device* dev = device_allocseq(dev_meta(serial_cat), sdev);
     dev->ops.read = __serial_read;
     dev->ops.read_page = __serial_read_page;
@@ -257,8 +281,9 @@ serial_create(struct devclass* class, char* if_ident)
 
     struct termport_capability* tp_cap = 
         new_capability(TERMPORT_CAP, struct termport_capability);
-    tp_cap->set_speed = __serial_set_speed;
-    tp_cap->set_cntrl_mode = __serial_set_cntrl_mode;
+    
+    term_cap_set_operations(tp_cap, &tpcap_ops);
+    sdev->tp_cap = cap_meta(tp_cap);
 
     waitq_init(&sdev->wq_rxdone);
     waitq_init(&sdev->wq_txdone);
@@ -267,9 +292,12 @@ serial_create(struct devclass* class, char* if_ident)
     
     device_grant_capability(dev, cap_meta(tp_cap));
 
-    register_device(dev, class, "s%d", class->variant);
+    register_device(dev, class, "%s%d", if_ident, class->variant);
 
     term_create(dev, if_ident);
+
+    INFO("interface: %s, %xh:%xh.%d", dev->name_val, 
+            class->fn_grp, class->device, class->variant);
 
     class->variant++;
     return sdev;

@@ -1,6 +1,6 @@
 #include <klibc/string.h>
 #include <lunaix/fs.h>
-#include <lunaix/fs/iso9660.h>
+#include "iso9660.h"
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>

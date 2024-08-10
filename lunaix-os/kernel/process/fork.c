@@ -8,6 +8,7 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
 #include <lunaix/signal.h>
+#include <lunaix/kpreempt.h>
 
 #include <sys/abi.h>
 #include <sys/mm/mm_defs.h>
@@ -62,12 +63,12 @@ __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
     struct leaflet* leaflet;
 
     ptr_t kstack_pn = pfn(current_thread->kstack);
-    kstack_pn -= pfn(KSTACK_SIZE) - 1;
+    kstack_pn -= pfn(KSTACK_SIZE);
 
     // copy the kernel stack
     pte_t* src_ptep = mkptep_pn(VMS_SELF, kstack_pn);
     pte_t* dest_ptep = mkptep_pn(vm_mnt, kstack_pn);
-    for (size_t i = 0; i < pfn(KSTACK_SIZE); i++) {
+    for (size_t i = 0; i <= pfn(KSTACK_SIZE); i++) {
         pte_t p = *src_ptep;
 
         if (pte_isguardian(p)) {
@@ -149,9 +150,8 @@ done:
 pid_t
 dup_proc()
 {
-    // FIXME need investigate: issue with fork, as well as pthread
-    //       especially when involving frequent alloc and dealloc ops
-    //       (could be issue in allocator's segregated free list)
+    no_preemption();
+    
     struct proc_info* pcb = alloc_process();
     if (!pcb) {
         syscall_result(ENOMEM);

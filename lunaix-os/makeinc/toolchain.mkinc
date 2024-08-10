@@ -4,7 +4,7 @@ AS := $(CX_PREFIX)as
 AR := $(CX_PREFIX)ar
 LBUILD ?= $(shell realpath ./scripts/build-tools/luna_build.py)
 
-O := -O2
+
 W := -Wall -Wextra -Werror \
 		-Wno-unknown-pragmas \
 		-Wno-unused-function \
@@ -14,21 +14,14 @@ W := -Wall -Wextra -Werror \
 		-Wno-discarded-qualifiers\
 		-Werror=incompatible-pointer-types
 
-OFLAGS := -fno-gcse\
-		  -fno-gcse-lm\
-		  -fno-cse-follow-jumps\
-		  -fno-cse-skip-blocks\
-		  -fno-optimize-strlen\
-		  -fno-inline-functions-called-once \
-		  -fno-inline-small-functions \
-		  -fno-indirect-inlining\
-		  -fno-omit-frame-pointer
+OFLAGS := -fno-omit-frame-pointer
 
-CFLAGS := -std=gnu99 $(OFLAGS) $(W)
+CFLAGS := -std=gnu99 $(OFLAGS) $(W) -g
 
 ifeq ($(MODE),debug)
-	O = -Og
-	CFLAGS += -g
+	O := -Og
+else
+	O := -O2
 endif
 
 CFLAGS += $(O)

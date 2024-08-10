@@ -10,7 +10,7 @@
     tmp_store:
         .skip 8
     lo_tmp_stack:
-        .skip 256
+        .skip 1024
     tmp_stack:
     
 
@@ -160,7 +160,7 @@
         # is required to prevent corrupt existing stack
         movq $tmp_stack, %rsp
 
-        call signal_dispatch    # kernel/signal.c
+        call switch_signposting    # kernel/process/switch.c
 
         movq current_thread, %rbx
         test %rax, %rax         # do we have signal to handle?

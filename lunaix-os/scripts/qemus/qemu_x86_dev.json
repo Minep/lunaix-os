@@ -1,6 +1,7 @@
 {
     "arch": "$ARCH",
     "memory": "1G",
+    "ncpu": 1,
     "machine": "q35",
     "cpu": {
         "type": "base",
@@ -33,6 +34,14 @@
             "logfile": "lunaix_ttyS0.log"
         },
         {
+            "class": "pci-serial",
+            "logfile": "ttyPCI0.log"
+        },
+        {
+            "class": "pci-serial",
+            "logfile": "ttyPCI1.log"
+        },
+        {
             "class": "rtc",
             "base": "utc"
         },
@@ -44,6 +53,11 @@
                     "type": "ide-cd",
                     "img": "$KIMG",
                     "ro": true,
+                    "format": "raw"
+                },
+                {
+                    "type": "ide-hd",
+                    "img": "$EXT2_TEST_DISC",
                     "format": "raw"
                 }
             ]

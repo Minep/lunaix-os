@@ -17,8 +17,10 @@ pmm_arch_init_remap(struct pmem* memory, struct boot_handoff* bctx)
     
     size_t i = 0;
     struct boot_mmapent* ent;
-    for (; i < bctx->mem.mmap_len; i++) {
-        ent = &bctx->mem.mmap[i];
+
+restart:;
+    while (i < bctx->mem.mmap_len) {
+        ent = &bctx->mem.mmap[i++];
         if (free_memregion(ent) && ent->size > pool_size) {
             goto found;
         }
@@ -38,7 +40,7 @@ found:;
 #endif
 
     if (aligned_pplist + pool_size > ent->start + ent->size) {
-        return 0;
+        goto restart;
     }
 
     // for x86_32, the upper bound of memory requirement for pplist

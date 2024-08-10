@@ -32,7 +32,7 @@ static inline ptr_t must_inline
 abi_get_callframe()
 {
     ptr_t val;
-    asm("movq %%rbp, %0" : "=r"(val)::);
+    asm volatile("movq %%rbp, %0" : "=r"(val)::"memory");
     return val;
 }
 

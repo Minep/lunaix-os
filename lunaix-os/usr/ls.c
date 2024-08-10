@@ -20,7 +20,7 @@ main(int argc, const char* argv[])
 
     while ((dent = readdir(dir))) {
         if (dent->d_type == DT_DIR) {
-            printf(" %s\n", dent->d_name);
+            printf(" %s/\n", dent->d_name);
         } else if (dent->d_type == DT_SYMLINK) {
             printf(" %s@\n", dent->d_name);
         } else {
@@ -28,7 +28,12 @@ main(int argc, const char* argv[])
         }
     }
 
+    int err = errno;
+    if (err) {
+        printf("failed: %d\n",err);
+    }
+
     closedir(dir);
 
-    return 0;
+    return err;
 }

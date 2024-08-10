@@ -2,6 +2,9 @@
 #include <lunaix/spike.h>
 #include <lunaix/tty/tty.h>
 #include <stdint.h>
+#include <lunaix/owloysius.h>
+#include <lunaix/mm/pagetable.h>
+#include <lunaix/mm/mmio.h>
 
 #include <sys/port_io.h>
 
@@ -114,3 +117,12 @@ tty_put_str_at(char* str, int x, int y)
         str++;
     }
 }
+
+static void
+vga_rawtty_init()
+{
+    // FIXME we should get rid of it at some point
+    tty_init((void*)ioremap(0xB8000, PAGE_SIZE));
+    tty_set_theme(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+}
+owloysius_fetch_init(vga_rawtty_init, on_earlyboot);

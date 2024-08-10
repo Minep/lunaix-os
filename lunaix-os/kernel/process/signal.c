@@ -6,6 +6,8 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syslog.h>
 #include <lunaix/mm/valloc.h>
+#include <lunaix/switch.h>
+#include <lunaix/kpreempt.h>
 
 #include <klibc/string.h>
 
@@ -28,17 +30,19 @@ signal_terminate(int caused_by)
 }
 
 // Referenced in kernel/asm/x86/interrupt.S
-void*
-signal_dispatch()
+void
+signal_dispatch(struct signpost_result* result)
 {
+    continue_switch(result);
+
     if (kernel_process(__current)) {
         // signal is undefined under 'kernel process'
-        return 0;
+        return;
     }
 
     if (!pending_sigs(current_thread)) {
         // 没有待处理信号
-        return 0;
+        return;
     }
 
     struct sigregistry* sigreg = __current->sigreg;
@@ -46,29 +50,28 @@ signal_dispatch()
     struct sigact* prev_working = active_signal(current_thread);
     sigset_t mask = psig->sig_mask | (prev_working ? prev_working->sa_mask : 0);
 
-    int sig_selected = 31 - clz(psig->sig_pending & ~mask);
+    int sig_selected = msbiti - clz(psig->sig_pending & ~mask);
     sigset_clear(psig->sig_pending, sig_selected);
 
     if (!sig_selected) {
         // SIG0 is reserved
-        return 0;
+        return;
     }
 
     struct sigact* action = sigreg->signals[sig_selected];
     if (!action || !action->sa_actor) {
         if (sigset_test(TERMSIG, sig_selected)) {
             signal_terminate(sig_selected);
-            schedule();
-            // never return
+            giveup_switch(result);
         }
-        return 0;
+        return;
     }
 
     ptr_t ustack = current_thread->ustack_top;
     ptr_t ustack_start = current_thread->ustack->start;
     if ((int)(ustack - ustack_start) < (int)sizeof(struct proc_sig)) {
         // 用户栈没有空间存放信号上下文
-        return 0;
+        return;
     }
 
     struct proc_sig* sigframe =
@@ -82,7 +85,7 @@ signal_dispatch()
 
     sigactive_push(current_thread, sig_selected);
 
-    return sigframe;
+    redirect_switch(result, __ptr(sigframe));
 }
 
 static inline void must_inline
@@ -147,8 +150,7 @@ int
 signal_send(pid_t pid, signum_t signum)
 {
     if (signum >= _SIG_NUM) {
-        syscall_result(EINVAL);
-        return -1;
+        return EINVAL;
     }
 
     pid_t sender_pid = __current->pid;
@@ -166,8 +168,7 @@ signal_send(pid_t pid, signum_t signum)
     } else {
         // TODO: send to all process.
         //  But I don't want to support it yet.
-        syscall_result(EINVAL);
-        return -1;
+        return EINVAL;
     }
 
 send_grp: ;
@@ -179,8 +180,7 @@ send_grp: ;
 
 send_single:
     if (proc_terminated(proc)) {
-        syscall_result(EINVAL);
-        return -1;
+        return EINVAL;
     }
 
     proc_setsignal(proc, signum);
@@ -350,7 +350,7 @@ __DEFINE_LXSYSCALL2(int, sys_sigaction, int, signum, struct sigaction*, action)
 __DEFINE_LXSYSCALL(int, pause)
 {
     pause_current_thread();
-    sched_pass();
+    yield_current();
 
     syscall_result(EINTR);
     return -1;
@@ -358,7 +358,7 @@ __DEFINE_LXSYSCALL(int, pause)
 
 __DEFINE_LXSYSCALL2(int, kill, pid_t, pid, int, signum)
 {
-    return signal_send(pid, signum);
+    return syscall_result(signal_send(pid, signum));
 }
 
 __DEFINE_LXSYSCALL1(int, sigpending, sigset_t, *sigset)
@@ -374,7 +374,7 @@ __DEFINE_LXSYSCALL1(int, sigsuspend, sigset_t, *mask)
     sigctx->sig_mask = (*mask) & ~UNMASKABLE;
 
     pause_current_thread();
-    sched_pass();
+    yield_current();
 
     sigctx->sig_mask = tmp;
     return -1;

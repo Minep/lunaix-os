@@ -33,6 +33,8 @@ struct scheduler sched_ctx;
 
 struct cake_pile *proc_pile ,*thread_pile;
 
+#define root_process   (sched_ctx.procs[1])
+
 LOG_MODULE("SCHED")
 
 void
@@ -60,6 +62,7 @@ run(struct thread* thread)
     set_current_executing(thread);
 
     switch_context();
+
     fail("unexpected return from switching");
 }
 
@@ -100,11 +103,20 @@ cleanup_detached_threads() {
     cpu_enable_interrupt();
 }
 
-int
+bool
 can_schedule(struct thread* thread)
 {
     if (!thread) {
         return 0;
+    }
+
+    if (proc_terminated(thread)) {
+        return false;
+    }
+
+    if (preempt_check_stalled(thread)) {
+        thread_flags_set(thread, TH_STALLED);
+        return true;
     }
 
     if (unlikely(kernel_process(thread->process))) {
@@ -117,6 +129,7 @@ can_schedule(struct thread* thread)
     if ((thread->state & PS_PAUSED)) {
         return !!(sh->sig_pending & ~1);
     }
+
     if ((thread->state & PS_BLOCKED)) {
         return sigset_test(sh->sig_pending, _SIGINT);
     }
@@ -126,8 +139,9 @@ can_schedule(struct thread* thread)
         // all other threads are also SIGSTOP (as per POSIX-2008.1)
         // In which case, the entire process is stopped.
         thread->state = PS_STOPPED;
-        return 0;
+        return false;
     }
+    
     if (sigset_test(sh->sig_pending, _SIGCONT)) {
         thread->state = PS_READY;
     }
@@ -174,7 +188,7 @@ schedule()
     assert(sched_ctx.ptable_len && sched_ctx.ttable_len);
 
     // 上下文切换相当的敏感！我们不希望任何的中断打乱栈的顺序……
-    cpu_disable_interrupt();
+    no_preemption();
 
     if (!(current_thread->state & ~PS_RUNNING)) {
         current_thread->state = PS_READY;
@@ -214,13 +228,6 @@ done:
     fail("unexpected return from scheduler");
 }
 
-void
-sched_pass()
-{
-    cpu_enable_interrupt();
-    cpu_trap_sched();
-}
-
 __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
 {
     if (!seconds) {
@@ -256,7 +263,6 @@ __DEFINE_LXSYSCALL1(unsigned int, alarm, unsigned int, seconds)
 
     bed->alarm_time = seconds ? now + seconds : 0;
 
-    struct proc_info* root_proc = sched_ctx.procs[0];
     if (llist_empty(&bed->sleepers)) {
         llist_append(&sched_ctx.sleepers, &bed->sleepers);
     }
@@ -304,6 +310,7 @@ _wait(pid_t wpid, int* status, int options)
     }
 
     wpid = wpid ? wpid : -__current->pgid;
+
 repeat:
     llist_for_each(proc, n, &__current->children, siblings)
     {
@@ -322,12 +329,12 @@ repeat:
         return 0;
     }
     // 放弃当前的运行机会
-    sched_pass();
+    yield_current();
     goto repeat;
 
 done:
     if (status) {
-        *status = proc->exit_code | status_flags;
+        *status = PEXITNUM(status_flags, proc->exit_code);
     }
     return destroy_process(proc->pid);
 }
@@ -435,7 +442,7 @@ commit_process(struct proc_info* process)
     // every process is the child of first process (pid=1)
     if (!process->parent) {
         if (likely(!kernel_process(process))) {
-            process->parent = sched_ctx.procs[1];
+            process->parent = root_process;
         } else {
             process->parent = process;
         }
@@ -472,6 +479,20 @@ destory_thread(struct thread* thread)
     sched_ctx.ttable_len--;
 
     cake_release(thread_pile, thread);
+}
+
+static void
+orphan_children(struct proc_info* proc)
+{
+    struct proc_info *root;
+    struct proc_info *pos, *n;
+
+    root = root_process;
+
+    llist_for_each(pos, n, &proc->children, siblings) {
+        pos->parent = root;
+        llist_append(&root->children, &pos->siblings);
+    }
 }
 
 void 
@@ -519,6 +540,8 @@ delete_process(struct proc_info* proc)
         // terminate and destory all thread unconditionally
         destory_thread(pos);
     }
+
+    orphan_children(proc);
 
     procvm_unmount_release(mm);
 

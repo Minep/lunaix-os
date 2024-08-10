@@ -284,6 +284,13 @@ vmap_range(pfn_t start, size_t npages, pte_attr_t prot)
     return vmap_ptes_at(_pte, LFT_SIZE, npages);
 }
 
+static inline void
+vunmap_range(pfn_t start, size_t npages)
+{
+    pte_t* ptep = mkptep_va(VMS_SELF, start);
+    vmm_set_ptes_contig(ptep, null_pte, LFT_SIZE, npages);
+}
+
 
 /**
  * @brief Allocate a page in kernel space.
@@ -295,5 +302,23 @@ vmap_range(pfn_t start, size_t npages, pte_attr_t prot)
  */
 pte_t 
 alloc_kpage_at(pte_t* ptep, pte_t pte, int order);
+
+static inline void*
+vmalloc_page(int order)
+{
+    struct leaflet* leaf = alloc_leaflet(0);
+    if (!leaf) {
+        return NULL;
+    }
+
+    return (void*)vmap(leaf, KERNEL_DATA);
+}
+
+static inline void
+vmfree(void* ptr)
+{
+    struct leaflet* leaf = ppfn_leaflet(pfn((ptr_t)ptr));
+    leaflet_return(leaf);
+}
 
 #endif /* __LUNAIX_PAGE_H */

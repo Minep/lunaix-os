@@ -11,7 +11,7 @@
 #include <klibc/strfmt.h>
 #include <klibc/string.h>
 #include <lunaix/clock.h>
-#include <lunaix/fs.h>
+#include <lunaix/fs/api.h>
 #include <lunaix/fs/twifs.h>
 #include <lunaix/fs/twimap.h>
 #include <lunaix/mm/cake.h>
@@ -80,6 +80,12 @@ __twifs_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
 }
 
 int
+__twifs_unmount(struct v_superblock* vsb)
+{
+    return 0;
+}
+
+int
 __twifs_fwrite(struct v_inode* inode, void* buffer, size_t len, size_t fpos)
 {
     struct twifs_node* twi_node = (struct twifs_node*)inode->data;
@@ -132,7 +138,7 @@ __twifs_dirlookup(struct v_inode* inode, struct v_dnode* dnode)
 {
     struct twifs_node* twi_node = (struct twifs_node*)inode->data;
 
-    if ((twi_node->itype & F_FILE)) {
+    if (!check_directory_node(inode)) {
         return ENOTDIR;
     }
 
@@ -165,14 +171,17 @@ int
 __twifs_iterate_dir(struct v_file* file, struct dir_context* dctx)
 {
     struct twifs_node* twi_node = (struct twifs_node*)(file->inode->data);
-    int counter = 0;
+    unsigned int counter = 2;
     struct twifs_node *pos, *n;
+
+    if (fsapi_handle_pseudo_dirent(file, dctx)) {
+        return 1;
+    }
 
     llist_for_each(pos, n, &twi_node->children, siblings)
     {
-        if (counter++ >= dctx->index) {
-            dctx->index = counter;
-            dctx->read_complete_callback(
+        if (counter++ >= file->f_pos) {
+            fsapi_dir_report(
               dctx, pos->name.value, pos->name.len, vfs_get_dtype(pos->itype));
             return 1;
         }
@@ -194,7 +203,7 @@ __twifs_openfile(struct v_inode* inode, struct v_file* file)
 int
 twifs_rm_node(struct twifs_node* node)
 {
-    if (!(node->itype & F_FILE) && !llist_empty(&node->children)) {
+    if (check_itype(node->itype, VFS_IFDIR) && !llist_empty(&node->children)) {
         return ENOTEMPTY;
     }
     llist_delete(&node->siblings);
@@ -243,16 +252,13 @@ twifs_dir_node(struct twifs_node* parent, const char* fmt, ...)
 void
 twifs_init()
 {
+    struct filesystem* fs;
+    fs = fsapi_fs_declare("twifs", FSTYPE_PSEUDO | FSTYPE_ROFS);
+    
+    fsapi_fs_set_mntops(fs, __twifs_mount, __twifs_unmount);
+    fsapi_fs_finalise(fs);
+
     twi_pile = cake_new_pile("twifs_node", sizeof(struct twifs_node), 1, 0);
-
-    struct filesystem* twifs = vzalloc(sizeof(struct filesystem));
-    twifs->fs_name = HSTR("twifs", 5);
-    twifs->mount = __twifs_mount;
-    twifs->types = FSTYPE_ROFS;
-    twifs->fs_id = 0;
-
-    fsm_register(twifs);
-
     fs_root = twifs_dir_node(NULL, NULL, 0, 0);
 }
 EXPORT_FILE_SYSTEM(twifs, twifs_init);

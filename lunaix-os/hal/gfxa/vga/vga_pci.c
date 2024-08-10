@@ -6,7 +6,6 @@
 
 #include <hal/gfxm.h>
 #include <hal/pci.h>
-#include <sys/pci_hba.h>
 
 #include <klibc/string.h>
 
@@ -76,8 +75,8 @@ vga_pci_bind(struct device_def* devdef, struct device* pcidev_base)
 
     pci_write_cspace(pcidev->cspace_base, PCI_REG_STATUS_CMD, cmd);
 
-    ptr_t fb_mapped = (ptr_t)ioremap(fb->start, FB256K);
-    ptr_t mmio_mapped = (ptr_t)ioremap(mmio->start, mmio->size);
+    ptr_t fb_mapped = ioremap(fb->start, FB256K);
+    ptr_t mmio_mapped = ioremap(mmio->start, mmio->size);
 
     struct vga* vga_state =
       vga_new_state(mmio_mapped + VGA_REG_OFF, fb_mapped, FB256K);
@@ -105,13 +104,19 @@ vga_pci_init(struct device_def* def)
 
 #define VGA_PCI_CLASS 0x30000
 
+static bool
+vga_pci_compat(struct pci_device_def* def, 
+                struct pci_device* pcidev)
+{
+    return pci_device_class(pcidev) == VGA_PCI_CLASS;
+}
+
+
 static struct pci_device_def vga_pci_devdef = {
-    .dev_class = VGA_PCI_CLASS,
-    .dev_ident = PCI_DEVIDENT(0x1234, 0x1111),
-    .ident_mask = PCI_MATCH_EXACT,
     .devdef = { .class = DEVCLASS(DEVIF_PCI, DEVFN_DISP, DEV_VGA),
                 .name = "Generic VGA",
                 .init = vga_pci_init,
-                .bind = vga_pci_bind }
+                .bind = vga_pci_bind },
+    .test_compatibility = vga_pci_compat
 };
 EXPORT_PCI_DEVICE(vga_pci, &vga_pci_devdef, load_onboot);

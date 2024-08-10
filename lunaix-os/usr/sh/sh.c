@@ -113,6 +113,7 @@ sigint_handle(int signum)
 void
 sh_exec(const char** argv)
 {
+    static int prev_exit;
     const char* envp[] = { 0 };
     char* name = argv[0];
     if (!strcmp(name, "cd")) {
@@ -121,15 +122,48 @@ sh_exec(const char** argv)
         return;
     }
 
+    if (!strcmp(name, "?")) {
+        printf("%d\n", prev_exit);
+        return;
+    }
+
+    char buffer[1024];
+    strcpy(buffer, "/usr/bin/");
+    strcpy(&buffer[9], name);
+
     pid_t p;
+    int res;
     if (!(p = fork())) {
-        if (execve(name, argv, envp)) {
+        if (execve(buffer, argv, envp)) {
             sh_printerr();
         }
         _exit(1);
     }
     setpgid(p, getpgid());
-    waitpid(p, NULL, 0);
+    waitpid(p, &res, 0);
+
+    prev_exit = WEXITSTATUS(res);
+}
+
+static char*
+sanity_filter(char* buf)
+{
+    int off = 0, i = 0;
+    char c;
+    do {
+        c = buf[i];
+        
+        if ((32 <= c && c <= 126) || !c) {
+            buf[i - off] = c;
+        }
+        else {
+            off++;
+        }
+
+        i++;
+    } while(c);
+
+    return buf;
 }
 
 void
@@ -157,6 +191,7 @@ sh_loop()
         }
 
         buf[sz] = '\0';
+        sanity_filter(buf);
 
         // currently, this shell only support single argument
         if (!parse_cmdline(buf, argv)) {
