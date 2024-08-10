@@ -5,5 +5,7 @@ sources([
     "process.c",
     "taskfs.c",
     "task_attr.c",
-    "thread.c"
+    "thread.c",
+    "preemption.c",
+    "switch.c",
 ])

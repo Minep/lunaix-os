@@ -1,5 +1,5 @@
 #include <klibc/string.h>
-#include <lunaix/fs/iso9660.h>
+#include "iso9660.h"
 
 int
 isorr_parse_px(struct iso_drecache* cache, void* px_start)

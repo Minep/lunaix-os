@@ -8,13 +8,13 @@
 
 # The LunaixOS Project
 
-LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有浓重个人风格的操作系统。开发过程以视频教程形式在Bilibili呈现：[《从零开始自制操作系统系列》](https://space.bilibili.com/12995787/channel/collectiondetail?sid=196337)。
+LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有浓重个人风格的操作系统，由 Lunaix 内核驱动。开发过程以视频教程形式在Bilibili呈现：[《从零开始自制操作系统系列》](https://space.bilibili.com/12995787/channel/collectiondetail?sid=196337)。
 
 ## 1. 一些实用资源
 
-如果有意研读LunaixOS的内核代码和其中的设计，或欲开始属于自己的OS开发之道，以下资料可能会对此有用。
+如果有意研读 Lunaix 内核代码和其中的设计，或欲开始属于自己的OS开发之道，以下资料可能会对此有用。
 
-+ [最新的LunaixOS源代码分析教程](docs/tutorial/0-教程介绍和环境搭建.md)
++ [LunaixOS源代码分析教程](docs/tutorial/0-教程介绍和环境搭建.md)
 + 内核虚拟内存的详细布局
   + [x86_32](docs/img/lunaix-mem-map/lunaix-mem-x86_32.png)
   + [x86_64](docs/img/lunaix-mem-map/lunaix-mem-x86_64.png)
@@ -47,7 +47,8 @@ Lunaix全部特性一览：
 + 信号机制
 + PCI 3.0
 + PCIe 1.1 (WIP)
-+ 块设备驱动
++ 块设备IO与驱动
+  + 块IO通用缓存池
   + Serial ATA AHCI
     + ATA设备
     + ATAPI封装的SCSI协议
@@ -59,6 +60,9 @@ Lunaix全部特性一览：
   + ISO9660
     + ECMA-119
     + IEEE P1282（Rock Ridge拓展）
+  + ext2
+    + Revision 0
+    + Revision 1 （额外特性不支持）
 + 远程GDB串口调试 (COM1@9600Bd)
 + 用户程序加载与执行
 + 通用设备抽象层
@@ -77,7 +81,10 @@ Lunaix全部特性一览：
   + 参考：`lunaix-os/hal/term`
 + 线程模型
   + 用户线程支持（pthread系列）
-  + 内核线程支持（抢占式内核设计）
+  + 内核线程支持
++ 抢占式内核设计
+  + 内核态上下文切换
+  + 内核态异常挂起/死锁自动检测机制
 
 ## 3. 目录结构
 
@@ -100,7 +107,7 @@ Lunaix全部特性一览：
 
 ### 4.1 使用 GNU CC 工具链
 
-正如同大多数OS一样，LunaixOS 是一个混合了 C 和汇编的产物。这就意味着你得要使用一些标准的C编译器来构建Lunaix。在这里，我推荐使用 GNU CC 工具链来进行构建。因为Lunaix 在编写时使用了大量的GNU CC 相关编译器属性修饰 (`__attribute__`) 。假若使用其他工具链，如LLVM，我对此就不能做出任何保证了。
+正如同大多数内核一样，Lunaix 是一个混合了 C 和汇编的产物。这就意味着你得要使用一些标准的C编译器来构建Lunaix。在这里，我推荐使用 GNU CC 工具链来进行构建。因为Lunaix 在编写时使用了大量的GNU CC 相关编译器属性修饰 (`__attribute__`) 。假若使用其他工具链，如LLVM，我对此就不能做出任何保证了。
 
 如果你使用的是基于 x86 指令集的Linux系统，不论是64位还是32位，**其本机自带的gcc就足以编译Lunaix**。 当然了，如果说你的平台是其他非x86的，你也可以指定使用某个针对x86_32的gcc套件来进行交叉编译——在`make`时通过`CX_PREFIX`变量来指定gcc套件的前缀。如下例所示，我们可以在任意平台上，如risc-v，单独使用一个面向x86_32的gcc来进行交叉编译：
 
@@ -176,6 +183,12 @@ console=/dev/ttyFB0
 2. 在GDB窗口中输入`c`然后回车，此时Lunaix开始运行。这样做的目的是允许在QEMU进行模拟前，事先打好感兴趣的断点。
 
 该脚本的运行需要设置 `ARCH=<isa>` 环境变量，其值需要与编译时制定的值一致。
+
+如：
+
+```sh
+ARCH=x86_64 ./live_debug.sh
+```
 
 ## 5. 运行，分支以及 Issue
 
@@ -289,11 +302,11 @@ LunaixOS 提供对以下POSIX的系统接口的实现。内核定义的系统调
 2. `readdir(2)`
 2. `readlink(2)`
 2. `readlinkat(2)`
-2. `rmdir(2)`※
-2. `unlink(2)`※
-2. `unlinkat(2)`※
+2. `rmdir(2)`
+2. `unlink(2)`
+2. `unlinkat(2)`
 2. `link(2)`※
-2. `fsync(2)`※
+2. `fsync(2)`
 2. `dup(2)`
 2. `dup2(2)`
 2. `symlink(2)`

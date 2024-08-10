@@ -1,10 +1,13 @@
 #include <lunaix/blkio.h>
+#include <lunaix/syslog.h>
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/valloc.h>
 
 #include <sys/cpu.h>
 
 static struct cake_pile* blkio_reqpile;
+
+LOG_MODULE("blkio")
 
 void
 blkio_init()
@@ -67,17 +70,40 @@ blkio_newctx(req_handler handler)
     ctx->handle_one = handler;
 
     llist_init_head(&ctx->queue);
+    mutex_init(&ctx->lock);
 
     return ctx;
 }
 
 void
-blkio_commit(struct blkio_context* ctx, struct blkio_req* req, int options)
+blkio_commit(struct blkio_req* req, int options)
 {
-    req->flags |= BLKIO_PENDING;
-    req->io_ctx = ctx;
-    llist_append(&ctx->queue, &req->reqs);
+    struct blkio_context* ctx;
 
+    if (blkio_is_pending(req)) {
+        // prevent double submition
+        return;
+    }
+
+    assert(req->io_ctx);
+
+    req->flags |= BLKIO_PENDING;
+    
+    if ((options & BLKIO_WAIT)) {
+        req->flags |= BLKIO_SHOULD_WAIT;
+        prepare_to_wait(&req->wait);
+    }
+    else {
+        req->flags &= ~BLKIO_SHOULD_WAIT;
+    }
+
+    ctx = req->io_ctx;
+
+    blkio_lock(ctx);
+    
+    llist_append(&ctx->queue, &req->reqs);
+    
+    blkio_unlock(ctx);
     // if the pipeline is not running (e.g., stalling). Then we should schedule
     // one immediately and kick it started.
     // NOTE: Possible race condition between blkio_commit and pwait.
@@ -89,23 +115,43 @@ blkio_commit(struct blkio_context* ctx, struct blkio_req* req, int options)
     // As we don't want to overwhelming the interrupt context and also keep the
     // request RTT as small as possible, hence #1 is preferred.
 
-    if (!ctx->busy) {
+    /*
+        FIXME
+        Potential racing here.
+        happened when blkio is committed at high volumn, while the
+         block device has very little latency.
+        This is particular serious for non-async blkio, it could
+         completed before we do pwait, causing the thread hanged indefinitely
+    */
+
+    if (blkio_stalled(ctx)) {
         if ((options & BLKIO_WAIT)) {
-            cpu_disable_interrupt();
             blkio_schedule(ctx);
-            pwait(&req->wait);
+            try_wait_check_stall();
             return;
         }
         blkio_schedule(ctx);
     } else if ((options & BLKIO_WAIT)) {
-        pwait(&req->wait);
+        try_wait_check_stall();
     }
 }
 
 void
 blkio_schedule(struct blkio_context* ctx)
 {
+    // stall the pipeline if ctx is locked by others.
+    // we must not try to hold the lock in this case, as
+    //  blkio_schedule will be in irq context most of the
+    //  time, we can't afford the waiting there.
+    if (mutex_on_hold(&ctx->lock)) {
+        return;
+    }
+
+    // will always successed when in irq context
+    blkio_lock(ctx);
+
     if (llist_empty(&ctx->queue)) {
+        blkio_unlock(ctx);
         return;
     }
 
@@ -113,7 +159,9 @@ blkio_schedule(struct blkio_context* ctx)
     llist_delete(&head->reqs);
 
     head->flags |= BLKIO_BUSY;
-    head->io_ctx->busy++;
+    ctx->busy++;
+
+    blkio_unlock(ctx);
 
     ctx->handle_one(head);
 }
@@ -121,19 +169,30 @@ blkio_schedule(struct blkio_context* ctx)
 void
 blkio_complete(struct blkio_req* req)
 {
+    struct blkio_context* ctx;
+
+    ctx = req->io_ctx;
     req->flags &= ~(BLKIO_BUSY | BLKIO_PENDING);
+
+    // Wake all blocked processes on completion,
+    //  albeit should be no more than one process in everycase (by design)
+    if ((req->flags & BLKIO_SHOULD_WAIT)) {
+        assert(!waitq_empty(&req->wait));
+        pwake_all(&req->wait);
+    }
+
+    if (req->errcode) {
+        WARN("request completed with error. (errno=0x%x, ctx=%p)",
+                req->errcode, (ptr_t)ctx);
+    }
 
     if (req->completed) {
         req->completed(req);
     }
 
-    // Wake all blocked processes on completion,
-    //  albeit should be no more than one process in everycase (by design)
-    pwake_all(&req->wait);
-
     if ((req->flags & BLKIO_FOC)) {
         blkio_free_req(req);
     }
 
-    req->io_ctx->busy--;
+    ctx->busy--;
 }

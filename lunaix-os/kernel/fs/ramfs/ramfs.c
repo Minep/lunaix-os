@@ -9,7 +9,7 @@
  *
  */
 #include <klibc/string.h>
-#include <lunaix/fs.h>
+#include <lunaix/fs/api.h>
 #include <lunaix/fs/ramfs.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
@@ -64,9 +64,10 @@ __ramfs_mknod(struct v_dnode* dnode, struct v_inode** nod_out, u32_t flags)
 
     rinode->flags = flags;
     inode->data = rinode;
+    inode->itype = VFS_IFFILE;
 
-    if (!(flags & RAMF_DIR)) {
-        inode->itype = VFS_IFFILE;
+    if ((flags & RAMF_DIR)) {
+        inode->itype |= VFS_IFDIR;
     }
 
     if ((flags & RAMF_SYMLINK)) {
@@ -86,11 +87,16 @@ __ramfs_mknod(struct v_dnode* dnode, struct v_inode** nod_out, u32_t flags)
 int
 ramfs_readdir(struct v_file* file, struct dir_context* dctx)
 {
-    int i = 0;
+    unsigned int i = 2;
     struct v_dnode *pos, *n;
+
+    if (fsapi_handle_pseudo_dirent(file, dctx)) {
+        return 1;
+    }
+
     llist_for_each(pos, n, &file->dnode->children, siblings)
     {
-        if (i++ >= dctx->index) {
+        if (i++ >= file->f_pos) {
             dctx->read_complete_callback(dctx,
                                          pos->name.value,
                                          pos->name.len,
@@ -108,7 +114,7 @@ ramfs_mkdir(struct v_inode* this, struct v_dnode* dnode)
 }
 
 int
-ramfs_create(struct v_inode* this, struct v_dnode* dnode)
+ramfs_create(struct v_inode* this, struct v_dnode* dnode, unsigned int itype)
 {
     return __ramfs_mknod(dnode, NULL, RAMF_FILE);
 }
@@ -135,17 +141,6 @@ ramfs_unmount(struct v_superblock* vsb)
     return 0;
 }
 
-void
-ramfs_init()
-{
-    struct filesystem* ramfs = fsm_new_fs("ramfs", -1);
-    ramfs->mount = ramfs_mount;
-    ramfs->unmount = ramfs_unmount;
-
-    fsm_register(ramfs);
-}
-EXPORT_FILE_SYSTEM(ramfs, ramfs_init);
-
 int
 ramfs_mksymlink(struct v_inode* this, const char* target)
 {
@@ -162,9 +157,10 @@ ramfs_mksymlink(struct v_inode* this, const char* target)
 
     memcpy(symlink, target, len);
 
-    this->itype |= VFS_IFSYMLINK;
+    this->itype = VFS_IFSYMLINK;
     rinode->flags |= RAMF_SYMLINK;
     rinode->symlink = symlink;
+    rinode->size = len;
 
     return 0;
 }
@@ -180,17 +176,17 @@ ramfs_read_symlink(struct v_inode* this, const char** path_out)
 
     *path_out = rinode->symlink;
 
-    return 0;
+    return rinode->size;
 }
 
 int
-ramfs_unlink(struct v_inode* this)
+ramfs_unlink(struct v_inode* this, struct v_dnode* name)
 {
     struct ram_inode* rinode = RAM_INODE(this->data);
 
     if ((rinode->flags & RAMF_SYMLINK)) {
         rinode->flags &= ~RAMF_SYMLINK;
-        this->itype &= ~VFS_IFSYMLINK;
+        this->itype &= ~F_SYMLINK;
 
         vfree(rinode->symlink);
 
@@ -201,6 +197,17 @@ ramfs_unlink(struct v_inode* this)
 
     return 0;
 }
+
+static void
+ramfs_init()
+{
+    struct filesystem* fs;
+    fs = fsapi_fs_declare("ramfs", FSTYPE_PSEUDO);
+    
+    fsapi_fs_set_mntops(fs, ramfs_mount, ramfs_unmount);
+    fsapi_fs_finalise(fs);
+}
+EXPORT_FILE_SYSTEM(ramfs, ramfs_init);
 
 const struct v_inode_ops ramfs_inode_ops = { .mkdir = ramfs_mkdir,
                                              .rmdir = default_inode_rmdir,

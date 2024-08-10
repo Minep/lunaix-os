@@ -10,12 +10,10 @@
 struct ram_inode
 {
     u32_t flags;
+    size_t size;
     char* symlink;
 };
 
 #define RAM_INODE(data) ((struct ram_inode*)(data))
-
-void
-ramfs_init();
 
 #endif /* __LUNAIX_RAMFS_H */

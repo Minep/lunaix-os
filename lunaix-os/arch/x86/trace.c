@@ -3,9 +3,10 @@
 void
 trace_print_transistion_short(struct hart_state* hstate)
 {
-    trace_log("  trigger: iv=%d, ecause=%p",
+    trace_log("  trigger: iv=%d, ecause=%p, frame=%p",
                 hart_vector_stamp(hstate),
-                hart_ecause(hstate));
+                hart_ecause(hstate),
+                hart_stack_frame(hstate));
 }
 
 #ifdef CONFIG_ARCH_X86_64
@@ -40,7 +41,7 @@ trace_dump_state(struct hart_state* hstate)
     trace_log("  rdi=0x%016lx, rsi=0x%016lx",
                 rh->rdi, rh->rsi);
 
-    trace_log("   r8=0x%016lx,  r9=0x%016lx",
+    trace_log("  r08=0x%016lx, r09=0x%016lx",
                 rh->r8, rh->r9);
     trace_log("  r10=0x%016lx, r11=0x%016lx",
                 rh->r10, rh->r11);

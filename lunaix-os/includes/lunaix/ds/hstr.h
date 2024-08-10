@@ -26,6 +26,10 @@ struct hstr
 
 #define HSTR_EQ(str1, str2) ((str1)->hash == (str2)->hash)
 
+#define HSTR_VAL(hstr)  ((hstr).value)
+#define HSTR_LEN(hstr)  ((hstr).len)
+#define HSTR_HASH(hstr) ((hstr).hash)
+
 inline void
 hstr_rehash(struct hstr* hash_str, u32_t truncate_to)
 {

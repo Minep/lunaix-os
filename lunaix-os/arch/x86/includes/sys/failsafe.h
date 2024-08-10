@@ -24,13 +24,10 @@ failsafe_diagnostic() {
     extern int failsafe_stack_top[];
 #ifdef CONFIG_ARCH_X86_64
      asm (
-        "movq %%rsp, %%rax\n"
-        "movq %%rbp, %%rbx\n"
+        "movq %%rsp, %%rdi\n"
+        "movq %%rbp, %%rsi\n"
 
         "movq %0, %%rsp\n"
-
-        "pushq %%rax\n"
-        "pushq %%rbx\n"
         
         "call do_failsafe_unrecoverable\n"
         ::"r"(failsafe_stack_top) 

@@ -15,6 +15,14 @@
         }                                                                      \
     } while (0)
 
+#define maybe_mount(src, target, fs, opts)                                      \
+    do {                                                                       \
+        int err = 0;                                                           \
+        if ((err = mount(src, target, fs, opts))) {                            \
+            syslog(2, "mount fs %s to %s failed (%d)\n", fs, target, errno);   \
+        }                                                                      \
+    } while (0)
+
 #define check(statement)                                                       \
     ({                                                                         \
         int err = 0;                                                           \
@@ -54,10 +62,12 @@ main(int argc, const char** argv)
     mkdir("/dev");
     mkdir("/sys");
     mkdir("/task");
+    mkdir("/mnt/disk");
 
     must_mount(NULL, "/dev", "devfs", 0);
     must_mount(NULL, "/sys", "twifs", MNT_RO);
     must_mount(NULL, "/task", "taskfs", MNT_RO);
+    maybe_mount("/dev/block/sdb", "/mnt/disk", "ext2", 0);
 
     int fd = check(open("/dev/tty", 0));
 
@@ -70,8 +80,6 @@ main(int argc, const char** argv)
     pid_t pid;
     int err = 0;
     if (!(pid = fork())) {
-
-        
         err = execve(sh_argv[0], sh_argv, sh_envp);
         printf("fail to execute (%d)\n", errno);
         _exit(err);

@@ -1,7 +1,8 @@
-#include <lunaix/fs/iso9660.h>
 #include <lunaix/fs/probe_boot.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/syslog.h>
+
+#include "iso9660/iso9660.h"
 
 LOG_MODULE("PROBE")
 
@@ -47,9 +48,11 @@ probe_boot_medium()
                     dev->ident.unique,
                     dev->name.value,
                     (char*)volp->vol_id);
-            break;
+            goto done;
         }
     }
+
+    return NULL;
 
 done:
     vfree(volp);

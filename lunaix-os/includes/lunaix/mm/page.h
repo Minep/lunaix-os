@@ -303,4 +303,22 @@ vunmap_range(pfn_t start, size_t npages)
 pte_t 
 alloc_kpage_at(pte_t* ptep, pte_t pte, int order);
 
+static inline void*
+vmalloc_page(int order)
+{
+    struct leaflet* leaf = alloc_leaflet(0);
+    if (!leaf) {
+        return NULL;
+    }
+
+    return (void*)vmap(leaf, KERNEL_DATA);
+}
+
+static inline void
+vmfree(void* ptr)
+{
+    struct leaflet* leaf = ppfn_leaflet(pfn((ptr_t)ptr));
+    leaflet_return(leaf);
+}
+
 #endif /* __LUNAIX_PAGE_H */

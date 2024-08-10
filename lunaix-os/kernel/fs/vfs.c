@@ -72,12 +72,6 @@ struct hstr vfs_ddot = HSTR("..", 2);
 struct hstr vfs_dot = HSTR(".", 1);
 struct hstr vfs_empty = HSTR("", 0);
 
-struct v_superblock*
-vfs_sb_alloc();
-
-void
-vfs_sb_free(struct v_superblock* sb);
-
 static int
 __vfs_try_evict_dnode(struct lru_node* obj);
 
@@ -97,8 +91,8 @@ vfs_init()
 
     dnode_cache = vzalloc(VFS_HASHTABLE_SIZE * sizeof(struct hbucket));
 
-    dnode_lru = lru_new_zone(__vfs_try_evict_dnode);
-    inode_lru = lru_new_zone(__vfs_try_evict_inode);
+    dnode_lru = lru_new_zone("vfs_dnode", __vfs_try_evict_dnode);
+    inode_lru = lru_new_zone("vfs_inode", __vfs_try_evict_inode);
 
     hstr_rehash(&vfs_ddot, HSTR_FULL_HASH);
     hstr_rehash(&vfs_dot, HSTR_FULL_HASH);
@@ -121,6 +115,19 @@ __dcache_hash(struct v_dnode* parent, u32_t* hash)
     return &dnode_cache[_hash & VFS_HASH_MASK];
 }
 
+static inline int
+__sync_inode_nolock(struct v_inode* inode)
+{
+    pcache_commit_all(inode);
+
+    int errno = ENOTSUP;
+    if (inode->ops->sync) {
+        errno = inode->ops->sync(inode);
+    }
+
+    return errno;
+}
+
 struct v_dnode*
 vfs_dcache_lookup(struct v_dnode* parent, struct hstr* str)
 {
@@ -137,7 +144,7 @@ vfs_dcache_lookup(struct v_dnode* parent, struct hstr* str)
     struct v_dnode *pos, *n;
     hashtable_bucket_foreach(slot, pos, n, hash_list)
     {
-        if (pos->name.hash == hash) {
+        if (pos->name.hash == hash && pos->parent == parent) {
             return pos;
         }
     }
@@ -200,7 +207,7 @@ vfs_open(struct v_dnode* dnode, struct v_file** file)
     vfile->ref_count = ATOMIC_VAR_INIT(1);
     vfile->ops = inode->default_fops;
 
-    if ((inode->itype & F_MFILE) && !inode->pg_cache) {
+    if (check_file_node(inode) && !inode->pg_cache) {
         struct pcache* pcache = vzalloc(sizeof(struct pcache));
         pcache_init(pcache);
         pcache->master = inode;
@@ -230,6 +237,7 @@ vfs_assign_inode(struct v_dnode* assign_to, struct v_inode* inode)
         llist_delete(&assign_to->aka_list);
         assign_to->inode->link_count--;
     }
+
     llist_append(&inode->aka_dnodes, &assign_to->aka_list);
     assign_to->inode = inode;
     inode->link_count++;
@@ -260,38 +268,57 @@ vfs_link(struct v_dnode* to_link, struct v_dnode* name)
 int
 vfs_pclose(struct v_file* file, pid_t pid)
 {
+    struct v_inode* inode;
     int errno = 0;
+    
     if (file->ref_count > 1) {
         atomic_fetch_sub(&file->ref_count, 1);
-    } else if (!(errno = file->ops->close(file))) {
-        atomic_fetch_sub(&file->dnode->ref_count, 1);
-        file->inode->open_count--;
+        return 0;
+    } 
+    
+    inode = file->inode;
 
-        /*
-         * Prevent dead lock.
-         * This happened when process is terminated while blocking on read.
-         * In that case, the process is still holding the inode lock and it
-             will never get released.
-         * The unlocking should also include ownership check.
-         *
-         * To see why, consider two process both open the same file both with
-         * fd=x.
-         *      Process A: busy on reading x
-         *      Process B: do nothing with x
-         * Assuming that, after a very short time, process B get terminated
-         * while process A is still busy in it's reading business. By this
-         * design, the inode lock of this file x is get released by B rather
-         * than A. And this will cause a probable race condition on A if other
-         * process is writing to this file later after B exit.
-         */
-        if (mutex_on_hold(&file->inode->lock)) {
-            mutex_unlock_for(&file->inode->lock, pid);
-        }
-        mnt_chillax(file->dnode->mnt);
+    /*
+     * Prevent dead lock.
+     * This happened when process is terminated while blocking on read.
+     * In that case, the process is still holding the inode lock and it
+         will never get released.
+     * The unlocking should also include ownership check.
+     *
+     * To see why, consider two process both open the same file both with
+     * fd=x.
+     *      Process A: busy on reading x
+     *      Process B: do nothing with x
+     * Assuming that, after a very short time, process B get terminated
+     * while process A is still busy in it's reading business. By this
+     * design, the inode lock of this file x is get released by B rather
+     * than A. And this will cause a probable race condition on A if other
+     * process is writing to this file later after B exit.
+    */
 
-        pcache_commit_all(file->inode);
-        cake_release(file_pile, file);
+    if (mutex_on_hold(&inode->lock)) {
+        mutex_unlock_for(&inode->lock, pid);
     }
+
+    lock_inode(inode);
+
+    pcache_commit_all(inode);
+    if ((errno = file->ops->close(file))) {
+        goto unlock;
+    }
+
+    atomic_fetch_sub(&file->dnode->ref_count, 1);
+    inode->open_count--;
+
+    if (!inode->open_count) {
+        __sync_inode_nolock(inode);
+    }
+
+    mnt_chillax(file->dnode->mnt);
+    cake_release(file_pile, file);
+
+unlock:
+    unlock_inode(inode);
     return errno;
 }
 
@@ -308,6 +335,18 @@ vfs_free_fd(struct v_fd* fd)
 }
 
 int
+vfs_isync(struct v_inode* inode)
+{
+    lock_inode(inode);
+
+    int errno = __sync_inode_nolock(inode);
+
+    unlock_inode(inode);
+
+    return errno;
+}
+
+int
 vfs_fsync(struct v_file* file)
 {
     int errno;
@@ -315,18 +354,7 @@ vfs_fsync(struct v_file* file)
         return errno;
     }
 
-    lock_inode(file->inode);
-
-    pcache_commit_all(file->inode);
-
-    errno = ENOTSUP;
-    if (file->ops->sync) {
-        errno = file->ops->sync(file);
-    }
-
-    unlock_inode(file->inode);
-
-    return errno;
+    return vfs_isync(file->inode);
 }
 
 int
@@ -348,12 +376,30 @@ vfs_sb_alloc()
     memset(sb, 0, sizeof(*sb));
     llist_init_head(&sb->sb_list);
     sb->i_cache = vzalloc(VFS_HASHTABLE_SIZE * sizeof(struct hbucket));
+    sb->ref_count = 1;
     return sb;
+}
+
+void
+vfs_sb_ref(struct v_superblock* sb)
+{
+    sb->ref_count++;
 }
 
 void
 vfs_sb_free(struct v_superblock* sb)
 {
+    assert(sb->ref_count);
+
+    sb->ref_count--;
+    if (sb->ref_count) {
+        return;
+    }
+
+    if (sb->ops.release) {
+        sb->ops.release(sb);
+    }
+
     vfree(sb->i_cache);
     cake_release(superblock_pile, sb);
 }
@@ -406,7 +452,7 @@ vfs_d_alloc(struct v_dnode* parent, struct hstr* name)
     hstrcpy(&dnode->name, name);
 
     if (parent) {
-        dnode->super_block = parent->super_block;
+        vfs_d_assign_sb(dnode, parent->super_block);
         dnode->mnt = parent->mnt;
     }
 
@@ -435,6 +481,11 @@ vfs_d_free(struct v_dnode* dnode)
         vfs_dcache_remove(pos);
     }
 
+    if (dnode->destruct) {
+        dnode->destruct(dnode);
+    }
+
+    vfs_sb_free(dnode->super_block);
     vfree((void*)dnode->name.value);
     cake_release(dnode_pile, dnode);
 }
@@ -484,11 +535,11 @@ vfs_i_alloc(struct v_superblock* sb)
 
     sb->ops.init_inode(sb, inode);
 
-    inode->sb = sb;
     inode->ctime = clock_unixtime();
     inode->atime = inode->ctime;
     inode->mtime = inode->ctime;
 
+    vfs_i_assign_sb(inode, sb);
     lru_use_one(inode_lru, &inode->lru);
     return inode;
 }
@@ -506,15 +557,22 @@ vfs_i_free(struct v_inode* inode)
     if (inode->destruct) {
         inode->destruct(inode);
     }
+
+    vfs_sb_free(inode->sb);
     hlist_delete(&inode->hash_list);
     cake_release(inode_pile, inode);
 }
 
 /* ---- System call definition and support ---- */
 
-#define FLOCATE_CREATE_EMPTY 1
-#define FLOCATE_CREATE_ONLY 2
-#define FLOCATE_NOFOLLOW 4
+// make a new name when not exists
+#define FLOC_MAYBE_MKNAME 1
+
+// name must be non-exist and made.
+#define FLOC_MKNAME 2
+
+// no follow symlink
+#define FLOC_NOFOLLOW 4
 
 int
 vfs_getfd(int fd, struct v_fd** fd_s)
@@ -525,53 +583,104 @@ vfs_getfd(int fd, struct v_fd** fd_s)
     return EBADF;
 }
 
-int
+static int
+__vfs_mknod(struct v_inode* parent, struct v_dnode* dnode, 
+            unsigned int itype, dev_t* dev)
+{
+    int errno;
+
+    errno = parent->ops->create(parent, dnode, itype);
+    if (errno) {
+        return errno;
+    }
+
+    return 0;
+}
+
+struct file_locator {
+    struct v_dnode* dir;
+    struct v_dnode* file;
+    bool fresh;
+};
+
+/**
+ * @brief unlock the file locator (floc) if possible.
+ *        If the file to be located if not exists, and
+ *        any FLOC_*MKNAME flag is set, then the parent
+ *        dnode will be locked until the file has been properly
+ *        finalised by subsequent logic.
+ * 
+ * @param floc 
+ */
+static inline void
+__floc_try_unlock(struct file_locator* floc)
+{
+    if (floc->fresh) {
+        assert(floc->dir);
+        unlock_dnode(floc->dir);
+    }
+}
+
+static int
 __vfs_try_locate_file(const char* path,
-                      struct v_dnode** fdir,
-                      struct v_dnode** file,
+                      struct file_locator* floc,
                       int options)
 {
     char name_str[VFS_NAME_MAXLEN];
+    struct v_dnode *fdir, *file;
     struct hstr name = HSTR(name_str, 0);
     int errno, woption = 0;
 
-    if ((options & FLOCATE_NOFOLLOW)) {
+    if ((options & FLOC_NOFOLLOW)) {
         woption |= VFS_WALK_NOFOLLOW;
+        options &= ~FLOC_NOFOLLOW;
     }
 
+    floc->fresh = false;
     name_str[0] = 0;
-    if ((errno = vfs_walk_proc(path, fdir, &name, woption | VFS_WALK_PARENT))) {
+    errno = vfs_walk_proc(path, &fdir, &name, woption | VFS_WALK_PARENT);
+    if (errno) {
         return errno;
     }
 
-    errno = vfs_walk(*fdir, name.value, file, NULL, woption);
+    errno = vfs_walk(fdir, name.value, &file, NULL, woption);
 
-    if (errno != ENOENT && (options & FLOCATE_CREATE_ONLY)) {
-        return EEXIST;
+    if (errno && errno != ENOENT) {
+        goto done;
+    }
+    
+    if (!errno) {
+        if ((options & FLOC_MKNAME)) {
+            errno = EEXIST;
+        }
+        goto done;
     }
 
-    if (errno != ENOENT ||
-        !(options & (FLOCATE_CREATE_EMPTY | FLOCATE_CREATE_ONLY))) {
-        return errno;
+    // errno == ENOENT
+    if (!options) {
+        goto done;
     }
 
-    struct v_dnode* parent = *fdir;
-    struct v_dnode* file_new = vfs_d_alloc(parent, &name);
+    errno = vfs_check_writable(fdir);
+    if (errno) {
+        goto done;
+    }
 
-    if (!file_new) {
+    floc->fresh = true;
+
+    file = vfs_d_alloc(fdir, &name);
+
+    if (!file) {
         return ENOMEM;
     }
 
-    lock_dnode(parent);
+    lock_dnode(fdir);
 
-    if (!(errno = parent->inode->ops->create(parent->inode, file_new))) {
-        vfs_dcache_add(parent, file_new);
-        *file = file_new;
-    } else {
-        vfs_d_free(file_new);
-    }
+    vfs_dcache_add(fdir, file);
 
-    unlock_dnode(parent);
+done:
+    floc->dir   = fdir;
+    floc->file  = file;
 
     return errno;
 }
@@ -582,32 +691,61 @@ vfs_do_open(const char* path, int options)
     int errno, fd, loptions = 0;
     struct v_dnode *dentry, *file;
     struct v_file* ofile = NULL;
+    struct file_locator floc;
+    struct v_inode* inode;
 
     if ((options & FO_CREATE)) {
-        loptions |= FLOCATE_CREATE_EMPTY;
+        loptions |= FLOC_MAYBE_MKNAME;
     } else if ((options & FO_NOFOLLOW)) {
-        loptions |= FLOCATE_NOFOLLOW;
+        loptions |= FLOC_NOFOLLOW;
     }
 
-    errno = __vfs_try_locate_file(path, &dentry, &file, loptions);
+    errno = __vfs_try_locate_file(path, &floc, loptions);
 
-    if (!errno && !(errno = vfs_alloc_fdslot(&fd))) {
+    if (errno || (errno = vfs_alloc_fdslot(&fd))) {
+        return errno;
+    }
 
-        if (errno || (errno = vfs_open(file, &ofile))) {
+    file   = floc.file;
+    dentry = floc.dir;
+
+    if (floc.fresh) {
+        errno = __vfs_mknod(dentry->inode, file, VFS_IFFILE, NULL);
+        if (errno) {
+            vfs_d_free(file);
+            __floc_try_unlock(&floc);
             return errno;
         }
 
-        struct v_fd* fd_s = cake_grab(fd_pile);
-        memset(fd_s, 0, sizeof(*fd_s));
-
-        ofile->f_pos = ofile->inode->fsize & -((options & FO_APPEND) != 0);
-        fd_s->file = ofile;
-        fd_s->flags = options;
-        __current->fdtable->fds[fd] = fd_s;
-        return fd;
+        __floc_try_unlock(&floc);
     }
 
-    return errno;
+
+    if ((errno = vfs_open(file, &ofile))) {
+        return errno;
+    }
+
+    inode = ofile->inode;
+    lock_inode(inode);
+
+    struct v_fd* fd_s = cake_grab(fd_pile);
+    memset(fd_s, 0, sizeof(*fd_s));
+
+    if ((options & O_TRUNC)) {
+        file->inode->fsize = 0;   
+    }
+
+    if (vfs_get_dtype(inode->itype) == DT_DIR) {
+        ofile->f_pos = 0;
+    }
+    
+    fd_s->file = ofile;
+    fd_s->flags = options;
+    __current->fdtable->fds[fd] = fd_s;
+
+    unlock_inode(inode);
+    
+    return fd;
 }
 
 __DEFINE_LXSYSCALL2(int, open, const char*, path, int, options)
@@ -642,7 +780,7 @@ __vfs_readdir_callback(struct dir_context* dctx,
                        const int dtype)
 {
     struct lx_dirent* dent = (struct lx_dirent*)dctx->cb_data;
-    strncpy(dent->d_name, name, DIRENT_NAME_MAX_LEN);
+    strncpy(dent->d_name, name, MIN(len, DIRENT_NAME_MAX_LEN));
     dent->d_nlen = len;
     dent->d_type = dtype;
 }
@@ -660,28 +798,23 @@ __DEFINE_LXSYSCALL2(int, sys_readdir, int, fd, struct lx_dirent*, dent)
 
     lock_inode(inode);
 
-    if ((inode->itype & F_FILE)) {
+    if (!check_directory_node(inode)) {
         errno = ENOTDIR;
-    } else {
-        struct dir_context dctx = (struct dir_context){
-          .cb_data = dent,
-          .index = dent->d_offset,
-          .read_complete_callback = __vfs_readdir_callback};
-        errno = 1;
-        if (dent->d_offset == 0) {
-            __vfs_readdir_callback(&dctx, vfs_dot.value, vfs_dot.len, DT_DIR);
-        } else if (dent->d_offset == 1) {
-            __vfs_readdir_callback(&dctx, vfs_ddot.value, vfs_ddot.len, DT_DIR);
-        } else {
-            dctx.index -= 2;
-            if ((errno = fd_s->file->ops->readdir(fd_s->file, &dctx)) != 1) {
-                unlock_inode(inode);
-                goto done;
-            }
-        }
-        dent->d_offset++;
+        goto unlock;
     }
 
+    struct dir_context dctx = (struct dir_context) {
+        .cb_data = dent,
+        .read_complete_callback = __vfs_readdir_callback
+    };
+
+    if ((errno = fd_s->file->ops->readdir(fd_s->file, &dctx)) != 1) {
+        goto unlock;
+    }
+    dent->d_offset++;
+    fd_s->file->f_pos++;
+
+unlock:
     unlock_inode(inode);
 
 done:
@@ -697,7 +830,7 @@ __DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
     }
 
     struct v_file* file = fd_s->file;
-    if (!(file->inode->itype & F_FILE)) {
+    if (check_directory_node(file->inode)) {
         errno = EISDIR;
         goto done;
     }
@@ -706,7 +839,7 @@ __DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
 
     file->inode->atime = clock_unixtime();
 
-    if ((file->inode->itype & VFS_IFSEQDEV) || (fd_s->flags & FO_DIRECT)) {
+    if (check_seqdev_node(file->inode) || (fd_s->flags & FO_DIRECT)) {
         errno = file->ops->read(file->inode, buf, count, file->f_pos);
     } else {
         errno = pcache_read(file->inode, buf, count, file->f_pos);
@@ -732,34 +865,41 @@ __DEFINE_LXSYSCALL3(int, write, int, fd, void*, buf, size_t, count)
         goto done;
     }
 
+    struct v_inode* inode;
     struct v_file* file = fd_s->file;
 
     if ((errno = vfs_check_writable(file->dnode))) {
         goto done;
     }
 
-    if (!(file->inode->itype & F_FILE)) {
+    if (check_directory_node(file->inode)) {
         errno = EISDIR;
         goto done;
     }
 
-    lock_inode(file->inode);
+    inode = file->inode;
+    lock_inode(inode);
 
-    file->inode->mtime = clock_unixtime();
+    inode->mtime = clock_unixtime();
+    if ((fd_s->flags & O_APPEND)) {
+        file->f_pos = inode->fsize;
+    }
 
-    if ((file->inode->itype & VFS_IFSEQDEV) || (fd_s->flags & FO_DIRECT)) {
-        errno = file->ops->write(file->inode, buf, count, file->f_pos);
+    if (check_seqdev_node(inode) || (fd_s->flags & FO_DIRECT)) {
+        errno = file->ops->write(inode, buf, count, file->f_pos);
     } else {
-        errno = pcache_write(file->inode, buf, count, file->f_pos);
+        errno = pcache_write(inode, buf, count, file->f_pos);
     }
 
     if (errno > 0) {
         file->f_pos += errno;
-        unlock_inode(file->inode);
+        inode->fsize = MAX(inode->fsize, file->f_pos);
+
+        unlock_inode(inode);
         return errno;
     }
 
-    unlock_inode(file->inode);
+    unlock_inode(inode);
 
 done:
     return DO_STATUS(errno);
@@ -774,34 +914,42 @@ __DEFINE_LXSYSCALL3(int, lseek, int, fd, int, offset, int, options)
     }
 
     struct v_file* file = fd_s->file;
+    struct v_inode* inode = file->inode;
 
     if (!file->ops->seek) {
         errno = ENOTSUP;
         goto done;
     }
 
-    lock_inode(file->inode);
+    lock_inode(inode);
 
     int overflow = 0;
     int fpos = file->f_pos;
+
+    if (vfs_get_dtype(inode->itype) == DT_DIR) {
+        options = (options != FSEEK_END) ? options : FSEEK_SET;
+    }
+    
     switch (options) {
         case FSEEK_CUR:
-            overflow = sadd_overflow((int)file->f_pos, offset, &fpos);
+            overflow = sadd_of((int)file->f_pos, offset, &fpos);
             break;
         case FSEEK_END:
-            overflow = sadd_overflow((int)file->inode->fsize, offset, &fpos);
+            overflow = sadd_of((int)inode->fsize, offset, &fpos);
             break;
         case FSEEK_SET:
             fpos = offset;
             break;
     }
+
     if (overflow) {
         errno = EOVERFLOW;
-    } else if (!(errno = file->ops->seek(file->inode, fpos))) {
-        file->f_pos = fpos;
+    }
+    else {
+        errno = file->ops->seek(file, fpos);
     }
 
-    unlock_inode(file->inode);
+    unlock_inode(inode);
 
 done:
     return DO_STATUS(errno);
@@ -844,28 +992,42 @@ vfs_readlink(struct v_dnode* dnode, char* buf, size_t size)
 {
     const char* link;
     struct v_inode* inode = dnode->inode;
-    if (inode->ops->read_symlink) {
-        lock_inode(inode);
 
-        int errno = inode->ops->read_symlink(inode, &link);
-        strncpy(buf, link, size);
-
-        unlock_inode(inode);
-        return errno;
+    if (!check_symlink_node(inode)) {
+        return EINVAL;
     }
-    return 0;
+
+    if (!inode->ops->read_symlink) {
+        return ENOTSUP;
+    }
+
+    lock_inode(inode);
+
+    int errno = inode->ops->read_symlink(inode, &link);
+    if (errno >= 0) {
+        strncpy(buf, link, MIN(size, (size_t)errno));
+    }
+
+    unlock_inode(inode);
+    return errno;
 }
 
 int
 vfs_get_dtype(int itype)
 {
-    if ((itype & VFS_IFSYMLINK) == VFS_IFSYMLINK) {
-        return DT_SYMLINK;
-    } else if (!(itype & VFS_IFFILE)) {
-        return DT_DIR;
-    } else {
-        return DT_FILE;
+    int dtype = DT_FILE;
+    if (check_itype(itype, VFS_IFSYMLINK)) {
+        dtype |= DT_SYMLINK;
     }
+    
+    if (check_itype(itype, VFS_IFDIR)) {
+        dtype |= DT_DIR;
+        return dtype;
+    }
+
+    // TODO other types
+    
+    return dtype;
 }
 
 __DEFINE_LXSYSCALL3(int, realpathat, int, fd, char*, buf, size_t, size)
@@ -974,7 +1136,7 @@ __DEFINE_LXSYSCALL1(int, rmdir, const char*, pathname)
     lock_dnode(parent);
     lock_inode(parent->inode);
 
-    if (!(dnode->inode->itype & F_MFILE)) {
+    if (check_directory_node(dnode->inode)) {
         errno = parent->inode->ops->rmdir(parent->inode, dnode);
         if (!errno) {
             vfs_dcache_remove(dnode);
@@ -1016,16 +1178,18 @@ __DEFINE_LXSYSCALL1(int, mkdir, const char*, path)
         goto done;
     }
 
+    struct v_inode* inode = parent->inode;
+
     lock_dnode(parent);
-    lock_inode(parent->inode);
+    lock_inode(inode);
 
     if ((parent->super_block->fs->types & FSTYPE_ROFS)) {
         errno = ENOTSUP;
-    } else if (!parent->inode->ops->mkdir) {
+    } else if (!inode->ops->mkdir) {
         errno = ENOTSUP;
-    } else if ((parent->inode->itype & F_FILE)) {
+    } else if (!check_directory_node(inode)) {
         errno = ENOTDIR;
-    } else if (!(errno = parent->inode->ops->mkdir(parent->inode, dir))) {
+    } else if (!(errno = inode->ops->mkdir(inode, dir))) {
         vfs_dcache_add(parent, dir);
         goto cleanup;
     }
@@ -1033,7 +1197,7 @@ __DEFINE_LXSYSCALL1(int, mkdir, const char*, path)
     vfs_d_free(dir);
 
 cleanup:
-    unlock_inode(parent->inode);
+    unlock_inode(inode);
     unlock_dnode(parent);
 done:
     return DO_STATUS(errno);
@@ -1057,8 +1221,8 @@ __vfs_do_unlink(struct v_dnode* dnode)
 
     if (inode->open_count) {
         errno = EBUSY;
-    } else if ((inode->itype & F_MFILE)) {
-        errno = inode->ops->unlink(inode);
+    } else if (!check_directory_node(inode)) {
+        errno = inode->ops->unlink(inode, dnode);
         if (!errno) {
             vfs_d_free(dnode);
         }
@@ -1105,16 +1269,30 @@ done:
 __DEFINE_LXSYSCALL2(int, link, const char*, oldpath, const char*, newpath)
 {
     int errno;
-    struct v_dnode *dentry, *to_link, *name_dentry, *name_file;
+    struct file_locator floc;
+    struct v_dnode *to_link, *name_file;
 
-    errno = __vfs_try_locate_file(oldpath, &dentry, &to_link, 0);
-    if (!errno) {
-        errno = __vfs_try_locate_file(
-          newpath, &name_dentry, &name_file, FLOCATE_CREATE_ONLY);
-        if (!errno) {
-            errno = vfs_link(to_link, name_file);
-        }
+    errno = __vfs_try_locate_file(oldpath, &floc, 0);
+    if (errno) {
+        goto done;
     }
+
+    __floc_try_unlock(&floc);
+
+    to_link = floc.file;
+    errno = __vfs_try_locate_file(newpath, &floc, FLOC_MKNAME);
+    if (!errno) {
+        goto done;       
+    }
+
+    name_file = floc.file;
+    errno = vfs_link(to_link, name_file);
+    if (errno) {
+        vfs_d_free(name_file);
+    }
+
+done:
+    __floc_try_unlock(&floc);
     return DO_STATUS(errno);
 }
 
@@ -1204,28 +1382,44 @@ __DEFINE_LXSYSCALL2(
   int, symlink, const char*, pathname, const char*, link_target)
 {
     int errno;
-    struct v_dnode *dnode, *file;
-    if ((errno = __vfs_try_locate_file(
-           pathname, &dnode, &file, FLOCATE_CREATE_ONLY))) {
+    struct file_locator floc;
+    struct v_dnode *file;
+    struct v_inode *f_ino;
+    
+    errno = __vfs_try_locate_file(pathname, &floc, FLOC_MKNAME);
+    if (errno) {
         goto done;
     }
 
-    if ((errno = vfs_check_writable(file))) {
+    file = floc.file;
+    errno = __vfs_mknod(floc.dir->inode, file, VFS_IFSYMLINK, NULL);
+    if (errno) {
+        vfs_d_free(file);
         goto done;
     }
 
-    if (!file->inode->ops->set_symlink) {
+    f_ino = file->inode;
+
+    assert(f_ino);
+
+    errno = vfs_check_writable(file);
+    if (errno) {
+        goto done;
+    }
+
+    if (!f_ino->ops->set_symlink) {
         errno = ENOTSUP;
         goto done;
     }
 
-    lock_inode(file->inode);
+    lock_inode(f_ino);
 
-    errno = file->inode->ops->set_symlink(file->inode, link_target);
+    errno = f_ino->ops->set_symlink(f_ino, link_target);
 
-    unlock_inode(file->inode);
+    unlock_inode(f_ino);
 
 done:
+    __floc_try_unlock(&floc);
     return DO_STATUS(errno);
 }
 
@@ -1261,7 +1455,7 @@ vfs_do_chdir(struct proc_info* proc, struct v_dnode* dnode)
 
     lock_dnode(dnode);
 
-    if ((dnode->inode->itype & F_FILE)) {
+    if (!check_directory_node(dnode->inode)) {
         errno = ENOTDIR;
         goto done;
     }
@@ -1456,7 +1650,7 @@ __DEFINE_LXSYSCALL2(int, fstat, int, fd, struct file_stat*, stat)
                                .st_ioblksize = PAGE_SIZE,
                                .st_blksize = vino->sb->blksize};
 
-    if (VFS_DEVFILE(vino->itype)) {
+    if (check_device_node(vino)) {
         struct device* rdev = resolve_device(vino->data);
         if (!rdev || rdev->magic != DEV_STRUCT_MAGIC) {
             errno = EINVAL;

@@ -58,7 +58,7 @@ fail:
 static void
 lunad_do_usr() {
     // No, these are not preemptive
-    cpu_disable_interrupt();
+    no_preemption();
 
     if (!mount_bootmedium() || !exec_initd()) {
         fail("failed to initd");
@@ -89,11 +89,11 @@ lunad_main()
         thread (which is preemptive!)
     */
 
-    cpu_enable_interrupt();
+    set_preemption();
     while (1)
     {
         cleanup_detached_threads();
-        sched_pass();
+        yield_current();
     }
 }
 

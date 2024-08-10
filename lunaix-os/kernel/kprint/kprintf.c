@@ -68,6 +68,15 @@ kprintf_m(const char* component, const char* fmt, va_list args)
     kprintf_ml(component, level, fmt, args);
 }
 
+void
+kprintf_v(const char* component, const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    kprintf_m(component, fmt, args);
+    va_end(args);
+}
+
 static void
 __twimap_kprintf_read(struct twimap* map)
 {

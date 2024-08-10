@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_TASKFS_H
 #define __LUNAIX_TASKFS_H
 
-#include <lunaix/fs.h>
+#include <lunaix/fs/api.h>
 #include <lunaix/fs/twimap.h>
 
 struct task_attribute

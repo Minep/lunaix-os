@@ -30,7 +30,7 @@
  * https://elixir.bootlin.com/linux/v4.4/source/include/linux/log2.h#L85
  *
  */
-#define ILOG2(x)                                                               \
+#define ilog2(x)                                                               \
     (__builtin_constant_p(x) ? ((x) == 0              ? 0                      \
                                 : ((x) & (1ul << 31)) ? 31                     \
                                 : ((x) & (1ul << 30)) ? 30                     \
@@ -64,20 +64,36 @@
                                 : ((x) & (1ul << 2))  ? 2                      \
                                 : ((x) & (1ul << 1))  ? 1                      \
                                                       : 0)                      \
-                             : (31 - clz(x)))
+                             : (msbiti - clz(x)))
+
+#define llog2(x)   (msbitl - clzl(x))
 
 #ifndef CONFIG_NO_ASSERT
 #define assert(cond)                                                           \
     do {                                                                       \
-        if (unlikely(!(cond))) {                                                         \
+        if (unlikely(!(cond))) {                                                \
             __assert_fail(#cond, __FILE__, __LINE__);                          \
+        }                                                                      \
+    } while(0)
+
+#define assert_p(cond, prefix)                                                 \
+    do {                                                                       \
+        if (unlikely(!(cond))) {                                               \
+            __assert_fail(prefix ": " #cond, __FILE__, __LINE__);              \
         }                                                                      \
     } while(0)
 
 #define assert_msg(cond, msg)                                                  \
     do {                                                                       \
-        if (unlikely(!(cond))) {                                                         \
+        if (unlikely(!(cond))) {                                               \
             __assert_fail(msg, __FILE__, __LINE__);                            \
+        }                                                                      \
+    } while(0)
+
+#define assert_msg_p(cond, prefix, msg)                                        \
+    do {                                                                       \
+        if (unlikely(!(cond))) {                                               \
+            __assert_fail(prefix ":" msg, __FILE__, __LINE__);                     \
         }                                                                      \
     } while(0)
 
@@ -88,6 +104,7 @@
     } while(0)
 
 #define fail(msg) __assert_fail(msg, __FILE__, __LINE__);
+#define fail_p(msg, prefix) fail(prefix msg);
 
 void
 __assert_fail(const char* expr, const char* file, unsigned int line)

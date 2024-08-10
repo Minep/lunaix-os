@@ -16,9 +16,21 @@
 
 #define defualt                 weak
 
+#define msbiti                  (sizeof(int) * 8 - 1)
 #define clz(bits)               __builtin_clz(bits)
-#define sadd_overflow(a, b, of) __builtin_sadd_overflow(a, b, of)
-#define umul_overflow(a, b, of) __builtin_umul_overflow(a, b, of)
+
+#ifdef CONFIG_ARCH_BITS_64
+#define msbitl                  (sizeof(long) * 8 - 1)
+#define clzl(bits)              __builtin_clzl(bits)
+#else
+#define msbitl                  msbiti
+#define clzl(bits)              clz(bits)
+#endif
+
+#define sadd_of(a, b, of)       __builtin_sadd_overflow(a, b, of)
+#define saddl_of(a, b, of)      __builtin_saddl_overflow(a, b, of)
+#define umul_of(a, b, of)       __builtin_umul_overflow(a, b, of)
+#define umull_of(a, b, of)      __builtin_umull_overflow(a, b, of)
 #define offsetof(f, m)          __builtin_offsetof(f, m)
 
 #define prefetch_rd(ptr, ll)    __builtin_prefetch((ptr), 0, ll)

@@ -20,7 +20,7 @@
 .section .bss
     .align 16
     lo_tmp_stack:
-        .skip 256
+        .skip 1024
     tmp_stack:
 
 /*
@@ -182,7 +182,7 @@
         # is required to prevent corrupt existing stack
         movl $tmp_stack, %esp
 
-        call signal_dispatch    # kernel/signal.c
+        call switch_signposting    # kernel/process/switch.c
 
         movl current_thread, %ebx
         test %eax, %eax         # do we have signal to handle?
