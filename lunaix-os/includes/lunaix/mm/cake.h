@@ -58,8 +58,6 @@ struct cake_s
             piece_t free_list[0];
         };
     };
-
-    spinlock_t lock
 };
 
 /**

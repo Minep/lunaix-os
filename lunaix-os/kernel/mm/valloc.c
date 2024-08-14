@@ -6,7 +6,7 @@
 #define CLASS_LEN(class) (sizeof(class) / sizeof(class[0]))
 
 // threshold to use external cake metadata
-#define EXTERN_THRESHOLD    64
+#define EXTERN_THRESHOLD    128
 
 static char piles_names[][PILE_NAME_MAXLEN] = 
 {
@@ -15,11 +15,22 @@ static char piles_names[][PILE_NAME_MAXLEN] =
     "valloc_2k",  "valloc_4k",  "valloc_8k"  
 };
 
+#define M128    (4)
+#define M1K     (M128 + 3)
+
 static int page_counts[] = 
 {
-    1, 1, 1, 1,     // 8, 16, 32, 64
-    1, 2, 2, 4,     // 128, 256, 512, 1k
-    4, 8, 8         // 2k, 4k, 8k
+    [0] = 1,
+    [1] = 1,
+    [2] = 1,
+    [3] = 1,
+    [M128    ] = 1,
+    [M128 + 1] = 2,
+    [M128 + 2] = 2,
+    [M1K     ] = 4,
+    [M1K + 1 ] = 4,
+    [M1K + 2 ] = 8,
+    [M1K + 3 ] = 8
 };
 
 static char piles_names_dma[][PILE_NAME_MAXLEN] = 
@@ -43,11 +54,15 @@ valloc_init()
         piles[i] = cake_new_pile(piles_names[i], size, page_counts[i], opts);
     }
 
+    opts = PILE_ALIGN_CACHE;
     // DMA 内存保证128字节对齐
     for (size_t i = 0; i < CLASS_LEN(piles_names_dma); i++) {
         int size = 1 << (i + 7);
+        if (size >= EXTERN_THRESHOLD) {
+            opts |= PILE_FL_EXTERN;
+        }
         piles_dma[i] = cake_new_pile(
-            piles_names_dma[i], size, size > 1024 ? 4 : 1, PILE_ALIGN_CACHE);
+            piles_names_dma[i], size, page_counts[M128 + i], opts);
     }
 }
 

@@ -230,27 +230,27 @@ __destory_cake(struct cake_s* cake)
     struct leaflet* leaflet;
     struct cake_pile* owner;
     pfn_t _pfn;
+    ptr_t page_va;
 
-    _pfn = pfn(vmm_v2p(cake->first_piece));
-    leaflet = ppfn_leaflet(_pfn);
     owner = cake->owner;
-
     assert(!cake->used_pieces);
 
     llist_delete(&cake->cakes);
     owner->cakes_count--;
-
     
-    if (!embedded_pile(cake)) {
+    if (!embedded_pile(owner)) {
+        page_va = __ptr(cake->first_piece);
         __free_fls(cake);
         cake_release(&cakes, cake); 
-        vunmap(cake->first_piece, leaflet);
     }
     else {
-        vunmap(__ptr(cake), leaflet);
+        page_va = __ptr(cake);
     }
 
-done:
+    _pfn = pfn(vmm_v2p(page_va));
+    leaflet = ppfn_leaflet(_pfn);
+    vunmap(page_va, leaflet);
+
     leaflet_return(leaflet);
 }
 
