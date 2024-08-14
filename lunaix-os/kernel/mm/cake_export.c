@@ -18,7 +18,7 @@ void
 __cake_stat_reset(struct twimap* map)
 {
     map->index = container_of(&piles, struct cake_pile, piles);
-    twimap_printf(map, "name, n_cakes, pg/cake, slices/cake, n_slices\n");
+    twimap_printf(map, "name cakes pages size slices actives\n");
 }
 
 void
@@ -26,10 +26,11 @@ __cake_rd_stat(struct twimap* map)
 {
     struct cake_pile* pos = twimap_index(map, struct cake_pile*);
     twimap_printf(map,
-                  "%s %d %d %d %d\n",
+                  "%s %d %d %d %d %d\n",
                   pos->pile_name,
                   pos->cakes_count,
                   pos->pg_per_cake,
+                  pos->piece_size,
                   pos->pieces_per_cake,
                   pos->alloced_pieces);
 }
