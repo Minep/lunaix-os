@@ -68,4 +68,4 @@ clean:
 	@rm -f $(ksrc_objs)
 	@rm -f $(ksrc_deps)
 	@rm -f $(klinking)
-	@rm -f .lunaix_ksymtable.S $(ksymtable)
+	@rm -f lunaix_ksymtable.S $(ksymtable)

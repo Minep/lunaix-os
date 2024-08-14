@@ -15,7 +15,8 @@
 !.pre-commit-config.yaml
 !LBuild
 !LConfig
-!Makefile
+!makefile
+!live_debug.sh
 !kernel.mk
 
 *.[od]
