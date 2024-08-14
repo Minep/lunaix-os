@@ -45,9 +45,9 @@ $(tmp_kbin): $(klinking) $(ksrc_objs)
 
 $(ksymtable): $(tmp_kbin)
 	$(call status_,KSYM,$@)
-	@ARCH=$(ARCH) scripts/gen_ksymtable.sh DdRrTtAGg $< > .lunaix_ksymtable.S
+	@ARCH=$(ARCH) scripts/gen_ksymtable.sh DdRrTtAGg $< > lunaix_ksymtable.S
 
-	@$(CC) $(CFLAGS) -c .lunaix_ksymtable.S -o $@
+	@$(CC) $(CFLAGS) -c lunaix_ksymtable.S -o $@
 
 
 .PHONY: __do_relink

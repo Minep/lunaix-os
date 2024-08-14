@@ -1,6 +1,6 @@
 # Lunaix内核初始化流程
 
-虽然不同的架构对启动与初始化有着不同的要求，但这些区分仅仅只是出现在针对与架构特性与功能的初始化层面上。对于架构中性的内核而言，其初始化流程是保持不变的。
+虽然不同的架构对启动与初始化有着不同的要求，但这些区分只是针对指令集架构或其微架构的特性。对于架构中性的内核而言，其初始化流程是保持不变的。
 
 下图展示了从内核被引导，及至第一个用户进程的创建，这之间的流程。
 
@@ -66,3 +66,52 @@
   冻结物理内存。用于“锁住”包含启动时所需信息的物理页，这类页面一般由固件提供，以便OS能够更好的进行适配。如ACPI的系统描述表们。该类页面将在 **unlock pmem** 时分释放。
 + **unlock pmem**
   解冻物理内存。
+
+### 自加载符号
+
+上文提到的“安装函数”，如 init_fn，均属于Lunaix的自加载函数。这类函数通常由内核在初始化过程中自动调用。当然，可以被自加载的东西并不局限于函数，而是可以为任意符号，比如一个全局变量。Lunaix的自加载框架只负责统筹所有导出的符号，具体的释义和用法由具体使用此框架的子系统决定，而不同的释义与用法也就构成了不同的自加载类型。
+
+目前定义的自加载类型由如下几大类：
+
++ **devdefs** 设备驱动声明（`device`阶段）
++ **lunainit** 通用初始化函数（`init_fn`阶段）
++ **twiplugin** (twifs) 内核态映射构建函数
++ **fs** 文件系统驱动声明
+
+#### 所有自加载符号
+
+| 类型 | 符号 | 源文件 |
+| --- | --- | --- |
+| fs | `iso9660` | kernel/fs/iso9660/mount.c |
+| devdefs | `randdev` | arch/x86/hal/rngx86.c |
+| fs | `ext2fs` | kernel/fs/ext2/mount.c |
+| twiplugin | `sys_clock` | kernel/time/clock.c |
+| devdefs | `lxconsole` | hal/char/lxconsole.c |
+| devdefs | `zerodev` | hal/char/devzero.c |
+| lunainit | `lxconsole_init` | hal/char/lxconsole.c |
+| devdefs | `vga_pci` | hal/gfxa/vga/vga_pci.c |
+| twiplugin | `fstab` | kernel/fs/fsm.c |
+| devdefs | `ahci` | hal/ahci/ahci_pci.c |
+| twiplugin | `rtc_fsexport` | hal/rtc/rtc_device.c |
+| lunainit | `vga_rawtty_init` | hal/gfxa/vga/vga_rawtty.c |
+| twiplugin | `cake_alloc` | kernel/mm/cake_export.c |
+| twiplugin | `pci_devs` | hal/bus/pci.c |
+| lunainit | `init_serial_dev` | hal/char/serial.c |
+| twiplugin | `vfs_general` | kernel/fs/fs_export.c |
+| devdefs | `uart16550_pci` | hal/char/uart/16x50_pci.c |
+| twiplugin | `devdb` | kernel/device/devdb.c |
+| fs | `twifs` | kernel/fs/twifs/twifs.c |
+| lunainit | `setup_default_tty` | hal/term/console.c |
+| twiplugin | `__lru_twimap` | kernel/lrud.c |
+| devdefs | `uart16550_pmio` | hal/char/uart/16x50_isa.c |
+| fs | `ramfs` | kernel/fs/ramfs/ramfs.c |
+| lunainit | `__intc_init` | arch/x86/exceptions/isrm.c |
+| devdefs | `acpi` | hal/acpi/acpi.c |
+| fs | `devfs` | kernel/device/devfs.c |
+| devdefs | `mc146818` | arch/x86/hal/mc146818a.c |
+| lunainit | `__init_blkbuf` | kernel/block/blkbuf.c |
+| twiplugin | `kprintf` | kernel/kprint/kprintf.c |
+| devdefs | `nulldev` | hal/char/devnull.c |
+| devdefs | `pci3hba` | hal/bus/pci.c |
+| fs | `taskfs` | kernel/process/taskfs.c |
+| devdefs | `i8042_kbd` | arch/x86/hal/ps2kbd.c |
