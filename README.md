@@ -14,12 +14,8 @@ LunaixOS - 一个简单的，详细的，POSIX兼容的（但愿！），带有�
 
 如果有意研读 Lunaix 内核代码和其中的设计，或欲开始属于自己的OS开发之道，以下资料可能会对此有用。
 
++ [内核文档（Luna's Tour）](docs/lunaix-internal.md)
 + [LunaixOS源代码分析教程](docs/tutorial/0-教程介绍和环境搭建.md)
-+ 内核虚拟内存的详细布局
-  + [x86_32](docs/img/lunaix-mem-map/lunaix-mem-x86_32.png)
-  + [x86_64](docs/img/lunaix-mem-map/lunaix-mem-x86_64.png)
-+ [LunaixOS启动流程概览](docs/img/boot_sequence.jpeg)
-+ LunaixOS总体架构概览（WIP）
 + [作者修改的QEMU](https://github.com/Minep/qemu) (添加了一些额外用于调试的功能)
 
 ## 2. 当前进度以及支持的功能
@@ -194,9 +190,9 @@ ARCH=x86_64 ./live_debug.sh
 
 ### 5.1 代码稳定性
 
-主分支一般是稳定的。因为在大多数情况下，我都会尽量保证本机运行无误后，push到该分支中。至于其他的分支，则是作为标记或者是开发中的功能。前者标记用分支一般会很快删掉；后者开发分支不能保证稳定性，这些分支的代码有可能没有经过测试，但可以作为Lunaix当前开发进度的参考。
+主分支一般是稳定的。因为在大多数情况下，我都会尽量保证本机运行无误后，push到该分支中。所有正在开发的功能请参考当前活跃的Pull Request。
 
-该系统是经过虚拟机和真机测试。如果发现在使用`make all`之后，虚拟机中运行报错，则一般是编译器优化问题。这个问题笔者一般很快就会修复，如果你使用别的版本的gcc（笔者版本11.2），出现了此问题，欢迎提issue。请参考[附录3：Issue的提交](#appendix3)
+如果主分支的运行出现了此问题，欢迎提issue。请参考[附录3：Issue的提交](#appendix3)
 
 ## 6. 调试 Lunaix 内核
 
@@ -263,7 +259,7 @@ ARCH=x86_64 ./live_debug.sh
 
 #### 网站
 
-+ [OSDev](https://wiki.osdev.org/Main_Page) - 杂七杂八的参考，很多过来人的经验。作者主要用于上古资料查询以及收集；技术文献，手册，标准的粗略总结；以及开发环境/工具链的搭建。当然，上面的内容假设了x86_32架构的生态，对于其他的ISA支持，该网站便失去了其价值了。
++ [OSDev](https://wiki.osdev.org/Main_Page) - 适合快速入门，和一些文档手册的总结。
 + [FreeVGA](http://www.osdever.net/FreeVGA/home.htm) - 98年的资源！关于VGA编程技术的宝藏网站。
 + GNU CC 和 GNU LD 的官方文档。
 + [PCI Lookup](https://www.pcilookup.com/) - PCI设备编号查询

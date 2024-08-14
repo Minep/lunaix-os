@@ -1,4 +1,4 @@
-| Name | Id |
+| Name | ID |
 | ----- | ---- |
 | __SYSCALL_fork |  1 |
 | __SYSCALL_yield |  2 |

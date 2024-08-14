@@ -1,26 +1,29 @@
-build/
-playground/
-.vscode/settings.json
-.vscode/*.log
-.VSCodeCounter/
-.idea
-bx_enh_dbg.ini
-machine/
-draft/
-iso_inspect/
-unused/
-__pycache__/
+/*
 
-.builder/
-.config.json
+!arch
+!hal
+!kernel
+!libs
+!makeinc
+!includes
+!scripts
+!usr
+!link
 
-link/lunaix.ld
+!.gitignore
+!*.md
+!.pre-commit-config.yaml
+!LBuild
+!LConfig
+!makefile
+!live_debug.sh
+!kernel.mk
 
-.gdb_history
-
-**.o
-**.d
-
+*.[od]
+*.ld
 *.log
 
-.lunaix_ksymtable.S
+__pycache__
+
+.config.json
+.builder
