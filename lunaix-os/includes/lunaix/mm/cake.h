@@ -6,7 +6,8 @@
 
 #define PILE_NAME_MAXLEN 20
 
-#define PILE_ALIGN_CACHE 1
+#define PILE_ALIGN_CACHE 0b0001
+#define PILE_FL_EXTERN   0b0010
 
 struct cake_pile;
 
@@ -24,22 +25,39 @@ struct cake_pile
     u32_t alloced_pieces;
     u32_t pieces_per_cake;
     u32_t pg_per_cake;
+    u32_t options;
     char pile_name[PILE_NAME_MAXLEN+1];
 
     pile_cb ctor;
 };
 
-typedef unsigned int piece_index_t;
+typedef unsigned short piece_t;
 
-#define EO_FREE_PIECE ((u32_t)-1)
+#define EO_FREE_PIECE ((piece_t)-1)
+
+#define CAKE_FL_SIZE        128 
+#define CAKE_FL_MAXLEN      \
+    ((unsigned int)((CAKE_FL_SIZE - sizeof(ptr_t)) / sizeof(piece_t)))
+struct cake_fl
+{
+    piece_t indices[CAKE_FL_MAXLEN];
+    struct cake_fl* next;
+} align(CAKE_FL_SIZE);
 
 struct cake_s
 {
     struct llist_header cakes;
+    struct cake_pile* owner;
     void* first_piece;
     unsigned int used_pieces;
     unsigned int next_free;
-    piece_index_t free_list[0];
+    union {
+        struct cake_fl* fl;
+        struct {
+            void* rsvd;
+            piece_t free_list[0];
+        };
+    };
 };
 
 /**
@@ -82,6 +100,9 @@ cake_init();
 
 void
 cake_export();
+
+void
+cake_reclaim_freed();
 
 /********** some handy constructor ***********/
 
