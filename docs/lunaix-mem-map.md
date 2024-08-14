@@ -3,8 +3,8 @@
 该说明将会展示 Lunaix 内核在不同架构下的虚拟内存地址资源的划分。
 请参看下表：
 
-+ [x86_32](docs/img/lunaix-mem-map/lunaix-mem-x86_32.png)
-+ [x86_64](docs/img/lunaix-mem-map/lunaix-mem-x86_64.png)
++ [x86_32](img/lunaix-mem-map/lunaix-mem-x86_32.png)
++ [x86_64](img/lunaix-mem-map/lunaix-mem-x86_64.png)
 
 ## 图例
 
