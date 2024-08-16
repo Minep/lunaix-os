@@ -28,18 +28,26 @@
     },
     "devices": [
         {
-            "class": "basic_serial",
-            "protocol": "telnet",
-            "addr": ":12345",
-            "logfile": "lunaix_ttyS0.log"
+            "class": "isa-serial",
+            "io": {
+                "type": "telnet",
+                "port": "12345",
+                "logfile": "lunaix_ttyS0.log"
+            }
         },
         {
             "class": "pci-serial",
-            "logfile": "ttyPCI0.log"
+            "io": {
+                "type": "null",
+                "logfile": "ttypci1.log"
+            }
         },
         {
             "class": "pci-serial",
-            "logfile": "ttyPCI1.log"
+            "io": {
+                "type": "null",
+                "logfile": "ttypci2.log"
+            }
         },
         {
             "class": "rtc",
@@ -64,9 +72,11 @@
         },
         {
             "class": "hmp",
-            "protocol": "telnet",
-            "addr": ":$QMPORT",
-            "logfile": "qm.log"
+            "io": {
+                "type": "telnet",
+                "port": "$QMPORT",
+                "logfile": "qm.log"
+            }
         }
     ]
 }
