@@ -4,7 +4,7 @@ def x86_configurations():
     
     add_to_collection(architecture_support)
 
-    @Term
+    @Term("Use SSE2/3/4 extension")
     def x86_enable_sse_feature():
         """ 
             Config whether to allow using SSE feature for certain
@@ -15,14 +15,14 @@ def x86_configurations():
         default(False)
 
 
-    @Term
+    @Term("Bootloader Model")
     def x86_bl():
         """
             Select the bootloader interface
             
             Supported interface
-                mb:      multiboot compliant
-                mb2:     multiboot2 compliant
+                mb:      multiboot compliance
+                mb2:     multiboot2 compliance
                 none:    do not use any interface
         """
 

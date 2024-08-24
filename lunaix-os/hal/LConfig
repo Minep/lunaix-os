@@ -2,7 +2,7 @@ include("char")
 include("bus")
 include("ahci")
 
-@Collection
+@Collection("Devices & Peripherials")
 def hal():
     """ Lunaix hardware asbtraction layer """
 

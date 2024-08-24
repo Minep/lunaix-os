@@ -61,6 +61,8 @@ class EventType:
     E_KEY = 0
     E_REDRAW = 1
     E_QUIT = 2
+    E_TASK = 3
+    E_CHFOCUS = 4
     E_M_FOCUS = 0b10000000
 
     def focused_only(t):
@@ -382,8 +384,14 @@ class TuiObject(SpatialObject):
     
     def context(self):
         return self._context
+    
+    def session(self):
+        return self._context.session()
 
     def on_create(self):
+        pass
+
+    def on_destory(self):
         pass
 
     def on_quit(self):
@@ -444,6 +452,11 @@ class TuiContainerObject(TuiObject):
         super().on_create()
         for child in self._children:
             child.on_create()
+
+    def on_destory(self):
+        super().on_destory()
+        for child in self._children:
+            child.on_destory()
     
     def on_quit(self):
         super().on_quit()
@@ -543,6 +556,10 @@ class Layout(TuiContainerObject):
         def on_create(self):
             if self.__obj:
                 self.__obj.on_create()
+
+        def on_destory(self):
+            if self.__obj:
+                self.__obj.on_destory()
 
         def on_quit(self):
             if self.__obj:
@@ -685,6 +702,11 @@ class TuiPanel(TuiContainerObject):
         if self.__use_shadow:
             sy, sx = self.__shadow_param
             self.__shad.set_geometric(h, w, y + sy, x + sx)
+
+    def on_destory(self):
+        super().on_destory()
+        self.__swin.hide()
+        self.__shad.hide()
 
     def on_draw(self):
         win = self.__swin.window()
@@ -833,6 +855,7 @@ class TuiTextBox(TuiWidget):
         self.__textb = textpad.Textbox(self.__box.window(), True)
         self.__textb.stripspaces = True
         self.__str = ""
+        self.__scheduled_edit = False
 
         self._context.focus_group().register(self, 0)
 
@@ -868,13 +891,18 @@ class TuiTextBox(TuiWidget):
 
     def __edit(self):
         self.__str = self.__textb.edit(lambda x: self.__validate(x))
+        self.session().schedule(EventType.E_CHFOCUS)
+        self.__scheduled_edit = False
 
     def get_text(self):
         return self.__str
     
     def on_focused(self):
         self.__box.set_background(ColorScope.BOX)
-        self.__edit()
+        if not self.__scheduled_edit:
+            # edit will block, defer to next update cycle
+            self.session().schedule_task(self.__edit)
+            self.__scheduled_edit = True
 
     def on_focus_lost(self):
         self.__box.set_background(ColorScope.PANEL)
@@ -1038,6 +1066,13 @@ class TuiSession:
     def set_color(self, scope, fg, bg):
         curses.init_pair(scope, int(fg), int(bg))
 
+    def schedule_redraw(self):
+        self.schedule(EventType.E_REDRAW)
+
+    def schedule_task(self, task):
+        self.schedule(EventType.E_REDRAW)
+        self.schedule(EventType.E_TASK, task)
+
     def schedule(self, event, arg = None):
         if len(self.__sched_events) > 0:
             if self.__sched_events[-1] == event:
@@ -1056,7 +1091,8 @@ class TuiSession:
         if len(self.__context_stack) == 1:
             return
         
-        self.__context_stack.pop()
+        ctx = self.__context_stack.pop()
+        ctx.on_destory()
         self.schedule(EventType.E_REDRAW)
 
         curses.curs_set(self.active().curser_mode())
@@ -1122,12 +1158,11 @@ class TuiFocusGroup:
         return self.__id - 1
 
     def navigate_focus(self, dir = 1):
-        if self.__focused:
-            self.__focused.on_focus_lost()
-        
         self.__sel = (self.__sel + dir) % len(self.__grp)
         f = None if not len(self.__grp) else self.__grp[self.__sel][1]
-        if f:
+        if f and f != self.__focused:
+            if self.__focused:
+                self.__focused.on_focus_lost()
             f.on_focused()
         self.__focused = f
 
@@ -1169,8 +1204,11 @@ class TuiContext(TuiObject):
     def prepare(self):
         self.__root.on_create()
 
-    def window(self):
-        return self.__win
+    def on_destory(self):
+        self.__root.on_destory()
+
+    def canvas(self):
+        return (self, self.__win)
     
     def session(self):
         return self.__session
@@ -1178,6 +1216,12 @@ class TuiContext(TuiObject):
     def dispatch_event(self, evt, arg):
         if evt == EventType.E_REDRAW:
             self.__focus_group.navigate_focus(0)
+        elif evt == EventType.E_CHFOCUS:
+            self.__focus_group.navigate_focus(1)
+            self.__session.schedule(EventType.E_REDRAW)
+            return
+        elif evt == EventType.E_TASK:
+            arg()
         elif evt == EventType.E_QUIT:
             self.__root.on_quit()
         elif evt == EventType.E_KEY:
@@ -1190,11 +1234,15 @@ class TuiContext(TuiObject):
             focused.on_event(evt | EventType.E_M_FOCUS, arg)
 
     def redraw(self, win):
-        self.__root.on_layout()
-        self.__root.on_draw()
+        self.__win = win
+        self.on_layout()
+        self.on_draw()
 
     def on_layout(self):
-        pass
+        self.__root.on_layout()
+
+    def on_draw(self):
+        self.__root.on_draw()
 
     def focus_group(self):
         return self.__focus_group

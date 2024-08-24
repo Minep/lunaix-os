@@ -84,8 +84,7 @@ class MainMenuContext(tui.TuiContext):
         hint.set_text(
             "Use <UP>/<DOWN>/<ENTER> to select from list\n"
             "Use <TAB>/<RIGHT>/<LEFT> to change focus\n"
-            "<H>: show help (if applicable), <BACKSPACE>: back previous level\n"
-            "   *: Item is read-only, "
+            "<H>: show help (if applicable), <BACKSPACE>: back previous level"
         )
         hint.set_alignment(Alignment.CENTER | Alignment.LEFT)
         hint.set_margin(0, 0, 0, 10)
@@ -134,6 +133,10 @@ class MainMenuContext(tui.TuiContext):
     def _handle_key_event(self, key):
         if key == curses.KEY_BACKSPACE or key == 8:
             self.session().pop_context()
+        elif key == 27:
+            do_exit(self.session())
+            return
+        
         super()._handle_key_event(key)
 
 class ItemType:
@@ -257,7 +260,7 @@ class LunaConfigItem(tui.SimpleList.Item):
             self.__node.set_value(val)
         except:
             show_dialog(
-                self.session(), "Invalid value",
+                self.__session, "Invalid value",
                 f"Value: '{val}' does not match the type")
             return False
         

@@ -1,19 +1,19 @@
 include("uart")
 
-@Collection
+@Collection("Character Devices")
 def char_device():
     """ Controlling support of character devices """
 
     add_to_collection(hal)
 
-    @Term
+    @Term("VGA 80x25 text-mode console")
     def vga_console():
         """ Enable VGA console device (text mode only) """
 
         type(bool)
         default(True)
 
-    @Term
+    @Term("VGA character game device")
     def chargame_console():
         """ Enable VGA Charactor Game console device (text mode only) """
 

@@ -159,6 +159,13 @@ class Dialogue(tui.TuiContext):
 
     def prepare(self):
         self.__create_layout(self.__title_txt)
+
+    def _handle_key_event(self, key):
+        if key == 27:
+            self.__close()
+            return
+        super()._handle_key_event(key)
+        
     
     def _ok_onclick(self):
         self.__status = Dialogue.Yes

@@ -1,12 +1,12 @@
 include("x86/LConfig")
 
-@Collection
+@Collection("Platform")
 def architecture_support():
     """
         Config ISA related features
     """
 
-    @Term
+    @Term("Architecture")
     def arch():
         """ Config ISA support """
         type(["i386", "x86_64", "aarch64", "rv64"])
@@ -16,7 +16,7 @@ def architecture_support():
         if env_val:
             set_value(env_val)
 
-    @Term
+    @Term("Base operand size")
     @ReadOnly
     def arch_bits():
         type(["64", "32"])
