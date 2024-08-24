@@ -1,7 +1,8 @@
 import curses
 import re
-import time
+import threading
 import curses.panel as cpanel
+import curses.textpad as textpad
 import textwrap
 
 def resize_safe(obj, co, y, x):
@@ -15,6 +16,12 @@ def move_safe(obj, co, y, x):
         co.move(y, x)
     except:
         raise Exception(obj._id, f"move {co}", (y, x))
+    
+def addstr_safe(obj, co, y, x, str, *args):
+    try:
+        co.addstr(y, x, str, *args)
+    except:
+        raise Exception(obj._id, f"addstr {co}", (y, x))
 
 class _TuiColor:
     def __init__(self, v) -> None:
@@ -50,10 +57,8 @@ class ColorScope:
     TEXT_HI   = 4
     SHADOW    = 5
     SELECT    = 6
-
-class SizeMode:
-    S_ABS = 1
-    S_REL = 2
+    HINT      = 7
+    BOX       = 8
 
 class EventType:
     E_KEY = 0
@@ -72,7 +77,6 @@ class Matchers:
 
 class BoundExpression:
     def __init__(self, expr = None):
-        #self._mode = SizeMode.S_ABS
         self._mult = 0
         self._add  = 0
 
@@ -210,7 +214,42 @@ class Bound:
     
     def yx(self, scale = 1):
         return int(self.__y * scale), int(self.__x * scale)
+
+class TuiStackWindow:
+    def __init__(self, obj) -> None:
+        self.__obj = obj
+        self.__win = curses.newwin(0, 0)
+        self.__pan = cpanel.new_panel(self.__win)
+        self.__pan.hide()
+
+    def resize(self, h, w):
+        resize_safe(self.__obj, self.__win, h, w)
     
+    def relocate(self, y, x):
+        move_safe(self.__obj, self.__pan, y, x)
+
+    def set_geometric(self, h, w, y, x):
+        resize_safe(self.__obj, self.__win, h, w)
+        move_safe(self.__obj, self.__pan, y, x)
+
+    def set_background(self, color_scope):
+        self.__win.bkgd(' ', curses.color_pair(color_scope))
+
+    def show(self):
+        self.__pan.show()
+
+    def hide(self):
+        self.__pan.hide()
+    
+    def send_back(self):
+        self.__pan.bottom()
+
+    def send_front(self):
+        self.__pan.top()
+
+    def window(self):
+        return self.__win
+
 class SpatialObject:
     def __init__(self) -> None:
         self._local_pos = DynamicBound()
@@ -219,7 +258,7 @@ class SpatialObject:
         self._size = Bound()
         self._margin = (0, 0, 0, 0)
         self._padding = (0, 0, 0, 0)
-        self._align = Alignment.ABS
+        self._align = Alignment.TOP | Alignment.LEFT
 
     def set_local_pos(self, x, y):
         self._local_pos.dyn_x().update(x)
@@ -281,8 +320,8 @@ class SpatialObject:
     def __satisfy_margin(self, constrain):
         tm, lm, bm, rm = self._margin
         
-        self._pos.growX(lm - rm)
-        self._pos.growY(tm - bm)
+        self._pos.growX(rm - lm)
+        self._pos.growY(bm - tm)
 
     def __satisfy_padding(self, constrain):
         csize = constrain._size
@@ -321,6 +360,8 @@ class TuiObject(SpatialObject):
         self._id = id
         self._context = context
         self._parent = None
+        self._visible = True
+        self._focused = False
 
     def set_parent(self, parent):
         self._parent = parent
@@ -350,10 +391,20 @@ class TuiObject(SpatialObject):
         pass
 
     def on_focused(self):
-        pass
+        self._focused = True
 
     def on_focus_lost(self):
-        pass
+        self._focused = False
+
+    def set_visbility(self, visible):
+        self._visible = visible
+
+    def do_draw(self):
+        if self._visible:
+            self.on_draw()
+    
+    def do_layout(self):
+        self.on_layout()
 
 class TuiWidget(TuiObject):
     def __init__(self, context, id):
@@ -393,17 +444,80 @@ class TuiContainerObject(TuiObject):
     def on_layout(self):
         super().on_layout()
         for child in self._children:
-            child.on_layout()
+            child.do_layout()
 
     def on_draw(self):
         super().on_draw()
         for child in self._children:
-            child.on_draw()
+            child.do_draw()
 
     def on_event(self, ev_type, ev_arg):
         super().on_event(ev_type, ev_arg)
         for child in self._children:
             child.on_event(ev_type, ev_arg)
+
+
+class TuiScrollable(TuiObject):
+    def __init__(self, context, id):
+        super().__init__(context, id)
+        self.__spos = Bound()
+
+        self.__pad = curses.newpad(1, 1)
+        self.__pad.bkgd(' ', curses.color_pair(ColorScope.PANEL))
+        self.__pad_panel = cpanel.new_panel(self.__pad)
+        self.__content = None
+
+    def canvas(self):
+        return (self, self.__pad)
+
+    def set_content(self, content):
+        self.__content = content
+        self.__content.set_parent(self)
+
+    def set_scrollY(self, y):
+        view_y = self._size.y()
+        self.__spos.resetY((y + 1) // view_y * view_y)
+
+    def set_scrollX(self, x):
+        view_x = self._size.x()
+        self.__spos.resetX((x + 1) // view_x * view_x)
+
+    def reached_last(self):
+        off = self.__spos.y() + self._size.y()
+        return off >= self.__content._size.y()
+    
+    def reached_top(self):
+        return self.__spos.y() < self._size.y()
+
+    def on_layout(self):
+        super().on_layout()
+
+        if not self.__content:
+            return
+        
+        self.__content.on_layout()
+                
+        h, w = self._size.yx()
+        ch, cw = self.__content._size.yx()
+        sh, sw = max(ch, h), max(cw, w)
+
+        resize_safe(self, self.__pad, sh, sw)
+
+    def on_draw(self):
+        if not self.__content:
+            return
+        
+        self.__pad.erase()
+
+        self.__pad_panel.top()
+        self.__content.on_draw()
+
+        wminy, wminx = self._pos.yx()
+        wmaxy, wmaxx = self._size.yx()
+        wmaxy, wmaxx = wmaxy + wminy, wmaxx + wminx
+        self.__pad.touchwin()
+        self.__pad.refresh(*self.__spos.yx(), 
+                            wminy, wminx, wmaxy - 1, wmaxx - 1)
 
 
 class Layout(TuiContainerObject):
@@ -427,11 +541,11 @@ class Layout(TuiContainerObject):
         def on_layout(self):
             super().on_layout()
             if self.__obj:
-                self.__obj.on_layout()
+                self.__obj.do_layout()
 
         def on_draw(self):
             if self.__obj:
-                self.__obj.on_draw()
+                self.__obj.do_draw()
 
         def on_event(self, ev_type, ev_arg):
             if self.__obj:
@@ -530,19 +644,14 @@ class TuiPanel(TuiContainerObject):
         self.__use_shadow = False
         self.__shadow_param = (0, 0)
 
-        self.__win = curses.newwin(0, 0)
-        self.__win.bkgd(' ', curses.color_pair(ColorScope.PANEL))
-        self.__panel = cpanel.new_panel(self.__win)
+        self.__swin = TuiStackWindow(self)
+        self.__shad = TuiStackWindow(self)
 
-        self.__winsh = curses.newwin(0, 0)
-        self.__winsh.bkgd(' ', curses.color_pair(ColorScope.SHADOW))
-        self.__panelsh = cpanel.new_panel(self.__winsh)
-
-        self.__panel.hide()
-        self.__panelsh.hide()
+        self.__swin.set_background(ColorScope.PANEL)
+        self.__shad.set_background(ColorScope.SHADOW)
 
     def canvas(self):
-        return (self, self.__win)
+        return (self, self.__swin.window())
 
     def drop_shadow(self, off_y, off_x):
         self.__shadow_param = (off_y, off_x)
@@ -554,36 +663,34 @@ class TuiPanel(TuiContainerObject):
     def on_layout(self):
         super().on_layout()
 
-        self.__panel.hide()
+        self.__swin.hide()
 
         h, w = self._size.y(), self._size.x()
         y, x = self._pos.y(), self._pos.x()
-        resize_safe(self, self.__win, h, w)
-        move_safe(self, self.__panel, y, x)
+        self.__swin.set_geometric(h, w, y, x)
         
         if self.__use_shadow:
             sy, sx = self.__shadow_param
-            resize_safe(self, self.__winsh, h, w)
-            move_safe(self, self.__panelsh, y + sy, x + sx)
+            self.__shad.set_geometric(h, w, y + sy, x + sx)
 
     def on_draw(self):
-        self.__win.erase()
+        win = self.__swin.window()
+        win.erase()
 
         if self.__use_border:
-            self.__win.border()
+            win.border()
         
         if self.__use_shadow:
-            self.__panelsh.show()
-            self.__winsh.refresh()
+            self.__shad.show()
         else:
-            self.__panelsh.hide()
+            self.__shad.hide()
 
-        self.__panel.top()
+        self.__swin.show()
+        self.__swin.send_front()
+
         super().on_draw()
 
-        self.__panel.show()
-        self.__win.touchwin()
-        self.__win.refresh()
+        win.touchwin()
 
 class TuiLabel(TuiWidget):
     def __init__(self, context, id):
@@ -592,24 +699,32 @@ class TuiLabel(TuiWidget):
         self._wrapped = []
 
         self.__auto_fit = True
-        self.__wrap = False
+        self.__trunc = False
         self.__dopad = False
         self.__highlight = False
+        self.__color_scope = -1
 
     def __try_fit_text(self, txt):
         if self.__auto_fit:
             self._dyn_size.dyn_x().set_pair(0, len(txt))
             self._dyn_size.dyn_y().set_pair(0, 1)
+
+    def __pad_text(self):
+        for i, t in enumerate(self._wrapped):
+            self._wrapped[i] = str.rjust(t, self._size.x())
     
     def set_text(self, text):
         self._text = text
         self.__try_fit_text(text)
 
+    def override_color(self, color = -1):
+        self.__color_scope = color
+
     def auto_fit(self, _b):
         self.__auto_fit = _b
 
-    def wrap_text(self, _b):
-        self.__wrap = _b
+    def truncate(self, _b):
+        self.__trunc = _b
 
     def hightlight(self, _b):
         self.__highlight = _b
@@ -627,32 +742,189 @@ class TuiLabel(TuiWidget):
 
         if len(txt) <= self._size.x():
             self._wrapped = [txt]
+            self.__pad_text()
             return
 
-        if not self.__wrap:
+        if not self.__trunc:
             txt = txt[:self._size.x() - 1]
             self._wrapped = [txt]
+            self.__pad_text()
             return
 
         self._wrapped = textwrap.wrap(txt, self._size.x())
+        self.__pad_text()
 
     def on_draw(self):
         _, win = self.canvas()
         y, x = self._pos.yx()
         
-        if self.__highlight:
+        if self.__color_scope != -1:
+            color = curses.color_pair(self.__color_scope)
+        elif self.__highlight:
             color = curses.color_pair(ColorScope.TEXT_HI)
         else:
             color = curses.color_pair(ColorScope.TEXT)
 
         for i, t in enumerate(self._wrapped):
-            win.addstr(y + i, x, t, color)
+            addstr_safe(self, win, y + i, x, t, color)
 
+
+class TuiTextBlock(TuiWidget):
+    def __init__(self, context, id):
+        super().__init__(context, id)
+        self.__lines = []
+        self.__wrapped = []
+    
+    def set_text(self, text):
+        self.__lines = text.split('\n')
+
+    def on_layout(self):
+        super().on_layout()
+
+        self.__wrapped.clear()
+        for t in self.__lines:
+            wrap = textwrap.wrap(t, self._size.x())
+            self.__wrapped += wrap
+
+    def on_draw(self):
+        _, win = self.canvas()
+        y, x = self._pos.yx()
+        
+        color = curses.color_pair(ColorScope.TEXT)
+        for i, t in enumerate(self.__wrapped):
+            addstr_safe(self, win, y + i, x, t, color)
+
+
+class TuiTextBox(TuiWidget):
+    def __init__(self, context, id):
+        super().__init__(context, id)
+        self.__box = TuiStackWindow(self)
+        self.__box.set_background(ColorScope.PANEL)
+        self.__textb = textpad.Textbox(self.__box.window(), True)
+        self.__textb.stripspaces = True
+        self.__str = ""
+
+        self._context.focus_group().register(self)
+
+    def __validate(self, x):
+        if x == 10 or x == 9:
+            return 7
+        return x
+    
+    def on_layout(self):
+        super().on_layout()
+
+        co, _ = self.canvas()
+        h, w = self._size.yx()
+        y, x = self._pos.yx()
+        cy, cx = co._pos.yx()
+        y, x = y + cy, x + cx
+
+        self.__box.hide()
+        self.__box.set_geometric(1, w - 1, y + h // 2, x + 1)
+
+    def on_draw(self):
+        self.__box.show()
+        self.__box.send_front()
+        
+        _, cwin = self.canvas()
+
+        h, w = self._size.yx()
+        y, x = self._pos.yx()
+        textpad.rectangle(cwin, y, x, y + h - 1, x+w)
+
+        win = self.__box.window()
+        win.touchwin()
+
+    def __edit(self):
+        self.__str = self.__textb.edit(lambda x: self.__validate(x))
+
+    def get_text(self):
+        return self.__str
+    
+    def on_focused(self):
+        self.__box.set_background(ColorScope.BOX)
+        self.__edit()
+
+    def on_focus_lost(self):
+        self.__box.set_background(ColorScope.PANEL)
+        
+
+class SimpleList(TuiWidget):
+    class Item:
+        def __init__(self) -> None:
+            pass
+        def get_text(self):
+            return "list_item"
+        def on_selected(self):
+            pass
+
+    def __init__(self, context, id):
+        super().__init__(context, id)
+        self.__items = []
+        self.__selected = 0
+
+        self._context.focus_group().register(self)
+
+    def count(self):
+        return len(self.__items)
+    
+    def index(self):
+        return self.__selected
+
+    def add_item(self, item):
+        self.__items.append(item)
+
+    def clear(self, item):
+        self.__items.clear()
+        self.__selected = 0
+
+    def on_layout(self):
+        super().on_layout()
+        self._size.resetY(len(self.__items) + 1)
+
+    def on_draw(self):
+        _, win = self.canvas()
+        w = self._size.x()
+
+        for i, item in enumerate(self.__items):
+            color = curses.color_pair(ColorScope.TEXT)
+            if i == self.__selected:
+                if self._focused:
+                    color = curses.color_pair(ColorScope.SELECT)
+                else:
+                    color = curses.color_pair(ColorScope.BOX)
+            
+            txt = str.ljust(item.get_text(), w)
+            txt = txt[:w]
+            addstr_safe(self, win, i, 0, txt, color)
+
+    def on_event(self, ev_type, ev_arg):
+        e = EventType.value(ev_type)
+        if e != EventType.E_KEY:
+            return
+        
+        if (ev_arg != curses.KEY_DOWN and 
+            ev_arg != curses.KEY_UP and
+            ev_arg != 10):
+            return
+        
+        if ev_arg == 10 and len(self.__items) > 0:
+            sel = self.__items[self.__selected]
+            sel.on_selected()
+            return
+
+        if ev_arg == curses.KEY_DOWN:
+            self.__selected += 1
+        else:
+            self.__selected -= 1
+
+        self.__selected = max(self.__selected, 0)
+        self.__selected = self.__selected % len(self.__items)
 
 class TuiButton(TuiLabel):
     def __init__(self, context, id):
         super().__init__(context, id)
-        self.__selected = False
         self.__onclick = None
 
         context.focus_group().register(self)
@@ -670,18 +942,12 @@ class TuiButton(TuiLabel):
         _, win = self.canvas()
         y, x = self._pos.yx()
         
-        if self.__selected:
+        if self._focused:
             color = curses.color_pair(ColorScope.SELECT)
         else:
             color = curses.color_pair(ColorScope.TEXT)
 
-        win.addstr(y, x, self._wrapped[0], color)
-    
-    def on_focused(self):
-        self.__selected = True
-    
-    def on_focus_lost(self):
-        self.__selected = False
+        addstr_safe(self, win, y, x, self._wrapped[0], color)
     
     def on_event(self, ev_type, ev_arg):
         if not EventType.focused_only(ev_type):
@@ -699,6 +965,7 @@ class TuiSession:
         curses.start_color()
 
         curses.noecho()
+        curses.cbreak()
 
         self.__context_stack = []
         self.__sched_events = []
@@ -713,6 +980,7 @@ class TuiSession:
         self.__sched_events.append((event, arg))
 
     def push_context(self, tuictx):
+        tuictx.prepare()
         self.__context_stack.append(tuictx)
         self.schedule(EventType.E_REDRAW)
 
@@ -734,13 +1002,14 @@ class TuiSession:
             if key != -1:
                 self.schedule(EventType.E_KEY, key)
             
-            for evt, arg in self.__sched_events:
-                if evt == EventType.E_QUIT:
-                    self.__notify_quit()
-                    break
-                acting.dispatch_event(evt, arg)
+            if len(self.__sched_events) == 0:
+                continue
 
-            self.__sched_events.clear()
+            evt, arg = self.__sched_events.pop(0)
+            if evt == EventType.E_QUIT:
+                self.__notify_quit()
+                break
+            acting.dispatch_event(evt, arg)
         
     def __notify_quit(self):
         while len(self.__context_stack) == 0:
@@ -786,7 +1055,7 @@ class TuiContext(TuiObject):
 
         self.__winbg.bkgd(' ', curses.color_pair(ColorScope.WIN))
 
-        self.__win.timeout(100)
+        self.__win.timeout(50)
         self.__win.keypad(True)
 
         y, x = ws
@@ -807,6 +1076,7 @@ class TuiContext(TuiObject):
 
     def prepare(self):
         self.__root.on_create()
+        self.__focus_group.navigate_focus(0)
 
     def window(self):
         return self.__win
@@ -829,8 +1099,8 @@ class TuiContext(TuiObject):
             focused.on_event(evt | EventType.E_M_FOCUS, arg)
 
     def redraw(self):
-        self.__session.stdsc.erase()
-        self.__win.erase()
+        self.__session.stdsc.clear()
+        self.__win.clear()
 
         self.__root.on_layout()
         self.__root.on_draw()
@@ -855,7 +1125,6 @@ class TuiContext(TuiObject):
             self.__focus_group.navigate_focus(-1)
         else:
             self.__root.on_event(EventType.E_KEY, key)
-            return
         
         if self.__focus_group.focused():
             self.__session.schedule(EventType.E_REDRAW)
