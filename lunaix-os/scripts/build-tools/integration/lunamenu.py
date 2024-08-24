@@ -6,6 +6,7 @@ from lcfg.types import (
 
 import subprocess
 import curses
+import textwrap
 import integration.libtui as tui
 import integration.libmenu as menu
 
@@ -13,8 +14,17 @@ from integration.libtui import ColorScope, TuiColor, Alignment, EventType
 from integration.libmenu import Dialogue, ListView, show_dialog
 
 __git_repo_info = None
+__tainted = False
 
-def get_git_hash() -> str:
+def mark_tainted():
+    global __tainted
+    __tainted = True
+
+def unmark_tainted():
+    global __tainted
+    __tainted = False
+
+def get_git_hash():
     try:
         hsh = subprocess.check_output([
                     'git', 'rev-parse', '--short', 'HEAD'
@@ -25,71 +35,106 @@ def get_git_hash() -> str:
         return f"{branch}@{hsh}"
     except:
         return None
-
-def create_main_menu_context(session, view_title):
+    
+def get_git_info():
     global __git_repo_info
+    return __git_repo_info
+    
+def do_save(session):
+    show_dialog(session, "Notice", "Configuration saved")
+    unmark_tainted()
 
-    main_ctx = tui.TuiContext(session)
+def do_exit(session):
+    global __tainted
+    if not __tainted:
+        session.schedule(EventType.E_QUIT)
+        return
+    
+    quit = QuitDialogue(session)
+    quit.show()
 
-    root = tui.TuiPanel(main_ctx, "main_panel")
-    root.set_size("0.9*", "0.8*")
-    root.set_alignment(Alignment.CENTER)
-    root.drop_shadow(1, 2)
-    root.border(True)
+class MainMenuContext(tui.TuiContext):
+    def __init__(self, session, view_title):
+        super().__init__(session)
 
-    layout = tui.FlexLinearLayout(main_ctx, "layout", "5,*,5")
-    layout.orientation(tui.FlexLinearLayout.PORTRAIT)
-    layout.set_size("*", "*")
-    layout.set_padding(1, 1, 1, 1)
+        self.__title = view_title
+        
+        self.__prepare_layout()
 
-    listv = ListView(main_ctx, "list_view")
-    listv.set_size("80", "*")
-    listv.set_alignment(Alignment.CENTER)
+    def __prepare_layout(self):
+        
+        root = tui.TuiPanel(self, "main_panel")
+        root.set_size("0.9*", "0.8*")
+        root.set_alignment(Alignment.CENTER)
+        root.drop_shadow(1, 2)
+        root.border(True)
 
-    hint = tui.TuiTextBlock(main_ctx, "hint")
-    hint.set_size("*", "3")
-    hint.set_text(
-        "Use <UP>/<DOWN>/<ENTER> to select from list\n"
-        "Use <TAB>/<RIGHT>/<LEFT> to change focus\n"
-        "   *: Item is read-only"
-    )
-    hint.set_alignment(Alignment.CENTER | Alignment.LEFT)
-    hint.set_margin(0, 0, 0, 10)
+        layout = tui.FlexLinearLayout(self, "layout", "6,*,5")
+        layout.orientation(tui.FlexLinearLayout.PORTRAIT)
+        layout.set_size("*", "*")
+        layout.set_padding(1, 1, 1, 1)
 
-    suffix = ""
-    btns_defs = [
-        { 
-            "text": "Save", 
-            "onclick": lambda x: show_diag(session) 
-        },
-        { 
-            "text": "Exit", 
-            "onclick": lambda x: session.schedule(EventType.E_QUIT)
-        }
-    ]
+        listv = ListView(self, "list_view")
+        listv.set_size("80", "*")
+        listv.set_alignment(Alignment.CENTER)
 
-    if __git_repo_info:
-        suffix += f" - {__git_repo_info}"
+        hint = tui.TuiTextBlock(self, "hint")
+        hint.set_size(w="*")
+        hint.height_auto_fit(True)
+        hint.set_text(
+            "Use <UP>/<DOWN>/<ENTER> to select from list\n"
+            "Use <TAB>/<RIGHT>/<LEFT> to change focus\n"
+            "<H>: show help (if applicable), <BACKSPACE>: back previous level\n"
+            "   *: Item is read-only, "
+        )
+        hint.set_alignment(Alignment.CENTER | Alignment.LEFT)
+        hint.set_margin(0, 0, 0, 10)
 
-    if view_title:
-        suffix += f" - {view_title}"
-        btns_defs.insert(1, { 
-            "text": "Back", 
-            "onclick": lambda x: session.pop_context() 
-        })
+        suffix = ""
+        btns_defs = [
+            { 
+                "text": "Save", 
+                "onclick": lambda x: do_save(self.session())
+            },
+            { 
+                "text": "Exit", 
+                "onclick": lambda x: do_exit(self.session())
+            }
+        ]
 
-    btns = menu.create_buttons(main_ctx, btns_defs, sizes="50,*")
+        repo_info = get_git_info()
 
-    layout.set_cell(0, hint)
-    layout.set_cell(1, listv)
-    layout.set_cell(2, btns)
+        if self.__title:
+            suffix += f" - {self.__title}"
+            btns_defs.insert(1, { 
+                "text": "Back", 
+                "onclick": lambda x: self.session().pop_context() 
+            })
 
-    t = menu.create_title(main_ctx, "Lunaix Menuconfig" + suffix)
-    root.add(t)
-    root.add(layout)
+        btns = menu.create_buttons(self, btns_defs, sizes="50,*")
 
-    main_ctx.set_root(root)
-    return (main_ctx, listv)
+        layout.set_cell(0, hint)
+        layout.set_cell(1, listv)
+        layout.set_cell(2, btns)
+
+        t = menu.create_title(self, "Lunaix Kernel Configuration" + suffix)
+        t2 = menu.create_title(self, repo_info)
+        t2.set_alignment(Alignment.BOT | Alignment.RIGHT)
+
+        root.add(t)
+        root.add(t2)
+        root.add(layout)
+
+        self.set_root(root)
+        self.__menu_list = listv
+
+    def menu(self):
+        return self.__menu_list
+
+    def _handle_key_event(self, key):
+        if key == curses.KEY_BACKSPACE or key == 8:
+            self.session().pop_context()
+        super()._handle_key_event(key)
 
 class ItemType:
     Expandable = 0
@@ -122,11 +167,12 @@ class ItemType:
             return "%s ---->"
         
         v = self.__node.get_value()
-        if self.__type == ItemType.Switch:
+
+        if self.is_switch():
             mark = "*" if v else " "
             return f"[{mark}] %s"
         
-        if self.__primitive:
+        if self.is_choice() or isinstance(v, int):
             return f"({v}) %s"
         
         return "%s"
@@ -179,7 +225,7 @@ class LunaConfigItem(tui.SimpleList.Item):
             show_dialog(
                 self.__session, 
                 f"Read-only: \"{self.__name}\"", 
-                f"Value defined in this field:\n'{self.__node.get_value()}'")
+                f"Value defined in this field:\n\n'{self.__node.get_value()}'")
             return
         
         if self.__type.expandable():
@@ -215,17 +261,33 @@ class LunaConfigItem(tui.SimpleList.Item):
                 f"Value: '{val}' does not match the type")
             return False
         
+        mark_tainted()
         CollectionView.reload_active(self.__session)
         return True
+    
+    def on_key_pressed(self, key):
+        if (key & ~0b100000) != ord('H'):
+            return
+        
+        h = self.__node.help_prompt()
+        if not self.__type.expandable():
+            h = "\n".join([
+                h, "", "--------",
+                "Supported Values:",
+                textwrap.indent(str(self.__type.provider()), "  ")
+            ])
+
+        dia = HelpDialogue(self.__session, f"Help: '{self.__name}'", h)
+        dia.show()
     
 class CollectionView(RenderContext):
     def __init__(self, session, node, label = None) -> None:
         super().__init__()
         
-        ctx, listv = create_main_menu_context(session, label)
+        ctx = MainMenuContext(session, label)
         self.__node = node
         self.__tui_ctx = ctx
-        self.__listv = listv
+        self.__listv = ctx.menu()
         self.__session = session
         self.__reloader = lambda x: node.render(x)
 
@@ -286,6 +348,7 @@ class ValueEditDialogue(menu.Dialogue):
             listv.add_item(MultiChoiceItem(t, self.__get_val))
         
         self.set_content(listv)
+        self.set_size()
     
     def __on_selected(self, listv, index, item):
         self.__value = item.value()
@@ -296,6 +359,56 @@ class ValueEditDialogue(menu.Dialogue):
 
         if self.__item.change_value(self.__value):
             super()._ok_onclick()
+
+class QuitDialogue(menu.Dialogue):
+    def __init__(self, session):
+        super().__init__(session, 
+                         "Quit ?", "Unsaved changes, sure to quit?", False, 
+                         "Quit Anyway", "No", "Save and Quit")
+        
+    def _ok_onclick(self):
+        self.session().schedule(EventType.E_QUIT)
+
+    def _abort_onclick(self):
+        unmark_tainted()
+        self._ok_onclick()
+
+
+class HelpDialogue(menu.Dialogue):
+    def __init__(self, session, title="", content=""):
+        super().__init__(session, title, None, no_btn=None)
+
+        self.__content = content
+        self.__scroll_y = 0
+        self.set_local_pos(0, -2)
+
+    def prepare(self):
+        tb = tui.TuiTextBlock(self._context, "content")
+        tb.set_size(w="70")
+        tb.set_text(self.__content)
+        tb.height_auto_fit(True)
+        self.__tb = tb
+        
+        self.__scroll = tui.TuiScrollable(self._context, "scroll")
+        self.__scroll.set_size("65", "*")
+        self.__scroll.set_alignment(Alignment.CENTER)
+        self.__scroll.set_content(tb)
+
+        self.set_size(w="75")
+        self.set_content(self.__scroll)
+        
+        super().prepare()
+
+    def _handle_key_event(self, key):
+        if key == curses.KEY_UP:
+            self.__scroll_y = max(self.__scroll_y - 1, 0)
+            self.__scroll.set_scrollY(self.__scroll_y)
+        elif key == curses.KEY_DOWN:
+            y = self.__tb._size.y()
+            self.__scroll_y = min(self.__scroll_y + 1, y)
+            self.__scroll.set_scrollY(self.__scroll_y)
+        super()._handle_key_event(key)
+
 
 def main(w, root_node):
     global __git_repo_info
@@ -328,4 +441,7 @@ def main(w, root_node):
     session.event_loop()
 
 def menuconfig(root_node):
+    global __tainted
     curses.wrapper(main, root_node)
+
+    return not __tainted

@@ -46,7 +46,10 @@ def do_config(opt, lcfg_env):
     #     print("Configuration aborted.")
     #     exit(-1)
 
-    menuconfig(lcfg_env)
+    clean_quit = menuconfig(lcfg_env)
+    if not clean_quit:
+        print("Configuration aborted. Nothing has been saved.")
+        exit(-1)
 
 def do_buildfile_gen(opts, lcfg_env):
     root_path = abspath(opts.root)

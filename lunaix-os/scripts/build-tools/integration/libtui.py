@@ -177,6 +177,10 @@ class DynamicBound:
     
     def resolve(self, ref_w, ref_h):
         return (self.__y.calc(ref_h), self.__x.calc(ref_w))
+    
+    def set(self, dyn_bound):
+        self.__x.set(dyn_bound.dyn_x())
+        self.__y.set(dyn_bound.dyn_y())
 
 class Bound:
     def __init__(self) -> None:
@@ -267,9 +271,11 @@ class SpatialObject:
     def set_alignment(self, align):
         self._align = align
 
-    def set_size(self, w, h):
-        self._dyn_size.dyn_x().update(w)
-        self._dyn_size.dyn_y().update(h)
+    def set_size(self, w = None, h = None):
+        if w:
+            self._dyn_size.dyn_x().update(w)
+        if h:
+            self._dyn_size.dyn_y().update(h)
 
     def set_margin(self, top, right, bottom, left):
         self._margin = (top, right, bottom, left)
@@ -304,7 +310,7 @@ class SpatialObject:
             ay = cy // 2
         
         if self._align & Alignment.BOT:
-            ay = cy - ay
+            ay = min(cy - ay, cy - 1)
             ry = -ry
         elif self._align & Alignment.TOP:
             ay = size.y() // 2
@@ -330,6 +336,9 @@ class SpatialObject:
         y, x = self._pos.yx()
 
         tp, lp, bp, rp = self._padding
+
+        if not (tp or lp or bp or rp):
+            return
 
         dtp = min(y - h, tp) - tp
         dbp = min(ch - (y + h), bp) - bp
@@ -475,12 +484,10 @@ class TuiScrollable(TuiObject):
         self.__content.set_parent(self)
 
     def set_scrollY(self, y):
-        view_y = self._size.y()
-        self.__spos.resetY((y + 1) // view_y * view_y)
+        self.__spos.resetY(y)
 
     def set_scrollX(self, x):
-        view_x = self._size.x()
-        self.__spos.resetX((x + 1) // view_x * view_x)
+        self.__spos.resetX(x)
 
     def reached_last(self):
         off = self.__spos.y() + self._size.y()
@@ -500,6 +507,9 @@ class TuiScrollable(TuiObject):
         h, w = self._size.yx()
         ch, cw = self.__content._size.yx()
         sh, sw = max(ch, h), max(cw, w)
+
+        self.__spos.resetX(min(self.__spos.x(), max(cw, w) - w))
+        self.__spos.resetY(min(self.__spos.y(), max(ch, h) - h))
 
         resize_safe(self, self.__pad, sh, sw)
 
@@ -660,6 +670,9 @@ class TuiPanel(TuiContainerObject):
     def border(self, _b):
         self.__use_border = _b
 
+    def bkgd_override(self, scope):
+        self.__swin.set_background(scope)
+
     def on_layout(self):
         super().on_layout()
 
@@ -774,17 +787,34 @@ class TuiTextBlock(TuiWidget):
         super().__init__(context, id)
         self.__lines = []
         self.__wrapped = []
+        self.__fit_to_height = False
     
     def set_text(self, text):
+        text = textwrap.dedent(text)
         self.__lines = text.split('\n')
+        if self.__fit_to_height:
+            self._dyn_size.dyn_y().set_pair(0, 0)
+
+    def height_auto_fit(self, yes):
+        self.__fit_to_height = yes
 
     def on_layout(self):
         super().on_layout()
 
         self.__wrapped.clear()
         for t in self.__lines:
+            if not t:
+                self.__wrapped.append(t)
+                continue
             wrap = textwrap.wrap(t, self._size.x())
             self.__wrapped += wrap
+
+        if self._dyn_size.dyn_y().nullity():
+            h = len(self.__wrapped)
+            self._dyn_size.dyn_y().set_pair(0, h)
+
+            # redo layouting
+            super().on_layout()
 
     def on_draw(self):
         _, win = self.canvas()
@@ -858,6 +888,8 @@ class SimpleList(TuiWidget):
             return "list_item"
         def on_selected(self):
             pass
+        def on_key_pressed(self, key):
+            pass
 
     def __init__(self, context, id):
         super().__init__(context, id)
@@ -911,17 +943,22 @@ class SimpleList(TuiWidget):
         if not EventType.key_press(ev_type):
             return
         
-        if (ev_arg != curses.KEY_DOWN and 
-            ev_arg != curses.KEY_UP and
-            ev_arg != 10):
+        if len(self.__items) == 0:
             return
-        
-        if ev_arg == 10 and len(self.__items) > 0:
-            sel = self.__items[self.__selected]
+
+        sel = self.__items[self.__selected]
+
+        if ev_arg == 10:
             sel.on_selected()
             
             if self.__on_sel_confirm_cb:
                 self.__on_sel_confirm_cb(self, self.__selected, sel)
+            return
+        
+        sel.on_key_pressed(ev_arg)
+        
+        if (ev_arg != curses.KEY_DOWN and 
+            ev_arg != curses.KEY_UP):
             return
 
         prev = self.__selected
@@ -967,7 +1004,7 @@ class TuiButton(TuiLabel):
     def on_event(self, ev_type, ev_arg):
         if not EventType.focused_only(ev_type):
             return
-        if EventType.key_press(ev_type):
+        if not EventType.key_press(ev_type):
             return
         
         if ev_arg == ord('\n') and self.__onclick:
@@ -1017,7 +1054,6 @@ class TuiSession:
 
     def pop_context(self):
         if len(self.__context_stack) == 1:
-            self.schedule(EventType.E_QUIT)
             return
         
         self.__context_stack.pop()
@@ -1145,7 +1181,7 @@ class TuiContext(TuiObject):
         elif evt == EventType.E_QUIT:
             self.__root.on_quit()
         elif evt == EventType.E_KEY:
-            self.__handle_key_event(arg)
+            self._handle_key_event(arg)
         else:
             self.__root.on_event(evt, arg)
 
@@ -1163,7 +1199,7 @@ class TuiContext(TuiObject):
     def focus_group(self):
         return self.__focus_group
     
-    def __handle_key_event(self, key):
+    def _handle_key_event(self, key):
         if key == ord('\t') or key == curses.KEY_RIGHT:
             self.__focus_group.navigate_focus()
         elif key == curses.KEY_LEFT:

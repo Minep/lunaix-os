@@ -25,7 +25,7 @@ def create_title(ctx, title):
     _t = tui.TuiLabel(ctx, "label")
     _t.set_text(title)
     _t.set_local_pos(1, 0)
-    _t.set_alignment(Alignment.TOP | Alignment.LEFT)
+    _t.set_alignment(Alignment.TOP | Alignment.CENTER)
     _t.hightlight(True)
     _t.pad_around(True)
     return _t
@@ -102,7 +102,9 @@ class ListView(tui.TuiObject):
         self.__layout.on_layout()
 
     def _on_sel_changed(self, listv, prev, new):
-        self.__scroll.set_scrollY(new)
+        h = self.__scroll._size.y()
+        self.__scroll.set_scrollY((new + 1) // h * h)
+
         if self.__sel_changed:
             self.__sel_changed(listv, prev, new)
 
@@ -146,6 +148,9 @@ class Dialogue(tui.TuiContext):
         self.__input_dialog = input
         self._textbox = None
 
+        self.set_size("70", "0.5*")
+        self.set_alignment(Alignment.CENTER)
+
     def set_content(self, content):
         self.__content = content
 
@@ -170,25 +175,26 @@ class Dialogue(tui.TuiContext):
     def __create_layout(self, title):
         panel  = tui.TuiPanel(self, "panel")
         layout = tui.FlexLinearLayout(self, "layout", "*,3")
-        btn_grp = create_buttons(self, self.__btns, "0.5*,*")
+        btn_grp = create_buttons(self, self.__btns)
         t = create_title(self, title)
+        content = self.__create_content()
 
         self.__title = t
         self.__layout = layout
         self.__panel = panel
 
-        panel.set_size("70", "0.5*")
-        panel.set_alignment(Alignment.CENTER)
+        panel._dyn_size.set(self._dyn_size)
+        panel._local_pos.set(self._local_pos)
+        panel.set_alignment(self._align)
         panel.drop_shadow(1, 2)
         panel.border(True)
 
         layout.orientation(tui.FlexLinearLayout.PORTRAIT)
         layout.set_size("*", "*")
-        layout.set_padding(1, 1, 1, 1)
+        layout.set_padding(4, 1, 1, 1)
 
         t.set_alignment(Alignment.CENTER | Alignment.TOP)
 
-        content = self.__create_content()
         layout.set_cell(0, content)
         layout.set_cell(1, btn_grp)
 
@@ -208,6 +214,7 @@ class Dialogue(tui.TuiContext):
             return self.__content
         
         if not self.__input_dialog:
+            self.set_size(h = "20")
             return text
         
         tb = tui.TuiTextBox(self, "input")
@@ -222,7 +229,7 @@ class Dialogue(tui.TuiContext):
             layout.set_cell(1, tb)
         else:
             layout = tb
-            self.__panel.set_size("70", "10")
+            self.set_size(h = "10")
         
         self.set_curser_mode(1)
 
