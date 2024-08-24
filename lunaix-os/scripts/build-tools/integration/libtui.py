@@ -1,27 +1,24 @@
 import curses
 import re
-import threading
 import curses.panel as cpanel
 import curses.textpad as textpad
 import textwrap
 
-def resize_safe(obj, co, y, x):
+def __invoke_fn(obj, fn, *args):
     try:
-        co.resize(y, x)
+        fn(*args)
     except:
-        raise Exception(obj._id, f"resize {co}", (y, x))
+        _id = obj._id if obj else "<root>"
+        raise Exception(_id, str(fn), args)
+
+def resize_safe(obj, co, y, x):
+    __invoke_fn(obj, co.resize, y, x)
 
 def move_safe(obj, co, y, x):
-    try:
-        co.move(y, x)
-    except:
-        raise Exception(obj._id, f"move {co}", (y, x))
+    __invoke_fn(obj, co.move, y, x)
     
 def addstr_safe(obj, co, y, x, str, *args):
-    try:
-        co.addstr(y, x, str, *args)
-    except:
-        raise Exception(obj._id, f"addstr {co}", (y, x))
+    __invoke_fn(obj, co.addstr, y, x, str, *args)
 
 class _TuiColor:
     def __init__(self, v) -> None:
@@ -71,6 +68,9 @@ class EventType:
     
     def value(t):
         return t & ~EventType.E_M_FOCUS
+    
+    def key_press(t):
+        return (t & ~EventType.E_M_FOCUS) == EventType.E_KEY
 
 class Matchers:
     RelSize = re.compile(r"(?P<mult>[0-9]+(?:\.[0-9]+)?)?\*(?P<add>[+-][0-9]+)?")
@@ -576,7 +576,7 @@ class Layout(TuiContainerObject):
         self._children[i].set_obj(obj)
 
 
-class StackLayout(Layout):
+class FlexLinearLayout(Layout):
     LANDSCAPE = 0
     PORTRAIT = 1
     def __init__(self, context, id, ratios):
@@ -585,7 +585,7 @@ class StackLayout(Layout):
         super().__init__(context, id, ratios)
 
     def orientation(self, orient):
-        self.__horizontal = orient == StackLayout.LANDSCAPE
+        self.__horizontal = orient == FlexLinearLayout.LANDSCAPE
     
     def on_layout(self):
         self.__apply_ratio()
@@ -804,7 +804,7 @@ class TuiTextBox(TuiWidget):
         self.__textb.stripspaces = True
         self.__str = ""
 
-        self._context.focus_group().register(self)
+        self._context.focus_group().register(self, 0)
 
     def __validate(self, x):
         if x == 10 or x == 9:
@@ -863,8 +863,16 @@ class SimpleList(TuiWidget):
         super().__init__(context, id)
         self.__items = []
         self.__selected = 0
+        self.__on_sel_confirm_cb = None
+        self.__on_sel_change_cb = None
 
         self._context.focus_group().register(self)
+
+    def set_onselected_cb(self, cb):
+        self.__on_sel_confirm_cb = cb
+
+    def set_onselection_change_cb(self, cb):
+        self.__on_sel_change_cb = cb
 
     def count(self):
         return len(self.__items)
@@ -875,12 +883,12 @@ class SimpleList(TuiWidget):
     def add_item(self, item):
         self.__items.append(item)
 
-    def clear(self, item):
+    def clear(self):
         self.__items.clear()
-        self.__selected = 0
 
     def on_layout(self):
         super().on_layout()
+        self.__selected = min(self.__selected, len(self.__items))
         self._size.resetY(len(self.__items) + 1)
 
     def on_draw(self):
@@ -900,8 +908,7 @@ class SimpleList(TuiWidget):
             addstr_safe(self, win, i, 0, txt, color)
 
     def on_event(self, ev_type, ev_arg):
-        e = EventType.value(ev_type)
-        if e != EventType.E_KEY:
+        if not EventType.key_press(ev_type):
             return
         
         if (ev_arg != curses.KEY_DOWN and 
@@ -912,8 +919,12 @@ class SimpleList(TuiWidget):
         if ev_arg == 10 and len(self.__items) > 0:
             sel = self.__items[self.__selected]
             sel.on_selected()
+            
+            if self.__on_sel_confirm_cb:
+                self.__on_sel_confirm_cb(self, self.__selected, sel)
             return
 
+        prev = self.__selected
         if ev_arg == curses.KEY_DOWN:
             self.__selected += 1
         else:
@@ -921,6 +932,10 @@ class SimpleList(TuiWidget):
 
         self.__selected = max(self.__selected, 0)
         self.__selected = self.__selected % len(self.__items)
+        
+        if self.__on_sel_change_cb:
+            self.__on_sel_change_cb(self, prev, self.__selected)
+
 
 class TuiButton(TuiLabel):
     def __init__(self, context, id):
@@ -952,7 +967,7 @@ class TuiButton(TuiLabel):
     def on_event(self, ev_type, ev_arg):
         if not EventType.focused_only(ev_type):
             return
-        if EventType.value(ev_type) != EventType.E_KEY:
+        if EventType.key_press(ev_type):
             return
         
         if ev_arg == ord('\n') and self.__onclick:
@@ -970,6 +985,16 @@ class TuiSession:
         self.__context_stack = []
         self.__sched_events = []
 
+        ws = self.window_size()
+        self.__win = curses.newwin(*ws)
+        self.__winbg = curses.newwin(*ws)
+        self.__panbg = cpanel.new_panel(self.__winbg)
+
+        self.__winbg.bkgd(' ', curses.color_pair(ColorScope.WIN))
+
+        self.__win.timeout(50)
+        self.__win.keypad(True)
+
     def window_size(self):
         return self.stdsc.getmaxyx()
 
@@ -977,6 +1002,10 @@ class TuiSession:
         curses.init_pair(scope, int(fg), int(bg))
 
     def schedule(self, event, arg = None):
+        if len(self.__sched_events) > 0:
+            if self.__sched_events[-1] == event:
+                return
+    
         self.__sched_events.append((event, arg))
 
     def push_context(self, tuictx):
@@ -984,21 +1013,27 @@ class TuiSession:
         self.__context_stack.append(tuictx)
         self.schedule(EventType.E_REDRAW)
 
+        curses.curs_set(self.active().curser_mode())
+
     def pop_context(self):
         if len(self.__context_stack) == 1:
+            self.schedule(EventType.E_QUIT)
             return
         
         self.__context_stack.pop()
         self.schedule(EventType.E_REDRAW)
+
+        curses.curs_set(self.active().curser_mode())
+
+    def active(self):
+        return self.__context_stack[-1]
     
     def event_loop(self):
         if len(self.__context_stack) == 0:
             raise RuntimeError("no tui context to display")
         
         while True:
-            acting = self.__context_stack[-1]
-            
-            key = acting.window().getch()
+            key = self.__win.getch()
             if key != -1:
                 self.schedule(EventType.E_KEY, key)
             
@@ -1006,15 +1041,34 @@ class TuiSession:
                 continue
 
             evt, arg = self.__sched_events.pop(0)
-            if evt == EventType.E_QUIT:
+            if evt == EventType.E_REDRAW:
+                self.__redraw()
+            elif evt == EventType.E_QUIT:
                 self.__notify_quit()
                 break
-            acting.dispatch_event(evt, arg)
+
+            self.active().dispatch_event(evt, arg)
         
     def __notify_quit(self):
         while len(self.__context_stack) == 0:
             ctx = self.__context_stack.pop()
             ctx.dispatch_event(EventType.E_QUIT, None)
+
+    def __redraw(self):
+        self.stdsc.erase()
+        self.__win.erase()
+        
+        self.active().redraw(self.__win)
+
+        self.__panbg.bottom()
+        self.__win.touchwin()
+        self.__winbg.touchwin()
+
+        self.__win.refresh()
+        self.__winbg.refresh()
+
+        cpanel.update_panels()
+        curses.doupdate()
 
 class TuiFocusGroup:
     def __init__(self) -> None:
@@ -1023,8 +1077,11 @@ class TuiFocusGroup:
         self.__sel = 0
         self.__focused = None
     
-    def register(self, tui_obj):
-        self.__grp.append((self.__id, tui_obj))
+    def register(self, tui_obj, pos=-1):
+        if pos == -1:
+            self.__grp.append((self.__id, tui_obj))
+        else:
+            self.__grp.insert(pos, (self.__id, tui_obj))
         self.__id += 1
         return self.__id - 1
 
@@ -1048,21 +1105,20 @@ class TuiContext(TuiObject):
         self.__sobj = None
         self.__session = session
 
-        ws = self.__session.window_size()
-        self.__win = curses.newwin(*ws)
-        self.__winbg = curses.newwin(*ws)
-        self.__panbg = cpanel.new_panel(self.__winbg)
+        self.__win = None
 
-        self.__winbg.bkgd(' ', curses.color_pair(ColorScope.WIN))
-
-        self.__win.timeout(50)
-        self.__win.keypad(True)
-
-        y, x = ws
+        y, x = self.__session.window_size()
         self._size.reset(x, y)
         self.set_parent(None)
 
         self.__focus_group = TuiFocusGroup()
+        self.__curser_mode = 0
+
+    def set_curser_mode(self, mode):
+        self.__curser_mode = mode
+
+    def curser_mode(self):
+        return self.__curser_mode
 
     def set_root(self, root):
         self.__root = root
@@ -1076,7 +1132,6 @@ class TuiContext(TuiObject):
 
     def prepare(self):
         self.__root.on_create()
-        self.__focus_group.navigate_focus(0)
 
     def window(self):
         return self.__win
@@ -1086,7 +1141,7 @@ class TuiContext(TuiObject):
     
     def dispatch_event(self, evt, arg):
         if evt == EventType.E_REDRAW:
-            self.redraw()
+            self.__focus_group.navigate_focus(0)
         elif evt == EventType.E_QUIT:
             self.__root.on_quit()
         elif evt == EventType.E_KEY:
@@ -1098,19 +1153,9 @@ class TuiContext(TuiObject):
         if focused:
             focused.on_event(evt | EventType.E_M_FOCUS, arg)
 
-    def redraw(self):
-        self.__session.stdsc.clear()
-        self.__win.clear()
-
+    def redraw(self, win):
         self.__root.on_layout()
         self.__root.on_draw()
-
-        self.__panbg.bottom()
-        self.__win.touchwin()
-        self.__win.refresh()
-
-        cpanel.update_panels()
-        curses.doupdate()
 
     def on_layout(self):
         pass

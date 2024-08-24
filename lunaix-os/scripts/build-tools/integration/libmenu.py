@@ -1,12 +1,12 @@
 import curses
-import libtui as tui
-from libtui import ColorScope, TuiColor, Alignment, EventType
+import integration.libtui as tui
+from integration.libtui import ColorScope, TuiColor, Alignment, EventType
 
 def create_buttons(main_ctx, btn_defs, sizes = "*,*"):
     size_defs = ",".join(['*'] * len(btn_defs))
 
-    layout = tui.StackLayout(main_ctx, "buttons", size_defs)
-    layout.orientation(tui.StackLayout.LANDSCAPE)
+    layout = tui.FlexLinearLayout(main_ctx, "buttons", size_defs)
+    layout.orientation(tui.FlexLinearLayout.LANDSCAPE)
     layout.set_size(*(sizes.split(',')[:2]))
     layout.set_padding(1, 1, 1, 1)
     layout.set_alignment(Alignment.CENTER | Alignment.BOT)
@@ -36,6 +36,9 @@ class ListView(tui.TuiObject):
 
         self.__create_layout()
 
+        self.__sel_changed = None
+        self.__sel = None
+
     def __create_layout(self):
         hint_moveup = tui.TuiLabel(self._context, "movup")
         hint_moveup.override_color(ColorScope.HINT)
@@ -53,16 +56,19 @@ class ListView(tui.TuiObject):
         list_.set_size("*", "*")
         list_.set_alignment(Alignment.CENTER | Alignment.TOP)
 
+        list_.set_onselected_cb(self._on_selected)
+        list_.set_onselection_change_cb(self._on_sel_changed)
+
         scroll = tui.TuiScrollable(self._context, "scroll")
         scroll.set_size("*", "*")
         scroll.set_alignment(Alignment.CENTER)
         scroll.set_content(list_)
 
-        layout = tui.StackLayout(
+        layout = tui.FlexLinearLayout(
                     self._context, f"main_layout", "2,*,2")
         layout.set_size("*", "*")
         layout.set_alignment(Alignment.CENTER)
-        layout.orientation(tui.StackLayout.PORTRAIT)
+        layout.orientation(tui.FlexLinearLayout.PORTRAIT)
         layout.set_parent(self)
 
         layout.set_cell(0, hint_moveup)
@@ -78,6 +84,9 @@ class ListView(tui.TuiObject):
     def add_item(self, item):
         self.__list.add_item(item)
 
+    def clear(self):
+        self.__list.clear()
+
     def on_draw(self):
         super().on_draw()
         
@@ -92,18 +101,20 @@ class ListView(tui.TuiObject):
         super().on_layout()
         self.__layout.on_layout()
 
-    def on_event(self, ev_type, ev_arg):
-        super().on_event(ev_type, ev_arg)
-        self.__layout.on_event(ev_type, ev_arg)
+    def _on_sel_changed(self, listv, prev, new):
+        self.__scroll.set_scrollY(new)
+        if self.__sel_changed:
+            self.__sel_changed(listv, prev, new)
 
-        e = EventType.value(ev_type)
-        if e != EventType.E_KEY:
-            return
-        
-        if (ev_arg != curses.KEY_DOWN and ev_arg != curses.KEY_UP):
-            return
+    def _on_selected(self, listv, index, item):
+        if self.__sel:
+            self.__sel(listv, index, item)
+    
+    def set_onselected_cb(self, cb):
+        self.__sel = cb
 
-        self.__scroll.set_scrollY(self.__list.index())
+    def set_onselect_changed_cb(self, cb):
+        self.__sel_changed = cb
 
 class Dialogue(tui.TuiContext):
     Pending = 0
@@ -115,87 +126,107 @@ class Dialogue(tui.TuiContext):
         super().__init__(session)
 
         self.__btns = [
-            { "text": ok_btn, "onclick": lambda x: self.__ok_onclick() },
-            { "text": no_btn, "onclick": lambda x: self.__no_onclick() }
+            { "text": ok_btn, "onclick": lambda x: self._ok_onclick() }
         ]
 
+        if no_btn:
+            self.__btns.append({ 
+                "text": no_btn, 
+                "onclick": lambda x: self._no_onclick() 
+            })
         if abort_btn:
             self.__btns.append({ 
                 "text": abort_btn, 
-                "onclick": lambda x: self.__abort_onclick() 
+                "onclick": lambda x: self._abort_onclick() 
             })
 
         self.__title_txt = title
         self.__status = Dialogue.Pending
         self.__content = content
         self.__input_dialog = input
+        self._textbox = None
+
+    def set_content(self, content):
+        self.__content = content
+
+    def set_input_dialogue(self, yes):
+        self.__input_dialog = yes
 
     def prepare(self):
         self.__create_layout(self.__title_txt)
     
-    def __ok_onclick(self):
+    def _ok_onclick(self):
         self.__status = Dialogue.Yes
         self.__close()
 
-    def __no_onclick(self):
+    def _no_onclick(self):
         self.__status = Dialogue.No
         self.__close()
 
-    def __abort_onclick(self):
+    def _abort_onclick(self):
         self.__status = Dialogue.Abort
         self.__close()
 
     def __create_layout(self, title):
         panel  = tui.TuiPanel(self, "panel")
-        panel.set_size("0.5*", "0.5*")
+        layout = tui.FlexLinearLayout(self, "layout", "*,3")
+        btn_grp = create_buttons(self, self.__btns, "0.5*,*")
+        t = create_title(self, title)
+
+        self.__title = t
+        self.__layout = layout
+        self.__panel = panel
+
+        panel.set_size("70", "0.5*")
         panel.set_alignment(Alignment.CENTER)
         panel.drop_shadow(1, 2)
         panel.border(True)
 
-        layout = tui.StackLayout(self, "layout", "*,5")
-        layout.orientation(tui.StackLayout.PORTRAIT)
+        layout.orientation(tui.FlexLinearLayout.PORTRAIT)
         layout.set_size("*", "*")
         layout.set_padding(1, 1, 1, 1)
 
-        btn_grp = create_buttons(self, self.__btns, "0.5*,*")
+        t.set_alignment(Alignment.CENTER | Alignment.TOP)
 
         content = self.__create_content()
-
         layout.set_cell(0, content)
         layout.set_cell(1, btn_grp)
-
-        t = create_title(self, title)
-        t.set_alignment(Alignment.CENTER | Alignment.TOP)
 
         panel.add(t)
         panel.add(layout)
 
         self.set_root(panel)
-        self.__title = t
-        self.__layout = layout
 
     def __create_content(self):
         text = None
-        if self.__content is not None:
+        if isinstance(self.__content, str):
             text = tui.TuiTextBlock(self, "tb")
-            text.set_size("0.6*", "10")
+            text.set_size("0.6*", "0.5*")
             text.set_alignment(Alignment.CENTER)
             text.set_text(self.__content)
+        elif self.__content is not None:
+            return self.__content
         
         if not self.__input_dialog:
             return text
-        
-        layout = tui.StackLayout(self, "layout", "*,5")
-        layout.orientation(tui.StackLayout.PORTRAIT)
-        layout.set_size("*", "*")
         
         tb = tui.TuiTextBox(self, "input")
         tb.set_size("0.5*", "3")
         tb.set_alignment(Alignment.CENTER)
         
         if text:
+            layout = tui.FlexLinearLayout(self, "layout", "*,5")
+            layout.orientation(tui.FlexLinearLayout.PORTRAIT)
+            layout.set_size("*", "*")
             layout.set_cell(0, text)
-        layout.set_cell(1, tb)
+            layout.set_cell(1, tb)
+        else:
+            layout = tb
+            self.__panel.set_size("70", "10")
+        
+        self.set_curser_mode(1)
+
+        self._textbox = tb
 
         return layout
         
@@ -209,3 +240,8 @@ class Dialogue(tui.TuiContext):
         if title:
             self.__title.set_text(title)
         self.session().push_context(self)
+
+
+def show_dialog(session, title, text):
+    dia = Dialogue(session, title=title, content=text, no_btn=None)
+    dia.show()

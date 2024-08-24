@@ -8,6 +8,7 @@ from integration.config_io import CHeaderConfigProvider
 from integration.lbuild_bridge import LConfigProvider
 from integration.render_ishell import InteractiveShell
 from integration.build_gen import MakefileBuildGen, install_lbuild_functions
+from integration.lunamenu import menuconfig
 
 import lcfg.types as lcfg_type
 import lcfg.builtins as builtin
@@ -40,10 +41,12 @@ def do_config(opt, lcfg_env):
     if not redo_config:
         return
     
-    shell = InteractiveShell(lcfg_env)
-    if not shell.render_loop():
-        print("Configuration aborted.")
-        exit(-1)
+    # shell = InteractiveShell(lcfg_env)
+    # if not shell.render_loop():
+    #     print("Configuration aborted.")
+    #     exit(-1)
+
+    menuconfig(lcfg_env)
 
 def do_buildfile_gen(opts, lcfg_env):
     root_path = abspath(opts.root)
