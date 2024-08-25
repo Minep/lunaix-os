@@ -538,15 +538,13 @@ class TuiScrollable(TuiObject):
         if not self.__content:
             return
         
-        self.__pad.erase()
-
         self.__pad_panel.top()
         self.__content.on_draw()
 
         wminy, wminx = self._pos.yx()
         wmaxy, wmaxx = self._size.yx()
         wmaxy, wmaxx = wmaxy + wminy, wmaxx + wminx
-        self.__pad.touchwin()
+
         self.__pad.refresh(*self.__spos.yx(), 
                             wminy, wminx, wmaxy - 1, wmaxx - 1)
 
@@ -718,7 +716,7 @@ class TuiPanel(TuiContainerObject):
 
     def on_draw(self):
         win = self.__swin.window()
-        win.erase()
+        win.noutrefresh()
 
         if self.__use_border:
             win.border()
@@ -732,8 +730,6 @@ class TuiPanel(TuiContainerObject):
         self.__swin.send_front()
 
         super().on_draw()
-
-        win.touchwin()
 
 class TuiLabel(TuiWidget):
     def __init__(self, context, id):
@@ -1135,17 +1131,11 @@ class TuiSession:
             ctx.dispatch_event(EventType.E_QUIT, None)
 
     def __redraw(self):
-        self.stdsc.erase()
-        self.__win.erase()
+        self.__win.noutrefresh()
         
         self.active().redraw(self.__win)
 
         self.__panbg.bottom()
-        self.__win.touchwin()
-        self.__winbg.touchwin()
-
-        self.__win.refresh()
-        self.__winbg.refresh()
 
         cpanel.update_panels()
         curses.doupdate()
