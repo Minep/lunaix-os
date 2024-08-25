@@ -25,7 +25,7 @@
         movl 4(%esp), %ebx
         pushl %ebx
 
-        call *(%eax)
+        calll %eax
 
         movl %eax, %ebx
         movl $__SYSCALL_th_exit, %eax

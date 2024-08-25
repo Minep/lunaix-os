@@ -58,6 +58,17 @@ image: $(kbuild_dir) kernel usr/build
 		-- -volid "LUNA" -system_id "Lunaix" \
 		-report_about FAILURE -abort_on FAILURE
 
+.NOTPARALLEL:
+.PHONY: image
+export KCMD=$(CMDLINE)
+export LBUILD ARCH MODE
+all: $(kbuild_dir) kernel usr/build
+
+.PHONY: rootfs
+rootfs:
+	$(call status,TASK,$(notdir $@))
+	@./scripts/mkrootfs.sh
+
 usr/build: user
 
 prepare: $(os_img_dir)

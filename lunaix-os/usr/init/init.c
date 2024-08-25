@@ -53,29 +53,21 @@ init_termios(int fd) {
     return 0;
 }
 
-const char* sh_argv[] = { "/usr/bin/sh", 0  };
+const char* sh_argv[] = { "/bin/sh", 0  };
 const char* sh_envp[] = {  0  };
 
 int
 main(int argc, const char** argv)
 {
-    mkdir("/dev");
-    mkdir("/sys");
-    mkdir("/task");
-    mkdir("/mnt/disk");
-
     must_mount(NULL, "/dev", "devfs", 0);
     must_mount(NULL, "/sys", "twifs", MNT_RO);
     must_mount(NULL, "/task", "taskfs", MNT_RO);
-    maybe_mount("/dev/block/sdb", "/mnt/disk", "ext2", 0);
 
     int fd = check(open("/dev/tty", 0));
 
     check(init_termios(fd));
 
     check(dup(fd));
-
-    check(symlink("/usr", "/mnt/lunaix-os/usr"));
 
     pid_t pid;
     int err = 0;

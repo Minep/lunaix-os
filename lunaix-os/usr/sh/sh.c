@@ -128,8 +128,8 @@ sh_exec(const char** argv)
     }
 
     char buffer[1024];
-    strcpy(buffer, "/usr/bin/");
-    strcpy(&buffer[9], name);
+    strcpy(buffer, "/bin/");
+    strcpy(&buffer[5], name);
 
     pid_t p;
     int res;

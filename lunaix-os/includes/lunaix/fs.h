@@ -113,6 +113,11 @@ struct filesystem
     mntops_umnt unmount;
 };
 
+struct fs_iter
+{
+    struct filesystem* fs;
+};
+
 struct v_superblock
 {
     struct llist_header sb_list;
@@ -338,6 +343,18 @@ fsm_register(struct filesystem* fs);
 
 struct filesystem*
 fsm_get(const char* fs_name);
+
+void
+fsm_itbegin(struct fs_iter* iterator);
+
+bool
+fsm_itnext(struct fs_iter* iterator);
+
+static inline void
+fsm_itend(struct fs_iter* iterator)
+{
+    iterator->fs = NULL;
+}
 
 void
 vfs_init();

@@ -145,7 +145,7 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
     while (i++ < MAX_PTEN) {
         pte_t pte = *ptep;
 
-        if (l0tep_impile_vmnts(ptep)) {
+        if (l0tep_implie_vmnts(ptep)) {
             goto _cont;
         }
 
@@ -315,7 +315,6 @@ void
 procvm_mount_self(struct proc_mm* mm) 
 {
     assert(!mm->vm_mnt);
-    assert(!mm->guest_mm);
 
     mm->vm_mnt = VMS_SELF;
 }

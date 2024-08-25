@@ -66,6 +66,19 @@ fsm_new_fs(char* name, size_t name_len)
     return fs;
 }
 
+void
+fsm_itbegin(struct fs_iter* iterator)
+{
+    iterator->fs = list_entry(&fs_flatlist, struct filesystem, fs_flat);
+}
+
+bool
+fsm_itnext(struct fs_iter* iterator)
+{
+    iterator->fs = list_next(iterator->fs, struct filesystem, fs_flat);
+    return &iterator->fs->fs_flat != &fs_flatlist;
+}
+
 static void
 read_fslist(struct twimap *mapping)
 {

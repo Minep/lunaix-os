@@ -81,8 +81,6 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     
     invoke_init_function(on_boot);
 
-    must_success(vfs_unmount("/dev"));
-
     /* Finish up bootstrapping sequence, we are ready to spawn the root process
      * and start geting into uspace
      */
@@ -121,7 +119,7 @@ kmem_init(struct boot_handoff* bhctx)
 
     unsigned int i = ptep_vfn(ptep);
     do {
-        if (l0tep_impile_vmnts(ptep)) {
+        if (l0tep_implie_vmnts(ptep)) {
             ptep++;
             continue;
         }
