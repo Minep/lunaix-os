@@ -1,86 +1,86 @@
 
-@Collection
+@Collection("Memory Management")
 def memory_subsystem():
     """ Config the memory subsystem """
 
-    @Collection
+    @Collection("Physical Memory")
     def physical_mm():
         """ Physical memory manager  """
 
-        @Term
+        @Term("Allocation policy")
         def pmalloc_method():
             """ Allocation policy for phiscal memory  """
             
             type(["simple", "buddy", "ncontig"])
             default("simple")
 
-        @Group
+        @Group("Simple")
         def pmalloc_simple_po_thresholds():
             
-            @Term
+            @Term("Maximum cached order-0 free pages")
             def pmalloc_simple_max_po0():
                 """ free list capacity for order-0 pages  """
                 
                 type(int)
                 default(4096)
 
-            @Term
+            @Term("Maximum cached order-1 free pages")
             def pmalloc_simple_max_po1():
                 """ free list capacity for order-1 pages  """
 
                 type(int)
                 default(2048)
             
-            @Term
+            @Term("Maximum cached order-2 free pages")
             def pmalloc_simple_max_po2():
                 """ free list capacity for order-2 pages  """
 
                 type(int)
                 default(2048)
             
-            @Term
+            @Term("Maximum cached order-3 free pages")
             def pmalloc_simple_max_po3():
                 """ free list capacity for order-3 pages  """
                 
                 type(int)
                 default(2048)
             
-            @Term
+            @Term("Maximum cached order-4 free pages")
             def pmalloc_simple_max_po4():
                 """ free list capacity for order-4 pages  """
 
                 type(int)
                 default(512)
             
-            @Term
+            @Term("Maximum cached order-5 free pages")
             def pmalloc_simple_max_po5():
                 """ free list capacity for order-5 pages  """
 
                 type(int)
                 default(512)
             
-            @Term
+            @Term("Maximum cached order-6 free pages")
             def pmalloc_simple_max_po6():
                 """ free list capacity for order-6 pages  """
 
                 type(int)
                 default(128)
             
-            @Term
+            @Term("Maximum cached order-7 free pages")
             def pmalloc_simple_max_po7():
                 """ free list capacity for order-7 pages  """
 
                 type(int)
                 default(128)
             
-            @Term
+            @Term("Maximum cached order-8 free pages")
             def pmalloc_simple_max_po8():
                 """ free list capacity for order-8 pages  """
 
                 type(int)
                 default(64)
             
-            @Term
+            @Term("Maximum cached order-9 free pages")
             def pmalloc_simple_max_po9():
                 """ free list capacity for order-9 pages  """
 

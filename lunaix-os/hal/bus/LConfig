@@ -1,17 +1,17 @@
 
-@Collection
+@Collection("Buses & Interconnects")
 def bus_if():
     """ System/platform bus interface """
 
     add_to_collection(hal)
 
-    @Term
+    @Term("PCI")
     def pci_enable():
         """ Peripheral Component Interconnect (PCI) Bus """
         type(bool)
         default(True)
 
-    @Term
+    @Term("PCI Express")
     def pcie_ext():
         """ Enable support of PCI-Express extension """
         type(bool)
@@ -19,7 +19,7 @@ def bus_if():
 
         return v(pci_enable)
 
-    @Term
+    @Term("Use PMIO for PCI")
     def pci_pmio():
         """ Use port-mapped I/O interface for controlling PCI """
         type(bool)

@@ -1,10 +1,10 @@
 
-@Collection
+@Collection("AHCI")
 def sata_ahci():
 
     add_to_collection(hal)
 
-    @Term
+    @Term("Enable AHCI support")
     def ahci_enable():
         """ Enable the support of SATA AHCI. 
             Must require PCI at current stage """

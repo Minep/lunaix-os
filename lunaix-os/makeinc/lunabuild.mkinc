@@ -7,15 +7,16 @@ lbuild_opts := --lconfig-file LConfig
 
 all_lconfigs = $(shell find $(CURDIR) -name "LConfig")
 
+LCONFIG_FLAGS += --config $(lbuild_opts) --config-save $(lconfig_save)
+
 export
 $(lconfig_save): $(all_lconfigs)
 	@echo restarting configuration...
-	@$(LBUILD) --config $(lbuild_opts) --config-save $(lconfig_save)  --force\
-			   -o $(lbuild_dir)/
+	@$(LBUILD) $(LCONFIG_FLAGS)  --force -o $(lbuild_dir)/
 
 export
 $(lbuild_config_h): $(lconfig_save)
-	@$(LBUILD) --config $(lbuild_opts) --config-save $(lconfig_save) -o $(@D)
+	@$(LBUILD) $(LCONFIG_FLAGS) -o $(@D)
 
 export
 $(lbuild_mkinc): $(lbuild_config_h)
@@ -24,5 +25,5 @@ $(lbuild_mkinc): $(lbuild_config_h)
 .PHONY: config
 export
 config: $(all_lconfigs)
-	@$(LBUILD) --config $(lbuild_opts) --config-save $(lconfig_save) --force\
+	@$(LBUILD) $(LCONFIG_FLAGS) --force\
 			   -o $(lbuild_dir)/

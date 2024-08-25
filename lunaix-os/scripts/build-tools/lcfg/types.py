@@ -70,8 +70,8 @@ class MultipleChoiceType(PrimitiveType):
         return None in self._type
     
     def __str__(self) -> str:
-        accepted = [f"  {t}" for t in self._type]
+        accepted = [f"  * {t}" for t in self._type]
         return "\n".join([
-            "choose one: \n",
+            "choose one:",
             *accepted
         ])

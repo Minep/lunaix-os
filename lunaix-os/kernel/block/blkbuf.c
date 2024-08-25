@@ -3,6 +3,7 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/owloysius.h>
 #include <lunaix/syslog.h>
+#include <sys/muldiv64.h>
 
 LOG_MODULE("blkbuf")  
 
@@ -17,7 +18,8 @@ static struct cake_pile* bb_pile;
 static inline u64_t
 __tolba(struct blkbuf_cache* cache, unsigned int blk_id)
 {
-    return ((u64_t)cache->blksize * (u64_t)blk_id) / cache->blkdev->blk_size;
+    return udiv64(((u64_t)cache->blksize * (u64_t)blk_id), 
+                    cache->blkdev->blk_size);
 }
 
 static void
