@@ -8,7 +8,7 @@ from integration.config_io import CHeaderConfigProvider
 from integration.lbuild_bridge import LConfigProvider
 from integration.render_ishell import InteractiveShell
 from integration.build_gen import MakefileBuildGen, install_lbuild_functions
-from integration.lunamenu import menuconfig
+from integration.lunamenu import menuconfig, TerminalSizeCheckFailed
 
 import lcfg.types as lcfg_type
 import lcfg.builtins as builtin
@@ -40,13 +40,19 @@ def do_config(opt, lcfg_env):
     redo_config = not exists(opt.config_save) or opt.force
     if not redo_config or opt.quiet:
         return
-    
-    # shell = InteractiveShell(lcfg_env)
-    # if not shell.render_loop():
-    #     print("Configuration aborted.")
-    #     exit(-1)
 
-    clean_quit = menuconfig(lcfg_env)
+    try:
+        clean_quit = menuconfig(lcfg_env)
+    except TerminalSizeCheckFailed as e:
+        least = e.args[0]
+        current = e.args[1]
+        print(
+            f"Your terminal size: {current} is less than minimum requirement of {least}.\n"
+            "menuconfig will not function properly, switch to prompt based.\n")
+
+        shell = InteractiveShell(lcfg_env)
+        clean_quit = shell.render_loop()
+    
     if not clean_quit:
         print("Configuration aborted. Nothing has been saved.")
         exit(-1)

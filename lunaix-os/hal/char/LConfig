@@ -15,7 +15,11 @@ def char_device():
 
     @Term("VGA character game device")
     def chargame_console():
-        """ Enable VGA Charactor Game console device (text mode only) """
+        """ 
+            Enable VGA Charactor Game console device (text mode only) 
+
+            You normally don't need to include this, unless you want some user space fun ;)
+        """
 
         type(bool)
         default(False)

@@ -64,7 +64,7 @@ class MainMenuContext(tui.TuiContext):
     def __prepare_layout(self):
         
         root = tui.TuiPanel(self, "main_panel")
-        root.set_size("0.9*", "0.8*")
+        root.set_size("*-10", "*-5")
         root.set_alignment(Alignment.CENTER)
         root.drop_shadow(1, 2)
         root.border(True)
@@ -75,11 +75,12 @@ class MainMenuContext(tui.TuiContext):
         layout.set_padding(1, 1, 1, 1)
 
         listv = ListView(self, "list_view")
-        listv.set_size("80", "*")
+        listv.set_size("70", "*")
         listv.set_alignment(Alignment.CENTER)
 
         hint = tui.TuiTextBlock(self, "hint")
         hint.set_size(w="*")
+        hint.set_local_pos("0.1*", 0)
         hint.height_auto_fit(True)
         hint.set_text(
             "Use <UP>/<DOWN>/<ENTER> to select from list\n"
@@ -87,7 +88,6 @@ class MainMenuContext(tui.TuiContext):
             "<H>: show help (if applicable), <BACKSPACE>: back previous level"
         )
         hint.set_alignment(Alignment.CENTER | Alignment.LEFT)
-        hint.set_margin(0, 0, 0, 10)
 
         suffix = ""
         btns_defs = [
@@ -412,13 +412,20 @@ class HelpDialogue(menu.Dialogue):
             self.__scroll.set_scrollY(self.__scroll_y)
         super()._handle_key_event(key)
 
+class TerminalSizeCheckFailed(Exception):
+    def __init__(self, *args: object) -> None:
+        super().__init__(*args)
 
-def main(w, root_node):
+def main(_, root_node):
     global __git_repo_info
 
     __git_repo_info = get_git_hash()
 
     session = tui.TuiSession()
+
+    h, w = session.window_size()
+    if h < 30 or w < 85:
+        raise TerminalSizeCheckFailed((90, 40), (w, h))
 
     base_background = TuiColor.white.bright()
     session.set_color(ColorScope.WIN,   

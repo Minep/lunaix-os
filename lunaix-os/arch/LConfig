@@ -8,9 +8,12 @@ def architecture_support():
 
     @Term("Architecture")
     def arch():
-        """ Config ISA support """
-        type(["i386", "x86_64", "aarch64", "rv64"])
-        default("i386")
+        """ 
+            Config ISA support 
+        """
+        # type(["i386", "x86_64", "aarch64", "rv64"])
+        type(["i386", "x86_64"])
+        default("x86_64")
 
         env_val = env("ARCH")
         if env_val:
@@ -19,6 +22,13 @@ def architecture_support():
     @Term("Base operand size")
     @ReadOnly
     def arch_bits():
+        """ 
+            Defines the base size of a general register of the 
+            current selected ISA.
+
+            This the 'bits' part when we are talking about a CPU
+        """
+
         type(["64", "32"])
         match v(arch):
             case "i386": 
