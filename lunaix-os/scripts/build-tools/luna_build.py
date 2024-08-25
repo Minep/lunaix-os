@@ -38,7 +38,7 @@ def prepare_lconfig_env(out_dir):
 
 def do_config(opt, lcfg_env):
     redo_config = not exists(opt.config_save) or opt.force
-    if not redo_config:
+    if not redo_config or opt.quiet:
         return
     
     # shell = InteractiveShell(lcfg_env)
@@ -77,6 +77,7 @@ def do_buildfile_gen(opts, lcfg_env):
 def main():
     parser = ArgumentParser()
     parser.add_argument("--config", action="store_true", default=False)
+    parser.add_argument("--quiet", action="store_true", default=False)
     parser.add_argument("--lconfig-file", default="LConfig")
     parser.add_argument("--config-save", default=".config.json")
     parser.add_argument("--force", action="store_true", default=False)

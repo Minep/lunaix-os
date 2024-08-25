@@ -1,5 +1,8 @@
 include utils.mkinc
 include toolchain.mkinc
+
+LCONFIG_FLAGS := --quiet
+
 include lunabuild.mkinc
 
 include $(lbuild_mkinc)

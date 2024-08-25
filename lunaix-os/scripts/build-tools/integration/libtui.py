@@ -1,3 +1,11 @@
+#
+# libtui - TUI framework using ncurses
+#  (c) 2024 Lunaixsky
+# 
+# I sware, this is the last time I ever touch 
+#  any sort of the GUI messes.
+#
+
 import curses
 import re
 import curses.panel as cpanel
