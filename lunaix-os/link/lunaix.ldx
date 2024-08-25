@@ -6,7 +6,13 @@ ENTRY(ENTRY_POINT)
 SECTIONS {
     . = LOAD_OFF;
 
+    __kload_start = ALIGN(PAGE_GRAN);
+
+
+    /* ---- boot start ---- */
+
     #include <linking/boot_secs.ldx>
+
 
     /* ---- kernel start ---- */
 
@@ -15,7 +21,7 @@ SECTIONS {
     PROVIDE(__kexec_text_start = ALIGN(PAGE_GRAN));
     __kexec_start = ALIGN(PAGE_GRAN);
     
-    
+
     /* kernel executable sections */
 
     #include "kernel.ldx"
@@ -25,13 +31,15 @@ SECTIONS {
 
     #include "lga.ldx"
 
-
-    /* All other stuff */
-
+    /* Kernel symbol table */
     .ksymtable BLOCK(PAGE_GRAN) : AT ( ADDR(.ksymtable) - KEXEC_BASE )
     {
         *(.ksymtable)
     }
+
+    __kload_end = ALIGN(PAGE_GRAN) - KEXEC_BASE;
+
+    /* Non-initialized sections */
 
     .bss BLOCK(PAGE_GRAN) : AT ( ADDR(.bss) - KEXEC_BASE ) 
     {
@@ -47,5 +55,6 @@ SECTIONS {
         PROVIDE(__bsskstack_end = .);
     }
 
+    __kbss_end  = ALIGN(PAGE_GRAN) - KEXEC_BASE;
     __kexec_end = ALIGN(PAGE_GRAN);
 }

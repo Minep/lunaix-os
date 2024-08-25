@@ -70,6 +70,8 @@ exec_initd()
     const char* argv[] = { "/init", 0 };
     const char* envp[] = { 0 };
 
+    kcmd_get_option("init", (char**)&argv[0]);
+
     if ((errno = exec_kexecve(argv[0], argv, envp))) {
         goto fail;
     }

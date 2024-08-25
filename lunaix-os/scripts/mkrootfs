@@ -33,11 +33,14 @@ function cleanup() {
         case "$arg" in
             "tmpmnt")
                 echo "revert: ${tmp_mnt}"
-                rm -rf "${tmp_mnt}"
+                ${prefix} rm -rf "${tmp_mnt}"
             ;;
             "img")
                 echo "revert: ${rootfs}"
                 rm -f "${rootfs}"
+            ;;
+            "mnt")
+                echo "${prefix} rm umount ${tmp_mnt}"
             ;;
         esac
     done
@@ -57,27 +60,15 @@ ${prefix} mount -o loop "${rootfs}" "${tmp_mnt}" \
 ${prefix} chmod -R o+rwx ${tmp_mnt} \
     || cleanup tmpmnt img
 
+
 cd "${tmp_mnt}" || cleanup tmpmnt img
 
+${prefix} ${SCRIPT_DIR}/mkrootfs-layout ${tmp_mnt} ${USR}
 
-mkdir bin dev sys task mnt lib usr \
-    || has_err=1
-mkdir -p usr/include \
-    || has_err=1
-mkdir -p usr/include/lunalibc \
-    || has_err=1
-
-cp "${USR}"/bin/* bin/ \
-    || has_err=1
-cp -R "${USR}"/includes/* usr/include/lunalibc \
-    || has_err=1
-mv bin/init . \
-    || has_err=1
-
-${prefix} chmod -R 775 . \
-    || has_err=1
-${prefix} chown -R root:root . \
-    || has_err=1
+has_err=$?
+if [ "$has_err" -eq 2 ]; then
+    cleanup mnt tmpmnt img
+fi
 
 sync -f .
 

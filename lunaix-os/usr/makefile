@@ -20,11 +20,13 @@ libc_files := $(libc_name).a
 libc := $(addprefix $(build_dir)/lib/,$(libc_files))
 
 common_param :=	CC AR INCLUDES BUILD_DIR BUILD_NAME\
-				CFLAGS LDFLAGS ARCH LBUILD
+				CFLAGS LDFLAGS ARCH LBUILD LIBC_INCLUDE
 
 INCLUDES := $(sys_include)
 BUILD_DIR := $(build_dir)
 BUILD_NAME := $(libc_name).a
+
+LIBC_INCLUDE := $(build_dir)/usr/includes
 
 mkapp-list := $(addprefix app-, $(shell cat apps.list))
 mkexec-list := $(addprefix $(build_dir)/bin/, $(_LBUILD_SRCS))
@@ -38,12 +40,13 @@ $(build_dir)/bin:
 $(build_dir)/lib:
 	@mkdir -p $(build_dir)/lib
 
-$(build_dir)/includes:
-	@mkdir -p $(build_dir)/includes
+$(LIBC_INCLUDE):
+	@mkdir -p $(LIBC_INCLUDE)
 
 # LibC
 export $(common_param)
-$(build_dir)/$(libc_name).a: $(build_dir)/bin $(build_dir)/lib $(build_dir)/includes
+$(build_dir)/$(libc_name).a: $(build_dir)/bin \
+							 $(build_dir)/lib $(LIBC_INCLUDE)
 	$(call status,TASK,$(BUILD_NAME))
 	@$(MAKE) $(MKFLAGS) -C libc/ $(task)
 
@@ -59,7 +62,7 @@ app-%: $(uexec_ld)
 	@$(MAKE) $(MKFLAGS) -C $* $(task) BUILD_NAME="$*"
 
 app: task := all
-app: INCLUDES += $(build_dir)/includes
+app: INCLUDES += $(LIBC_INCLUDE)
 app: $(mkapp-list)
 
 
@@ -73,7 +76,7 @@ $(build_dir)/bin/%: exec_%.o $(uexec_ld)
 	@$(CC) -T $(uexec_ld) -o $@ $< $(libc) $(LDFLAGS)
 
 exec: task := all
-exec: INCLUDES += $(build_dir)/includes
+exec: INCLUDES += $(LIBC_INCLUDE)
 exec: $(mkexec-list)
 
 

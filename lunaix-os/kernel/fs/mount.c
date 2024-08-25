@@ -204,6 +204,8 @@ cleanup:
     vfs_sb_free(sb);
     __vfs_release_vmnt(mnt_point->mnt);
 
+    mnt_point->mnt = parent_mnt;
+
     return errno;
 }
 
@@ -232,6 +234,7 @@ vfs_mount_at(const char* fs_name,
             continue;
         }
 
+        INFO("mount attempt: %s", HSTR_VAL(fsi.fs->fs_name));
         errno = vfs_mount_fsat(fsi.fs, device, mnt_point, options);
         if (!errno) {
             break;

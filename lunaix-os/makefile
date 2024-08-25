@@ -58,16 +58,16 @@ image: $(kbuild_dir) kernel usr/build
 		-- -volid "LUNA" -system_id "Lunaix" \
 		-report_about FAILURE -abort_on FAILURE
 
+.PHONY: rootfs all clean-user clean
+
 .NOTPARALLEL:
-.PHONY: image
 export KCMD=$(CMDLINE)
 export LBUILD ARCH MODE
 all: $(kbuild_dir) kernel usr/build
 
-.PHONY: rootfs
-rootfs:
+rootfs: usr/build
 	$(call status,TASK,$(notdir $@))
-	@./scripts/mkrootfs.sh
+	@./scripts/mkrootfs
 
 usr/build: user
 
@@ -77,6 +77,9 @@ export LBUILD ARCH MODE
 user:
 	$(call status,TASK,$@)
 	@$(MAKE) $(MKFLAGS) -C usr all -I $(mkinc_dir)
+
+clean-user:
+	@$(MAKE) -C usr clean -I $(mkinc_dir)
 
 clean:
 	@$(MAKE) -C usr clean -I $(mkinc_dir)

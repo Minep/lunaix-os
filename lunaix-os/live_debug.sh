@@ -16,6 +16,6 @@ make CMDLINE=${default_cmd} ARCH=${ARCH} MODE=${MODE:-debug} all -j5 || exit -1
     -v ARCH=${ARCH} \
     -- \
     -kernel build/bin/kernel.bin \
-    -append "${default_cmd} rootfs=/dev/block/sda" &
+    -append "${default_cmd} rootfs=/dev/block/sda init=/bin/init" &
 
 QMPORT=${hmp_port} gdb build/bin/kernel.bin -ex "target remote localhost:${gdb_port}"

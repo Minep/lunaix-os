@@ -29,7 +29,7 @@
         movq (%rsp), %rax
         movq 8(%rsp), %rdi
 
-        callq %rax
+        callq *%rax
 
         movq %rax, %rbx
         movq $__SYSCALL_th_exit, %rax
