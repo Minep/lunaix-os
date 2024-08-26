@@ -29,6 +29,12 @@ signal_terminate(int caused_by)
     terminate_current(caused_by | PEXITSIG);
 }
 
+static inline void
+signal_terminate_proc(struct proc_info* pcb, int caused_by)
+{
+    terminate_proccess(pcb, caused_by | PEXITSIG);
+}
+
 // Referenced in kernel/asm/x86/interrupt.S
 void
 signal_dispatch(struct signpost_result* result)
@@ -134,7 +140,7 @@ proc_setsignal(struct proc_info* proc, signum_t signum)
     switch (signum)
     {
     case SIGKILL:
-        signal_terminate(signum);
+        signal_terminate_proc(proc, signum);
         break;
     case SIGCONT:
     case SIGSTOP:
@@ -144,6 +150,20 @@ proc_setsignal(struct proc_info* proc, signum_t signum)
     }
     
     __set_signal(proc->th_active, signum);
+}
+
+static inline void
+__broadcast_group(struct proc_info* proc, signum_t signum)
+{
+    if (proc_terminated(proc)) {
+        return;
+    }
+
+    struct proc_info *pos, *n;
+    llist_for_each(pos, n, &proc->grp_member, grp_member)
+    {
+        proc_setsignal(pos, signum);
+    }
 }
 
 int
@@ -158,27 +178,17 @@ signal_send(pid_t pid, signum_t signum)
 
     if (pid > 0) {
         proc = get_process(pid);
-        goto send_single;
     } else if (!pid) {
         proc = __current;
-        goto send_grp;
     } else if (pid < 0) {
         proc = get_process(-pid);
-        goto send_grp;
+        __broadcast_group(proc, signum);
     } else {
         // TODO: send to all process.
         //  But I don't want to support it yet.
         return EINVAL;
     }
 
-send_grp: ;
-    struct proc_info *pos, *n;
-    llist_for_each(pos, n, &proc->grp_member, grp_member)
-    {
-        proc_setsignal(pos, signum);
-    }
-
-send_single:
     if (proc_terminated(proc)) {
         return EINVAL;
     }

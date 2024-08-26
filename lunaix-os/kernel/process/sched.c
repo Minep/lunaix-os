@@ -550,7 +550,7 @@ delete_process(struct proc_info* proc)
 
 pid_t
 destroy_process(pid_t pid)
-{
+{    
     int index = pid;
     if (index <= 0 || index > sched_ctx.ptable_len) {
         syscall_result(EINVAL);
@@ -565,6 +565,8 @@ destroy_process(pid_t pid)
 
 static void 
 terminate_proc_only(struct proc_info* proc, int exit_code) {
+    assert(proc->pid != 0);
+
     proc->state = PS_TERMNAT;
     proc->exit_code = exit_code;
 
@@ -598,7 +600,7 @@ terminate_proccess(struct proc_info* proc, int exit_code) {
     terminate_proc_only(proc, exit_code);
 
     struct thread *pos, *n;
-    llist_for_each(pos, n, &__current->threads, proc_sibs) {
+    llist_for_each(pos, n, &proc->threads, proc_sibs) {
         pos->state = PS_TERMNAT;
     }
 }

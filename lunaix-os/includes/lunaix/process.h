@@ -45,9 +45,12 @@
 #define PS_GrDT (PS_TERMNAT | PS_DESTROY)
 #define PS_Rn (PS_RUNNING | PS_CREATED)
 
-#define proc_terminated(proc) (((proc)->state) & PS_GrDT)
-#define proc_hanged(proc) (((proc)->state) & PS_BLOCKED)
-#define proc_runnable(proc) (!(proc)->state || !(((proc)->state) & ~PS_Rn))
+#define proc_terminated(proc) \
+            (!(proc) || ((proc)->state) & PS_GrDT)
+#define proc_hanged(proc) \
+            ((proc)  && ((proc)->state) & PS_BLOCKED)
+#define proc_runnable(proc) \
+            ((proc) && (!(proc)->state || !(((proc)->state) & ~PS_Rn)))
 
 
 #define TH_DETACHED         0b00000001
@@ -367,6 +370,7 @@ spawn_kthread(ptr_t entry) {
     
     assert(th);
     start_thread(th, entry);
+    detach_thread(th);
 }
 
 void 

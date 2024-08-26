@@ -259,6 +259,12 @@ procvm_dupvms_mount(struct proc_mm* mm) {
 void
 procvm_mount(struct proc_mm* mm)
 {
+    // if current mm is already active
+    if (active_vms(mm->vm_mnt)) {
+        return;
+    }
+    
+    // we are double mounting
     assert(!mm->vm_mnt);
     assert(mm->vmroot);
 
@@ -272,9 +278,13 @@ procvm_mount(struct proc_mm* mm)
 void
 procvm_unmount(struct proc_mm* mm)
 {
+    if (active_vms(mm->vm_mnt)) {
+        return;
+    }
+    
     assert(mm->vm_mnt);
-
     vms_unmount(VMS_MOUNT_1);
+    
     struct proc_mm* mm_current = vmspace(__current);
     if (mm_current) {
         mm_current->guest_mm = NULL;
