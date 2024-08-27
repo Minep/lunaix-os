@@ -53,7 +53,7 @@ class MMStats(LunadbgCommand):
             if (i + 1) % optn.cols == 0:
                 pp2.print(''.join(row))
                 row.clear()
-        if (i + 1) % optn.cols != 0:
+        if len(row) > 0:
             pp2.print(''.join(row))
         
         pp.printf("(granule: %d, density: %d@4K)", optn.granule, pmem.page_per_granule)

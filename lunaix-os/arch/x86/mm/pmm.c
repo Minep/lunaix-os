@@ -12,7 +12,7 @@ pmm_arch_init_pool(struct pmem* memory)
 ptr_t
 pmm_arch_init_remap(struct pmem* memory, struct boot_handoff* bctx)
 {
-    size_t ppfn_total = pfn(bctx->mem.size) + 1;
+    size_t ppfn_total = pfn(bctx->mem.size);
     size_t pool_size  = ppfn_total * sizeof(struct ppage);
     
     size_t i = 0;

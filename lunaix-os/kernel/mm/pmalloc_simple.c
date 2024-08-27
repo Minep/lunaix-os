@@ -162,7 +162,8 @@ pmm_alloc_napot_type(int pool, size_t order, ppage_type_t type)
 }
 
 bool
-pmm_allocator_trymark_onhold(struct pmem_pool* pool, struct ppage* start, struct ppage* end)
+pmm_allocator_trymark_onhold(struct pmem_pool* pool, 
+                             struct ppage* start, struct ppage* end)
 {
     while (start <= end) {
         if (__uninitialized_page(start)) {
@@ -188,7 +189,8 @@ pmm_allocator_trymark_onhold(struct pmem_pool* pool, struct ppage* start, struct
 }
 
 bool
-pmm_allocator_trymark_unhold(struct pmem_pool* pool, struct ppage* start, struct ppage* end)
+pmm_allocator_trymark_unhold(struct pmem_pool* pool, 
+                             struct ppage* start, struct ppage* end)
 {
     while (start <= end) {
         if (!__uninitialized_page(start) && reserved_page(start)) {
