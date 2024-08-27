@@ -64,8 +64,10 @@
         movw $TSS_SEG, %ax
         ltr %ax
 
+        call prepare_boot_handover
+
         xorq %rbp, %rbp
-        movq $bhctx_buffer, %rdi       # mb_parser.c
+        movq %rax, %rdi
         call kernel_bootstrap
 
     1:

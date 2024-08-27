@@ -3,8 +3,6 @@
 
 #include "base_defs.ld.inc"
 
-__kboot_start = .;
-
 .boot.text BLOCK(PAGE_GRAN) : 
 {
 #if defined(CONFIG_X86_BL_MB) || defined(CONFIG_X86_BL_MB2)
@@ -14,16 +12,14 @@ __kboot_start = .;
     *(.boot.text)
 }
 
-.boot.bss BLOCK(PAGE_GRAN) : 
-{
-    *(.boot.bss)
-}
-
 .boot.data BLOCK(PAGE_GRAN) : 
 {
+    /*
+        We treat our boot.bss as data.
+        to avoid confusing linker and some bootloader
+    */
     *(.boot.data)
+    *(.boot.bss)
 }
-
-__kboot_end = ALIGN(PAGE_GRAN);
 
 #endif /* __LUNAIX_BOOT_SECS_LD_INC */

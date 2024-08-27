@@ -1,7 +1,12 @@
 #include <lunaix/boot_generic.h>
 #include <lunaix/mm/pagetable.h>
+#include <lunaix/mm/pmm.h>
+#include <lunaix/spike.h>
+#include <lunaix/sections.h>
+#include <lunaix/generic/bootmem.h>
 
-#include "sys/mm/mm_defs.h"
+#include <sys/mm/mm_defs.h>
+#include <sys/boot/bstage.h>
 
 #ifdef CONFIG_ARCH_X86_64
 
@@ -15,7 +20,10 @@ boot_begin_arch_reserve(struct boot_handoff* bhctx)
 void
 boot_clean_arch_reserve(struct boot_handoff* bhctx)
 {
-    return;
+    pfn_t start;
+
+    start = leaf_count(__ptr(__kboot_start));
+    pmm_unhold_range(start, leaf_count(__ptr(__kboot_end)) - start);
 }
 
 #else
@@ -42,5 +50,19 @@ boot_clean_arch_reserve(struct boot_handoff* bhctx)
     vmm_unset_ptes(ptep, count);
 }
 
-
 #endif
+
+extern void
+mb_parse(struct boot_handoff* bhctx);
+
+struct boot_handoff*
+prepare_boot_handover()
+{
+    struct boot_handoff* handoff;
+
+    handoff = bootmem_alloc(sizeof(*handoff));
+
+    mb_parse(handoff);
+
+    return handoff;
+}

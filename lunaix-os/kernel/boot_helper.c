@@ -4,6 +4,7 @@
 #include <lunaix/mm/vmm.h>
 #include <lunaix/spike.h>
 #include <lunaix/kcmd.h>
+#include <lunaix/sections.h>
 #include <sys/mm/mm_defs.h>
 
 extern unsigned char __kexec_end[], __kexec_start[];
@@ -44,7 +45,20 @@ boot_begin(struct boot_handoff* bhctx)
     }
 }
 
-extern u8_t __kboot_end; /* link/linker.ld */
+static void
+__free_reclaimable()
+{
+    ptr_t start;
+    pfn_t pgs;
+    pte_t* ptep;
+
+    start = reclaimable_start;
+    pgs   = leaf_count(reclaimable_end - start);
+    ptep  = mkptep_va(VMS_SELF, start);
+
+    pmm_unhold_range(pfn(to_kphysical(start)), pgs);
+    vmm_unset_ptes(ptep, pgs);
+}
 
 /**
  * @brief Release memory for kernel bootstrapping initialization
@@ -67,6 +81,8 @@ boot_end(struct boot_handoff* bhctx)
     bhctx->release(bhctx);
 
     boot_clean_arch_reserve(bhctx);
+
+    __free_reclaimable();
 }
 
 void

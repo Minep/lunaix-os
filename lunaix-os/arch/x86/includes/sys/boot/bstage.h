@@ -1,10 +1,16 @@
 #ifndef __LUNAIX_BSTAGE_H
 #define __LUNAIX_BSTAGE_H
 #include <lunaix/types.h>
+#include <lunaix/boot_generic.h>
+
+extern ptr_t __multiboot_addr;
+
+extern u8_t __kboot_start[];
+extern u8_t __kboot_end[];
 
 #define boot_text __attribute__((section(".boot.text")))
 #define boot_data __attribute__((section(".boot.data")))
-#define boot_bss __attribute__((section(".boot.bss")))
+#define boot_bss  __attribute__((section(".boot.bss")))
 
 /*
     Bridge the far symbol to the vicinity.
@@ -16,7 +22,7 @@
 #ifdef CONFIG_ARCH_X86_64
 #define bridge_farsym(far_sym)          \
     asm(                                \
-        ".section .boot.bss\n"         \
+        ".section .boot.data\n"         \
         ".align 8\n"                    \
         ".globl __lc_" #far_sym "\n"    \
         "__lc_" #far_sym ":\n"          \
@@ -32,6 +38,7 @@
 
 #endif
 
-ptr_t remap_kernel();
+ptr_t 
+remap_kernel();
 
 #endif /* __LUNAIX_BSTAGE_H */

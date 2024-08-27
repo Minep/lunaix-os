@@ -10,8 +10,11 @@ SECTIONS {
 
 
     /* ---- boot start ---- */
+    __kboot_start = .;
 
     #include <linking/boot_secs.ldx>
+
+    __kboot_end = ALIGN(PAGE_GRAN);
 
 
     /* ---- kernel start ---- */
@@ -53,6 +56,15 @@ SECTIONS {
         *(.bss.kstack)
 
         PROVIDE(__bsskstack_end = .);
+    }
+
+    .bss.reclaim BLOCK(PAGE_GRAN) : AT ( ADDR(.bss.kstack) - KEXEC_BASE )
+    {
+        PROVIDE(__bssreclaim_start = .);
+
+        *(.bss.reclaim)
+
+        PROVIDE(__bssreclaim_end = .);
     }
 
     __kbss_end  = ALIGN(PAGE_GRAN) - KEXEC_BASE;

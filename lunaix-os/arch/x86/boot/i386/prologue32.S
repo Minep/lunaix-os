@@ -71,7 +71,9 @@
         movw $TSS_SEG, %ax
         ltr %ax
 
-        movl $bhctx_buffer, (%esp)       # mb_parser.c
+        call prepare_boot_handover
+
+        movl %eax, (%esp)
         call kernel_bootstrap
 
     1:
