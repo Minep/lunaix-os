@@ -97,7 +97,7 @@ mb_parse_mods(struct boot_handoff* bhctx,
             .end = mod->mod_end,
             .str = mod_name 
         };
-                                           
+
         strncpy(mod_name, cmd, name_len);
     }
 
