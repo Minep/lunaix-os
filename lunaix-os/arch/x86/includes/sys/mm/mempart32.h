@@ -32,28 +32,28 @@
 #define KERNEL_IMG_SIZE             __ulong(0x4000000)
 #define KERNEL_IMG_END END_POINT(KERNEL_IMG)
 
-#define PG_MOUNT_1                  __ulong(0xc4000000)
+#define PG_MOUNT_1                  __ulong(0xc8000000)
 #define PG_MOUNT_1_SIZE             __ulong(0x1000)
 #define PG_MOUNT_1_END END_POINT(PG_MOUNT_1)
 
-#define PG_MOUNT_2                  __ulong(0xc4001000)
+#define PG_MOUNT_2                  __ulong(0xc8001000)
 #define PG_MOUNT_2_SIZE             __ulong(0x1000)
 #define PG_MOUNT_2_END END_POINT(PG_MOUNT_2)
 
-#define PG_MOUNT_3                  __ulong(0xc4002000)
+#define PG_MOUNT_3                  __ulong(0xc8002000)
 #define PG_MOUNT_3_SIZE             __ulong(0x1000)
 #define PG_MOUNT_3_END END_POINT(PG_MOUNT_3)
 
-#define PG_MOUNT_4                  __ulong(0xc4003000)
+#define PG_MOUNT_4                  __ulong(0xc8003000)
 #define PG_MOUNT_4_SIZE             __ulong(0x1000)
 #define PG_MOUNT_4_END END_POINT(PG_MOUNT_4)
 
-#define PG_MOUNT_VAR                __ulong(0xc4004000)
+#define PG_MOUNT_VAR                __ulong(0xc8004000)
 #define PG_MOUNT_VAR_SIZE           __ulong(0x3fc000)
 #define PG_MOUNT_VAR_END END_POINT(PG_MOUNT_VAR)
 
-#define VMAP                        __ulong(0xc4400000)
-#define VMAP_SIZE                   __ulong(0x3b400000)
+#define VMAP                        __ulong(0xc8400000)
+#define VMAP_SIZE                   __ulong(0x37400000)
 #define VMAP_END END_POINT(VMAP)
 
 #define PMAP                        VMAP

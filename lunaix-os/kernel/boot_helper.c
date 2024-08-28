@@ -7,8 +7,6 @@
 #include <lunaix/sections.h>
 #include <sys/mm/mm_defs.h>
 
-extern unsigned char __kexec_end[], __kexec_start[];
-
 /**
  * @brief Reserve memory for kernel bootstrapping initialization
  *
@@ -22,7 +20,7 @@ boot_begin(struct boot_handoff* bhctx)
     boot_begin_arch_reserve(bhctx);
     
     // 将内核占据的页，包括前1MB，hhk_init 设为已占用
-    size_t pg_count = leaf_count(to_kphysical(__kexec_end));
+    size_t pg_count = leaf_count(to_kphysical(kernel_load_end));
     pmm_onhold_range(0, pg_count);
 
     size_t i;

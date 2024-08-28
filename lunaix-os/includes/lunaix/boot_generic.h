@@ -38,11 +38,12 @@ struct boot_handoff
 
     struct
     {
-        ptr_t ksections;
-        size_t size;
+        struct {
+            char* cmdline;
+            size_t len;
+        };
 
-        char* cmdline;
-        size_t len;
+        ptr_t dtb_pa;
     } kexec;
 
     struct

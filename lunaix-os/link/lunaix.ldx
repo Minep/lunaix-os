@@ -69,4 +69,12 @@ SECTIONS {
 
     __kbss_end  = ALIGN(PAGE_GRAN) - KEXEC_BASE;
     __kexec_end = ALIGN(PAGE_GRAN);
+
+#ifdef CONFIG_USE_DEVICETREE
+    __dtb_start = ALIGN(PAGE_GRAN);
+    . = __dtb_start + CONFIG_DTB_MAXSIZE;
+#endif
+
+    __kimg_end = ALIGN(PAGE_GRAN);
+
 }

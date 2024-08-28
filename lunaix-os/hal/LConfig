@@ -20,4 +20,16 @@ def hal():
         """
 
         type(bool)
-        default(True)
+        default(not v(arch).startswith("x86"))
+
+    @ReadOnly
+    @Term("Maximum size of device tree blob (in KiB)")
+    def dtb_maxsize():
+        """
+            Maximum size for a firmware provided device tree blob
+        """
+
+        type(int)
+        default(256)
+
+        return v(use_devicetree)
