@@ -13,7 +13,6 @@ kinc_opts := $(addprefix -I,$(_LBUILD_INCS))
 config_h += -include $(lbuild_config_h)
 
 tmp_kbin  := $(BUILD_DIR)/tmpk.bin
-ksymtable := lunaix_ksyms.o
 klinking  := link/lunaix.ld
 
 CFLAGS += $(khdr_opts) $(kinc_opts) $(config_h) -MMD -MP
@@ -42,6 +41,10 @@ $(tmp_kbin): $(klinking) $(ksrc_objs)
 	@$(CC) -T $(klinking) $(config_h) $(LDFLAGS) -o $@ \
 			$(call all_linkable,$^)
 
+ksymtable := lunaix_ksyms.o
+ksecsmap  := lunaix_ksecsmap.o
+
+kautogen  := $(ksecsmap) $(ksymtable)
 
 $(ksymtable): $(tmp_kbin)
 	$(call status_,KSYM,$@)
@@ -49,9 +52,15 @@ $(ksymtable): $(tmp_kbin)
 
 	@$(CC) $(CFLAGS) -c lunaix_ksymtable.S -o $@
 
+$(ksecsmap): $(tmp_kbin)
+	$(call status_,KGEN,$@)
+	@scripts/elftool.tool -p -i $< > lunaix_ksecsmap.S
+
+	@$(CC) $(CFLAGS) -c lunaix_ksecsmap.S -o $@
 
 .PHONY: __do_relink
-__do_relink: $(klinking) $(ksrc_objs) $(ksymtable)
+
+__do_relink: $(klinking) $(ksrc_objs) $(kautogen)
 	$(call status_,LD,$(kbin))
 
 	@$(CC) -T $(klinking) $(config_h) $(LDFLAGS) -o $(kbin) \

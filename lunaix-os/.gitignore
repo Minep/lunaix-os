@@ -23,6 +23,8 @@
 *.ld
 *.log
 
+scripts/*.tool
+
 __pycache__
 
 .config.json
