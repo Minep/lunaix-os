@@ -1,6 +1,7 @@
 #include "base.ldx"
 
-.lga BLOCK(PAGE_GRAN) : AT ( ADDR(.lga) - KEXEC_BASE ) 
+.lga BLOCK(PAGE_GRAN) 
+    : AT ( ADDR(.lga) - KEXEC_BASE )
 {
     PROVIDE(__lga_twiplugin_inits_start = .);
         
@@ -98,4 +99,4 @@
     KEEP(*(.lga.lunainit.c_postboot));
 
     PROVIDE(__lga_lunainit_on_postboot_end = .);   
-}
+} : rodata
