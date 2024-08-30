@@ -20,7 +20,7 @@ extern u8_t __kboot_end[];
     code is too far away from the boot code.
 */
 #ifdef CONFIG_ARCH_X86_64
-#define bridge_farsym(far_sym)          \
+#define __bridge_farsym(far_sym)        \
     asm(                                \
         ".section .boot.data\n"         \
         ".align 8\n"                    \
@@ -30,11 +30,16 @@ extern u8_t __kboot_end[];
         ".previous\n"                   \
     );                                  \
     extern unsigned long __lc_##far_sym[];
-#define __far(far_sym)  (__lc_##far_sym[0])
+#define bridge_farsym(far_sym)  __bridge_farsym(far_sym)
+
+#define ___far(far_sym)  (__lc_##far_sym[0])
+#define __far(far_sym)  ___far(far_sym)
 
 #else
-#define bridge_farsym(far_sym) extern u8_t far_sym[];
-#define __far(far_sym) ((ptr_t)far_sym)
+#define __bridge_farsym(far_sym)    extern unsigned long far_sym[]
+#define ___far(far_sym)             ((ptr_t)far_sym)
+#define bridge_farsym(far_sym)      __bridge_farsym(far_sym);
+#define __far(far_sym)              ___far(far_sym)
 
 #endif
 

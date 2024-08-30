@@ -192,6 +192,27 @@ __wr_maplast(struct ksec_genctx* ctx, struct elf_section* sec)
     })
 
 static void
+__emit_size(struct ksec_genctx* genctx)
+{
+    ptr_t va;
+    unsigned int size = 0;
+    int n = genctx->size - 1;
+
+    /*
+        first two LOAD are boot text and data.
+        we are calculating the kernel size, so
+        ignore it.
+    */
+    for (int i = 2; i < n; i++)
+    {
+        size += genctx->secs[i].memsz;
+    }
+
+    va = genctx->secs[n].va;
+    printf(".4byte 0x%x + (__kexec_end - 0x%lx)\n", size, va);
+}
+
+static void
 __generate_kernelmap(struct elf_generic_ehdr* ehdr)
 {
     
@@ -223,14 +244,14 @@ __generate_kernelmap(struct elf_generic_ehdr* ehdr)
     struct elf_section* sec_ent;
 
     printf(".4byte 0x%x\n", genctx.size);
+    __emit_size(&genctx);
     
     /*
-        By convention, the last two LOAD is reserved for 
-        .autogen and .bss.*.
-        
-        Their size will not be known until after relink,
-        so we need to emit a special entry and let linker
-        determine the size. (see __wr_maplast)
+        Lunaix define the last LOAD phdr is variable
+        sized. that is the actual size will not be known 
+        until after relink, so we need to emit a special 
+        entry and let linker determine the size. 
+        (see __wr_maplast)
      */
 
     for (; i < genctx.size - 1; i++)

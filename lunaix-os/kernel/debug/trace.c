@@ -3,6 +3,7 @@
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 #include <lunaix/trace.h>
+#include <lunaix/sections.h>
 
 #include <sys/abi.h>
 #include <sys/mm/mm_defs.h>
@@ -14,8 +15,7 @@
 
 LOG_MODULE("TRACE")
 
-weak struct ksyms __lunaix_ksymtable[] = { };
-extern struct ksyms __lunaix_ksymtable[];
+extern_autogen(ksymtable);
 
 static struct trace_context trace_ctx;
 
@@ -33,7 +33,7 @@ trace_log(const char* fmt, ...)
 void
 trace_modksyms_init(struct boot_handoff* bhctx)
 {
-    trace_ctx.ksym_table = __lunaix_ksymtable;
+    trace_ctx.ksym_table = autogen(struct ksyms, ksymtable);
 }
 
 struct ksym_entry*

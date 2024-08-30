@@ -5,14 +5,14 @@ ENTRY(ENTRY_POINT)
 
 PHDRS
 {
-    boot_text PT_LOAD;
-    boot_data PT_LOAD;
+    boot_text       PT_LOAD;
+    boot_data       PT_LOAD;
 
-    text PT_LOAD;
-    data PT_LOAD;
-    rodata PT_LOAD FLAGS(4);
+    text            PT_LOAD;
+    data            PT_LOAD;
+    rodata          PT_LOAD     FLAGS(4);
 
-    var PT_LOAD;
+    var             PT_LOAD;
 }
 
 SECTIONS {

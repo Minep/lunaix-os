@@ -4,23 +4,23 @@
 #include <lunaix/mm/pagetable.h>
 #include <lunaix/mann_flags.h>
 
-static inline pte_attr_t
-translate_vmr_prot(unsigned int vmr_prot)
+static inline pte_t
+translate_vmr_prot(unsigned int vmr_prot, pte_t pte)
 {
-    pte_attr_t _pte_prot = _PTE_U;
-    if ((vmr_prot & PROT_READ)) {
-        _pte_prot |= _PTE_R;
-    }
+    pte = pte_mkuser(pte);
 
     if ((vmr_prot & PROT_WRITE)) {
-        _pte_prot |= _PTE_W;
+        pte = pte_mkwritable(pte);
     }
 
-    if (!(vmr_prot & PROT_EXEC)) {
-        _pte_prot |= _PTE_NX;
+    if ((vmr_prot & PROT_EXEC)) {
+        pte = pte_mkexec(pte);
+    }
+    else {
+        pte = pte_mknonexec(pte);
     }
 
-    return _pte_prot;
+    return pte;
 }
 
 

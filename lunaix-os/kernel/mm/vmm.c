@@ -49,7 +49,7 @@ vms_mount(ptr_t mnt, ptr_t vms_root)
     assert(vms_root);
 
     pte_t* ptep = mkl0tep_va(VMS_SELF, mnt);
-    set_pte(ptep, mkpte(vms_root, KERNEL_DATA));
+    set_pte(ptep, mkpte(vms_root, KERNEL_PGTAB));
     tlb_flush_kernel(mnt);
     return mnt;
 }

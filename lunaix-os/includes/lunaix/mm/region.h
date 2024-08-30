@@ -70,10 +70,10 @@ region_copy_mm(struct proc_mm* src, struct proc_mm* dest);
 struct mm_region*
 region_dup(struct mm_region* origin);
 
-static inline pte_attr_t
-region_pteprot(struct mm_region* vmr)
+static inline pte_t
+region_tweakpte(struct mm_region* vmr, pte_t pte)
 {
-    return translate_vmr_prot(vmr->attr);
+    return translate_vmr_prot(vmr->attr, pte);
 }
 
 #endif /* __LUNAIX_REGION_H */

@@ -75,7 +75,7 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
     */
     pte_t* ptep_ssm     = mkl0tep_va(VMS_SELF, dest_mnt);
     pte_t* ptep_sms     = mkl1tep_va(VMS_SELF, dest_mnt) + VMS_SELF_L0TI;
-    pte_t  pte_sms      = mkpte_prot(KERNEL_DATA);
+    pte_t  pte_sms      = mkpte_prot(KERNEL_PGTAB);
 
     pte_sms = alloc_kpage_at(ptep_ssm, pte_sms, 0);
     set_pte(ptep_sms, pte_sms);    
@@ -359,11 +359,13 @@ procvm_enter_remote(struct remote_vmctx* rvmctx, struct proc_mm* mm,
 
     pte_t* rptep = mkptep_va(vm_mnt, remote_base);
     pte_t* lptep = mkptep_va(VMS_SELF, rvmctx->local_mnt);
-    unsigned int pattr = region_pteprot(region);
+
+    pte_t pte, rpte = null_pte;
+    rpte = region_tweakpte(region, rpte);
 
     for (size_t i = 0; i < size_pn; i++)
     {
-        pte_t pte = vmm_tryptep(rptep, PAGE_SIZE);
+        pte = vmm_tryptep(rptep, PAGE_SIZE);
         if (pte_isloaded(pte)) {
             set_pte(lptep, pte);
             continue;
@@ -371,7 +373,7 @@ procvm_enter_remote(struct remote_vmctx* rvmctx, struct proc_mm* mm,
 
         ptr_t pa = ppage_addr(pmm_alloc_normal(0));
         set_pte(lptep, mkpte(pa, KERNEL_DATA));
-        set_pte(rptep, mkpte(pa, pattr));
+        set_pte(rptep, pte_setpaddr(rpte, pa));
     }
 
     return vm_mnt;

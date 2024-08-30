@@ -31,8 +31,8 @@ syms_len=${#syms_idx[@]}
 declare -A assoc_array
 
 echo '.section .autogen.ksymtable, "a", @progbits'
-echo "    .global __lunaix_ksymtable"
-echo "    __lunaix_ksymtable:"
+echo "    .global __autogen_ksymtable"
+echo "    __autogen_ksymtable:"
 echo "        .$dtype $syms_len"
 echo "        .align 8"
 
