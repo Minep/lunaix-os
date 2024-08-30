@@ -261,5 +261,6 @@ term_sendsig(struct term* tdev, int signal)
 {
     if ((tdev->lflags & _ISIG)) {
         signal_send(-tdev->fggrp, signal);
+        pwake_all(&tdev->line_in_event);
     }
 }

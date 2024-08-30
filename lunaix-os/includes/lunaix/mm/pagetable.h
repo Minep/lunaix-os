@@ -573,7 +573,7 @@ active_vms(ptr_t vmnt)
 }
 
 static inline bool
-l0tep_impile_vmnts(pte_t* ptep)
+l0tep_implie_vmnts(pte_t* ptep)
 {
     return l0tep_implie(ptep, VMS_SELF) ||
            l0tep_implie(ptep, VMS_MOUNT_1);

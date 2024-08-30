@@ -18,8 +18,7 @@ class PhysicalMemProfile:
         self.mem_distr.clear()
 
         pplist = self._pmem.pplist()
-        page_per_granule = self.max_mem_pg / self.__mem_distr_granule
-        page_per_granule = math.ceil(page_per_granule)
+        page_per_granule = int(self.max_mem_pg) // self.__mem_distr_granule
         remainder = self.max_mem_pg % self.__mem_distr_granule
         bucket = 0
         non_contig = 0

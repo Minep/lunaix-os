@@ -75,7 +75,7 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
     */
     pte_t* ptep_ssm     = mkl0tep_va(VMS_SELF, dest_mnt);
     pte_t* ptep_sms     = mkl1tep_va(VMS_SELF, dest_mnt) + VMS_SELF_L0TI;
-    pte_t  pte_sms      = mkpte_prot(KERNEL_DATA);
+    pte_t  pte_sms      = mkpte_prot(KERNEL_PGTAB);
 
     pte_sms = alloc_kpage_at(ptep_ssm, pte_sms, 0);
     set_pte(ptep_sms, pte_sms);    
@@ -145,7 +145,7 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
     while (i++ < MAX_PTEN) {
         pte_t pte = *ptep;
 
-        if (l0tep_impile_vmnts(ptep)) {
+        if (l0tep_implie_vmnts(ptep)) {
             goto _cont;
         }
 
@@ -259,6 +259,12 @@ procvm_dupvms_mount(struct proc_mm* mm) {
 void
 procvm_mount(struct proc_mm* mm)
 {
+    // if current mm is already active
+    if (active_vms(mm->vm_mnt)) {
+        return;
+    }
+    
+    // we are double mounting
     assert(!mm->vm_mnt);
     assert(mm->vmroot);
 
@@ -272,9 +278,13 @@ procvm_mount(struct proc_mm* mm)
 void
 procvm_unmount(struct proc_mm* mm)
 {
+    if (active_vms(mm->vm_mnt)) {
+        return;
+    }
+    
     assert(mm->vm_mnt);
-
     vms_unmount(VMS_MOUNT_1);
+    
     struct proc_mm* mm_current = vmspace(__current);
     if (mm_current) {
         mm_current->guest_mm = NULL;
@@ -315,7 +325,6 @@ void
 procvm_mount_self(struct proc_mm* mm) 
 {
     assert(!mm->vm_mnt);
-    assert(!mm->guest_mm);
 
     mm->vm_mnt = VMS_SELF;
 }
@@ -350,11 +359,13 @@ procvm_enter_remote(struct remote_vmctx* rvmctx, struct proc_mm* mm,
 
     pte_t* rptep = mkptep_va(vm_mnt, remote_base);
     pte_t* lptep = mkptep_va(VMS_SELF, rvmctx->local_mnt);
-    unsigned int pattr = region_pteprot(region);
+
+    pte_t pte, rpte = null_pte;
+    rpte = region_tweakpte(region, rpte);
 
     for (size_t i = 0; i < size_pn; i++)
     {
-        pte_t pte = vmm_tryptep(rptep, PAGE_SIZE);
+        pte = vmm_tryptep(rptep, PAGE_SIZE);
         if (pte_isloaded(pte)) {
             set_pte(lptep, pte);
             continue;
@@ -362,7 +373,7 @@ procvm_enter_remote(struct remote_vmctx* rvmctx, struct proc_mm* mm,
 
         ptr_t pa = ppage_addr(pmm_alloc_normal(0));
         set_pte(lptep, mkpte(pa, KERNEL_DATA));
-        set_pte(rptep, mkpte(pa, pattr));
+        set_pte(rptep, pte_setpaddr(rpte, pa));
     }
 
     return vm_mnt;

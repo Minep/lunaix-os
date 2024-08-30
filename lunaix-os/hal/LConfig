@@ -6,4 +6,30 @@ include("ahci")
 def hal():
     """ Lunaix hardware asbtraction layer """
 
-    pass
+    @Term("Devicetree for hardware discovery")
+    def use_devicetree():
+        """
+            Decide whether to use Devicetree for platform
+            resource topology sensing.
+
+            On some architecture, Lunaix will fallback to use
+            devicetree when ran out of options. For others, such
+            as those designed with embedded support in mind, 
+            devicetree might be mandatory and perhaps the only
+            way.
+        """
+
+        type(bool)
+        default(not v(arch).startswith("x86"))
+
+    @ReadOnly
+    @Term("Maximum size of device tree blob (in KiB)")
+    def dtb_maxsize():
+        """
+            Maximum size for a firmware provided device tree blob
+        """
+
+        type(int)
+        default(256)
+
+        return v(use_devicetree)

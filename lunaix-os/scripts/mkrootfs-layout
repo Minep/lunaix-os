@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+
+base="$1"
+content="$2"
+
+if [ -z "$base" ]; then
+    echo "please specify the working directory"
+    exit 2
+fi
+
+cd "$base" || exit 2
+
+echo "creating basic layout."
+
+mkdir bin dev sys task mnt lib usr \
+    || has_err=1
+
+if [ -n "${content}" ]; then
+    echo "copying contents"
+
+    cp -R "${content}"/* .
+else
+    echo "Note: no content is specified, only basic layout is created"\
+         "You may need to add them later"
+    has_err=1
+fi
+
+echo "ownership set to root:root"
+
+chown -R root:root . \
+    || has_err=1
+
+exit "${has_err:-0}"

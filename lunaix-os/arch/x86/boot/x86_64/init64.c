@@ -2,10 +2,12 @@
 #include "sys/crx.h"
 #include "sys/cpu.h"
 
+ptr_t __multiboot_addr boot_data;
+
 void boot_text
-x86_init(struct multiboot_info* mb)
+x86_init(ptr_t mb)
 {
-    mb_parse(mb);
+    __multiboot_addr = mb;
 
     cr4_setfeature(CR4_PCIDE);
 

@@ -5,19 +5,6 @@
 #include <sys/cpu.h>
 #include <lunaix/process.h>
 
-#define _preemptible \
-        __attribute__((section(".kf.preempt"))) no_inline
-
-#define ensure_preempt_caller()                                 \
-    do {                                                        \
-        extern int __kf_preempt_start[];                        \
-        extern int __kf_preempt_end[];                          \
-        ptr_t _retaddr = abi_get_retaddr();                     \
-        assert_msg((ptr_t)__kf_preempt_start <= _retaddr        \
-                    && _retaddr < (ptr_t)__kf_preempt_end,      \
-                   "caller must be kernel preemptible");        \
-    } while(0)
-
 static inline void
 set_preemption() 
 {

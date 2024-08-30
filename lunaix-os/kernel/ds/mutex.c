@@ -44,7 +44,7 @@ mutex_unlock_for(mutex_t* mutex, pid_t pid)
     if (mutex->owner != pid || !atomic_load(&mutex->lk)) {
         return;
     }
-    __mutext_unlock(mutex);
+    atomic_fetch_sub(&mutex->lk, 1);
 }
 
 void

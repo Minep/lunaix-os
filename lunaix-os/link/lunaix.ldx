@@ -3,49 +3,103 @@
 
 ENTRY(ENTRY_POINT)
 
+PHDRS
+{
+    boot_text       PT_LOAD;
+    boot_data       PT_LOAD;
+
+    text            PT_LOAD;
+    data            PT_LOAD;
+    rodata          PT_LOAD     FLAGS(4);
+
+    var             PT_LOAD;
+}
+
 SECTIONS {
     . = LOAD_OFF;
 
+    __kload_start = ALIGN(PAGE_GRAN);
+
+
+    /* ---- boot start ---- */
+    __kboot_start = .;
+
     #include <linking/boot_secs.ldx>
+
+    __kboot_end = ALIGN(PAGE_GRAN);
+
 
     /* ---- kernel start ---- */
 
     . += KEXEC_BASE;
     
-    PROVIDE(__kexec_text_start = ALIGN(PAGE_GRAN));
+    PROVIDE(__kexec_text_start = ALIGN(PAGE_GRAN));    
     __kexec_start = ALIGN(PAGE_GRAN);
-    
-    
+
     /* kernel executable sections */
 
     #include "kernel.ldx"
-
 
     /* link-time allocated array */
 
     #include "lga.ldx"
 
+    /* 
+        All the auto-generated stuff and uninitialized data
+        must be a member of `var` segment 
+    */
 
-    /* All other stuff */
-
-    .ksymtable BLOCK(PAGE_GRAN) : AT ( ADDR(.ksymtable) - KEXEC_BASE )
+    .autogen BLOCK(PAGE_GRAN) 
+        : AT ( ADDR(.autogen) - KEXEC_BASE )
     {
-        *(.ksymtable)
-    }
+        KEEP(*(.autogen.*))
+    } : var
 
-    .bss BLOCK(PAGE_GRAN) : AT ( ADDR(.bss) - KEXEC_BASE ) 
+    /* 
+        End of loadable regions.
+        This fake section is used to correct address 
+         calculation
+    */
+    
+    .__load_end : {
+        __kload_end = ALIGN(PAGE_GRAN) - KEXEC_BASE;
+    } : var
+
+
+    .kpg BLOCK(PAGE_GRAN) 
+        : AT ( ADDR(.kpg) - KEXEC_BASE )
+    {
+        KEEP(*(.kpg))
+    } : var
+
+    .bss BLOCK(PAGE_GRAN) 
+        : AT ( ADDR(.bss) - KEXEC_BASE ) 
     {
         *(.bss)
-    }
 
-    .bss.kstack BLOCK(PAGE_GRAN) : AT ( ADDR(.bss.kstack) - KEXEC_BASE )
-    {
+        /* static kernel stack  */
+        . = ALIGN(PAGE_GRAN);
         PROVIDE(__bsskstack_start = .);
-
         *(.bss.kstack)
-
         PROVIDE(__bsskstack_end = .);
-    }
 
-    __kexec_end = ALIGN(PAGE_GRAN);
+        /* reclaimable data  */
+        . = ALIGN(PAGE_GRAN);
+        PROVIDE(__bssreclaim_start = .);
+        *(.bss.reclaim)
+        PROVIDE(__bssreclaim_end = .);
+    } : var
+
+    .__end_of_lunaix : 
+    {
+        __kbss_end  = ALIGN(PAGE_GRAN) - KEXEC_BASE;
+        __kexec_end = ALIGN(PAGE_GRAN);
+
+#ifdef CONFIG_USE_DEVICETREE
+        __dtb_start = ALIGN(PAGE_GRAN);
+        . = __dtb_start + CONFIG_DTB_MAXSIZE;
+#endif
+
+        __kimg_end = ALIGN(PAGE_GRAN);
+    } : var
 }

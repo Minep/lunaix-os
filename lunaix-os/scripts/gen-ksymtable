@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
 sym_types=$1
 bin=$2
 
 nm_out=$(nm -nfbsd "$bin")
-# class_info=$(readelf -h "$bin" | grep 'Class:' | awk '{print $2}')
+class_info=$($SCRIPT_DIR/elftool.tool -t -i $bin)
 
 allsyms=($nm_out)
 allsyms_len=${#allsyms[@]}
 
 dtype="4byte"
-if [ "$ARCH" == 'x86_64' ]; then
+if [ "$class_info" == 'ELF64' ]; then
     dtype="8byte"
 fi
 
@@ -28,9 +30,9 @@ done
 syms_len=${#syms_idx[@]}
 declare -A assoc_array
 
-echo '.section .ksymtable, "a", @progbits'
-echo "    .global __lunaix_ksymtable"
-echo "    __lunaix_ksymtable:"
+echo '.section .autogen.ksymtable, "a", @progbits'
+echo "    .global __autogen_ksymtable"
+echo "    __autogen_ksymtable:"
 echo "        .$dtype $syms_len"
 echo "        .align 8"
 

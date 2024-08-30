@@ -13,13 +13,12 @@ src_dirs += arch/$(ARCH)
 obj_files := $(addsuffix .o, $(_LBUILD_SRCS))
 
 build_lib := $(BUILD_DIR)/lib
-build_include := $(BUILD_DIR)/includes
 
 libc_include_opt = $(addprefix -I, $(libc_include))
 global_include_opt = $(addprefix -I, $(INCLUDES) $(_LBUILD_INCS))
 
 check_folders := $(src_dirs)
-check_folders += $(build_lib) $(build_include)
+check_folders += $(build_lib) $(LIBC_INCLUDE)
 
 $(BUILD_DIR):
 	@mkdir -p bin
@@ -47,7 +46,7 @@ clean:
 
 headers: $(libc_include)
 	@$(call status_,INSTALL,$(<F))
-	@cp -r $(libc_include)/* $(build_include)/
+	@cp -r $(libc_include)/* $(LIBC_INCLUDE)/
 
 all: $(addsuffix .check, $(check_folders)) $(build_lib)/$(BUILD_NAME) headers
 	@cp arch/$(ARCH)/crt0.S.o $(build_lib)/crt0.o

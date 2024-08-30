@@ -20,6 +20,7 @@ vfs_create_mount(struct v_mount* parent, struct v_dnode* mnt_point)
     }
 
     llist_init_head(&mnt->submnts);
+    llist_init_head(&mnt->sibmnts);
     llist_append(&all_mnts, &mnt->list);
     mutex_init(&mnt->lock);
 
@@ -67,7 +68,7 @@ __vfs_do_unmount(struct v_mount* mnt)
     // detached the inodes from cache, and let lru policy to recycle them
     for (size_t i = 0; i < VFS_HASHTABLE_SIZE; i++) {
         struct hbucket* bucket = &sb->i_cache[i];
-        if (!bucket) {
+        if (!bucket->head) {
             continue;
         }
         bucket->head->pprev = 0;
@@ -138,23 +139,19 @@ vfs_unmount(const char* target)
     return errno;
 }
 
-int
-vfs_mount_at(const char* fs_name,
-             struct device* device,
-             struct v_dnode* mnt_point,
-             int options)
+static int
+vfs_mount_fsat(struct filesystem* fs,
+               struct device* device,
+               struct v_dnode* mnt_point,
+               int options)
 {
+
     if (device && device->dev_type != DEV_IFVOL) {
         return ENOTBLK;
     }
 
     if (mnt_point->inode && !check_directory_node(mnt_point->inode)) {
         return ENOTDIR;
-    }
-
-    struct filesystem* fs = fsm_get(fs_name);
-    if (!fs) {
-        return ENODEV;
     }
 
     if ((fs->types & FSTYPE_ROFS)) {
@@ -167,6 +164,8 @@ vfs_mount_at(const char* fs_name,
 
     int errno = 0;
     char* dev_name = "sys";
+    char* fsname = HSTR_VAL(fs->fs_name);
+
     struct v_mount* parent_mnt = mnt_point->mnt;
     struct v_superblock *sb = vfs_sb_alloc(), 
                         *old_sb = mnt_point->super_block;
@@ -188,7 +187,8 @@ vfs_mount_at(const char* fs_name,
 
     mnt_point->mnt->flags = options;
     if (!(errno = fs->mount(sb, mnt_point))) {
-        kprintf("mount: dev=%s, fs=%s, mode=%d", dev_name, fs_name, options);
+        kprintf("mount: dev=%s, fs=%s, mode=%d", 
+                    dev_name, fsname, options);
     } else {
         goto cleanup;
     }
@@ -198,13 +198,48 @@ vfs_mount_at(const char* fs_name,
 
 cleanup:
     ERROR("failed mount: dev=%s, fs=%s, mode=%d, err=%d",
-          dev_name,
-          fs_name,
-          options,
-          errno);
+            dev_name, fsname, options, errno);
+
     vfs_d_assign_sb(mnt_point, old_sb);
     vfs_sb_free(sb);
     __vfs_release_vmnt(mnt_point->mnt);
+
+    mnt_point->mnt = parent_mnt;
+
+    return errno;
+}
+
+int
+vfs_mount_at(const char* fs_name,
+             struct device* device,
+             struct v_dnode* mnt_point,
+             int options)
+{
+    if (fs_name) {
+        struct filesystem* fs = fsm_get(fs_name);
+        if (!fs) {
+            return ENODEV;
+        }
+
+        return vfs_mount_fsat(fs, device, mnt_point, options);
+    }
+
+    int errno = ENODEV;
+    struct fs_iter fsi;
+
+    fsm_itbegin(&fsi);
+    while (fsm_itnext(&fsi))
+    {
+        if ((fsi.fs->types & FSTYPE_PSEUDO)) {
+            continue;
+        }
+
+        INFO("mount attempt: %s", HSTR_VAL(fsi.fs->fs_name));
+        errno = vfs_mount_fsat(fsi.fs, device, mnt_point, options);
+        if (!errno) {
+            break;
+        }
+    }
 
     return errno;
 }

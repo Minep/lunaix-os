@@ -51,21 +51,26 @@ typedef struct __pte pte_t;
 #endif
 
 
-#define _PTE_PROT_MASK          ( _PTE_W | _PTE_U | _PTE_X )
+#define _PTE_PPFN_MASK          ( (~PAGE_MASK & PMS_MASK))
+#define _PTE_PROT_MASK          ( ~_PTE_PPFN_MASK )
 
 #define KERNEL_PAGE             ( _PTE_P )
 #define KERNEL_EXEC             ( KERNEL_PAGE | _PTE_X )
 #define KERNEL_DATA             ( KERNEL_PAGE | _PTE_W | _PTE_NX )
 #define KERNEL_RDONLY           ( KERNEL_PAGE | _PTE_NX )
 #define KERNEL_ROEXEC           ( KERNEL_PAGE | _PTE_X  )
+#define KERNEL_PGTAB            ( KERNEL_PAGE | _PTE_W )
+#define KERNEL_DEFAULT            KERNEL_PGTAB
 
 #define USER_PAGE               ( _PTE_P | _PTE_U )
 #define USER_EXEC               ( USER_PAGE | _PTE_X )
 #define USER_DATA               ( USER_PAGE | _PTE_W | _PTE_NX )
 #define USER_RDONLY             ( USER_PAGE | _PTE_NX )
 #define USER_ROEXEC             ( USER_PAGE | _PTE_X  )
+#define USER_PGTAB              ( USER_PAGE | _PTE_W )
+#define USER_DEFAULT              USER_PGTAB
 
-#define SELF_MAP                ( KERNEL_DATA | _PTE_WT | _PTE_CD )
+#define SELF_MAP                ( KERNEL_PGTAB | _PTE_WT | _PTE_CD )
 
 #define __mkpte_from(pte_val)   ((pte_t){ .val = (pte_val) })
 
@@ -110,25 +115,25 @@ mkpte_raw(unsigned long pte_val)
 static inline pte_t
 pte_setpaddr(pte_t pte, ptr_t paddr)
 {
-    return __mkpte_from((pte.val & _PAGE_BASE_MASK) | (paddr & ~_PAGE_BASE_MASK));
+    return __mkpte_from((pte.val & _PTE_PROT_MASK) | (paddr & ~_PTE_PROT_MASK));
 }
 
 static inline pte_t
 pte_setppfn(pte_t pte, pfn_t ppfn)
 {
-    return __mkpte_from((pte.val & _PAGE_BASE_MASK) | (ppfn * PAGE_SIZE));
+    return pte_setpaddr(pte, ppfn * PAGE_SIZE);
 }
 
 static inline ptr_t
 pte_paddr(pte_t pte)
 {
-    return __paddr(pte.val) & ~_PAGE_BASE_MASK;
+    return __paddr(pte.val) & ~_PTE_PROT_MASK;
 }
 
 static inline pfn_t
 pte_ppfn(pte_t pte)
 {
-    return __paddr(pte.val) >> _PAGE_BASE_SHIFT;
+    return pte_paddr(pte) >> _PAGE_BASE_SHIFT;
 }
 
 static inline pte_t

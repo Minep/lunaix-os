@@ -311,10 +311,23 @@ class QEMUExec:
         return cmds
     
     def get_qemu_general_opts(self):
-        return [
+        opts = [
             "-m", get_config(self._opt, "memory", required=True),
             "-smp", str(get_config(self._opt, "ncpu", default=1))
         ]
+
+        kopts = get_config(self._opt, "kernel")
+        if kopts:
+            opts += [
+                "-kernel", get_config(kopts, "bin", required=True),
+                "-append", get_config(kopts, "cmd", required=True)
+            ]
+
+            dtb = get_config(kopts, "dtb")
+            if dtb:
+                opts += [ "-dtb", dtb ]
+
+        return opts
 
     def add_peripheral(self, peripheral):
         self._devices.append(peripheral)
@@ -374,7 +387,8 @@ def main():
         opts.update(json.loads(f.read()))
     
     for kv in arg_opt.values:
-        [k, v] = kv.split('=')
+        splits = kv.split('=')
+        k, v = splits[0], "=".join(splits[1:])
         g_lookup[k] = v
 
     arch = get_config(opts, "arch")

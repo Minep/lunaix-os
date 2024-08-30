@@ -1,92 +1,62 @@
 #define __BOOT_CODE__
 
 #include <lunaix/boot_generic.h>
+#include <lunaix/generic/bootmem.h>
+
 #include <sys/boot/bstage.h>
 #include <sys/boot/multiboot.h>
 #include <sys/mm/mempart.h>
 
-#define BHCTX_ALLOC 4096
+#include <klibc/string.h>
+
 #define MEM_1M      0x100000UL
 
-
-u8_t bhctx_buffer[BHCTX_ALLOC] boot_bss;
-
-#define check_buffer(ptr)                                                      \
-    if ((ptr) >= ((ptr_t)bhctx_buffer + BHCTX_ALLOC)) {                        \
-        asm("ud2");                                                            \
-    }
-
-size_t boot_text
-mb_memcpy(u8_t* destination, u8_t* base, unsigned int size)
+static void
+mb_parse_cmdline(struct boot_handoff* bhctx, char* cmdline)
 {
-    unsigned int i = 0;
-    for (; i < size; i++) {
-        *(destination + i) = *(base + i);
-    }
-    return i;
-}
-
-size_t boot_text
-mb_strcpy(char* destination, char* base)
-{
-    int i = 0;
-    char c = 0;
-    while ((c = base[i])) {
-        destination[i] = c;
-        i++;
-    }
-
-    destination[++i] = 0;
-
-    return i;
-}
-
-size_t boot_text
-mb_strlen(char* s)
-{
-    int i = 0;
-    while (s[i++])
-        ;
-    return i;
-}
-
-size_t boot_text
-mb_parse_cmdline(struct boot_handoff* bhctx, void* buffer, char* cmdline)
-{
-#define SPACE ' '
-
-    size_t slen = mb_strlen(cmdline);
-
+    size_t slen;
+    char* cmd;
+    
+    slen = strlen(cmdline);
     if (!slen) {
-        return 0;
+        return;
     }
 
-    mb_memcpy(buffer, (u8_t*)cmdline, slen);
-    bhctx->kexec.len = slen;
-    bhctx->kexec.cmdline = buffer;
+    cmd = bootmem_alloc(slen + 1);
+    strncpy(cmd, cmdline, slen);
 
-    return slen;
+    bhctx->kexec.len = slen;
+    bhctx->kexec.cmdline = cmd;
 }
 
-size_t boot_text
+static void
 mb_parse_mmap(struct boot_handoff* bhctx,
-              struct multiboot_info* mb,
-              void* buffer)
+              struct multiboot_info* mb)
 {
-    struct multiboot_mmap_entry* mb_mmap =
-      (struct multiboot_mmap_entry*)__ptr(mb->mmap_addr);
-    size_t mmap_len = mb->mmap_length / sizeof(struct multiboot_mmap_entry);
+    struct multiboot_mmap_entry *mb_mmap, *mb_mapent;
+    size_t mmap_len;
+    struct boot_mmapent *bmmap, *bmmapent;
 
-    struct boot_mmapent* bmmap = (struct boot_mmapent*)buffer;
+    mb_mmap = (struct multiboot_mmap_entry*)__ptr(mb->mmap_addr);
+    mmap_len = mb->mmap_length / sizeof(*mb_mmap);
+
+    bmmap = bootmem_alloc(sizeof(*bmmap) * mmap_len);
+    
     for (size_t i = 0; i < mmap_len; i++) {
-        struct boot_mmapent* bmmapent = &bmmap[i];
-        struct multiboot_mmap_entry* mb_mapent = &mb_mmap[i];
-
-        if (mb_mapent->type == MULTIBOOT_MEMORY_AVAILABLE) {
+        mb_mapent = &mb_mmap[i];
+        bmmapent  = &bmmap[i];
+    
+        if (mb_mapent->type == MULTIBOOT_MEMORY_AVAILABLE) 
+        {
             bmmapent->type = BOOT_MMAP_FREE;
-        } else if (mb_mapent->type == MULTIBOOT_MEMORY_ACPI_RECLAIMABLE) {
+        } 
+
+        else if (mb_mapent->type == MULTIBOOT_MEMORY_ACPI_RECLAIMABLE) 
+        {
             bmmapent->type = BOOT_MMAP_RCLM;
-        } else {
+        } 
+
+        else {
             bmmapent->type = BOOT_MMAP_RSVD;
         }
 
@@ -97,87 +67,78 @@ mb_parse_mmap(struct boot_handoff* bhctx,
     bhctx->mem.size = (mb->mem_upper << 10) + MEM_1M;
     bhctx->mem.mmap = bmmap;
     bhctx->mem.mmap_len = mmap_len;
-
-    return mmap_len * sizeof(struct boot_mmapent);
 }
 
-size_t boot_text
+static void
 mb_parse_mods(struct boot_handoff* bhctx,
-              struct multiboot_info* mb,
-              void* buffer)
+              struct multiboot_info* mb)
 {
     if (!mb->mods_count) {
         bhctx->mods.mods_num = 0;
-        return 0;
+        return;
     }
 
-    struct boot_modent* modents = (struct boot_modent*)buffer;
-    struct multiboot_mod_list* mods = 
-        (struct multiboot_mod_list*)__ptr(mb->mods_addr);
+    struct boot_modent* modents;
+    struct multiboot_mod_list* mods, *mod;
+    size_t name_len;
+    char* mod_name, *cmd;
 
-    ptr_t mod_str_ptr = __ptr(&modents[mb->mods_count]);
+    mods = (struct multiboot_mod_list*)__ptr(mb->mods_addr);
+    modents = bootmem_alloc(sizeof(*modents) * mb->mods_count);
 
     for (size_t i = 0; i < mb->mods_count; i++) {
-        struct multiboot_mod_list* mod = &mods[i];
-        modents[i] = (struct boot_modent){ .start = mod->mod_start,
-                                           .end = mod->mod_end,
-                                           .str = (char*)mod_str_ptr };
-                                           
-        mod_str_ptr += mb_strcpy((char*)mod_str_ptr, 
-                                 (char*)__ptr(mod->cmdline));
+        mod = &mods[i];
+        cmd = (char*)__ptr(mod->cmdline);
+        name_len = strlen(cmd);
+        mod_name = bootmem_alloc(name_len + 1);
+
+        modents[i] = (struct boot_modent){ 
+            .start = mod->mod_start,
+            .end = mod->mod_end,
+            .str = mod_name 
+        };
+
+        strncpy(mod_name, cmd, name_len);
     }
 
     bhctx->mods.mods_num = mb->mods_count;
     bhctx->mods.entries = modents;
-
-    return mod_str_ptr - (ptr_t)buffer;
 }
 
-void boot_text
+static void
 mb_prepare_hook(struct boot_handoff* bhctx)
 {
     // nothing to do
 }
 
-void boot_text
+static void
 mb_release_hook(struct boot_handoff* bhctx)
 {
     // nothing to do
 }
 
-#define align_addr(addr) (((addr) + (sizeof(ptr_t) - 1)) & ~(sizeof(ptr_t) - 1))
-
-struct boot_handoff* boot_text
-mb_parse(struct multiboot_info* mb)
+void
+mb_parse(struct boot_handoff* bhctx)
 {
-    struct boot_handoff* bhctx = (struct boot_handoff*)bhctx_buffer;
-    ptr_t bhctx_ex = (ptr_t)&bhctx[1];
+    struct multiboot_info* mb;
     
-    *bhctx = (struct boot_handoff){ };
+    mb = (struct multiboot_info*)__multiboot_addr;
 
     /* Parse memory map */
     if ((mb->flags & MULTIBOOT_INFO_MEM_MAP)) {
-        bhctx_ex += mb_parse_mmap(bhctx, mb, (void*)bhctx_ex);
-        bhctx_ex = align_addr(bhctx_ex);
+        mb_parse_mmap(bhctx, mb);
     }
 
     /* Parse cmdline */
     if ((mb->flags & MULTIBOOT_INFO_CMDLINE)) {
-        bhctx_ex +=
-          mb_parse_cmdline(bhctx, (void*)bhctx_ex, (char*)__ptr(mb->cmdline));
-        bhctx_ex = align_addr(bhctx_ex);
+        mb_parse_cmdline(bhctx, (char*)__ptr(mb->cmdline));
     }
 
     /* Parse sys modules */
     if ((mb->flags & MULTIBOOT_INFO_MODS)) {
-        bhctx_ex += mb_parse_mods(bhctx, mb, (void*)bhctx_ex);
-        bhctx_ex = align_addr(bhctx_ex);
+        mb_parse_mods(bhctx, mb);
     }
-
-    check_buffer(bhctx_ex);
 
     bhctx->prepare = mb_prepare_hook;
     bhctx->release = mb_release_hook;
-
-    return bhctx;
 }

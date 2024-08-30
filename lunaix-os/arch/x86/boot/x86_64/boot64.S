@@ -6,7 +6,7 @@
 
 #include "sys/mm/mempart64.h"
 
-.section .boot.bss
+.section .boot.data
     .align 8
     __tmp_gdt:
         .long 0x0

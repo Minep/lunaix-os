@@ -2,7 +2,6 @@
 #include <lunaix/exec.h>
 #include <lunaix/foptions.h>
 #include <lunaix/fs.h>
-#include <lunaix/fs/probe_boot.h>
 #include <lunaix/fs/twifs.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
@@ -10,6 +9,7 @@
 #include <lunaix/owloysius.h>
 #include <lunaix/sched.h>
 #include <lunaix/kpreempt.h>
+#include <lunaix/kcmd.h>
 
 #include <klibc/string.h>
 
@@ -21,16 +21,33 @@ init_platform();
 int
 mount_bootmedium()
 {
-    struct v_dnode* dnode;
     int errno = 0;
-    struct device* dev = probe_boot_medium();
-    if (!dev) {
-        ERROR("fail to acquire device. (%d)", errno);
+    char* rootfs;
+    struct v_dnode* dn;
+    struct device* dev;
+
+    if (!kcmd_get_option("rootfs", &rootfs)) {
+        ERROR("no rootfs.");
         return 0;
     }
 
-    if ((errno = vfs_mount("/mnt/lunaix-os", "iso9660", dev, 0))) {
-        ERROR("fail to mount boot medium. (%d)", errno);
+    if ((errno = vfs_walk(NULL, rootfs, &dn, NULL, 0))) {
+        ERROR("%s: no such file (%d)", rootfs, errno);
+        return 0;
+    }
+    
+    dev = resolve_device(dn->inode->data);
+    if (!dev) {
+        ERROR("%s: not a device", rootfs);
+        return 0;
+    }
+
+    // unmount the /dev to put old root fs in clear
+    must_success(vfs_unmount("/dev"));
+
+    // re-mount the root fs with our device.
+    if ((errno = vfs_mount_root(NULL, dev))) {
+        ERROR("mount root failed: %s (%d)", rootfs, errno);
         return 0;
     }
 
@@ -41,8 +58,10 @@ int
 exec_initd()
 {
     int errno = 0;
-    const char* argv[] = { "/mnt/lunaix-os/usr/bin/init", 0 };
+    const char* argv[] = { "/init", 0 };
     const char* envp[] = { 0 };
+
+    kcmd_get_option("init", (char**)&argv[0]);
 
     if ((errno = exec_kexecve(argv[0], argv, envp))) {
         goto fail;
@@ -60,7 +79,7 @@ lunad_do_usr() {
     // No, these are not preemptive
     no_preemption();
 
-    if (!mount_bootmedium() || !exec_initd()) {
+    if (!exec_initd()) {
         fail("failed to initd");
     }
 }
@@ -73,7 +92,7 @@ lunad_do_usr() {
  * 同时，该进程也负责fork出我们的init进程。
  *
  */
-void _preemptible
+void
 lunad_main()
 {
     spawn_kthread((ptr_t)init_platform);
@@ -99,16 +118,22 @@ lunad_main()
 
 void
 init_platform()
-{
+{    
     device_postboot_load();
     invoke_init_function(on_postboot);
 
     twifs_register_plugins();
+
+    if (!mount_bootmedium()) {
+        ERROR("failed to boot");
+        goto exit;
+    }
 
     // FIXME Re-design needed!!
     // sdbg_init();
     
     assert(!spawn_process(NULL, (ptr_t)lunad_do_usr, true));
 
+exit:
     exit_thread(NULL);
 }

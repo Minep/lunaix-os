@@ -270,12 +270,7 @@ vfs_pclose(struct v_file* file, pid_t pid)
 {
     struct v_inode* inode;
     int errno = 0;
-    
-    if (file->ref_count > 1) {
-        atomic_fetch_sub(&file->ref_count, 1);
-        return 0;
-    } 
-    
+
     inode = file->inode;
 
     /*
@@ -296,29 +291,42 @@ vfs_pclose(struct v_file* file, pid_t pid)
      * process is writing to this file later after B exit.
     */
 
-    if (mutex_on_hold(&inode->lock)) {
-        mutex_unlock_for(&inode->lock, pid);
+    mutex_unlock_for(&inode->lock, pid);
+    
+    if (file->ref_count > 1) {
+        atomic_fetch_sub(&file->ref_count, 1);
+        return 0;
     }
 
-    lock_inode(inode);
-
-    pcache_commit_all(inode);
     if ((errno = file->ops->close(file))) {
-        goto unlock;
+        goto done;
     }
 
     atomic_fetch_sub(&file->dnode->ref_count, 1);
+    mnt_chillax(file->dnode->mnt);
+    cake_release(file_pile, file);
+
+    /*
+        if the current inode is not being locked by other 
+        threads that does not share same open context,
+        then we can try to do sync opportunistically
+    */
+    if (mutex_on_hold(&inode->lock)) {
+        goto done;
+    }
+    
+    lock_inode(inode);
+
+    pcache_commit_all(inode);
     inode->open_count--;
 
     if (!inode->open_count) {
         __sync_inode_nolock(inode);
     }
 
-    mnt_chillax(file->dnode->mnt);
-    cake_release(file_pile, file);
-
-unlock:
     unlock_inode(inode);
+
+done:
     return errno;
 }
 

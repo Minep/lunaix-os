@@ -95,20 +95,23 @@ __prepare_fault_context(struct fault_context* fault)
     // for a ptep fault, the parent page tables should match the actual
     //  accesser permission
     if (kernel_refaddr) {
-        ptep_alloc_hierarchy(fault_ptep, fault_va, KERNEL_DATA);
+        ptep_alloc_hierarchy(fault_ptep, fault_va, KERNEL_PGTAB);
     } else {
-        ptep_alloc_hierarchy(fault_ptep, fault_va, USER_DATA);
+        ptep_alloc_hierarchy(fault_ptep, fault_va, USER_PGTAB);
     }
 
     fault->fault_pte = fault_pte;
+
+    if (fault->ptep_fault) {
+        // fault on intermediate levels.
+        fault_pte = pte_setprot(fault_pte, KERNEL_PGTAB);
+    }
     
-    if (fault->ptep_fault && !kernel_refaddr) {
-        fault->resolving = pte_setprot(fault_pte, USER_DATA);
-    } else {
-        fault->resolving = pte_setprot(fault_pte, KERNEL_DATA);
+    if (!kernel_refaddr) {
+        fault_pte = pte_mkuser(fault_pte);
     }
 
-    fault->resolving = pte_mkloaded(fault->resolving);
+    fault->resolving = pte_mkloaded(fault_pte);
     fault->kernel_vmfault = kernel_vmfault;
     fault->kernel_access  = kernel_context(fault->hstate);
 
@@ -160,8 +163,7 @@ static void
 __handle_anon_region(struct fault_context* fault)
 {
     pte_t pte = fault->resolving;
-    pte_attr_t prot = region_pteprot(fault->vmr);
-    pte = pte_setprot(pte, prot);
+    pte = region_tweakpte(fault->vmr, pte);
 
     // TODO Potentially we can get different order of leaflet here
     struct leaflet* region_part = alloc_leaflet(0);
@@ -191,7 +193,7 @@ __handle_named_region(struct fault_context* fault)
     // TODO Potentially we can get different order of leaflet here
     struct leaflet* region_part = alloc_leaflet(0);
 
-    pte = pte_setprot(pte, region_pteprot(vmr));
+    pte = region_tweakpte(vmr, pte);
     ptep_map_leaflet(fault->fault_ptep, pte, region_part);
 
     if (mseg_off < mapped_len) {

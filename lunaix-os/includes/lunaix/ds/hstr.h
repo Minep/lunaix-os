@@ -7,8 +7,8 @@
 
 struct hstr
 {
-    u32_t hash;
-    u32_t len;
+    unsigned int hash;
+    unsigned int len;
     const char* value;
 };
 

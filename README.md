@@ -71,6 +71,7 @@ Lunaix全部特性一览：
       + MC146818 RTC
       + i8042 PS/2
       + RNG（使用`rdrand`）
+  + [Devicetree](https://www.devicetree.org/)
 + 通用图形设备抽象层 (Draft)
   + 参考：`lunaix-os/hal/gfxa`
 + 虚拟终端设备接口（POSIX.1-2008, section 11）
@@ -92,7 +93,7 @@ Lunaix全部特性一览：
 
 ## 4. 编译与构建
 
-**！如果想要立刻构建并运行，请参考4.6！**
+**！如果想要立刻构建并运行，请参考4.7！**
 
 构建该项目需要满足以下条件：
 
@@ -117,15 +118,11 @@ make CX_PREFIX=i686-linux-gnu- all
 
 ### 4.3 构建选项
 
-
-假若条件满足，那么可以直接执行`make all`进行构建，完成后可在生成的`build`目录下找到可引导的iso。
-
 本项目支持的make命令：
 | 命令                     | 用途                                            |
 | ------------------------ | ----------------------------------------------- |
-| `make all`               | 等价于 `make image` |
-| `make image`             | 构建ISO镜像，可直接启动，使用ISO9660文件系统         |
-| `make kernel`            | 构建内核ELF镜像，无法直接启动，需要引导程序        |
+| `make all`               | 构建内核ELF镜像 |
+| `make rootfs`            | 构建根文件系统镜像，将会封装`usr/`下的程序        |
 | `make clean`             | 删除构建缓存，用于重新构建               |
 | `make config`            | 配置Lunaix                                   |
 
@@ -139,7 +136,11 @@ make CX_PREFIX=i686-linux-gnu- all
 
 Lunaix是一个可配置的内核，允许用户在编译前选择应当包含或移除的功能。
 
-使用`make config`来进行基于命令行的交互配置。呈现方式采用Shell的形式，所有的配置项按照类似于文件树的形式组织，如单个配置项为一个“文件”，多个配置项组成的配置组为一个目录，呈现形式为方括号`[]`包裹起来的项目。在提示符中输入`usage`并回车可以查看具体的使用方法。
+使用`make config`来进行基于命令行的交互配置。采用TUI呈现，效果类似于menuconfig.
+
+如果因为某种原因，TUI界面无法呈现，那么将会默认使用shell形式的呈现：
+
+所有的配置项按照类似于文件树的形式组织，如单个配置项为一个“文件”，多个配置项组成的配置组为一个目录，呈现形式为方括号`[]`包裹起来的项目。在提示符中输入`usage`并回车可以查看具体的使用方法。
 
 一个最常用的配置可能就是`architecture_support/arch`了，也就是配置Lunaix所面向的指令集。比如，编译一个在x86_64平台上运行的Lunaix，在提示符中输入（**注意等号两侧的空格，这是不能省略的**）：
 
@@ -147,14 +148,14 @@ Lunaix是一个可配置的内核，允许用户在编译前选择应当包含�
 /architecture_support/arch = x86_64
 ```
 
-之后输入`exit`保存并推出。而后正常编译。
+之后输入`exit`保存并退出。而后正常编译。
 
-
-### 4.5 设置内核启动参数
+### 4.5 设置内核参数
 
 在 make 的时候通过`CMDLINE`变量可以设置内核启动参数列表。该列表可以包含多个参数，通过一个或多个空格来分割。每个参数可以为键值对 `<key>=<val>` 或者是开关标志位 `<flag>`。目前 Lunaix 支持以下参数：
 
 + `console=<dev>` 设置系统终端的输入输出设备（tty设备）。其中 `<dev>` 是设备文件路径 （注意，这里的设备文件路径是针对Lunaix，而非Linux）。关于LunaixOS设备文件系统的介绍可参考 Lunaix Wiki（WIP）
++ （参考 4.6）
 
 如果`CMDLINE`未指定，则将会载入默认参数：
 
@@ -168,23 +169,33 @@ console=/dev/ttyFB0
 
 **注意：** 根据操作系统和键盘布局的不同，telnet客户端对一些关键键位的映射（如退格，回车）可能有所差别（如某些版本的Linux会将退格键映射为`0x7f`，也就是ASCII的`<DEL>`字符，而非我们熟知`0x08`）。如果读者想要通过串口方式把玩Lunaix，请修改`usr/init/init.c`里面的终端初始化代码，将`VERASE`设置为正确的映射（修改方式可以参考 POSIX termios 的使用方式。由于Lunaix的终端接口的实现是完全兼容POSIX的，读者可以直接去查阅Linux自带的帮助`man termios`，无需作任何的转换）
 
-### 4.6 测试与体验 Lunaix
 
-用户可以使用脚本`live_debug.sh` 来快速运行Lunaix。 该脚本自动按照默认的选项构建Lunaix，而后调用 `scripts/qemu.py` 根据配置文件生成QEMU启动参数
-（配置文件位于`scripts/qemus/`）
+### 4.6 Lunaix的启动
+
+由于 Lunaix 的定位是内核。为了避免太多的编译时的前置要求，同时为了提高灵活性，我们移除了iso文件的封装功能。目前的 Lunaix 将只会编译出一个 ELF 格式的二进制文件。用户可以根据自己的喜好，使用的不同的方式，不同的 bootloader 来引导 Lunaix. 
+
+为了能够使得 Lunaix 能够正确的启动，用户必须设置以下内核参数：
+
++ `rootfs=` 指明根目录设备，值为设备文件路径，指向包含根文件系统的磁盘设备，如`/dev/block/sda`。 Lunaix将会在启动之后自动挂在该文件系统到根目录。缺少此选项 Lunaix 将会拒绝启动，并进入 kernel panic （在 Lunaix 的世界里，这个被称之为 Nightmare Moon arrival ）
++ `init=` 指明 init 程序的位置，该程序必须放在 `rootfs` 中。改选项为可选设置，其默认值为 `/init`。  init 程序是 Lunaix 在启动后所运行的第一个程序。
+
+### 4.7 测试与体验 Lunaix
+
+
+想要快速体验，请跟随以下步骤：
+
+1. 决定一个你想要体验的架构，如 `x86_64`。 （支持：`x86_64`, `i386`）为了叙述方便，这个架构在下文被指代为`<arch>`
+2. 检查你是否安装了： `qemu-system-<arch>`，`gdb`，`python3`，`telnet`，`gcc`
+3. 运行 `make ARCH=<arch> user` 来编译自带的用户程序
+4. 运行 `make ARCH=<arch> rootfs` 来打包根文件系统镜像。（需要本机系统支持 `dd`，`mkfs.ext2`, `mount -o loop`, `mktemp`）
+5. 运行 `ARCH=<arch> live_debug.sh` 来启动
+
+该脚本自动按照默认的选项构建Lunaix，而后调用 `scripts/qemu.py` 根据配置文件生成QEMU启动参数（配置文件位于`scripts/qemus/`）
 
 由于该脚本的主要用途是方便作者进行调试，所以在QEMU窗口打开后还需要进行以下动作：
 
 1. 使用telnet连接到`localhost:12345`，这里是Lunaix进行标准输入输出所使用的UART映射（QEMU为guest提供UART实现，并将其利用telnet协议重定向到宿主机）
 2. 在GDB窗口中输入`c`然后回车，此时Lunaix开始运行。这样做的目的是允许在QEMU进行模拟前，事先打好感兴趣的断点。
-
-该脚本的运行需要设置 `ARCH=<isa>` 环境变量，其值需要与编译时制定的值一致。
-
-如：
-
-```sh
-ARCH=x86_64 ./live_debug.sh
-```
 
 ## 5. 运行，分支以及 Issue
 

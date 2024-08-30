@@ -1,7 +1,6 @@
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/pagetable.h>
-
-extern unsigned int __kexec_end[];
+#include <lunaix/sections.h>
 
 void
 pmm_arch_init_pool(struct pmem* memory)
@@ -12,7 +11,7 @@ pmm_arch_init_pool(struct pmem* memory)
 ptr_t
 pmm_arch_init_remap(struct pmem* memory, struct boot_handoff* bctx)
 {
-    size_t ppfn_total = pfn(bctx->mem.size) + 1;
+    size_t ppfn_total = pfn(bctx->mem.size);
     size_t pool_size  = ppfn_total * sizeof(struct ppage);
     
     size_t i = 0;
@@ -30,7 +29,7 @@ restart:;
     return 0;
 
 found:;
-    ptr_t kexec_end = to_kphysical(__kexec_end);
+    ptr_t kexec_end = to_kphysical(kernel_start);
     ptr_t aligned_pplist = MAX(ent->start, kexec_end);
 
 #ifdef CONFIG_ARCH_X86_64

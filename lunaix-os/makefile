@@ -9,7 +9,7 @@ ARCH ?= i386
 MODE ?= debug
 export ARCH
 
-DEPS := $(CC) $(LD) $(AR) xorriso grub-mkrescue
+DEPS := $(CC) $(LD) $(AR)
 
 CMDLINE ?= console=/dev/ttyFB0
 
@@ -31,8 +31,6 @@ $(DEPS):
 $(kbuild_dir):
 	@mkdir -p $(kbin_dir)
 	@mkdir -p $(os_img_dir)
-	@mkdir -p $(os_img_dir)/boot
-	@mkdir -p $(os_img_dir)/boot/grub
 	@mkdir -p $(os_img_dir)/usr
 
 .PHONY: kernel
@@ -43,20 +41,20 @@ kernel: $(lbuild_mkinc)
 
 	@$(MAKE) $(MKFLAGS) -I $(mkinc_dir) -f kernel.mk all
 
+.PHONY: rootfs all clean-user clean tool
+
+tool:
+	$(call status,TASK,$@)
+	@$(MAKE) $(MKFLAGS) -C scripts all -I $(mkinc_dir)
+
 .NOTPARALLEL:
-.PHONY: image
 export KCMD=$(CMDLINE)
 export LBUILD ARCH MODE
-image: $(kbuild_dir) kernel usr/build
-	$(call status,TASK,$(notdir $@))
-	$(call status,PACK,$(kimg))
+all: $(kbuild_dir) tool kernel usr/build
 
-	@./scripts/grub/config-grub.sh $(os_img_dir)/boot/grub/grub.cfg
-	@cp -r usr/build/* $(os_img_dir)/usr
-	@cp -r $(kbin_dir)/* $(os_img_dir)/boot
-	@grub-mkrescue -o $(kimg) $(os_img_dir)\
-		-- -volid "LUNA" -system_id "Lunaix" \
-		-report_about FAILURE -abort_on FAILURE
+rootfs: usr/build
+	$(call status,TASK,$(notdir $@))
+	@./scripts/mkrootfs
 
 usr/build: user
 
@@ -67,8 +65,13 @@ user:
 	$(call status,TASK,$@)
 	@$(MAKE) $(MKFLAGS) -C usr all -I $(mkinc_dir)
 
-clean:
+clean-user:
 	@$(MAKE) -C usr clean -I $(mkinc_dir)
+
+clean:
+	@$(MAKE) $(MKFLAGS) -C usr clean -I $(mkinc_dir)
+	@$(MAKE) $(MKFLAGS) -C scripts clean -I $(mkinc_dir)
 	@$(MAKE) -f kernel.mk clean -I $(mkinc_dir)
+	
 	@rm -rf $(kbuild_dir) || exit 1
 	@rm -rf .builder || exit 1
