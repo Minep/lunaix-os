@@ -92,7 +92,7 @@ lunad_do_usr() {
  * 同时，该进程也负责fork出我们的init进程。
  *
  */
-void _preemptible
+void
 lunad_main()
 {
     spawn_kthread((ptr_t)init_platform);

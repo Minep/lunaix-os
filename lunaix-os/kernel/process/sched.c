@@ -73,10 +73,9 @@ run(struct thread* thread)
     clean-up on these thread, in the preemptible kernel thread.
 */
 
-void _preemptible
-cleanup_detached_threads() {
-    ensure_preempt_caller();
-
+void
+cleanup_detached_threads() 
+{
     // XXX may be a lock on sched_context will ben the most appropriate?
     cpu_disable_interrupt();
 
