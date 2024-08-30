@@ -2,7 +2,6 @@
 #include <lunaix/exec.h>
 #include <lunaix/foptions.h>
 #include <lunaix/fs.h>
-#include <lunaix/fs/probe_boot.h>
 #include <lunaix/fs/twifs.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
@@ -28,14 +27,7 @@ mount_bootmedium()
     struct device* dev;
 
     if (!kcmd_get_option("rootfs", &rootfs)) {
-        WARN("no prefered rootfs detected, try disks...");
-
-        dev = probe_boot_medium();
-        if (dev) {
-            goto proceed;
-        }
-
-        ERROR("mount root: ran out options, can't proceed.");
+        ERROR("no rootfs.");
         return 0;
     }
 
@@ -50,7 +42,6 @@ mount_bootmedium()
         return 0;
     }
 
-proceed:
     // unmount the /dev to put old root fs in clear
     must_success(vfs_unmount("/dev"));
 

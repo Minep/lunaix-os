@@ -19,6 +19,10 @@
             "apic"
         ]
     },
+    "kernel": {
+        "bin": "$KBIN",
+        "cmd": "$KCMD"
+    },
     "debug": {
         "gdb_port": "$GDB_PORT",
         "traced": [
@@ -60,12 +64,6 @@
                 {
                     "type": "ide-hd",
                     "img": "$ROOTFS",
-                    "format": "raw"
-                },
-                {
-                    "type": "ide-cd",
-                    "img": "$KIMG",
-                    "ro": true,
                     "format": "raw"
                 }
             ]

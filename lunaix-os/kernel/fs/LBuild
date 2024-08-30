@@ -17,6 +17,5 @@ sources([
     "path_walk.c",
     "fsm.c",
     "fs_export.c",
-    "probe_boot.c"
 ])
 
