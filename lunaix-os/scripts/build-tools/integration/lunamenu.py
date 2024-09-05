@@ -118,6 +118,7 @@ class MainMenuContext(tui.TuiContext):
 
         t = menu.create_title(self, "Lunaix Kernel Configuration" + suffix)
         t2 = menu.create_title(self, repo_info)
+        t2.set_local_pos(2, 0)
         t2.set_alignment(Alignment.BOT | Alignment.RIGHT)
 
         root.add(t)

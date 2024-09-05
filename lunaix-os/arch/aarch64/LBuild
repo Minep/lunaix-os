@@ -1,0 +1,7 @@
+
+compile_opts([
+    "-mlittle-endian",
+    "-mgeneral-regs-only",
+    "-mabi=lp64",
+    "-mno-omit-leaf-frame-pointer"
+])
