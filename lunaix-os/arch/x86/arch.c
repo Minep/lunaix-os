@@ -41,7 +41,7 @@ select_platform_timer()
 
     // TODO select alternatives...
 
-    panick("no timer to use.");
+    fail("no timer to use.");
 }
 
 void

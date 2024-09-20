@@ -8,7 +8,7 @@ OUT  := $(addsuffix .tool,$(SRC))
 
 %.tool : %.c
 	$(call status,CC,$<)
-	@$(CC) $< -o $@
+	@cc $< -o $@
 
 .PHONY: all clean
 

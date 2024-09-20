@@ -115,9 +115,6 @@ __assert_fail(const char* expr, const char* file, unsigned int line)
 
 #endif // CONFIG_NO_ASSERT
 
-void noret
-panick(const char* msg);
-
 #define wait_until(cond)                                                       \
     while (!(cond))                                                            \
         ;

@@ -24,12 +24,7 @@ port_rdword(int port)
 static inline void
 port_rdwords(int port, void* addr, int cnt)
 {
-    asm volatile("cld\n"
-                 "repne\n"
-                 "insw"
-                 : "=D"(addr), "=c"(cnt)
-                 : "d"(port), "0"(addr), "1"(cnt)
-                 : "memory", "cc");
+    return;
 }
 
 static inline u32_t

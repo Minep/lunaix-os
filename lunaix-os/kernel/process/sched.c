@@ -346,7 +346,7 @@ get_free_pid() {
         ;
     
     if (unlikely(i == MAX_PROCESS)) {
-        panick("Panic in Ponyville shimmer!");
+        fail("Panic in Ponyville shimmer!");
     }
 
     return i;
@@ -593,7 +593,7 @@ terminate_proccess(struct proc_info* proc, int exit_code) {
     assert(!kernel_process(proc));
 
     if (proc->pid == 1) {
-        panick("Attempt to kill init");
+        fail("Attempt to kill init");
     }
 
     terminate_proc_only(proc, exit_code);
