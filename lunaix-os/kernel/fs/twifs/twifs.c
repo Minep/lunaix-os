@@ -18,7 +18,7 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 
-#include <sys/mm/pagetable.h>
+#include <asm/pagetable.h>
 
 static struct twifs_node* fs_root;
 

@@ -5,7 +5,7 @@
 #include <lunaix/mm/mmap.h>
 #include <lunaix/process.h>
 
-#include <sys/mm/mm_defs.h>
+#include <asm/mm_defs.h>
 
 #include <klibc/string.h>
 
@@ -250,17 +250,7 @@ vmscpy(struct proc_mm* dest_mm, struct proc_mm* src_mm)
     }
 
 done:;
-    unsigned int i  = va_level_index(KERNEL_RESIDENT, L0T_SIZE);
-    pte_t* src_smx = mkl0tep_va(VMS_SELF, 0);
-    for (; i < LEVEL_SIZE; i++)
-    {
-        pte_t* ptep = &ptep_smx[i];
-        if (lntep_implie_vmnts(ptep, L0T_SIZE)) {
-            continue;
-        }
-
-        set_pte(ptep, pte_at(&src_smx[i]));
-    }
+    procvm_link_kernel(dest_mnt);
     
     dest_mm->vmroot = pte_paddr(pte_sms);
 }
@@ -280,6 +270,8 @@ vmsfree(struct proc_mm* mm)
     {
         vmrfree(vm_mnt, pos);
     }
+
+    procvm_unlink_kernel();
 
     leaflet = pte_leaflet_aligned(pte_at(ptep_self));
     leaflet_return(leaflet);

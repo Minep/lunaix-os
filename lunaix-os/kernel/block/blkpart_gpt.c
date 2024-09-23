@@ -5,7 +5,7 @@
 #include <lunaix/status.h>
 #include <lunaix/syslog.h>
 
-#include <sys/muldiv64.h>
+#include <asm/muldiv64.h>
 
 #include <klibc/crc.h>
 

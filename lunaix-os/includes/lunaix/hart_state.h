@@ -6,7 +6,7 @@ struct regcontext;
 struct hart_state;
 
 #include <lunaix/compiler.h>
-#include <sys/hart.h>
+#include <asm/hart.h>
 
 struct hart_transition 
 {

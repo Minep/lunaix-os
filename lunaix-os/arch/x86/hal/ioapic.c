@@ -2,9 +2,9 @@
 
 #include <lunaix/mm/mmio.h>
 
-#include <sys/hart.h>
-#include "sys/ioapic.h"
-#include "sys/x86_isa.h"
+#include <asm/hart.h>
+#include "asm/soc/ioapic.h"
+#include "asm/x86.h"
 
 #define IOAPIC_IOREGSEL 0x00
 #define IOAPIC_IOWIN 0x10

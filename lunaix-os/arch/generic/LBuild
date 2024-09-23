@@ -1,0 +1,8 @@
+headers("includes")
+
+sources([
+    "bootmem.c",
+    "trace.c",
+    "vmutils.c",
+    "procvm.c",
+])

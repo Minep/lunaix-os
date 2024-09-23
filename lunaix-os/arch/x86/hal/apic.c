@@ -9,11 +9,11 @@
  *
  */
 
-#include "sys/x86_isa.h"
-#include <sys/cpu.h>
+#include "asm/x86.h"
+#include "asm/x86_cpu.h"
 
-#include "sys/apic.h"
-#include <sys/hart.h>
+#include "asm/soc/apic.h"
+#include <asm/hart.h>
 
 #include <lunaix/mm/mmio.h>
 #include <lunaix/spike.h>

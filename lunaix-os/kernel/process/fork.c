@@ -10,8 +10,8 @@
 #include <lunaix/signal.h>
 #include <lunaix/kpreempt.h>
 
-#include <sys/abi.h>
-#include <sys/mm/mm_defs.h>
+#include <asm/abi.h>
+#include <asm/mm_defs.h>
 
 #include <klibc/string.h>
 

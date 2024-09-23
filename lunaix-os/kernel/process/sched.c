@@ -1,7 +1,7 @@
-#include <sys/abi.h>
-#include <sys/mm/mempart.h>
+#include <asm/abi.h>
+#include <asm/mempart.h>
 
-#include <sys/cpu.h>
+#include <asm/cpu.h>
 
 #include <lunaix/fs/taskfs.h>
 #include <lunaix/mm/cake.h>
@@ -20,7 +20,7 @@
 #include <lunaix/hart_state.h>
 #include <lunaix/kpreempt.h>
 
-#include <lunaix/generic/isrm.h>
+#include <asm/isrm.h>
 
 #include <klibc/string.h>
 

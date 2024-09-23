@@ -4,7 +4,7 @@
 #include <lunaix/types.h>
 #include <lunaix/ds/llist.h>
 
-#include <sys/mm/memory.h>
+#include <asm/pagetable.h>
 
 #include <usr/lunaix/mann_flags.h>
 

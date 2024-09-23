@@ -2,13 +2,14 @@
 #include <lunaix/block.h>
 #include <lunaix/boot_generic.h>
 #include <lunaix/device.h>
-#include <lunaix/foptions.h>
 #include <lunaix/input.h>
+
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
+
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/spike.h>
@@ -18,14 +19,9 @@
 #include <lunaix/syslog.h>
 #include <lunaix/sections.h>
 
-#include <hal/acpi/acpi.h>
 #include <hal/devtree.h>
 
-#include <sys/abi.h>
-#include <sys/mm/mm_defs.h>
-
-#include <klibc/strfmt.h>
-#include <klibc/string.h>
+#include <asm/mm_defs.h>
 
 LOG_MODULE("kinit")
 
@@ -118,8 +114,6 @@ __remap_and_load_dtb(struct boot_handoff* bhctx)
 void
 kernel_bootstrap(struct boot_handoff* bhctx)
 {
-    vmm_init();
-
     pmm_init(bhctx);
     // now we can start reserving physical space
 

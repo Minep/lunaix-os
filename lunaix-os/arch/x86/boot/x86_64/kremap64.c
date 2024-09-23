@@ -5,7 +5,7 @@
 #include <lunaix/sections.h>
 
 #include <sys/boot/bstage.h>
-#include <sys/mm/mm_defs.h>
+#include <asm/mm_defs.h>
 
 #define RSVD_PAGES 32
 

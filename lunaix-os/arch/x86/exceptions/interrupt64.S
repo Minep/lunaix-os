@@ -1,7 +1,7 @@
 #define __ASM__
-#include <sys/hart.h>
-#include <sys/abi.h>
-#include <sys/interrupt64.S.inc>
+#include <asm/hart.h>
+#include <asm/abi.h>
+#include <asm/variants/interrupt64.S.inc>
 
 #include <lunaix/syscall.h>
 

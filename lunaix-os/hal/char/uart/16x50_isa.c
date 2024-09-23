@@ -1,8 +1,8 @@
 #include <lunaix/device.h>
-#include <lunaix/generic/isrm.h>
+#include <asm/isrm.h>
 #include <lunaix/syslog.h>
 
-#include <sys/port_io.h>
+#include <asm/x86_pmio.h>
 
 #include "16x50.h"
 

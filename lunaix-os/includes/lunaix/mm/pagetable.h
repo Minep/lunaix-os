@@ -99,9 +99,9 @@ struct __pte;
 typedef struct __pte pte_t;
 
 
-#include <sys/mm/mempart.h>
-#include <sys/mm/pagetable.h>
-#include <sys/cpu.h>
+#include <asm/mempart.h>
+#include <asm/pagetable.h>
+#include <asm/cpu.h>
 
 #define VMS_SELF                VMS_SELF_MOUNT
 #define VMS_SELF_L0TI           (__index(VMS_SELF_MOUNT) / L0T_SIZE)

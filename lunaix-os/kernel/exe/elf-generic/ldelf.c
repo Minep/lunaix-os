@@ -4,7 +4,7 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 
-#include <sys/mm/mempart.h>
+#include <asm/mempart.h>
 
 int
 elf_smap(struct load_context* ldctx,

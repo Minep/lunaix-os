@@ -1,7 +1,7 @@
-#include <cpuid.h>
 #include <lunaix/types.h>
-#include <sys/cpu.h>
-#include <sys/vectors.h>
+
+#include "asm/x86_ivs.h"
+#include "asm/x86_cpu.h"
 
 void
 cpu_rdmsr(u32_t msr_idx, u32_t* reg_high, u32_t* reg_low)

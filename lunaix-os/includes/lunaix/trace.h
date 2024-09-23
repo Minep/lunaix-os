@@ -3,7 +3,8 @@
 
 #include <lunaix/boot_generic.h>
 #include <lunaix/hart_state.h>
-#include <lunaix/generic/trace_arch.h>
+
+#include <sys-generic/trace_arch.h>
 
 struct ksym_entry
 {

@@ -6,7 +6,7 @@
 #include <lunaix/mm/pagetable.h>
 #include <lunaix/mm/mmio.h>
 
-#include <sys/port_io.h>
+#include <asm/x86_pmio.h>
 
 vga_attribute* tty_vga_buffer;
 

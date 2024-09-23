@@ -1,8 +1,8 @@
 #ifndef __LUNAIX_KPREEMPT_H
 #define __LUNAIX_KPREEMPT_H
 
-#include <sys/abi.h>
-#include <sys/cpu.h>
+#include <asm/abi.h>
+#include <asm/cpu.h>
 #include <lunaix/process.h>
 
 static inline void

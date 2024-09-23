@@ -3,7 +3,7 @@
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 
-#include <sys/mm/mempart.h>
+#include <asm/mempart.h>
 
 static ptr_t start = VMAP;
 static volatile ptr_t prev_va = 0;

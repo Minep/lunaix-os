@@ -5,7 +5,7 @@
 #include <lunaix/status.h>
 #include <lunaix/syslog.h>
 
-#include <sys/mm/pagetable.h>
+#include <asm/pagetable.h>
 
 #include <hal/serial.h>
 #include <hal/term.h>

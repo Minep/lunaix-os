@@ -1,11 +1,8 @@
-#include <sys/cpu.h>
-#include <sys/int_handler.h>
-#include <sys/hart.h>
-#include "sys/x86_isa.h"
+#include <asm/hart.h>
+#include "asm/x86.h"
 
-#include "sys/x86_isa.h"
+#include <asm/isrm.h>
 
-#include <lunaix/generic/isrm.h>
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>

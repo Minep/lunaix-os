@@ -41,12 +41,16 @@ struct fault_context
     int resolve_type;
 };
 
-bool
-__arch_prepare_fault_context(struct fault_context* context);
-
 static inline void
 fault_resolved(struct fault_context* fault, int flags)
 {
     fault->resolve_type |= (flags | RESOLVE_OK);
 }
+
+bool
+handle_page_fault(struct fault_context* fault);
+
+void noret
+fault_resolving_failed(struct fault_context* fault);
+
 #endif /* __LUNAIX_FAULT_H */

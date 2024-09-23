@@ -1,10 +1,10 @@
-#include <lunaix/generic/isrm.h>
+#include <asm/isrm.h>
 #include <lunaix/spike.h>
 #include <lunaix/owloysius.h>
 
-#include "sys/x86_isa.h"
-#include "sys/ioapic.h"
-#include "sys/apic.h"
+#include "asm/x86.h"
+#include "asm/soc/ioapic.h"
+#include "asm/soc/apic.h"
 
 /*
     total: 256 ivs

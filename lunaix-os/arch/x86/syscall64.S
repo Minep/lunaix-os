@@ -1,6 +1,6 @@
 #define __ASM__
 #include <lunaix/syscall.h>
-#include "sys/interrupt64.S.inc"
+#include "asm/variants/interrupt64.S.inc"
 
 .section .data
     /*
