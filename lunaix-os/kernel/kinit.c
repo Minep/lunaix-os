@@ -59,7 +59,7 @@ kmem_init(struct boot_handoff* bhctx)
 
     unsigned int i = ptep_vfn(ptep);
     do {
-        if (l0tep_implie_vmnts(ptep)) {
+        if (lntep_implie_vmnts(ptep, L0T_SIZE)) {
             ptep++;
             continue;
         }
