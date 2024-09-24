@@ -36,8 +36,8 @@
 #include <klibc/string.h>
 #include <sdbg/gdbstub.h>
 
-#include <sys/port_io.h>
-#include <sys/cpu.h>
+#include <asm/x86_pmio.h>
+#include <asm/cpu.h>
 
 /*****************************************************************************
  * Macros

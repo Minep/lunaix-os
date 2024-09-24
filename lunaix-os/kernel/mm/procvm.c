@@ -5,7 +5,7 @@
 #include <lunaix/mm/mmap.h>
 #include <lunaix/process.h>
 
-#include <sys/mm/mm_defs.h>
+#include <asm/mm_defs.h>
 
 #include <klibc/string.h>
 
@@ -29,14 +29,163 @@ __ptep_advancement(struct leaflet* leaflet, int level)
     return (1 << (leaflet_order(leaflet) % shifts)) - 1;
 }
 
-static ptr_t
-vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
+static inline int
+__descend(ptr_t dest_mnt, ptr_t src_mnt, ptr_t va, bool alloc)
 {
-    pte_t* ptep_dest    = mkl0tep(mkptep_va(dest_mnt, 0));
-    pte_t* ptep         = mkl0tep(mkptep_va(src_mnt, 0));
-    pte_t* ptepd_kernel = mkl0tep(mkptep_va(dest_mnt, KERNEL_RESIDENT));
-    pte_t* ptep_kernel  = mkl0tep(mkptep_va(src_mnt, KERNEL_RESIDENT));
+    pte_t *dest, *src, pte;
 
+    int i = 0;
+    while (!pt_last_level(i))
+    {
+        dest = mklntep_va(i, dest_mnt, va);
+        src  = mklntep_va(i, src_mnt, va);
+        pte  = pte_at(src);
+
+        if (!pte_isloaded(pte) || pte_huge(pte)) {
+            break;
+        }
+
+        if (alloc && pte_isnull(pte_at(dest))) {
+            alloc_kpage_at(dest, pte, 0);
+        }
+
+        i++;
+    }
+
+    return i;
+}
+
+static inline void
+copy_leaf(pte_t* dest, pte_t* src, pte_t pte, int level)
+{
+    struct leaflet* leaflet;
+
+    set_pte(dest, pte);
+
+    if (!pte_isloaded(pte)) {
+        return;
+    }
+
+    leaflet = pte_leaflet(pte);
+    assert(leaflet_refcount(leaflet));
+    
+    if (leaflet_ppfn(leaflet) == pte_ppfn(pte)) {
+        leaflet_borrow(leaflet);
+    }
+}
+
+static inline void
+copy_root(pte_t* dest, pte_t* src, pte_t pte, int level)
+{
+    alloc_kpage_at(dest, pte, 0);
+}
+
+static void
+vmrcpy(ptr_t dest_mnt, ptr_t src_mnt, struct mm_region* region)
+{
+    pte_t *src, *dest;
+    ptr_t loc;
+    int level;
+    struct leaflet* leaflet;
+
+    loc  = region->start;
+    src  = mkptep_va(src_mnt, loc);
+    dest = mkptep_va(dest_mnt, loc);
+
+    level = __descend(dest_mnt, src_mnt, loc, true);
+
+    while (loc < region->end)
+    {
+        pte_t pte = *src;
+
+        if (pte_isnull(pte)) {
+            goto cont;
+        } 
+        
+        if (pt_last_level(level) || pte_huge(pte)) {
+            copy_leaf(dest, src, pte, level);
+            goto cont;
+        }
+        
+        if (!pt_last_level(level)) {
+            copy_root(dest, src, pte, level);
+
+            src = ptep_step_into(src);
+            dest = ptep_step_into(dest);
+            level++;
+
+            continue;
+        }
+        
+    cont:
+        loc += lnt_page_size(level);
+        while (ptep_vfn(src) == MAX_PTEN - 1) {
+            assert(level > 0);
+            src = ptep_step_out(src);
+            dest = ptep_step_out(dest);
+            level--;
+        }
+
+        src++;
+        dest++;
+    }
+}
+
+static void
+vmrfree(ptr_t vm_mnt, struct mm_region* region)
+{
+    pte_t *src, *end;
+    ptr_t loc;
+    int level;
+    struct leaflet* leaflet;
+
+    loc  = region->start;
+    src  = mkptep_va(vm_mnt, region->start);
+    end  = mkptep_va(vm_mnt, region->end);
+
+    level = __descend(0, vm_mnt, loc, false);
+
+    while (src < end)
+    {
+        pte_t pte = *src;
+        ptr_t pa  = pte_paddr(pte);
+
+        if (pte_isnull(pte)) {
+            goto cont;
+        } 
+
+        if (!pt_last_level(level) && !pte_huge(pte)) {
+            src = ptep_step_into(src);
+            level++;
+
+            continue;
+        }
+
+        if (pte_isloaded(pte)) {
+            leaflet = pte_leaflet_aligned(pte);
+            leaflet_return(leaflet);
+
+            src += __ptep_advancement(leaflet, level);
+        }
+
+    cont:
+        while (ptep_vfn(src) == MAX_PTEN - 1) {
+            src = ptep_step_out(src);
+            leaflet = pte_leaflet_aligned(pte_at(src));
+            
+            assert(leaflet_order(leaflet) == 0);
+            leaflet_return(leaflet);
+            
+            level--;
+        }
+
+        src++;
+    }
+}
+
+static void
+vmscpy(struct proc_mm* dest_mm, struct proc_mm* src_mm)
+{
     // Build the self-reference on dest vms
 
     /* 
@@ -73,147 +222,56 @@ vmscpy(ptr_t dest_mnt, ptr_t src_mnt, bool only_kernel)
      *      Note: PML4: 2 extra steps
      *            PML5: 3 extra steps
     */
+
+    ptr_t  dest_mnt, src_mnt;
+    
+    dest_mnt = dest_mm->vm_mnt;
+    assert(dest_mnt);
+
     pte_t* ptep_ssm     = mkl0tep_va(VMS_SELF, dest_mnt);
-    pte_t* ptep_sms     = mkl1tep_va(VMS_SELF, dest_mnt) + VMS_SELF_L0TI;
+    pte_t* ptep_smx     = mkl1tep_va(VMS_SELF, dest_mnt);
     pte_t  pte_sms      = mkpte_prot(KERNEL_PGTAB);
 
     pte_sms = alloc_kpage_at(ptep_ssm, pte_sms, 0);
-    set_pte(ptep_sms, pte_sms);    
+    set_pte(&ptep_smx[VMS_SELF_L0TI], pte_sms);
     
     tlb_flush_kernel((ptr_t)dest_mnt);
-    tlb_flush_kernel((ptr_t)ptep_sms);
 
-    if (only_kernel) {
-        ptep = ptep_kernel;
-        ptep_dest += ptep_vfn(ptep_kernel);
-    } else {
-        ptep++;
-        ptep_dest++;
+    if (!src_mm) {
+        goto done;
     }
 
-    int level = 0;
-    struct leaflet* leaflet;
+    src_mnt = src_mm->vm_mnt;
 
-    while (ptep < ptep_kernel)
+    struct mm_region *pos, *n;
+    llist_for_each(pos, n, &src_mm->regions, head)
     {
-        pte_t pte = *ptep;
-
-        if (pte_isnull(pte)) {
-            goto cont;
-        } 
-        
-        if (pt_last_level(level) || pte_huge(pte)) {
-            set_pte(ptep_dest, pte);
-
-            if (pte_isloaded(pte)) {
-                leaflet = pte_leaflet(pte);
-                assert(leaflet_refcount(leaflet));
-                
-                if (leaflet_ppfn(leaflet) == pte_ppfn(pte)) {
-                    leaflet_borrow(leaflet);
-                }
-            }
-        }
-        else if (!pt_last_level(level)) {
-            alloc_kpage_at(ptep_dest, pte, 0);
-
-            ptep = ptep_step_into(ptep);
-            ptep_dest = ptep_step_into(ptep_dest);
-            level++;
-
-            continue;
-        }
-        
-    cont:
-        while (ptep_vfn(ptep) == MAX_PTEN - 1) {
-            assert(level > 0);
-            ptep = ptep_step_out(ptep);
-            ptep_dest = ptep_step_out(ptep_dest);
-            level--;
-        }
-
-        ptep++;
-        ptep_dest++;
+        vmrcpy(dest_mnt, src_mnt, pos);
     }
 
-    // Ensure we step back to L0T
-    assert(!level);
-    assert(ptep_dest == ptepd_kernel);
+done:;
+    procvm_link_kernel(dest_mnt);
     
-    // Carry over the kernel (exclude last two entry)
-    unsigned int i = ptep_vfn(ptep);
-    while (i++ < MAX_PTEN) {
-        pte_t pte = *ptep;
-
-        if (l0tep_implie_vmnts(ptep)) {
-            goto _cont;
-        }
-
-        assert(!pte_isnull(pte));
-
-        // Ensure it is a next level pagetable,
-        //  we MAY relax this later allow kernel
-        //  to have huge leaflet mapped at L0T
-        leaflet = pte_leaflet_aligned(pte);
-        assert(leaflet_order(leaflet) == 0);
-
-        set_pte(ptep_dest, pte);
-        leaflet_borrow(leaflet);
-    
-    _cont:
-        ptep++;
-        ptep_dest++;
-    }
-
-    return pte_paddr(pte_sms);
+    dest_mm->vmroot = pte_paddr(pte_sms);
 }
 
 static void
-vmsfree(ptr_t vm_mnt)
+vmsfree(struct proc_mm* mm)
 {
     struct leaflet* leaflet;
-    pte_t* ptep_head    = mkl0tep(mkptep_va(vm_mnt, 0));
-    pte_t* ptep_self    = mkl0tep(mkptep_va(vm_mnt, VMS_SELF));
-    pte_t* ptep_kernel  = mkl0tep(mkptep_va(vm_mnt, KERNEL_RESIDENT));
+    ptr_t vm_mnt;
+    pte_t* ptep_self;
+    
+    vm_mnt    = mm->vm_mnt;
+    ptep_self = mkl0tep(mkptep_va(vm_mnt, VMS_SELF));
 
-    int level = 0;
-    pte_t* ptep = ptep_head;
-    while (ptep < ptep_kernel)
+    struct mm_region *pos, *n;
+    llist_for_each(pos, n, &mm->regions, head)
     {
-        pte_t pte = *ptep;
-        ptr_t pa  = pte_paddr(pte);
-
-        if (pte_isnull(pte)) {
-            goto cont;
-        } 
-
-        if (!pt_last_level(level) && !pte_huge(pte)) {
-            ptep = ptep_step_into(ptep);
-            level++;
-
-            continue;
-        }
-
-        if (pte_isloaded(pte)) {
-            leaflet = pte_leaflet_aligned(pte);
-            leaflet_return(leaflet);
-
-            ptep += __ptep_advancement(leaflet, level);
-        }
-
-    cont:
-        while (ptep_vfn(ptep) == MAX_PTEN - 1) {
-            ptep = ptep_step_out(ptep);
-            leaflet = pte_leaflet_aligned(pte_at(ptep));
-            
-            assert(leaflet_order(leaflet) == 0);
-            leaflet_return(leaflet);
-            
-            level--;
-        }
-
-        ptep++;
+        vmrfree(vm_mnt, pos);
     }
+
+    procvm_unlink_kernel();
 
     leaflet = pte_leaflet_aligned(pte_at(ptep_self));
     leaflet_return(leaflet);
@@ -251,8 +309,8 @@ procvm_dupvms_mount(struct proc_mm* mm) {
    
     mm->heap = mm_current->heap;
     mm->vm_mnt = VMS_MOUNT_1;
-    mm->vmroot = vmscpy(VMS_MOUNT_1, VMS_SELF, false);
     
+    vmscpy(mm, mm_current);  
     region_copy_mm(mm_current, mm);
 }
 
@@ -301,7 +359,7 @@ procvm_initvms_mount(struct proc_mm* mm)
     __attach_to_current_vms(mm);
 
     mm->vm_mnt = VMS_MOUNT_1;
-    mm->vmroot = vmscpy(VMS_MOUNT_1, VMS_SELF, true);
+    vmscpy(mm, NULL);
 }
 
 void
@@ -314,9 +372,9 @@ procvm_unmount_release(struct proc_mm* mm) {
         region_release(pos);
     }
 
-    vfree(mm);
-    vmsfree(vm_mnt);
+    vmsfree(mm);
     vms_unmount(vm_mnt);
+    vfree(mm);
 
     __detach_from_current_vms(mm);
 }

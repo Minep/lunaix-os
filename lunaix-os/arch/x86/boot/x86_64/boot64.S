@@ -4,7 +4,7 @@
 #include "sys/boot/multiboot.S.inc"
 #endif
 
-#include "sys/mm/mempart64.h"
+#include "asm/variants/mempart64.h"
 
 .section .boot.data
     .align 8

@@ -1,6 +1,6 @@
-#include <sys/hart.h>
+#include <asm/hart.h>
 
-#include <lunaix/generic/isrm.h>
+#include <asm-generic/isrm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/spike.h>
@@ -10,8 +10,8 @@
 
 #include <klibc/strfmt.h>
 
-#include "sys/apic.h"
-#include <sys/int_handler.h>
+#include "asm/soc/apic.h"
+#include "asm/x86.h"
 
 LOG_MODULE("INTR")
 

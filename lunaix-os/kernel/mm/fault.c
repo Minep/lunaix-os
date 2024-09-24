@@ -10,7 +10,7 @@
 #include <lunaix/hart_state.h>
 #include <lunaix/failsafe.h>
 
-#include <sys/mm/mm_defs.h>
+#include <asm/mm_defs.h>
 
 #include <klibc/string.h>
 
@@ -77,15 +77,9 @@ done:
     context->fault_refva = refva;
 }
 
-static bool
+static void
 __prepare_fault_context(struct fault_context* fault)
 {
-    if (!__arch_prepare_fault_context(fault)) {
-        return false;
-    }
-
-    __gather_memaccess_info(fault);
-
     pte_t* fault_ptep      = fault->fault_ptep;
     ptr_t  fault_va        = fault->fault_va;
     pte_t  fault_pte       = *fault_ptep;
@@ -114,8 +108,6 @@ __prepare_fault_context(struct fault_context* fault)
     fault->resolving = pte_mkloaded(fault_pte);
     fault->kernel_vmfault = kernel_vmfault;
     fault->kernel_access  = kernel_context(fault->hstate);
-
-    return true;
 }
 
 static inline void
@@ -269,8 +261,8 @@ fault_prealloc_page(struct fault_context* fault)
 }
 
 
-static void noret
-__fail_to_resolve(struct fault_context* fault)
+void noret
+fault_resolving_failed(struct fault_context* fault)
 {
     if (fault->prealloc) {
         leaflet_return(fault->prealloc);
@@ -340,32 +332,24 @@ done:
     return !!(fault->resolve_type & RESOLVE_OK);
 }
 
-void
-intr_routine_page_fault(const struct hart_state* hstate)
+bool
+handle_page_fault(struct fault_context* fault)
 {
-    if (hstate->depth > 10) {
-        // Too many nested fault! we must messed up something
-        // XXX should we failed silently?
-        spin();
+    __gather_memaccess_info(fault);
+    __prepare_fault_context(fault);
+
+    fault_prealloc_page(fault);
+
+    if (!__try_resolve_fault(fault)) {
+        return false;
     }
 
-    struct fault_context fault = { .hstate = hstate };
-
-    if (!__prepare_fault_context(&fault)) {
-        __fail_to_resolve(&fault);
-    }
-
-    fault_prealloc_page(&fault);
-
-    if (!__try_resolve_fault(&fault)) {
-        __fail_to_resolve(&fault);
-    }
-
-    if ((fault.resolve_type & NO_PREALLOC)) {
-        if (fault.prealloc) {
-            leaflet_return(fault.prealloc);
+    if ((fault->resolve_type & NO_PREALLOC)) {
+        if (fault->prealloc) {
+            leaflet_return(fault->prealloc);
         }
     }
 
-    tlb_flush_kernel(fault.fault_va);
+    tlb_flush_kernel(fault->fault_va);
+    return true;
 }

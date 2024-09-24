@@ -6,13 +6,6 @@
 #include <lunaix/process.h>
 #include <lunaix/types.h>
 
-/**
- * @brief 初始化虚拟内存管理器
- *
- */
-void
-vmm_init();
-
 static inline void 
 vmm_set_ptes_contig(pte_t* ptep, pte_t pte, size_t lvl_size, size_t n)
 {

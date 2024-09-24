@@ -1,5 +1,5 @@
 #include <hal/pci.h>
-#include <sys/port_io.h>
+#include <asm/x86_pmio.h>
 
 #ifdef CONFIG_PCI_PMIO
 #define PCI_CONFIG_ADDR 0xcf8

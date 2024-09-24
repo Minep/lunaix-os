@@ -4,7 +4,7 @@
 #include <lunaix/spike.h>
 
 #include <klibc/string.h>
-#include <sys/mm/pagetable.h>
+#include <asm/pagetable.h>
 
 int
 iso9660_open(struct v_inode* this, struct v_file* file)

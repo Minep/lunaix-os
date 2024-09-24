@@ -18,4 +18,6 @@ make CMDLINE=${default_cmd} ARCH=${ARCH} MODE=${MODE:-debug} all -j5 || exit -1
     -- \
     -nographic &
 
-QMPORT=${hmp_port} gdb build/bin/kernel.bin -ex "target remote localhost:${gdb_port}"
+QMPORT=${hmp_port} gdb-multiarch \
+    build/bin/kernel.bin \
+    -ex "target remote localhost:${gdb_port}"

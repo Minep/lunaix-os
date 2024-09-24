@@ -11,7 +11,7 @@
 
 #include <klibc/string.h>
 
-#include <sys/mm/mempart.h>
+#include <asm/mempart.h>
 
 LOG_MODULE("SIG")
 

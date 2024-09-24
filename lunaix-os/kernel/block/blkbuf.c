@@ -3,7 +3,7 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/owloysius.h>
 #include <lunaix/syslog.h>
-#include <sys/muldiv64.h>
+#include <asm/muldiv64.h>
 
 LOG_MODULE("blkbuf")  
 

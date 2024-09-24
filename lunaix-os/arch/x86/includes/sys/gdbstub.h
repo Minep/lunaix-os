@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_ARCH_GDBSTUB_ARCH_H
 #define __LUNAIX_ARCH_GDBSTUB_ARCH_H
 
-#include "sys/hart.h"
+#include "asm/hart.h"
 
 enum GDB_REGISTER
 {

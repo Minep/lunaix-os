@@ -1,11 +1,12 @@
 #define __BOOT_CODE__
 
 #include <lunaix/boot_generic.h>
-#include <lunaix/generic/bootmem.h>
 
 #include <sys/boot/bstage.h>
 #include <sys/boot/multiboot.h>
-#include <sys/mm/mempart.h>
+#include <sys-generic/bootmem.h>
+
+#include <asm/mempart.h>
 
 #include <klibc/string.h>
 

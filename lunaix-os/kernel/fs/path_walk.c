@@ -32,7 +32,7 @@ __vfs_walk(struct v_dnode* start,
         } else {
             start = vfs_sysroot;
             if (!vfs_sysroot->mnt) {
-                panick("vfs: no root");
+                fail("vfs: no root");
             }
         }
 

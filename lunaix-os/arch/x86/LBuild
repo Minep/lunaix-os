@@ -12,7 +12,6 @@ sources([
     "boot/mb_parser.c",
     "boot/kpt_setup.c",
     "boot/boot_helper.c",
-    "boot/bootmem.c"
 ])
 
 sources([

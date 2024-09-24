@@ -1,9 +1,8 @@
 /* Generated from i386_isrdef.c.j2. Do NOT modify */
 
 #include <lunaix/types.h>
-#include "sys/int_handler.h"
-#include "sys/vectors.h"
-#include "sys/x86_isa.h"
+#include "asm/x86_ivs.h"
+#include "asm/x86.h"
 
 #define IDT_INTERRUPT 0x70
 #define IDT_ATTR(dpl, type) (((type) << 5) | ((dpl & 3) << 13) | (1 << 15))

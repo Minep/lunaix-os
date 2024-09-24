@@ -4,7 +4,7 @@
 #include <lunaix/compiler.h>
 
 #include <sys/boot/bstage.h>
-#include <sys/mm/mm_defs.h>
+#include <asm/mm_defs.h>
 
 
 ptr_t boot_text

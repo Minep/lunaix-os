@@ -2,7 +2,7 @@
 #define __LUNAIX_PHYSICAL_H
 
 #include <lunaix/compiler.h>
-#include <sys/mm/physical.h>
+#include <asm/physical.h>
 
 /**
  * @brief 长久页：不会被缓存，但允许释放

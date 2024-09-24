@@ -3,16 +3,10 @@
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 
-#include <sys/cpu.h>
-#include <sys/mm/mm_defs.h>
+#include <asm/cpu.h>
+#include <asm/mm_defs.h>
 
 LOG_MODULE("VM")
-
-void
-vmm_init()
-{
-    // XXX: something here?
-}
 
 pte_t
 vmm_tryptep(pte_t* ptep, size_t lvl_size)

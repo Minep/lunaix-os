@@ -108,4 +108,14 @@ procvm_copy_remote(struct remote_vmctx* rvmctx,
 void
 procvm_exit_remote(struct remote_vmctx* rvmctx);
 
+/*
+    architecture-specific
+*/
+
+void
+procvm_link_kernel(ptr_t dest_mnt);
+
+void
+procvm_unlink_kernel();
+
 #endif /* __LUNAIX_PROCVM_H */

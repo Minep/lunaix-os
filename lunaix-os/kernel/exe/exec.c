@@ -11,8 +11,8 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syscall_utils.h>
 
-#include <sys/abi.h>
-#include <sys/mm/mm_defs.h>
+#include <asm/abi.h>
+#include <asm/mm_defs.h>
 
 #include <klibc/string.h>
 

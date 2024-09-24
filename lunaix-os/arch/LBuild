@@ -1,3 +1,5 @@
+use("generic")
+
 use({
     config("arch"): {
         "i386": "x86",

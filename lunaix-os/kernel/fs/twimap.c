@@ -6,7 +6,7 @@
 #include <klibc/strfmt.h>
 #include <klibc/string.h>
 
-#include <sys/mm/pagetable.h>
+#include <asm/pagetable.h>
 
 #define TWIMAP_BUFFER_SIZE PAGE_SIZE
 

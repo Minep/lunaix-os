@@ -198,4 +198,6 @@ int main()
 
     // TODO test pthread + signal
     printf("All test passed.\n");
+
+    return 0;
 }

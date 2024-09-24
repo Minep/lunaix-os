@@ -99,9 +99,9 @@ struct __pte;
 typedef struct __pte pte_t;
 
 
-#include <sys/mm/mempart.h>
-#include <sys/mm/pagetable.h>
-#include <sys/cpu.h>
+#include <asm/mempart.h>
+#include <asm/pagetable.h>
+#include <asm/cpu.h>
 
 #define VMS_SELF                VMS_SELF_MOUNT
 #define VMS_SELF_L0TI           (__index(VMS_SELF_MOUNT) / L0T_SIZE)
@@ -529,6 +529,45 @@ mkl3tep_va(ptr_t mnt, ptr_t va)
     return mkl3tep(mkptep_va(mnt, va));
 }
 
+static inline pte_t*
+mklntep_va(int level, ptr_t mnt, ptr_t va)
+{
+    if (level == 0)
+        return mkl0tep_va(mnt, va);
+    
+#if LnT_ENABLED(1)
+    if (level == 1)
+        return mkl1tep_va(mnt, va);
+#endif
+
+#if LnT_ENABLED(2)
+    if (level == 2)
+        return mkl2tep_va(mnt, va);
+#endif
+
+#if LnT_ENABLED(3)
+    if (level == 3)
+        return mkl3tep_va(mnt, va);
+#endif
+    
+    return mkptep_va(mnt, va);
+}
+
+static inline unsigned long
+lnt_page_size(int level)
+{
+    if (level == 0)
+        return L0T_SIZE;
+    if (level == 1)
+        return L1T_SIZE;
+    if (level == 2)
+        return L2T_SIZE;
+    if (level == 3)
+        return L3T_SIZE;
+    
+    return LFT_SIZE;
+}
+
 static inline bool
 pt_last_level(int level)
 {
@@ -548,9 +587,9 @@ va_level_index(ptr_t va, size_t lvl_size)
 }
 
 static inline bool
-l0tep_implie(pte_t* ptep, ptr_t addr)
+lntep_implie(pte_t* ptep, ptr_t addr, size_t lvl_size)
 {
-    return ptep_va(ptep, L0T_SIZE) == __vaddr(addr);
+    return ptep_va(ptep, lvl_size) == __vaddr(addr);
 }
 
 static inline bool
@@ -573,10 +612,38 @@ active_vms(ptr_t vmnt)
 }
 
 static inline bool
-l0tep_implie_vmnts(pte_t* ptep)
+lntep_implie_vmnts(pte_t* ptep, size_t lvl_size)
 {
-    return l0tep_implie(ptep, VMS_SELF) ||
-           l0tep_implie(ptep, VMS_MOUNT_1);
+    return lntep_implie(ptep, VMS_SELF, lvl_size) ||
+           lntep_implie(ptep, VMS_MOUNT_1, lvl_size);
+}
+
+
+static inline int
+ptep_count_level(pte_t* ptep)
+{
+    int i = 0;
+    ptr_t addr = (ptr_t)ptep;
+
+    if (!is_ptep(addr << (LEVEL_SHIFT * i++)))
+        return MAX_LEVEL - i;
+
+#if LnT_ENABLED(1)
+    if (!is_ptep(addr << (LEVEL_SHIFT * i++)))
+        return MAX_LEVEL - i;
+#endif
+
+#if LnT_ENABLED(2)
+    if (!is_ptep(addr << (LEVEL_SHIFT * i++)))
+        return MAX_LEVEL - i;
+#endif
+
+#if LnT_ENABLED(3)
+    if (!is_ptep(addr << (LEVEL_SHIFT * i++)))
+        return MAX_LEVEL - i;
+#endif
+    
+    return 0;
 }
 
 #endif /* __LUNAIX_PAGETABLE_H */

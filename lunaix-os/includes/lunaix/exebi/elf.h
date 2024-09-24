@@ -18,7 +18,7 @@
 #define __LUNAIX_ELF32_H
 
 #include <lunaix/types.h>
-#include <sys/exebi/elf.h>
+#include <sys/elf.h>
 
 #define ET_EXEC 2
 #define ET_DYN 3
