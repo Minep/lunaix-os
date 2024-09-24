@@ -20,7 +20,7 @@
 #include <lunaix/hart_state.h>
 #include <lunaix/kpreempt.h>
 
-#include <asm/isrm.h>
+#include <asm-generic/isrm.h>
 
 #include <klibc/string.h>
 

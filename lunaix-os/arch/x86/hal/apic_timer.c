@@ -3,7 +3,7 @@
 
 #include <lunaix/clock.h>
 #include <lunaix/compiler.h>
-#include <asm/isrm.h>
+#include <asm-generic/isrm.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 

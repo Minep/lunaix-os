@@ -1,5 +1,5 @@
 #include <lunaix/device.h>
-#include <asm/isrm.h>
+#include <asm-generic/isrm.h>
 #include <lunaix/syslog.h>
 
 #include <asm/x86_pmio.h>

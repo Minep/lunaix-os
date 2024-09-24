@@ -1,7 +1,7 @@
 #include <asm/hart.h>
 #include "asm/x86.h"
 
-#include <asm/isrm.h>
+#include <asm-generic/isrm.h>
 
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>

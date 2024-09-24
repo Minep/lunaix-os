@@ -10,7 +10,7 @@
  *
  */
 
-#include <asm/isrm.h>
+#include <asm-generic/isrm.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/status.h>
 #include <lunaix/hart_state.h>

@@ -1,6 +1,6 @@
 #include <asm/hart.h>
 
-#include <asm/isrm.h>
+#include <asm-generic/isrm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/spike.h>

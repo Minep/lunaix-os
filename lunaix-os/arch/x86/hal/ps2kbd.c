@@ -1,7 +1,7 @@
 #include <lunaix/clock.h>
 #include <lunaix/ds/mutex.h>
 #include <lunaix/input.h>
-#include <asm/isrm.h>
+#include <asm-generic/isrm.h>
 #include <lunaix/keyboard.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>

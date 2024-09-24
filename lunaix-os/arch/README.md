@@ -60,7 +60,7 @@ Lunaix provide bunch of headers that **MUST** be implemented in order to behave 
 
 ```
 includes/asm/cpu.h
-includes/asm/isrm.h
+includes/asm-generic/isrm.h
 includes/asm/muldiv64.h
 includes/asm/hart.h
 includes/asm/mempart.h
@@ -76,7 +76,7 @@ includes/sys-generic/elf.h
 
 An implementation should copy these file out of `arch/x86`, replacing any `x86` specific function-body/structure-members/macros with the chosen architecture.
 
-Headers located under `generic/` can be implemented optionally. Most of default function definitions found in source files can be also optionally overridden, except for those with `fail()` as their only definition. 
+Most headers located under `generic/` has default implementation and is designed to eliminate common code. The defaults can be optionally override, except for those with `fail()` as their only definition or those listed in above.
 
 ### Preparing Linker Script
 

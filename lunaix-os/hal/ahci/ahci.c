@@ -18,7 +18,7 @@
 
 #include <klibc/string.h>
 #include <lunaix/block.h>
-#include <asm/isrm.h>
+#include <asm-generic/isrm.h>
 #include <lunaix/mm/mmio.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/page.h>

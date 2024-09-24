@@ -1,6 +1,6 @@
-#include <asm/isrm.h>
 #include <lunaix/spike.h>
 #include <lunaix/owloysius.h>
+#include <asm-generic/isrm.h>
 
 #include "asm/x86.h"
 #include "asm/soc/ioapic.h"
