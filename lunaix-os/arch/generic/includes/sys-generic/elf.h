@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_ARCH_ELF_H
-#define __LUNAIX_ARCH_ELF_H
+#ifndef __LUNAIX_ARCH_GENERIC_ELF_H
+#define __LUNAIX_ARCH_GENERIC_ELF_H
 
 #include <lunaix/types.h>
 
@@ -9,7 +9,7 @@
 #define ELFDATA2LSB 1
 #define ELFDATA2MSB 2
 
-#ifdef CONFIG_ARCH_X86_64
+#ifdef CONFIG_ARCH_BITS_64
 typedef unsigned long   elf_ptr_t;
 typedef unsigned short  elf_hlf_t;
 typedef unsigned long   elf_off_t;
@@ -45,7 +45,7 @@ struct elf_ehdr
 
 struct elf_phdr
 {
-#ifdef CONFIG_ARCH_X86_64
+#ifdef CONFIG_ARCH_BITS_64
     elf_wrd_t p_type;
     elf_wrd_t p_flags;
     elf_off_t p_offset;
@@ -66,4 +66,4 @@ struct elf_phdr
 #endif
 };
 
-#endif /* __LUNAIX_ARCH_ELF_H */
+#endif /* __LUNAIX_ARCH_GENERIC_ELF_H */
