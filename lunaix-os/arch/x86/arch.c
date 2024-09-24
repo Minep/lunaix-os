@@ -1,12 +1,11 @@
 #include <hal/hwtimer.h>
 
-#include <lunaix/generic/isrm.h>
+#include <asm-generic/isrm.h>
 #include <lunaix/spike.h>
 #include <lunaix/process.h>
 
-#include "sys/int_handler.h"
-#include "sys/x86_isa.h"
-#include "sys/hart.h"
+#include "asm/x86.h"
+#include "asm/hart.h"
 
 #include "hal/apic_timer.h"
 
@@ -41,7 +40,7 @@ select_platform_timer()
 
     // TODO select alternatives...
 
-    panick("no timer to use.");
+    fail("no timer to use.");
 }
 
 void

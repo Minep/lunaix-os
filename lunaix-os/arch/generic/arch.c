@@ -1,8 +1,8 @@
-#include <lunaix/spike.h>
 #include <hal/hwtimer.h>
+#include <lunaix/spike.h>
 
-struct hwtimer*
+_default struct hwtimer*
 select_platform_timer()
 {
-    fail("unimplemented");
+    fail("not implemented");
 }

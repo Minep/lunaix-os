@@ -3,10 +3,10 @@
 #include <lunaix/mm/pmm.h>
 #include <lunaix/spike.h>
 #include <lunaix/sections.h>
-#include <lunaix/generic/bootmem.h>
 
-#include <sys/mm/mm_defs.h>
+#include <asm/mm_defs.h>
 #include <sys/boot/bstage.h>
+#include <sys-generic/bootmem.h>
 
 #ifdef CONFIG_ARCH_X86_64
 

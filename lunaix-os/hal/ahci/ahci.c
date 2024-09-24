@@ -14,11 +14,11 @@
 #include <hal/ahci/scsi.h>
 #include <hal/pci.h>
 
-#include <sys/port_io.h>
+#include <asm/x86_pmio.h>
 
 #include <klibc/string.h>
 #include <lunaix/block.h>
-#include <lunaix/generic/isrm.h>
+#include <asm-generic/isrm.h>
 #include <lunaix/mm/mmio.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/page.h>

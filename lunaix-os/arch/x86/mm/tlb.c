@@ -1,4 +1,4 @@
-#include <sys/mm/tlb.h>
+#include <asm/tlb.h>
 #include <lunaix/process.h>
 
 void

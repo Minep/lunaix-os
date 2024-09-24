@@ -5,8 +5,8 @@
 #include <lunaix/mm/vmm.h>
 #include <klibc/string.h>
 
-#include <sys/mm/mempart.h>
-#include <sys/abi.h>
+#include <asm/mempart.h>
+#include <asm/abi.h>
 
 volatile struct x86_tss _tss = { };
 

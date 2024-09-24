@@ -3,7 +3,7 @@
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/valloc.h>
 
-#include <sys/cpu.h>
+#include <asm/cpu.h>
 
 static struct cake_pile* blkio_reqpile;
 

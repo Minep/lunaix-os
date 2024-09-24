@@ -14,7 +14,7 @@
 #define unreachable             __builtin_unreachable()
 #define no_inline               __attribute__((noinline))
 
-#define defualt                 weak
+#define _default                weak
 
 #define msbiti                  (sizeof(int) * 8 - 1)
 #define clz(bits)               __builtin_clz(bits)

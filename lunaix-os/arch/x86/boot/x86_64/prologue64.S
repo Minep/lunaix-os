@@ -1,7 +1,7 @@
 /* 高半核入口点 - 0xC0000000 */
 
 #define __ASM__
-#include <sys/abi.h>
+#include <asm/abi.h>
 #include <sys/failsafe.h>
 
 .section .bss.kstack

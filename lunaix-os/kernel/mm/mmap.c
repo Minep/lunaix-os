@@ -5,7 +5,7 @@
 #include <lunaix/syscall.h>
 #include <lunaix/syscall_utils.h>
 
-#include <sys/mm/mm_defs.h>
+#include <asm/mm_defs.h>
 
 #include <usr/lunaix/mann_flags.h>
 

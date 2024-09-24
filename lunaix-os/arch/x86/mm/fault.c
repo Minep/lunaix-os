@@ -1,9 +1,5 @@
 #include <lunaix/mm/fault.h>
-#include <lunaix/mm/region.h>
-#include <lunaix/process.h>
 #include <lunaix/hart_state.h>
-
-#include <sys/mm/mm_defs.h>
 
 bool
 __arch_prepare_fault_context(struct fault_context* fault)
@@ -21,4 +17,30 @@ __arch_prepare_fault_context(struct fault_context* fault)
     fault->fault_va    = ptr;
 
     return true;
+}
+
+
+void
+intr_routine_page_fault(const struct hart_state* hstate)
+{
+    if (hstate->depth > 10) {
+        // Too many nested fault! we must messed up something
+        // XXX should we failed silently?
+        spin();
+    }
+
+    struct fault_context fault = { .hstate = hstate };
+
+    if (!__arch_prepare_fault_context(&fault)) {
+        goto failed;
+    }
+
+    if (!handle_page_fault(&fault)) {
+        goto failed;
+    }
+
+    return;
+
+failed:
+    fault_resolving_failed(&fault);
 }

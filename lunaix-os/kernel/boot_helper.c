@@ -5,7 +5,7 @@
 #include <lunaix/spike.h>
 #include <lunaix/kcmd.h>
 #include <lunaix/sections.h>
-#include <sys/mm/mm_defs.h>
+#include <asm/mm_defs.h>
 
 /**
  * @brief Reserve memory for kernel bootstrapping initialization

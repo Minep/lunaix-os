@@ -5,8 +5,8 @@
 #include <lunaix/trace.h>
 #include <lunaix/sections.h>
 
-#include <sys/abi.h>
-#include <sys/mm/mm_defs.h>
+#include <asm/abi.h>
+#include <asm/mm_defs.h>
 #include <sys/trace.h>
 
 #include <klibc/string.h>

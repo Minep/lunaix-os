@@ -2,7 +2,7 @@
 #include <lunaix/mm/vmm.h>
 #include <klibc/string.h>
 
-#include <sys/mm/mempart.h>
+#include <asm/mempart.h>
 
 bool
 install_hart_transition(ptr_t vm_mnt, struct hart_transition* ht)

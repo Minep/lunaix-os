@@ -2,7 +2,7 @@
 #define __LUNAIX_AHCI_H
 
 #include "hba.h"
-#include <lunaix/generic/isrm.h>
+#include <asm-generic/isrm.h>
 
 /*
  * Macro naming rule:

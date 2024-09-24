@@ -9,8 +9,8 @@
 
 #include <usr/lunaix/threads.h>
 
-#include <sys/abi.h>
-#include <sys/mm/mm_defs.h>
+#include <asm/abi.h>
+#include <asm/mm_defs.h>
 
 LOG_MODULE("THREAD")
 

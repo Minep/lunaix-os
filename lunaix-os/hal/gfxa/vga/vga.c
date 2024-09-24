@@ -15,7 +15,7 @@
 #include <lunaix/spike.h>
 #include <lunaix/status.h>
 
-#include <sys/cpu.h>
+#include <asm/cpu.h>
 
 #include "vga.h"
 

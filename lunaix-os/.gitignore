@@ -29,3 +29,5 @@ __pycache__
 
 .config.json
 .builder
+
+.vscode

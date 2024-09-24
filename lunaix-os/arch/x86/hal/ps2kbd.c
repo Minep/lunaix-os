@@ -1,18 +1,18 @@
 #include <lunaix/clock.h>
 #include <lunaix/ds/mutex.h>
 #include <lunaix/input.h>
-#include <lunaix/generic/isrm.h>
+#include <asm-generic/isrm.h>
 #include <lunaix/keyboard.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
 #include <lunaix/hart_state.h>
 
-#include "sys/x86_isa.h"
+#include "asm/x86.h"
 
 #include <klibc/string.h>
 
-#include <sys/cpu.h>
-#include <sys/port_io.h>
+#include "asm/x86_cpu.h"
+#include <asm/x86_pmio.h>
 
 #define PS2_PORT_ENC_DATA 0x60
 #define PS2_PORT_ENC_CMDREG 0x60

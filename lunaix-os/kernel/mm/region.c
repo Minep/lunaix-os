@@ -3,7 +3,7 @@
 #include <lunaix/spike.h>
 #include <lunaix/process.h>
 
-#include <sys/mm/mempart.h>
+#include <asm/mempart.h>
 
 #include <klibc/string.h>
 

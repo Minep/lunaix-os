@@ -28,7 +28,6 @@ struct boot_modent
 
 struct boot_handoff
 {
-    size_t msize;
     struct
     {
         size_t size;

@@ -1,6 +1,6 @@
 #include <hal/ahci/ahci.h>
 #include <hal/ahci/sata.h>
-#include <lunaix/generic/isrm.h>
+#include <asm-generic/isrm.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/syslog.h>
 

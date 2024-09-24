@@ -1,5 +1,6 @@
 #include <lunaix/mm/page.h>
-#include <sys/mm/mm_defs.h>
+
+#include <asm/mm_defs.h>
 
 struct leaflet*
 dup_leaflet(struct leaflet* leaflet)
@@ -36,4 +37,23 @@ dup_leaflet(struct leaflet* leaflet)
     vunmap(dest_va, new_leaflet);
 
     return new_leaflet;
+}
+
+pte_t
+translate_vmr_prot(unsigned int vmr_prot, pte_t pte)
+{
+    pte = pte_mkuser(pte);
+
+    if ((vmr_prot & PROT_WRITE)) {
+        pte = pte_mkwritable(pte);
+    }
+
+    if ((vmr_prot & PROT_EXEC)) {
+        pte = pte_mkexec(pte);
+    }
+    else {
+        pte = pte_mknonexec(pte);
+    }
+
+    return pte;
 }

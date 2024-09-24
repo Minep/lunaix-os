@@ -1,6 +1,5 @@
 #include "sys/boot/archinit.h"
-#include "sys/crx.h"
-#include "sys/cpu.h"
+#include "asm/x86_cpu.h"
 
 ptr_t __multiboot_addr boot_data;
 

@@ -1,5 +1,5 @@
 #include <lunaix/device.h>
-#include <lunaix/generic/isrm.h>
+#include <asm-generic/isrm.h>
 #include <lunaix/mm/mmio.h>
 
 #include "16x50.h"

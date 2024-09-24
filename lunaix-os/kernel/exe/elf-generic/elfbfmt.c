@@ -32,7 +32,7 @@ elf_do_open(struct elf* elf, struct v_file* elf_file)
     return 0;
 }
 
-defualt int
+_default int
 elf_open(struct elf* elf, const char* path)
 {
     struct v_dnode* elfdn;
@@ -50,7 +50,7 @@ elf_open(struct elf* elf, const char* path)
     return elf_do_open(elf, elffile);
 }
 
-defualt int
+_default int
 elf_openat(struct elf* elf, void* elf_vfile)
 {
     // so the ref count kept in sync
@@ -58,7 +58,7 @@ elf_openat(struct elf* elf, void* elf_vfile)
     return elf_do_open(elf, elf_vfile);
 }
 
-defualt int
+_default int
 elf_close(struct elf* elf)
 {
     if (elf->pheaders) {
@@ -74,7 +74,7 @@ elf_close(struct elf* elf)
     return 0;
 }
 
-defualt int
+_default int
 elf_static_linked(const struct elf* elf)
 {
     for (size_t i = 0; i < elf->eheader.e_phnum; i++) {
@@ -86,7 +86,7 @@ elf_static_linked(const struct elf* elf)
     return 1;
 }
 
-defualt size_t
+_default size_t
 elf_loadable_memsz(const struct elf* elf)
 {
     // XXX: Hmmmm, I am not sure if we need this. This is designed to be handy
@@ -105,7 +105,7 @@ elf_loadable_memsz(const struct elf* elf)
     return sz;
 }
 
-defualt int
+_default int
 elf_find_loader(const struct elf* elf, char* path_out, size_t len)
 {
     int retval = NO_LOADER;
@@ -135,7 +135,7 @@ elf_find_loader(const struct elf* elf, char* path_out, size_t len)
     return retval;
 }
 
-defualt int
+_default int
 elf_read_ehdr(struct elf* elf)
 {
     struct v_file* elfile = (struct v_file*)elf->elf_file;
@@ -143,7 +143,7 @@ elf_read_ehdr(struct elf* elf)
     return elf_read(elfile, (void*)&elf->eheader, 0, SIZE_EHDR);
 }
 
-defualt int
+_default int
 elf_read_phdr(struct elf* elf)
 {
     int status = 0;
@@ -170,7 +170,7 @@ elf_read_phdr(struct elf* elf)
     return entries;
 }
 
-defualt int
+_default int
 elf_check_exec(const struct elf* elf, int type)
 {
     const struct elf_ehdr* ehdr = &elf->eheader;
@@ -178,7 +178,7 @@ elf_check_exec(const struct elf* elf, int type)
     return (ehdr->e_entry) && ehdr->e_type == type;
 }
 
-defualt int
+_default int
 elf_check_arch(const struct elf* elf)
 {
     const struct elf_ehdr* ehdr = &elf->eheader;
