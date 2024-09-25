@@ -1,7 +1,7 @@
-#ifndef __LUNAIX_AA64_CPU_H
-#define __LUNAIX_AA64_CPU_H
+#ifndef __LUNAIX_ARCH_CPU_H
+#define __LUNAIX_ARCH_CPU_H
 
-#include <sys/msrs.h>
+#include "aa64.h"
 
 void
 cpu_trap_sched();
@@ -18,4 +18,10 @@ cpu_disable_interrupt()
     set_sysreg(ALLINT_EL1, 1 << 12);
 }
 
-#endif /* __LUNAIX_AA64_CPU_H */
+static inline void
+cpu_wait()
+{
+    asm volatile ( "wfi" );
+}
+
+#endif /* __LUNAIX_CPU_H */

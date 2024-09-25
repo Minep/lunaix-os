@@ -1,8 +1,23 @@
 #ifndef __LUNAIX_ARCH_TLB_H
 #define __LUNAIX_ARCH_TLB_H
 
-#include <lunaix/compiler.h>
-#include <asm/mm_defs.h>
+#include <lunaix/types.h>
+
+#include <asm/aa64_mmu.h>
+#include <asm/aa64_sysinst.h>
+
+#define pack_va(asid, ttl, va)                \
+        (((asid & 0xffff) << 48)            | \
+         ((ttl  & 0b1111) << 44)            | \
+         (pfn(va) & ((1 << 44) - 1)))
+
+#define pack_rva(asid, ttl, base, n, scale)   \
+        (((asid    & 0xffff) << 48)         | \
+         ((_MMU_TG & 0b11) << 46)           | \
+         ((n       & 0x1f) << 39)           | \
+         ((scale   & 0b11) << 37)           | \
+         ((ttl     & 0b1111) << 44)         | \
+         (pfn(base)& ((1 << 37) - 1)))
 
 /**
  * @brief Invalidate an entry of all address space
@@ -12,7 +27,7 @@
 static inline void must_inline
 __tlb_invalidate(ptr_t va) 
 {
-    asm volatile("invlpg (%0)" ::"r"(va) : "memory");
+    sys_a1(tlbi_vaae1, pack_va(0, 0, va));
 }
 
 /**
@@ -24,8 +39,7 @@ __tlb_invalidate(ptr_t va)
 static inline void must_inline
 __tlb_flush_asid(unsigned int asid, ptr_t va) 
 {
-    // not supported on x86_32
-    asm volatile("invlpg (%0)" ::"r"(va) : "memory");
+    sys_a1(tlbi_vae1, pack_va(asid, 0, va));
 }
 
 /**
@@ -36,8 +50,7 @@ __tlb_flush_asid(unsigned int asid, ptr_t va)
 static inline void must_inline
 __tlb_flush_global(ptr_t va) 
 {
-    // not supported on x86_32
-    asm volatile("invlpg (%0)" ::"r"(va) : "memory");
+    __tlb_flush_asid(0, va);
 }
 
 /**
@@ -48,11 +61,7 @@ __tlb_flush_global(ptr_t va)
 static inline void must_inline
 __tlb_flush_all() 
 {
-    asm volatile(
-        "movl %%cr3, %%eax\n"
-        "movl %%eax, %%cr3"
-        :::"eax"
-    );
+    sys_a0(tlbi_alle1);
 }
 
 /**
@@ -63,8 +72,7 @@ __tlb_flush_all()
 static inline void must_inline
 __tlb_flush_asid_all(unsigned int asid) 
 {
-    // not supported on x86_32
-    __tlb_flush_all();
+    sys_a1(tlbi_aside1, pack_va(asid, 0, 0));
 }
 
 
@@ -78,10 +86,14 @@ __tlb_flush_asid_all(unsigned int asid)
 static inline void 
 tlb_flush_range(ptr_t addr, unsigned int npages)
 {
+#ifdef _MMU_USE_OA52
     for (unsigned int i = 0; i < npages; i++)
     {
         __tlb_invalidate(addr + i * PAGE_SIZE);
     }
+#else
+    sys_a1(tlbi_rvaae1, pack_rva(0, 0, addr, npages, 0));
+#endif
 }
 
 /**
@@ -95,39 +107,14 @@ tlb_flush_range(ptr_t addr, unsigned int npages)
 static inline void 
 tlb_flush_asid_range(unsigned int asid, ptr_t addr, unsigned int npages)
 {
+#ifdef _MMU_USE_OA52
     for (unsigned int i = 0; i < npages; i++)
     {
         __tlb_flush_asid(asid, addr + i * PAGE_SIZE);
     }
-}
-
-/**
- * @brief Invalidate an entry of kernel address spaces
- * 
- * @param asid 
- * @param addr 
- * @param npages 
- */
-static inline void 
-tlb_flush_kernel(ptr_t addr)
-{
-    __tlb_flush_global(addr);
-}
-
-/**
- * @brief Invalidate entries of kernel address spaces
- * 
- * @param asid 
- * @param addr 
- * @param npages 
- */
-static inline void 
-tlb_flush_kernel_ranged(ptr_t addr, unsigned int npages)
-{
-    for (unsigned int i = 0; i < npages; i++)
-    {
-        tlb_flush_kernel(addr + i * PAGE_SIZE);
-    }
+#else
+    sys_a1(tlbi_rvae1, pack_rva(asid, 0, addr, npages, 0));
+#endif
 }
 
 #include <asm-generic/tlb-shared.h>

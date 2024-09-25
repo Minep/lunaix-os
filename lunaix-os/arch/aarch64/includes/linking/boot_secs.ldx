@@ -1,0 +1,17 @@
+#ifndef __LUNAIX_BOOT_SECS_LD_INC
+#define __LUNAIX_BOOT_SECS_LD_INC
+
+#include "base_defs.ld.inc"
+
+.boot.text BLOCK(PAGE_GRAN) :
+{
+    *(.boot.text)
+} : boot_text 
+
+.boot.data BLOCK(PAGE_GRAN) :
+{
+    *(.boot.data)
+    *(.boot.bss)
+} : boot_data
+
+#endif

@@ -1,5 +1,5 @@
 #include <lunaix/boot_generic.h>
-#include <sys/msrs.h>
+#include <asm/aa64_msrs.h>
 
 #include "init.h"
 
