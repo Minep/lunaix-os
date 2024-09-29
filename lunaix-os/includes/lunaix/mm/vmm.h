@@ -11,7 +11,7 @@ vmm_set_ptes_contig(pte_t* ptep, pte_t pte, size_t lvl_size, size_t n)
 {
     do {
         set_pte(ptep, pte);
-        pte_val(pte) += lvl_size;
+        pte = pte_advance(pte, lvl_size);
         ptep++;
     } while (--n > 0);
 }

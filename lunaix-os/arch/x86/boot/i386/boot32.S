@@ -4,7 +4,7 @@
 #include "sys/boot/multiboot.S.inc"
 #endif
 
-.section .boot.bss
+.section .boot.data
     /* 根据System V ABI，栈地址必须16字节对齐 */
     /* 这里只是一个临时栈，在_hhk_init里面我们会初始化内核专用栈 */
     .align 16

@@ -32,7 +32,8 @@
 #define KERNEL_IMG_SIZE             __ulong(0x4000000)
 #define KERNEL_IMG_END END_POINT(KERNEL_IMG)
 
-#define PG_MOUNT_1                  __ulong(0xc8000000)
+#define KMAP                        __ulong(0xc8000000)
+#define PG_MOUNT_1                  KMAP
 #define PG_MOUNT_1_SIZE             __ulong(0x1000)
 #define PG_MOUNT_1_END END_POINT(PG_MOUNT_1)
 

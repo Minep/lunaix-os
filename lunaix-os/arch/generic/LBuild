@@ -6,4 +6,5 @@ sources([
     "vmutils.c",
     "procvm.c",
     "arch.c",
+    "kremap.c"
 ])

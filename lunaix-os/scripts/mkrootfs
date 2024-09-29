@@ -78,6 +78,8 @@ ${prefix} umount "${tmp_mnt}" || cleanup
 
 ${prefix} rm -d "${tmp_mnt}" || cleanup
 
+${prefix} chmod o+rw ${rootfs} || cleanup
+
 if [ ! "${has_err:-0}" -eq 0  ]; then
     echo "done, but with error."
 else

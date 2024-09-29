@@ -2,7 +2,7 @@
 
 #include <lunaix/boot_generic.h>
 
-#include <sys/boot/bstage.h>
+#include <asm/boot_stage.h>
 #include <sys/boot/multiboot.h>
 #include <sys-generic/bootmem.h>
 

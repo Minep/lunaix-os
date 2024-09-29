@@ -646,4 +646,10 @@ ptep_count_level(pte_t* ptep)
     return 0;
 }
 
+static inline pte_t must_inline
+pte_advance(pte_t pte, unsigned long lvl_size)
+{
+    return pte_setpaddr(pte, pte_paddr(pte) + lvl_size);
+}
+
 #endif /* __LUNAIX_PAGETABLE_H */

@@ -114,8 +114,8 @@ def main():
         lcfg_env.update()
         lcfg_env.save(opts.config_save)
         lcfg_env.export()
-    else:
-        do_buildfile_gen(opts, lcfg_env)
+
+    do_buildfile_gen(opts, lcfg_env)
 
 if __name__ == "__main__":
     main()
