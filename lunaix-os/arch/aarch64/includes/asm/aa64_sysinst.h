@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_AA64_SYSINST_H
 #define __LUNAIX_AA64_SYSINST_H
 
-#include "aa64_msrs.h"
+#include "aa64_asm.h"
 
 #define tlbi_alle1      __sr_encode(1, 4, 8, 7, 4)
 #define tlbi_aside1     __sr_encode(1, 0, 8, 7, 2)
