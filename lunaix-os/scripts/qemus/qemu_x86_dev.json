@@ -27,6 +27,7 @@
         "gdb_port": "$GDB_PORT",
         "traced": [
             "x86_recv_fault",
+            "x86_log_pagefault",
             "ide_dma_cb"
         ]
     },

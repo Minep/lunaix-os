@@ -5,7 +5,7 @@
 #include <lunaix/sections.h>
 
 #include <asm/mm_defs.h>
-#include <sys/boot/bstage.h>
+#include <asm/boot_stage.h>
 #include <sys-generic/bootmem.h>
 
 #ifdef CONFIG_ARCH_X86_64

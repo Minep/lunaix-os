@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_ARCH_MULDIV64_H
-#define __LUNAIX_ARCH_MULDIV64_H
+#ifndef __LUNAIX_ARCH_GENERIC_MULDIV64_H
+#define __LUNAIX_ARCH_GENERIC_MULDIV64_H
 
 #include <lunaix/types.h>
 

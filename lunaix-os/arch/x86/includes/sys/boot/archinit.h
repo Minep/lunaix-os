@@ -2,7 +2,7 @@
 #define __LUNAIX_ARCHINIT_H
 
 #include <lunaix/types.h>
-#include "bstage.h"
+#include <asm/boot_stage.h>
 #include "multiboot.h"
 
 ptr_t boot_text

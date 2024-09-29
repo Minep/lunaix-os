@@ -3,7 +3,7 @@
 #include <lunaix/mm/pagetable.h>
 #include <lunaix/compiler.h>
 
-#include <sys/boot/bstage.h>
+#include <asm/boot_stage.h>
 #include <asm/mm_defs.h>
 
 
