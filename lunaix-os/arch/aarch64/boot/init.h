@@ -3,10 +3,7 @@
 
 #include <lunaix/types.h>
 #include <sys-generic/bootmem.h>
-
-#define boot_text __attribute__((section(".boot.text")))
-#define boot_data __attribute__((section(".boot.data")))
-#define boot_bss  __attribute__((section(".boot.bss")))
+#include <asm/boot_stage.h>
 
 ptr_t
 kremap();

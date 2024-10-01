@@ -19,8 +19,8 @@
         mov fp, xzr
 
         ldr x4, =aarch64_init
-        blx x4
+        bl x4
          
         // x0: ptr to boot_handoff
         ldr x4, =kernel_bootstrap
-        blx x4
+        bl x4
