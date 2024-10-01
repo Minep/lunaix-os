@@ -18,13 +18,16 @@
 
 #define msbiti                  (sizeof(int) * 8 - 1)
 #define clz(bits)               __builtin_clz(bits)
+#define ctz(bits)               __builtin_ctz(bits)
 
 #ifdef CONFIG_ARCH_BITS_64
 #define msbitl                  (sizeof(long) * 8 - 1)
 #define clzl(bits)              __builtin_clzl(bits)
+#define ctzl(bits)              __builtin_ctzl(bits)
 #else
 #define msbitl                  msbiti
 #define clzl(bits)              clz(bits)
+#define ctzl(bits)              ctz(bits)
 #endif
 
 #define sadd_of(a, b, of)       __builtin_sadd_overflow(a, b, of)

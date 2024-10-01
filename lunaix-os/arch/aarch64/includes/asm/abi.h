@@ -9,6 +9,7 @@
 static inline void must_inline noret
 switch_context() {
     // TODO
+    asm ("b _aa64_switch_task");
     unreachable;
 }
 

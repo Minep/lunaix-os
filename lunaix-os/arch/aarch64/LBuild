@@ -1,4 +1,16 @@
 
+sources([
+    "boot/init.c",
+    "boot/kremap.c",
+    "boot/start.S"
+])
+
+sources([
+    "exception/entries.S",
+    "exception/context.S",
+    "exception/handler.c"
+])
+
 compile_opts([
     "-mlittle-endian",
     "-mgeneral-regs-only",

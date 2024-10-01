@@ -17,6 +17,7 @@
 #define SP_EL0          __sr_encode(3, 0,  4,  1, 0)
 #define SP_EL1          __sr_encode(3, 4,  4,  1, 0)
 
+#ifndef __ASM__
 #define read_sysreg(reg)                                    \
         ({  unsigned long _x;                               \
             asm ("mrs %0, " stringify(reg):"=r"(_x));       \
@@ -40,5 +41,5 @@
 #define SCTRL_A             (1UL << 1)
 #define SCTRL_M             (1UL << 0)
 
-
+#endif
 #endif /* __LUNAIX_AA64_MSRS_H */

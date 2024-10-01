@@ -1,5 +1,5 @@
 #include <lunaix/boot_generic.h>
-#include <asm/aa64_msrs.h>
+#include <asm/aa64.h>
 
 #include "init.h"
 
@@ -27,10 +27,12 @@ setup_pstate()
    set_sysreg(SPSel, 1);
 }
 
+extern void aa64_vbase();
+
 static inline void
 setup_evbar()
 {
-    // TODO install exception vectors, setup VBAR
+    set_sysreg(VBAR_EL1, aa64_vbase);
 }
 
 static inline void
