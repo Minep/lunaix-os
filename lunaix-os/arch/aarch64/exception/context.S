@@ -8,8 +8,10 @@
     .globl _aa64_switch_task
 
     _aa64_evec_prehandle:
-        stp  xzr, elr, [sp, #-16]!  # push {xzr , elr}
-        stp spsr, xzr, [sp, #-16]!  # push {spsr, xzr}
+        # reservation for struct exec_param
+        sub   sp,  sp,  #8         # push  sp_el1
+        sub   sp,  sp,  #16        # push {sp_el0, link}
+        sub   sp,  sp,  #16        # push {spsr,   parent_hart}
 
         stp   lr,  fp, [sp, #-16]!  # push {x31-x1}
         stp  x28, x27, [sp, #-16]!
@@ -32,6 +34,12 @@
 
         mrs   x0, SP_EL0
         str   x0, [x1, #execp_spel0_saved]
+
+        mrs   x0, ELR_E1
+        str   x0, [x1, #execp_link]
+
+        mrs   x0, SPSR_EL1
+        str   x0, [x1, #execp_spsr]
         
         sub   x0, sp,  #hart_end
         str   x0, [x1, #execp_spel1_saved]

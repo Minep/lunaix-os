@@ -4,7 +4,7 @@
 #include <lunaix/types.h>
 
 #ifndef __ASM__
-#define align_stack(ptr) ((ptr) & stack_alignment)
+#define align_stack(ptr) ((ptr) & ~15)
 
 static inline void must_inline noret
 switch_context() {

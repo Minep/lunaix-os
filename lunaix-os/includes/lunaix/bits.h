@@ -2,13 +2,16 @@
 #define __LUNAIX_BITS_H
 
 #include <lunaix/compiler.h>
+#include <asm/bits.h>
 
-#define BITS(h, l)               (((1UL << ((h) + 1)) - 1) ^ ((1UL << (l)) - 1))
-#define BIT(p)                   BITS(p, p)
+#define BITFIELD(h, l)              (h), (l)
 
-#define BITS_GET(from, bits)     (((from) & (bits)) >> ctzl(bits))
+#define BIT(p)                   BITFIELD(p, p)
 
-#define BITS_SET(to, bits, val)  \
-            (((to) & ~(bits)) | (((val) << ctzl(bits)) & (bits)))
+#define BITS_GENMASK(bits)       _BITS_GENMASK(bits)
+
+#define BITS_GET(from, bits)     _BITS_EXTRACT(from, bits)
+
+#define BITS_SET(to, bits, val)  _BITS_INSERT(to, val, bits)
 
 #endif /* __LUNAIX_BITS_H */

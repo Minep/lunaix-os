@@ -4,7 +4,7 @@
 #include <lunaix/types.h>
 #include <lunaix/bits.h>
 
-#define SPSR_EL          BITS(3, 2)
+#define SPSR_EL          BITFIELD(3, 2)
 #define SPSR_SP          BIT(0)
 
 static inline bool

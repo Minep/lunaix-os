@@ -1,22 +1,20 @@
 #ifndef __LUNAIX_AA64_ESR_H
 #define __LUNAIX_AA64_ESR_H
 
-#ifdef __ASM__
-
 #define EXCEPTION_SYNC      0
-#define EXCEPTION_IFQ       1
+#define EXCEPTION_FIQ       1
 #define EXCEPTION_IRQ       2
 #define EXCEPTION_SERR      3
 
-#else
+#ifndef __ASM__
 
 #include <lunaix/bits.h>
 #include <lunaix/types.h>
 
-#define ESR_ISS2            BITS(55, 32)
-#define ESR_EC              BITS(31, 26)
+#define ESR_ISS2            BITFIELD(55, 32)
+#define ESR_EC              BITFIELD(31, 26)
 #define ESR_IL              BIT(25)
-#define ESR_ISS             BITS(24,  0)
+#define ESR_ISS             BITFIELD(24,  0)
 
 #define EC_UNKNOWN          0b000000
 #define EC_WF               0b000001

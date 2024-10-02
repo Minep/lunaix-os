@@ -11,6 +11,11 @@ sources([
     "exception/handler.c"
 ])
 
+sources([
+    "fault.c",
+    "trace.c"
+])
+
 compile_opts([
     "-mlittle-endian",
     "-mgeneral-regs-only",

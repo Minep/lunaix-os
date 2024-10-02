@@ -6,7 +6,7 @@
 #include <lunaix/bits.h>
 #include <asm/aa64_spsr.h>
 
-#define SYNDROME_ETYPE  BITS(63, 56)
+#define SYNDROME_ETYPE  BITFIELD(63, 56)
 
 struct hart_state;
 
