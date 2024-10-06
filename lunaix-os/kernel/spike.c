@@ -5,6 +5,8 @@
 #include <lunaix/trace.h>
 #include <lunaix/failsafe.h>
 
+#include <asm/cpu.h>
+
 LOG_MODULE("spike")
 
 void noret
