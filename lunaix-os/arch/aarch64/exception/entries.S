@@ -3,17 +3,17 @@
 #include <asm/aa64_msrs.h>
 
 .macro aa64_exception_entry type
-    .align 128
+    .align 7
     .type  _exception_entry_t\type, @function
 
-    # each handler has at most 128 bytes (32 insts)
+    // each handler has at most 128 bytes (32 insts)
     _exception_entry_t\type:
         stp x1,  x0,  [sp, #-16]
 
-        # re-purpose the [63, 56] of ESR to exception
-        #  type identifier
+        // re-purpose the [63, 56] of ESR to exception
+        //  type identifier
 
-        mov x0,  =\type
+        mov x0,  #\type
         lsl x0,  x0, #56
         mrs x1,  ESR_EL1
         orr x0,  x0, x1
@@ -28,7 +28,7 @@
 .section .text
 
     .globl aa64_vbase
-    .align 128
+    .align 7
 
     aa64_vbase:
     aa64_exception_entry EXCEPTION_SYNC

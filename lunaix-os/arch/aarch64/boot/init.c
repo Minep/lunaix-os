@@ -32,7 +32,7 @@ extern void aa64_vbase();
 static inline void
 setup_evbar()
 {
-    set_sysreg(VBAR_EL1, aa64_vbase);
+    set_sysreg(VBAR_EL1, __ptr(aa64_vbase));
 }
 
 static inline void

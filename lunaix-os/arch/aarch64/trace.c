@@ -5,16 +5,16 @@
 static inline char*
 __type_name(reg_t syndrome)
 {
-    switch (hart_vector_stamp(syndrome))
+    switch (BITS_GET(syndrome, SYNDROME_ETYPE))
     {
-    case EXCEPTION_SYNC:
-        return "sync";
-    case EXCEPTION_IRQ:
-        return "async (irq)";
-    case EXCEPTION_FIQ:
-        return "async (fiq)";
-    case EXCEPTION_SERR:
-        return "async (serr)";
+        case EXCEPTION_SYNC:
+            return "sync";
+        case EXCEPTION_IRQ:
+            return "async (irq)";
+        case EXCEPTION_FIQ:
+            return "async (fiq)";
+        case EXCEPTION_SERR:
+            return "async (serr)";
     }
 
     return "unknwon";
@@ -50,7 +50,7 @@ trace_print_transition_full(struct hart_state* hstate)
     trace_log("  esr=0x%016lx,  spsr=0x%016lx",
                 syndrome, execp->spsr);
     trace_log("  sp_el0=0x%016lx,  sp_el1=0x%016lx",
-                execp->sp_el0, execp->sp_el1);
+                execp->sp_el0, hart_sp(hstate));
     trace_log("  pc=0x%016lx", execp->link);
 }
 

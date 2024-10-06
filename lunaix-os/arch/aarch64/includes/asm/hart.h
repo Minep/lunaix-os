@@ -15,7 +15,7 @@ struct regcontext
     union {
         reg_t x[31];
         struct {
-            reg_t x[29];
+            reg_t x_[29];
             reg_t fp;
             reg_t lr;
         };
@@ -29,7 +29,7 @@ struct exec_param
     reg_t link;
     struct {
         reg_t sp_el0;
-        reg_t sp_el1;
+        reg_t rsvd;
     };
     
     reg_t syndrome;
@@ -73,10 +73,7 @@ hart_pc(struct hart_state* hstate)
 static inline ptr_t
 hart_sp(struct hart_state* hstate)
 {
-    if (spsr_from_el0(hstate->execp.spsr)) {
-        return hstate->execp.sp_el0;
-    }
-    return hstate->execp.sp_el1;
+    return __ptr(&hstate[-1]);
 }
 
 static inline bool

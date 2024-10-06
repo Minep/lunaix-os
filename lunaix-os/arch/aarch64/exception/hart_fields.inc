@@ -16,8 +16,8 @@ execp_link:
     .struct execp_link + 8
 execp_spel0_saved:
     .struct execp_spel0_saved + 8
-execp_spel1_saved:
-    .struct execp_spel1_saved + 8
+execp_rsvd:
+    .struct execp_rsvd + 8
 execp_syndrome:
     .struct execp_syndrome + 8
 execp_end:

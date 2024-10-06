@@ -7,17 +7,17 @@
 #include <asm/aa64_sysinst.h>
 
 #define pack_va(asid, ttl, va)                \
-        (((asid & 0xffff) << 48)            | \
-         ((ttl  & 0b1111) << 44)            | \
-         (pfn(va) & ((1 << 44) - 1)))
+        (((asid & 0xffffUL) << 48)            | \
+         ((ttl  & 0b1111UL) << 44)            | \
+         (pfn(va) & ((1UL << 44) - 1)))
 
 #define pack_rva(asid, ttl, base, n, scale)   \
-        (((asid    & 0xffff) << 48)         | \
-         ((_MMU_TG & 0b11) << 46)           | \
-         ((n       & 0x1f) << 39)           | \
-         ((scale   & 0b11) << 37)           | \
-         ((ttl     & 0b1111) << 44)         | \
-         (pfn(base)& ((1 << 37) - 1)))
+        (((asid    & 0xffffUL) << 48)         | \
+         ((_MMU_TG & 0b11UL) << 46)           | \
+         ((n       & 0x1fUL) << 39)           | \
+         ((scale   & 0b11UL) << 37)           | \
+         ((ttl     & 0b1111UL) << 44)         | \
+         (pfn(base)& ((1UL << 37) - 1)))
 
 /**
  * @brief Invalidate an entry of all address space

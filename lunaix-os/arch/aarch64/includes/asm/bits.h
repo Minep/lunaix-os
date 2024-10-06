@@ -11,8 +11,8 @@
             unsigned long _r;           \
             asm ("ubfm %0, %1, %2, %3"  \
                  : "=r"(_r)             \
-                 : "r"(from)            \
-                   "i"(l) "i"(h));      \
+                 : "r"(from),           \
+                   "i"(l),"i"(h));      \
             _r;                         \
         })
 
@@ -21,8 +21,8 @@
             unsigned long _r = to;      \
             asm ("bfi %0, %1, %2, %3"   \
                  : "=r"(_r)             \
-                 : "r"(from)            \
-                   "i"(l)               \
+                 : "r"(from),           \
+                   "i"(l),              \
                    "i"(h - l + 1));     \
             _r;                         \
         })

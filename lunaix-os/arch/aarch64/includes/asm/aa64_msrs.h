@@ -41,5 +41,14 @@
 #define SCTRL_A             (1UL << 1)
 #define SCTRL_M             (1UL << 0)
 
+#define sysreg_flagging(reg, set, unset)                    \
+        ({                                                  \
+            unsigned long _x;                               \
+            _x = read_sysreg(reg);                          \
+            _x = (_x & ~(unset)) | (set);                   \
+            set_sysreg(reg, _x);                            \
+            _x;                                             \
+        })
+
 #endif
 #endif /* __LUNAIX_AA64_MSRS_H */

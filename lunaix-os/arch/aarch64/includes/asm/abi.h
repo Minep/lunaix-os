@@ -4,7 +4,12 @@
 #include <lunaix/types.h>
 
 #ifndef __ASM__
+
 #define align_stack(ptr) ((ptr) & ~15)
+
+#define store_retval(retval) current_thread->hstate->registers.x[0] = (retval)
+#define store_retval_to(th, retval) (th)->hstate->registers.x[0] = (retval)
+
 
 static inline void must_inline noret
 switch_context() {
@@ -27,6 +32,20 @@ static inline ptr_t
 abi_get_retaddrat(ptr_t fp)
 {
     return ((ptr_t*)fp)[1];
+}
+
+static inline ptr_t must_inline
+abi_get_callframe()
+{
+    ptr_t val;
+    asm volatile("mov %0, fp" : "=r"(val));
+    return val;
+}
+
+static inline void must_inline 
+j_usr(ptr_t sp, ptr_t pc) 
+{
+    // TODO
 }
 
 #endif

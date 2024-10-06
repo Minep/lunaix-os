@@ -1,4 +1,6 @@
 #include <lunaix/sections.h>
+
+#include <asm/mm_defs.h>
 #include <asm-generic/init_pagetable.h>
 #include <asm/boot_stage.h>
 
@@ -17,10 +19,10 @@ kremap()
     init_pt_alloc(&alloc, to_kphysical(&kpt), sizeof(kpt));
     init_ptw_state(&ptw, &alloc, kpt_alloc_table(&alloc));
 
-    pte = mkpte(boot_start, KERNEL_DATA);
+    pte = mkpte(bootsec_start, KERNEL_DATA);
     pte = pte_mkexec(pte);
-    nr  = leaf_count(boot_end - boot_start);
-    kpt_set_ptes(&ptw, boot_start, pte, LFT_SIZE, nr);
+    nr  = leaf_count(bootsec_end - bootsec_start);
+    kpt_set_ptes(&ptw, bootsec_start, pte, LFT_SIZE, nr);
 
     kpt_mktable_at(&ptw, VMAP, L0T_SIZE);
     kpt_mktable_at(&ptw, PMAP, L2T_SIZE);

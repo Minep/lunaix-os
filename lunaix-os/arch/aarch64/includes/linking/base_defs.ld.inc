@@ -2,7 +2,7 @@
 #define __LUNAIX_BASE_DEFS_LD_INC
 
 #define __LD__
-#include <sys/mm/mempart.h>
+#include <asm/mempart.h>
 
 #define KEXEC_BASE      KERNEL_IMG
 #define PAGE_GRAN       4K

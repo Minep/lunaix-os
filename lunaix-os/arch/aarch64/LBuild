@@ -12,8 +12,16 @@ sources([
 ])
 
 sources([
+    "soc/gic.c",
+])
+
+sources([
     "fault.c",
     "trace.c"
+])
+
+headers([
+    "includes"
 ])
 
 compile_opts([

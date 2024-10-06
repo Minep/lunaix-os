@@ -1,6 +1,6 @@
 #define __ASM__
 #include <asm/aa64_msrs.h>
-#include "hart_field.inc"
+#include "hart_fields.inc"
 
 .section .text
     
@@ -8,12 +8,12 @@
     .globl _aa64_switch_task
 
     _aa64_evec_prehandle:
-        # reservation for struct exec_param
-        sub   sp,  sp,  #8         # push  sp_el1
-        sub   sp,  sp,  #16        # push {sp_el0, link}
-        sub   sp,  sp,  #16        # push {spsr,   parent_hart}
+        // reservation for struct exec_param
+        sub   sp,  sp,  #8         // push  xzr
+        sub   sp,  sp,  #16        // push {sp_el0, link}
+        sub   sp,  sp,  #16        // push {spsr,   parent_hart}
 
-        stp   lr,  fp, [sp, #-16]!  # push {x31-x1}
+        stp   lr,  fp, [sp, #-16]! //push {x31-x1}
         stp  x28, x27, [sp, #-16]!
         stp  x26, x25, [sp, #-16]!
         stp  x24, x23, [sp, #-16]!
@@ -28,7 +28,7 @@
         stp   x6,  x5, [sp, #-16]!
         stp   x4,  x3, [sp, #-16]!
         stp   x2,  x1, [sp, #-16]!
-        stp   x0, xzr, [sp, #-16]!  # push {x0, xzr}
+        stp   x0, xzr, [sp, #-16]!  // push {x0, xzr}
 
         add   x1, sp,  #hart_execp
 
@@ -41,14 +41,11 @@
         mrs   x0, SPSR_EL1
         str   x0, [x1, #execp_spsr]
         
-        sub   x0, sp,  #hart_end
-        str   x0, [x1, #execp_spel1_saved]
-        
         mov   x0, sp
         bl    handle_exception
         
     do_eret:
-        mov   sp,   x0
+        add   sp, x0,   xzr
 
         add   x1,   x0, #hart_execp
 
@@ -80,12 +77,12 @@
         ldp  x27, x28, [sp, #16]!
         ldp   fp,  lr, [sp, #16]!
         
-        # sp now point to the start of exec_param
+        // sp now point to the start of exec_param
 
-        ldr   sp,  [sp, #execp_spel1_saved]
+        sub   sp,  sp, #execp_end
 
         eret
 
     _aa64_switch_task:
-        # TODO
+        // TODO
         b     do_eret
