@@ -319,11 +319,11 @@ dt_decode(struct dt_prop_iter* dtpi, struct dt_node_base* node,
 }
 
 #define dt_decode_reg(dtpi, node, field) \
-            dt_decode(dtpi, &(node)->base, (node)->(field), \
+            dt_decode(dtpi, &(node)->base, &(node)->field, \
                             (node)->base.sz_c + (node)->base.addr_c);
 
 #define dt_decode_range(dtpi, node, field) \
-            dt_decode(dtpi, &(node)->base, (node)->field, \
+            dt_decode(dtpi, &(node)->base, &(node)->field, \
                             (node)->base.sz_c * 2 + (node)->base.addr_c);
 
 static inline void
@@ -410,10 +410,32 @@ dtprop_reg_addr(struct dt_prop_iter* dtpi)
     return dtprop_extract(dtpi, 0);
 }
 
+static inline ptr_t
+dtprop_reg_nextaddr(struct dt_prop_iter* dtpi)
+{
+    ptr_t t;
+
+    t = (ptr_t)dtprop_to_u64(dtprop_reg_addr(dtpi));
+    dtprop_next(dtpi);
+
+    return t;
+}
+
 static inline dt_enc_t
 dtprop_reg_len(struct dt_prop_iter* dtpi)
 {
     return dtprop_extract(dtpi, dtpi->node->addr_c);
+}
+
+static inline size_t
+dtprop_reg_nextlen(struct dt_prop_iter* dtpi)
+{
+    size_t t;
+
+    t = (size_t)dtprop_to_u64(dtprop_reg_len(dtpi));
+    dtprop_next(dtpi);
+
+    return t;
 }
 
 static inline dt_enc_t

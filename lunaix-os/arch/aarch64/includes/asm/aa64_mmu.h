@@ -33,7 +33,7 @@
 #define TCR_G16K            (0b10)
 #define TCR_G64K            (0b11)
 
-#define TCR_SHNS            (0b01)
+#define TCR_SHNS            (0b00)
 #define TCR_SHOS            (0b10)
 #define TCR_SHIS            (0b11)
 

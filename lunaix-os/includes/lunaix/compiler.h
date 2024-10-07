@@ -13,6 +13,7 @@
 #define must_emit               __attribute__((used))
 #define unreachable             __builtin_unreachable()
 #define no_inline               __attribute__((noinline))
+#define asmlinkage              
 
 #define _default                weak
 
@@ -35,6 +36,8 @@
 #define umul_of(a, b, of)       __builtin_umul_overflow(a, b, of)
 #define umull_of(a, b, of)      __builtin_umull_overflow(a, b, of)
 #define offsetof(f, m)          __builtin_offsetof(f, m)
+#define select(cond, y, n)      __builtin_choose_expr(cond, y, n)
+#define is_const(v)             __builtin_constant_p(v)
 
 #define prefetch_rd(ptr, ll)    __builtin_prefetch((ptr), 0, ll)
 #define prefetch_wr(ptr, ll)    __builtin_prefetch((ptr), 1, ll)
@@ -60,5 +63,10 @@ spin()
         ;
     unreachable;
 }
+
+#ifdef CONFIG_ARCH_X86_32
+#undef  asmlinkage
+#define asmlinkage      __attribute__((regparm(0)))
+#endif
 
 #endif /* __LUNAIX_COMPILER_H */
