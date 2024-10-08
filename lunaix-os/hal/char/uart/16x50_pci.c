@@ -52,11 +52,11 @@ pci16650_check_compat(struct pci_device_def* def,
 static int
 pci16650_binder(struct device_def* def, struct device* dev)
 {
-    int irq;
     struct pci_base_addr* bar;
     struct pci_device* pcidev;
     struct uart16550* uart;
     struct serial_dev* sdev;
+    msi_vector_t msiv;
     
     pcidev = PCI_DEVICE(dev);
 
@@ -71,14 +71,19 @@ pci16650_binder(struct device_def* def, struct device* dev)
         if (bar->size == 0) {
             continue;
         }
-                
+
         if (!pci_bar_mmio_space(bar)) {
+#ifdef CONFIG_PCI_PMIO
             pci_cmd_set_pmio(&cmd);
             pci_apply_command(pcidev, cmd);
 
             uart = uart16x50_pmio_create(bar->start);
-        }
-        else {
+#else
+            WARN("plaform configured to not support pmio access.")
+            continue;
+#endif
+        } else 
+        {
             pci_cmd_set_mmio(&cmd);
             pci_apply_command(pcidev, cmd);
 
@@ -90,23 +95,22 @@ pci16650_binder(struct device_def* def, struct device* dev)
             continue;
         }
 
-        if (pci_capability_msi(pcidev)) {
-            irq = isrm_ivexalloc(uart_msi_irq_handler);
-            isrm_set_payload(irq, __ptr(uart));
-            pci_setup_msi(pcidev, irq);
+        if (!pci_capability_msi(pcidev)) {
+            WARN("failed to fallback to legacy INTx: not supported.");
+            continue;
         }
-        else {
-            irq = pci_intr_irq(pcidev);
-            irq = isrm_bindirq(irq, uart_intx_irq_handler);
-        }
+
+        msiv = isrm_msialloc(uart_msi_irq_handler);
+        isrm_set_payload(msi_vect(msiv), __ptr(uart));
+        pci_setup_msi(pcidev, msiv);
 
         INFO("base: 0x%x (%s), irq=%d (%s)", 
                 bar->start, 
                 pci_bar_mmio_space(bar) ? "mmio" : "pmio",
-                irq, 
+                msi_vect(msiv), 
                 pci_capability_msi(pcidev) ? "msi" : "intx, re-routed");
         
-        uart->iv = irq;
+        uart->iv = msi_vect(msiv);
 
         sdev = uart_create_serial(uart, &def->class, &pci_ports, "PCI");
         pci_bind_instance(pcidev, sdev);

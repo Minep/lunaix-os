@@ -50,7 +50,7 @@ tool:
 .NOTPARALLEL:
 export KCMD=$(CMDLINE)
 export LBUILD ARCH MODE
-all: $(kbuild_dir) tool kernel usr/build
+all: $(kbuild_dir) tool kernel
 
 rootfs: usr/build
 	$(call status,TASK,$(notdir $@))

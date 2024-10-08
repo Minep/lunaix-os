@@ -210,12 +210,12 @@ pci_probe_bar_info(struct pci_device* device)
 }
 
 void
-pci_setup_msi(struct pci_device* device, int vector)
+pci_setup_msi(struct pci_device* device, msi_vector_t msiv)
 {
     // PCI LB Spec. (Rev 3) Section 6.8 & 6.8.1
 
-    ptr_t msi_addr = pci_get_msi_base();
-    u32_t msi_data = pci_config_msi_data(vector);
+    ptr_t msi_addr = msi_addr(msiv);
+    u32_t msi_data = msi_data(msiv);
 
     pci_reg_t reg1 = pci_read_cspace(device->cspace_base, device->msi_loc);
     pci_reg_t msg_ctl = reg1 >> 16;

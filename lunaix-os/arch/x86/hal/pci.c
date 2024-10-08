@@ -20,14 +20,3 @@ pci_write_cspace(ptr_t base, int offset, pci_reg_t data)
 }
 
 #endif
-
-u16_t
-pci_config_msi_data(int vector) {
-    return vector;
-}
-
-ptr_t
-pci_get_msi_base() {
-    return 0xFEE00000;
-}
-

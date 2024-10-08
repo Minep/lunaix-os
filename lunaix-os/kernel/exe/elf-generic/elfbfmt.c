@@ -24,6 +24,10 @@ elf_do_open(struct elf* elf, struct v_file* elf_file)
         return status;
     }
 
+    if (!elf_check_arch(elf)) {
+        return EINVAL;
+    }
+
     if ((status = elf_read_phdr(elf)) < 0) {
         elf_close(elf);
         return status;

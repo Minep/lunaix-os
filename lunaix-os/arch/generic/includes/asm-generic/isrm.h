@@ -14,7 +14,18 @@
 #include <lunaix/types.h>
 #include <lunaix/hart_state.h>
 
+#include <hal/devtree.h>
+
 typedef void (*isr_cb)(const struct hart_state*);
+
+typedef struct {
+    ptr_t msi_addr;
+    reg_t msi_data;
+    int mapped_iv;
+} msi_vector_t;
+#define msi_addr(msiv)   ((msiv).msi_addr)
+#define msi_data(msiv)   ((msiv).msi_data)
+#define msi_vect(msiv)   ((msiv).mapped_iv)
 
 void
 isrm_init();
@@ -44,21 +55,20 @@ int
 isrm_ivexalloc(isr_cb handler);
 
 /**
- * @brief Bind a given irq and associated handler to an iv
- *
- * @param iv iv allocated by system
- */
-int
-isrm_bindirq(int irq, isr_cb irq_handler);
-
-/**
- * @brief Bind given iv with it's associated handler
+ * @brief Allocate an iv resource for MSI use
  *
  * @param iv
- * @param handler
  */
-void
-isrm_bindiv(int iv, isr_cb handler);
+msi_vector_t
+isrm_msialloc(isr_cb handler);
+
+/**
+ * @brief Bind the iv according to given device tree node
+ *
+ * @param node
+ */
+int
+isrm_bind_dtnode(struct dt_intr_node* node);
 
 /**
  * @brief Get the handler associated with the given iv
@@ -74,9 +84,6 @@ isrm_get_payload(const struct hart_state*);
 
 void
 isrm_set_payload(int iv, ptr_t);
-
-void
-isrm_irq_attach(int irq, int iv, cpu_t dest, u32_t flags);
 
 /**
  * @brief Notify end of interrupt event

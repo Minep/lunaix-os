@@ -66,11 +66,6 @@ load_executable(struct load_context* context, const struct v_file* exefile)
         goto done;
     }
 
-    if (!elf_check_arch(&elf)) {
-        errno = EINVAL;
-        goto done;
-    }
-
     if (!(elf_check_exec(&elf, ET_EXEC) || elf_check_exec(&elf, ET_DYN))) {
         errno = ENOEXEC;
         goto done;

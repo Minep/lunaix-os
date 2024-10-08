@@ -1,12 +1,12 @@
 #include <asm/hart.h>
 #include "asm/x86.h"
 
-#include <asm-generic/isrm.h>
-
 #include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/syslog.h>
+
+#include <asm/x86_isrm.h>
 
 LOG_MODULE("INTR")
 

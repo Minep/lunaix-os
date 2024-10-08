@@ -1,7 +1,6 @@
 #include <lunaix/clock.h>
 #include <lunaix/ds/mutex.h>
 #include <lunaix/input.h>
-#include <asm-generic/isrm.h>
 #include <lunaix/keyboard.h>
 #include <lunaix/syslog.h>
 #include <lunaix/timer.h>
@@ -12,6 +11,7 @@
 #include <klibc/string.h>
 
 #include "asm/x86_cpu.h"
+#include <asm/x86_isrm.h>
 #include <asm/x86_pmio.h>
 
 #define PS2_PORT_ENC_DATA 0x60
