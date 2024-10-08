@@ -10,7 +10,6 @@
  *
  */
 
-#include <asm-generic/isrm.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/status.h>
 #include <lunaix/hart_state.h>
@@ -19,6 +18,7 @@
 
 #include <klibc/string.h>
 
+#include <asm/x86_isrm.h>
 #include <asm/x86_pmio.h>
 
 #define RTC_INDEX_PORT 0x70

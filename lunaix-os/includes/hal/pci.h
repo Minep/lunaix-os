@@ -6,6 +6,8 @@
 #include <lunaix/ds/llist.h>
 #include <lunaix/types.h>
 
+#include <asm-generic/isrm.h>
+
 #define EXPORT_PCI_DEVICE(id, pci_devdef, stage)                               \
     EXPORT_DEVICE(id, &(pci_devdef)->devdef, stage)
 
@@ -170,7 +172,7 @@ void
 pci_probe_bar_info(struct pci_device* device);
 
 void
-pci_setup_msi(struct pci_device* device, int vector);
+pci_setup_msi(struct pci_device* device, msi_vector_t msiv);
 
 void
 pci_probe_msi_info(struct pci_device* device);
@@ -262,12 +264,5 @@ pci_read_cspace(ptr_t base, int offset);
 
 void
 pci_write_cspace(ptr_t base, int offset, pci_reg_t data);
-
-u16_t
-pci_config_msi_data(int vector);
-
-ptr_t
-pci_get_msi_base();
-
 
 #endif /* __LUNAIX_PCI_H */

@@ -1,8 +1,8 @@
 #include <lunaix/device.h>
-#include <asm-generic/isrm.h>
 #include <lunaix/syslog.h>
 
 #include <asm/x86_pmio.h>
+#include <asm/x86_isrm.h>
 
 #include "16x50.h"
 
@@ -58,7 +58,7 @@ upiom_init(struct device_def* def)
 
 static struct device_def uart_pmio_def = {
     .class = DEVCLASS(DEVIF_SOC, DEVFN_CHAR, DEV_UART16550),
-    .name = "16550 UART (PIO)",
+    .name = "16550 UART (pmio, isa-bus)",
     .init = upiom_init
 };
 EXPORT_DEVICE(uart16550_pmio, &uart_pmio_def, load_onboot);

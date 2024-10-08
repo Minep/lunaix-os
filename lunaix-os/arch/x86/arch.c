@@ -1,8 +1,9 @@
 #include <hal/hwtimer.h>
 
-#include <asm-generic/isrm.h>
 #include <lunaix/spike.h>
 #include <lunaix/process.h>
+
+#include <asm/x86_isrm.h>
 
 #include "asm/x86.h"
 #include "asm/hart.h"

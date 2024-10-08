@@ -9,6 +9,7 @@ ahci_pci_bind(struct device_def* def, struct device* dev)
     struct pci_device* ahci_dev;
     struct pci_base_addr* bar6;
     struct ahci_driver* ahci_drv;
+    msi_vector_t msiv;
 
     ahci_dev = PCI_DEVICE(dev);
     bar6 = pci_device_bar(ahci_dev, 5);
@@ -19,21 +20,16 @@ ahci_pci_bind(struct device_def* def, struct device* dev)
     pci_cmd_set_mmio(&cmd);
     pci_cmd_set_msi(&cmd);
     pci_apply_command(ahci_dev, cmd);
+    
+    assert(pci_capability_msi(ahci_dev));
 
-    int iv;
-    if (pci_capability_msi(ahci_dev)) {
-        iv = isrm_ivexalloc(ahci_hba_isr);
-        pci_setup_msi(ahci_dev, iv);
-    }
-    else {
-        iv = pci_intr_irq(ahci_dev);
-        iv = isrm_bindirq(iv, ahci_hba_isr);
-    }
+    msiv = isrm_msialloc(ahci_hba_isr);
+    pci_setup_msi(ahci_dev, msiv);
 
     struct ahci_driver_param param = {
         .mmio_base = bar6->start,
         .mmio_size = bar6->size,
-        .ahci_iv = iv,
+        .ahci_iv = msi_vect(msiv),
     };
 
     ahci_drv = ahci_driver_init(&param);

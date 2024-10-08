@@ -3,10 +3,10 @@
 
 #include <lunaix/clock.h>
 #include <lunaix/compiler.h>
-#include <asm-generic/isrm.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 
+#include <asm/x86_isrm.h>
 #include "asm/soc/apic.h"
 
 LOG_MODULE("APIC_TIMER")

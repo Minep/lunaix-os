@@ -1,6 +1,6 @@
 #include <lunaix/spike.h>
 #include <lunaix/owloysius.h>
-#include <asm-generic/isrm.h>
+#include <asm/x86_isrm.h>
 
 #include "asm/x86.h"
 #include "asm/soc/ioapic.h"
@@ -163,6 +163,24 @@ void
 isrm_notify_eos(cpu_t id)
 {
     isrm_notify_eoi(id, LUNAIX_SCHED);
+}
+
+msi_vector_t
+isrm_msialloc(isr_cb handler)
+{
+    unsigned int iv = isrm_ivexalloc(handler);
+
+    return (msi_vector_t){ 
+        .msi_addr  = 0xfee00000,
+        .msi_data  = iv,
+        .mapped_iv = iv
+    };
+}
+
+int
+isrm_bind_dtnode(struct dt_intr_node* node)
+{
+    fail("not supported");
 }
 
 

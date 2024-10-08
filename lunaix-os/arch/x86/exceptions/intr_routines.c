@@ -1,6 +1,5 @@
 #include <asm/hart.h>
 
-#include <asm-generic/isrm.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/spike.h>
@@ -10,6 +9,7 @@
 
 #include <klibc/strfmt.h>
 
+#include <asm/x86_isrm.h>
 #include "asm/soc/apic.h"
 #include "asm/x86.h"
 

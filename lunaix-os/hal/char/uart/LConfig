@@ -12,8 +12,11 @@ def uart_16x50():
 
         type(bool)
 
+        default(True)
+        
         is_x86 = v(arch) in ["i386", "x86_64"]
-        default(is_x86)
+        if not is_x86:
+            set_value(False)
 
         return is_x86
     
