@@ -4,6 +4,9 @@
 #include <lunaix/types.h>
 #include <lunaix/ds/bitmap.h>
 #include <lunaix/ds/hashtable.h>
+
+#include <hal/devtree.h>
+
 #include <asm/aa64_gic.h>
 #include <asm-generic/isrm.h>
 
@@ -182,10 +185,8 @@ struct arm_gic
     } mmrs;
 
     struct {
-        union {
-            ptr_t prop;
-            lpi_entry_t* property;
-        };
+        ptr_t prop_pa;
+        lpi_entry_t* prop_table;
         
         ptr_t pend;
         BITMAP(gic_bmp) pendings;
@@ -199,6 +200,8 @@ struct arm_gic
         struct gic_idomain* spi;
         struct gic_idomain* espi;
     } idomain;
+
+    struct dt_node* gic_node;
 };
 
 #endif /* __LUNAIX_GIC_H */

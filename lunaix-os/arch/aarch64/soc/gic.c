@@ -102,10 +102,14 @@ gic_create_from_dt()
     // ignore vcpu_if, as we dont do any EL2 stuff
 
     __create_its(gic_node);
+
+    gic.gic_node = gic_node;
 }
 
 
 /* ++++++ GIC dirver ++++++ */
+
+/* ****** Interrupt Management ****** */
 
 static void
 __config_interrupt(struct arm_gic* gic, struct gic_distributor* dist, 
@@ -121,7 +125,7 @@ __config_interrupt(struct arm_gic* gic, struct gic_distributor* dist,
 
         entry |= LPI_EN;
         
-        gic->lpi_tables.property[intid_rel] = entry;
+        gic->lpi_tables.prop_table[intid_rel] = entry;
 
         // clear any pending when we (re-)configuring
         bitmap_set(gic_bmp, &gic->lpi_tables.pendings, intid_rel, false);
@@ -157,7 +161,7 @@ __undone_interrupt(struct arm_gic* gic, struct gic_distributor* dist,
     intid_rel = ent->intid - ent->domain->base;
     
     if (ent->config.class == GIC_LPI) {
-        gic->lpi_tables.property[intid_rel] = 0;
+        gic->lpi_tables.prop_table[intid_rel] = 0;
 
         // clear any pending when we (re-)configuring
         bitmap_set(gic_bmp, &gic->lpi_tables.pendings, intid_rel, false);
@@ -172,87 +176,6 @@ __undone_interrupt(struct arm_gic* gic, struct gic_distributor* dist,
     }
 }
 
-static struct gic_idomain*
-__idomain(int nr_ints, unsigned int base, bool extended)
-{
-    struct gic_idomain* rec;
-
-    rec = valloc(sizeof(*rec));
-    
-    bitmap_init(gic_bmp, &rec->ivmap, nr_ints);
-    hashtable_init(rec->recs);
-
-    rec->base = base;
-    rec->extended = extended;
-
-    return rec;
-}
-
-static inline void
-__init_distributor(struct gic_distributor* d, 
-                   gicreg_t* base, unsigned int nr_ints)
-{
-    bitmap_init_ptr(gic_bmp,
-        &d->group, nr_ints, gic_regptr(base, GICD_IGROUPRn));
-
-    bitmap_init_ptr(gic_bmp,
-        &d->grpmod, nr_ints, gic_regptr(base, GICD_IGRPMODRn));
-
-    bitmap_init_ptr(gic_bmp,
-        &d->enable, nr_ints, gic_regptr(base, GICD_ISENABLER));
-    
-    bitmap_init_ptr(gic_bmp,
-        &d->disable, nr_ints, gic_regptr(base, GICD_ICENABLER));
-
-    bitmap_init_ptr(gic_bmp,
-        &d->icfg, nr_ints * 2, gic_regptr(base, GICD_ICFGR));
-    
-    bitmap_init_ptr(gic_bmp,
-        &d->nmi, nr_ints, gic_regptr(base, GICD_INMIR));
-}
-
-static inline struct leaflet*
-__alloc_lpi_table(size_t table_sz)
-{
-    unsigned int val;
-    struct leaflet* tab;
-
-    val = page_aligned(table_sz);
-    tab = alloc_leaflet(count_order(leaf_count(val)));
-    leaflet_wipe(tab);
-
-    return leaflet_addr(tab);
-}
-
-static struct gic_idomain*
-__deduce_domain(unsigned int intid)
-{
-    if (intid <= INITID_SGI_END) {
-        return gic.pes[0].idomain.local_ints;
-    }
-
-    if (intid <= INITID_PPI_END) {
-        return gic.pes[0].idomain.local_ints;
-    }
-
-    if (intid <= INITID_SPI_END) {
-        return gic.idomain.spi;
-    }
-
-    if (INITID_ePPI_BASE <= intid && intid <= INITID_ePPI_END) {
-        return gic.pes[0].idomain.eppi;
-    }
-
-    if (INITID_eSPI_BASE <= intid && intid <= INITID_eSPI_END) {
-        return gic.idomain.espi;
-    }
-
-    if (intid >= INITID_LPI_BASE) {
-        return gic.idomain.lpi;
-    }
-
-    return NULL;
-}
 
 static struct gic_interrupt*
 __find_interrupt_record(unsigned int intid)
@@ -299,6 +222,108 @@ __register_interrupt(struct gic_idomain* domain,
     return interrupt;
 }
 
+
+/* ****** Interrupt Domain Management ****** */
+
+static struct gic_idomain*
+__deduce_domain(unsigned int intid)
+{
+    if (intid <= INITID_SGI_END) {
+        return gic.pes[0].idomain.local_ints;
+    }
+
+    if (intid <= INITID_PPI_END) {
+        return gic.pes[0].idomain.local_ints;
+    }
+
+    if (intid <= INITID_SPI_END) {
+        return gic.idomain.spi;
+    }
+
+    if (INITID_ePPI_BASE <= intid && intid <= INITID_ePPI_END) {
+        return gic.pes[0].idomain.eppi;
+    }
+
+    if (INITID_eSPI_BASE <= intid && intid <= INITID_eSPI_END) {
+        return gic.idomain.espi;
+    }
+
+    if (intid >= INITID_LPI_BASE) {
+        return gic.idomain.lpi;
+    }
+
+    return NULL;
+}
+
+static struct gic_idomain*
+__idomain(int nr_ints, unsigned int base, bool extended)
+{
+    struct gic_idomain* rec;
+
+    rec = valloc(sizeof(*rec));
+    
+    bitmap_init(gic_bmp, &rec->ivmap, nr_ints);
+    hashtable_init(rec->recs);
+
+    rec->base = base;
+    rec->extended = extended;
+
+    return rec;
+}
+
+
+/* ****** Distributor-Related Management ****** */
+
+static inline void
+__init_distributor(struct gic_distributor* d, 
+                   gicreg_t* base, unsigned int nr_ints)
+{
+    bitmap_init_ptr(gic_bmp,
+        &d->group, nr_ints, gic_regptr(base, GICD_IGROUPRn));
+
+    bitmap_init_ptr(gic_bmp,
+        &d->grpmod, nr_ints, gic_regptr(base, GICD_IGRPMODRn));
+
+    bitmap_init_ptr(gic_bmp,
+        &d->enable, nr_ints, gic_regptr(base, GICD_ISENABLER));
+    
+    bitmap_init_ptr(gic_bmp,
+        &d->disable, nr_ints, gic_regptr(base, GICD_ICENABLER));
+
+    bitmap_init_ptr(gic_bmp,
+        &d->icfg, nr_ints * 2, gic_regptr(base, GICD_ICFGR));
+    
+    bitmap_init_ptr(gic_bmp,
+        &d->nmi, nr_ints, gic_regptr(base, GICD_INMIR));
+}
+
+static inline struct leaflet*
+__alloc_lpi_table(size_t table_sz)
+{
+    unsigned int val;
+    struct leaflet* tab;
+
+    val = page_aligned(table_sz);
+    tab = alloc_leaflet(count_order(leaf_count(val)));
+    leaflet_wipe(tab);
+
+    return leaflet_addr(tab);
+}
+
+static inline void
+__toggle_lpi_enable(struct gic_rd* rdist, bool en)
+{
+    gicreg_t val;
+
+    if (!en) {
+        while ((val = rdist->base[GICR_CTLR]) & GICR_CTLR_RWP);
+        rdist->base[GICR_CTLR] = val & ~GICR_CTLR_EnLPI;
+    }
+    else {
+        rdist->base[GICR_CTLR] = val | GICR_CTLR_EnLPI;
+    }
+}
+
 static struct gic_distributor*
 __attached_distributor(int cpu, struct gic_interrupt* ent)
 {
@@ -316,6 +341,9 @@ __attached_distributor(int cpu, struct gic_interrupt* ent)
     
     return &gic.dist;
 }
+
+
+/* ****** GIC Components Configuration ****** */
 
 static void
 gic_configure_icc()
@@ -399,8 +427,14 @@ gic_configure_global(struct arm_gic* gic)
         gic->idomain.lpi  = __idomain(gic->lpi_nr, INITID_LPI_BASE, false);
     }
 
-    gic->lpi_tables.prop = __alloc_lpi_table(gic->lpi_nr);
-    gic->lpi_tables.pend = __alloc_lpi_table(gic->lpi_nr / 8);
+    struct leaflet* tab;
+
+    tab = __alloc_lpi_table(gic->lpi_nr);
+    gic->lpi_tables.prop_table = vmap(tab, KERNEL_DATA);
+    gic->lpi_tables.prop_pa = leaflet_addr(tab);
+
+    tab = __alloc_lpi_table(gic->lpi_nr / 8);
+    gic->lpi_tables.pend = leaflet_addr(tab);
 
     bitmap_init_ptr(gic_bmp, 
         &gic->lpi_tables.pendings, gic->lpi_nr, gic->lpi_tables.pend);
@@ -435,8 +469,10 @@ gic_configure_pe(struct arm_gic* gic, struct gic_pe* pe)
 
     __init_distributor(&pe->rdist, pe->_rd->sgi_base, nr_local_ints);
 
+    __toggle_lpi_enable(pe->_rd, false);
+
     reg = 0;
-    BITS_SET(reg, GICR_BASER_PAddr, gic->lpi_tables.prop);
+    BITS_SET(reg, GICR_BASER_PAddr, gic->lpi_tables.prop_pa);
     BITS_SET(reg, GICR_BASER_Share, 0b01);
     BITS_SET(reg, GICR_PROPBASER_IDbits, ilog2(gic->max_intid));
     pe->_rd->sgi_base[GICR_PROPBASER] = reg;
@@ -446,7 +482,12 @@ gic_configure_pe(struct arm_gic* gic, struct gic_pe* pe)
     BITS_SET(reg, GICR_BASER_PAddr, gic->lpi_tables.pend);
     BITS_SET(reg, GICR_BASER_Share, 0b01);
     pe->_rd->sgi_base[GICR_PENDBASER] = reg;
+
+    __toggle_lpi_enable(pe->_rd, true);
 }
+
+
+/* ****** Interrupt Life-cycle Management ****** */
 
 struct gic_interrupt*
 aa64_isrm_ivalloc(struct gic_int_param* param, isr_cb handler)
@@ -541,7 +582,7 @@ gic_update_active()
     pe->iar_val = val;
 }
 
-static void
+static inline void
 gic_signal_eoi()
 {
     struct gic_pe* pe;
@@ -554,6 +595,8 @@ gic_signal_eoi()
     pe->active = NULL;
     set_sysreg(ICC_EOIR1_EL1, pe->iar_val);
 }
+
+/* ****** Lunaix ISRM Interfacing ****** */
 
 void
 isrm_init()
@@ -602,18 +645,6 @@ isrm_ivexalloc(isr_cb handler)
     return intr->intid;
 }
 
-int
-isrm_bindirq(int irq, isr_cb irq_handler)
-{
-    // Not supported
-}
-
-void
-isrm_bindiv(int iv, isr_cb handler)
-{
-    // Not supported
-}
-
 isr_cb
 isrm_get(int iv)
 {
@@ -652,18 +683,9 @@ isrm_set_payload(int iv, ptr_t payload)
 }
 
 void
-isrm_irq_attach(int irq, int iv, cpu_t dest, u32_t flags)
-{
-    // Not supported
-}
-
-void
 isrm_notify_eoi(cpu_t id, int iv)
 {
-    struct gic_interrupt* active;
-
-    active = gic.pes[0].active;
-    assert(active);
+    gic_signal_eoi();
 }
 
 void
@@ -672,6 +694,54 @@ isrm_notify_eos(cpu_t id)
     isrm_notify_eoi(id, 0);
 }
 
+msi_vector_t
+isrm_msialloc(isr_cb handler)
+{
+    int intid;
+    msi_vector_t msiv;
+    struct gic_int_param param;
+
+    param = (struct gic_int_param) {
+        .group = GIC_G1NS,
+        .trigger = GIC_TRIG_EDGE
+    };
+
+    if (gic.msi_via_spi) {
+        param.class = GIC_SPI;
+
+        intid = aa64_isrm_ivalloc(&param, handler);
+        msiv.msi_addr  = gic_regptr(gic.mmrs.dist_base, GICD_SETSPI_NSR);
+        goto done;
+    }
+    
+    if (unlikely(!gic.lpi_ready)) {
+        return invalid_msi_vector;
+    }
+
+    if (unlikely(gic.mmrs.its)) {
+        // TODO 
+        WARN("ITS-base MSI is yet unsupported.");
+        return invalid_msi_vector;
+    }
+
+    param.class = GIC_LPI;
+    intid = aa64_isrm_ivalloc(&param, handler);
+    msiv.msi_addr = gic_regptr(gic.pes[0]._rd->base, GICR_SETLPIR);
+
+done:
+    msiv.mapped_iv = intid;
+    msiv.msi_data  = intid;
+
+    return msiv;
+}
+
+int
+isrm_bind_dtnode(struct dt_intr_node* node)
+{
+    // TODO
+}
+
+/* ****** Device Definition & Export ****** */
 
 static void
 gic_init()

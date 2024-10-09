@@ -70,7 +70,7 @@ bitmap_##name##_query(BMP_PARAM(name), unsigned long pos)                       
     assert(pos < size);                                                         \
     unsigned long n = pos / (sizeof(type) * 8);                                 \
     int i = pos % (sizeof(type) * 8);                                           \
-    type at = BMP_STRCUT_MAP[n];                                                     \
+    type at = BMP_STRCUT_MAP[n];                                                \
     type msk = 1 << select(orient == BMP_ORIENT_MSB,                            \
                             sizeof(type) * 8 - 1 - i, i );                      \
     return !!(at & msk);                                                        \
@@ -84,10 +84,10 @@ bitmap_##name##_set(BMP_PARAM(name), unsigned long pos, bool val)               
     assert(pos < size);                                                         \
     unsigned long n = pos / (sizeof(type) * 8);                                 \
     int i = pos % (sizeof(type) * 8);                                           \
-    type at = BMP_STRCUT_MAP[n];                                          \
+    type at = BMP_STRCUT_MAP[n];                                                \
     unsigned int off = select(orient == BMP_ORIENT_MSB,                         \
                             sizeof(type) * 8 - 1 - i, i );                      \
-    BMP_STRCUT_MAP[n] = (at & ~(1 << off)) | (!!val << off);              \
+    BMP_STRCUT_MAP[n] = (at & ~(1 << off)) | (!!val << off);                    \
 }
 
 
@@ -99,15 +99,49 @@ bitmap_##name##_alloc_from(BMP_PARAM(name), unsigned long start,                
     unsigned long i, p = 0;                                                     \
     int shift;                                                                  \
     type u;                                                                     \
+                                                                                \
     i = start / 8 / sizeof(type);                                               \
     shift = select(orient == BMP_ORIENT_MSB, sizeof(type) * 8 - 1, 0);          \
+                                                                                \
     while ((u = BMP_STRCUT_MAP[i]) == (type)-1) i++;                            \
     while ((u & (type)(1U << shift)) && p++ < sizeof(type) * 8)                 \
         select(orient == BMP_ORIENT_MSB, u <<= 1, u >>= 1);                     \
+                                                                                \
     if (p < sizeof(type) * 8)                                                   \
         return false;                                                           \
+                                                                                \
     BMP_STRCUT_MAP[i] |= 1UL << shift;                                          \
-    *_out = (i + p);                                                            \
+    *_out = (i * 8 + p);                                                        \
+                                                                                \
+    return true;                                                                \
+}
+
+#define _DEFINE_BMP_ALLOCFROM_OP(type, size, name, orient)                      \
+static inline bool                                                              \
+bitmap_##name##_alloc_between(BMP_PARAM(name),                                  \
+                                unsigned long start, unsigned long end,         \
+                                unsigned long* _out)                            \
+{                                                                               \
+    unsigned long i, p = 0;                                                     \
+    unsigned long i_e, p_e = 0;                                                 \
+    int shift;                                                                  \
+    type u;                                                                     \
+                                                                                \
+    i = start / 8 / sizeof(type);                                               \
+    i_e = end / 8 / sizeof(type);                                               \
+    p_e = end % (8 * sizeof(type));                                             \
+    shift = select(orient == BMP_ORIENT_MSB, sizeof(type) * 8 - 1, 0);          \
+                                                                                \
+    while (i < i_e && (u = BMP_STRCUT_MAP[i]) == (type)-1) i++;                 \
+    while ((u & (type)(1U << shift)) && p++ < sizeof(type) * 8)                 \
+        select(orient == BMP_ORIENT_MSB, u <<= 1, u >>= 1);                     \
+                                                                                \
+    if (i >= i_e && p > p_e)                                                    \
+        return false;                                                           \
+                                                                                \
+    BMP_STRCUT_MAP[i] |= 1UL << shift;                                          \
+    *_out = (i * 8 + p);                                                        \
+                                                                                \
     return true;                                                                \
 }
 
@@ -143,5 +177,7 @@ bitmap_##name##_alloc_from(BMP_PARAM(name), unsigned long start,                
 #define bitmap_init_ptr(bitmap, bmp, nr_bits, ptr)      \
     _BMP_OP_CALL(bitmap, init_with, bmp, nr_bits, ptr) 
 
+#define bitmap_alloc_within(bitmap, bmp, start, end, out)      \
+    _BMP_OP_CALL(bitmap, alloc_between, bmp, start, end, out) 
 
 #endif /* __LUNAIX_BITMAP_H */
