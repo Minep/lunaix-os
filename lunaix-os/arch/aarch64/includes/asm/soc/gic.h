@@ -66,6 +66,7 @@ struct gic_int_param
     enum gic_tri_type trigger;
     enum gic_grp_type group;
     unsigned int priority;
+    unsigned int rel_intid;
     int cpu_id;
     bool as_nmi;
     bool ext_range;
@@ -200,8 +201,13 @@ struct arm_gic
         struct gic_idomain* spi;
         struct gic_idomain* espi;
     } idomain;
-
-    struct dt_node* gic_node;
 };
+
+void
+gic_create_from_dt(struct arm_gic* gic);
+
+unsigned int;
+gic_dtprop_interpret(struct gic_int_param* param, 
+                     struct dt_prop_val* val, int width);
 
 #endif /* __LUNAIX_GIC_H */

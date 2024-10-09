@@ -12,7 +12,8 @@ sources([
 ])
 
 sources([
-    "soc/gic.c",
+    "soc/gic/gic.c",
+    "soc/gic/gic_dt.c",
 ])
 
 sources([

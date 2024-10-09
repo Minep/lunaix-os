@@ -70,7 +70,7 @@ isrm_msialloc(isr_cb handler);
  * @param node
  */
 int
-isrm_bind_dtnode(struct dt_intr_node* node);
+isrm_bind_dtnode(struct dt_intr_node* node, isr_cb handler);
 
 /**
  * @brief Get the handler associated with the given iv

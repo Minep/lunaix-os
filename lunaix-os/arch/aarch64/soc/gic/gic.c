@@ -23,90 +23,6 @@ DEFINE_BMP_SET_OP(gic_bmp);
 
 DEFINE_BMP_ALLOCFROM_OP(gic_bmp);
 
-
-/* ++++++ GIC device-tree retrieval ++++++ */
-
-static void
-__setup_pe_rdist(struct dt_prop_iter* prop)
-{
-    ptr_t base;
-    size_t len, off;
-    int i;
-
-    base = dtprop_reg_nextaddr(prop);
-    len  = dtprop_reg_nextlen(prop);
-
-    assert(len >= NR_CPU * FRAME_SIZE * 2);
-
-    i = 0;
-    base = ioremap(base, len);
-    off = base;
-
-    for (; i < NR_CPU; i++) {
-        gic.pes[i]._rd = (struct gic_rd*) (base + off);
-        off += sizeof(struct gic_rd);
-    }
-}
-
-static void
-__create_its(struct dt_node* gic_node)
-{
-    struct dt_node* its_node;
-    struct dt_node_iter iter;
-    struct dt_prop_iter prop;
-    ptr_t its_base;
-    size_t its_size;
-
-    dt_begin_find(&iter, gic_node, "its");
-
-    if (!dt_find_next(&iter, (struct dt_node_base**)&its_node)) {
-        return;
-    }
-
-    dt_decode_reg(&prop, its_node, reg);
-
-    its_base = dtprop_reg_nextaddr(&prop);
-    its_size = dtprop_reg_nextlen(&prop);
-
-    assert(its_size >= sizeof(struct gic_its));
-
-    gic.mmrs.its = (struct gic_its*)ioremap(its_base, its_size);
-}
-
-static void
-gic_create_from_dt()
-{
-    struct dt_node* gic_node;
-    struct dt_node_iter iter;
-    struct dt_prop_iter prop;
-    ptr_t ptr;
-    size_t sz;
-
-    dt_begin_find(&iter, NULL, "interrupt-controller");
-
-    if (!dt_find_next(&iter, (struct dt_node_base**)&gic_node)) {
-        fail("expected /interrupt-controller node, but found none");
-    }
-
-    dt_decode_reg(&prop, gic_node, reg);
-
-    ptr = dtprop_reg_nextaddr(&prop);
-    sz  = dtprop_reg_nextlen(&prop);
-    gic.mmrs.dist_base = (gicreg_t*)ioremap(ptr, sz);
-
-    __setup_pe_rdist(&prop);
-    
-    // ignore cpu_if, as we use sysreg to access them
-    dtprop_next_n(&prop, 2);
-    
-    // ignore vcpu_if, as we dont do any EL2 stuff
-
-    __create_its(gic_node);
-
-    gic.gic_node = gic_node;
-}
-
-
 /* ++++++ GIC dirver ++++++ */
 
 /* ****** Interrupt Management ****** */
@@ -176,6 +92,22 @@ __undone_interrupt(struct arm_gic* gic, struct gic_distributor* dist,
     }
 }
 
+static inline struct gic_interrupt*
+__get_interrupt(struct gic_idomain* domain, unsigned int rel_intid)
+{
+    struct gic_interrupt *pos, *n;
+    unsigned int intid;
+
+    intid = rel_intid + domain->base;
+    hashtable_hash_foreach(domain->recs, intid, pos, n, node)
+    {
+        if (pos->intid == intid) {
+            return pos;
+        }
+    }
+
+    return NULL;
+}
 
 static struct gic_interrupt*
 __find_interrupt_record(unsigned int intid)
@@ -188,16 +120,7 @@ __find_interrupt_record(unsigned int intid)
         return NULL;
     }
 
-    struct gic_interrupt *pos, *n;
-
-    hashtable_hash_foreach(domain->recs, intid, pos, n, node)
-    {
-        if (pos->intid == intid) {
-            return pos;
-        }
-    }
-
-    return NULL;
+    return __get_interrupt(domain, intid - domain->base);
 }
 
 static inline struct gic_interrupt*
@@ -489,11 +412,14 @@ gic_configure_pe(struct arm_gic* gic, struct gic_pe* pe)
 
 /* ****** Interrupt Life-cycle Management ****** */
 
-struct gic_interrupt*
-aa64_isrm_ivalloc(struct gic_int_param* param, isr_cb handler)
+
+static struct gic_interrupt*
+__gic_install_int(struct gic_int_param* param, isr_cb handler, bool alloc)
 {
     unsigned int iv;
     struct gic_idomain* domain;
+    struct gic_interrupt* ent;
+    struct gic_distributor* dist;
     int cpu;
 
     cpu = param->cpu_id;
@@ -536,8 +462,18 @@ aa64_isrm_ivalloc(struct gic_int_param* param, isr_cb handler)
         break;
     }
 
-    if (!bitmap_alloc(gic_bmp, &domain->ivmap, 0, &iv)) {
-        FATAL("out of usable iv for class=%d", param->class);
+    if (alloc) {
+        if (!bitmap_alloc(gic_bmp, &domain->ivmap, 0, &iv)) {
+            FATAL("out of usable iv for class=%d", param->class);
+        }
+    }
+    else {
+        iv = param->rel_intid;
+        if ((ent = __get_interrupt(domain, iv))) {
+            return ent;
+        }
+        
+        bitmap_set(gic_bmp, &domain->ivmap, iv, true);
     }
 
     iv += domain->base;
@@ -548,9 +484,6 @@ aa64_isrm_ivalloc(struct gic_int_param* param, isr_cb handler)
         param->ext_range = true;
     }
 
-    struct gic_interrupt* ent;
-    struct gic_distributor* dist;
-
     ent  = __register_interrupt(domain, iv, param);
     dist = __attached_distributor(cpu, ent);
     
@@ -558,7 +491,7 @@ aa64_isrm_ivalloc(struct gic_int_param* param, isr_cb handler)
 
     ent->handler = handler;
 
-    return iv;
+    return ent;
 }
 
 static void
@@ -640,7 +573,7 @@ isrm_ivexalloc(isr_cb handler)
         .trigger = GIC_TRIG_EDGE,
     };
 
-    intr = aa64_isrm_ivalloc(&param, handler);
+    intr = __gic_install_int(&param, handler, true);
     
     return intr->intid;
 }
@@ -709,7 +642,7 @@ isrm_msialloc(isr_cb handler)
     if (gic.msi_via_spi) {
         param.class = GIC_SPI;
 
-        intid = aa64_isrm_ivalloc(&param, handler);
+        intid = __gic_install_int(&param, handler, true);
         msiv.msi_addr  = gic_regptr(gic.mmrs.dist_base, GICD_SETSPI_NSR);
         goto done;
     }
@@ -725,7 +658,7 @@ isrm_msialloc(isr_cb handler)
     }
 
     param.class = GIC_LPI;
-    intid = aa64_isrm_ivalloc(&param, handler);
+    intid = __gic_install_int(&param, handler, true);
     msiv.msi_addr = gic_regptr(gic.pes[0]._rd->base, GICR_SETLPIR);
 
 done:
@@ -736,9 +669,28 @@ done:
 }
 
 int
-isrm_bind_dtnode(struct dt_intr_node* node)
+isrm_bind_dtnode(struct dt_intr_node* node, isr_cb handler)
 {
-    // TODO
+    struct dt_prop_val* val;
+    struct gic_int_param param;
+    struct gic_interrupt* installed;
+
+    val = resolve_interrupt(INTR_TO_DTNODE(node));
+    if (!val) {
+        return EINVAL;
+    }
+
+    if (node->intr.extended) {
+        WARN("binding of multi interrupt is yet to supported");
+        return EINVAL;
+    }
+
+    gic_dtprop_interpret(&param, val, 3);
+    param.cpu_id = 0;
+
+    installed = __gic_install_int(&param, handler, false);
+
+    return installed->intid;
 }
 
 /* ****** Device Definition & Export ****** */
@@ -748,7 +700,7 @@ gic_init()
 {
     memset(&gic, 0, sizeof(gic));
 
-    gic_create_from_dt();
+    gic_create_from_dt(&gic);
 
     // configure the system interfaces
     gic_configure_icc();
