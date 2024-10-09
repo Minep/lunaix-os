@@ -1,0 +1,33 @@
+
+sources([
+    "boot/init.c",
+    "boot/kremap.c",
+    "boot/start.S"
+])
+
+sources([
+    "exception/entries.S",
+    "exception/context.S",
+    "exception/handler.c"
+])
+
+sources([
+    "soc/gic/gic.c",
+    "soc/gic/gic_dt.c",
+])
+
+sources([
+    "fault.c",
+    "trace.c"
+])
+
+headers([
+    "includes"
+])
+
+compile_opts([
+    "-mlittle-endian",
+    "-mgeneral-regs-only",
+    "-mabi=lp64",
+    "-mno-omit-leaf-frame-pointer"
+])

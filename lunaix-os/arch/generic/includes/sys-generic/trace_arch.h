@@ -3,6 +3,13 @@
 
 #include <lunaix/hart_state.h>
 
+static inline bool 
+arch_valid_fp(ptr_t ptr) {
+    extern int __bsskstack_end[];
+    extern int __bsskstack_start[];
+    return ((ptr_t)__bsskstack_start <= ptr && ptr <= (ptr_t)__bsskstack_end);
+}
+
 void
 trace_print_transistion_short(struct hart_state* hstate);
 
