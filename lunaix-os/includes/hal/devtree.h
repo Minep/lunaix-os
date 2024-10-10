@@ -125,7 +125,6 @@ struct dt_node_base
             bool dma_ncoherent : 1;
             bool intr_controll : 1;
             bool intr_neuxs    : 1;
-            unsigned int other : 29;
         };
         unsigned int    flags;
     };
@@ -279,8 +278,11 @@ struct dt_node_iter
     node_predicate_t pred;
 };
 
-#define dtnode_child_foreach(node_base, pos, n)  \
-        llist_for_each(pos, n, &(node_base)->children, siblings)
+
+
+/****
+ * FDT Related
+ ****/
 
 #define fdt_prop(tok) ((tok)->token == FDT_PROP)
 #define fdt_node(tok) ((tok)->token == FDT_NOD_BEGIN)
@@ -309,6 +311,16 @@ fdt_memrsvd_itnext(struct fdt_memrsvd_iter* rsvdi);
 void
 fdt_memrsvd_itend(struct fdt_memrsvd_iter* rsvdi);
 
+static inline char*
+fdtit_prop_key(struct fdt_iter* fdti)
+{
+    return &fdti->str_block[fdti->prop->nameoff];
+}
+
+
+/****
+ * DT Main Functions: General
+ ****/
 
 bool
 dt_load(ptr_t dtb_dropoff);
@@ -319,6 +331,29 @@ dt_resolve_phandle(dt_phnd_t phandle);
 struct dt_prop_val*
 dt_getprop(struct dt_node_base* base, const char* name);
 
+struct dt_prop_val*
+dt_resolve_interrupt(struct dt_node* node);
+
+void
+dt_resolve_interrupt_map(struct dt_node* node);
+
+static inline unsigned int
+dt_addr_cells(struct dt_node_base* base)
+{
+    return base->parent ? base->parent->addr_c : base->addr_c;
+}
+
+static inline unsigned int
+dt_size_cells(struct dt_node_base* base)
+{
+    return base->parent ? base->parent->sz_c : base->sz_c;
+}
+
+
+/****
+ * DT Main Functions: Node-finder
+ ****/
+
 void
 dt_begin_find_byname(struct dt_node_iter* iter, 
                      struct dt_node* node, const char* name);
@@ -326,12 +361,6 @@ dt_begin_find_byname(struct dt_node_iter* iter,
 void
 dt_begin_find(struct dt_node_iter* iter, struct dt_node* node, 
               node_predicate_t pred, void* closure);
-
-struct dt_prop_val*
-resolve_interrupt(struct dt_node* node);
-
-void
-resolve_interrupt_map(struct dt_node* node);
 
 static inline void
 dt_end_find(struct dt_node_iter* iter)
@@ -350,6 +379,10 @@ dt_found_any(struct dt_node_iter* iter)
 }
 
 
+/****
+ * DT Main Functions: Node-binding
+ ****/
+
 static inline void
 dt_bind_object(struct dt_node_base* base, void* obj)
 {
@@ -365,11 +398,10 @@ dt_has_binding(struct dt_node_base* base)
 #define dt_binding_of(node_base, type)  \
     ((type)(node_base)->obj)
 
-static inline char*
-fdtit_prop_key(struct fdt_iter* fdti)
-{
-    return &fdti->str_block[fdti->prop->nameoff];
-}
+
+/****
+ * DT Main Functions: Prop decoders
+ ****/
 
 static inline void
 dt_decode(struct dt_prop_iter* dtpi, struct dt_node_base* node, 
@@ -386,11 +418,16 @@ dt_decode(struct dt_prop_iter* dtpi, struct dt_node_base* node,
 
 #define dt_decode_reg(dtpi, node, field) \
             dt_decode(dtpi, &(node)->base, &(node)->field, \
-                            (node)->base.sz_c + (node)->base.addr_c);
+                        dt_size_cells(&(node)->base) \
+                            + dt_addr_cells(&(node)->base))
 
 #define dt_decode_range(dtpi, node, field) \
             dt_decode(dtpi, &(node)->base, &(node)->field, \
-                            (node)->base.sz_c * 2 + (node)->base.addr_c);
+                        dt_size_cells(&(node)->base) * 2 \
+                            + dt_addr_cells(&(node)->base))
+
+#define dt_decode_simple(dtpi, prop) \
+            dt_decode(dtpi, NULL, prop, 1);
 
 #define dtprop_off(dtpi) \
             (unsigned int)(\
@@ -479,7 +516,7 @@ dtprop_reg_nextaddr(struct dt_prop_iter* dtpi)
     ptr_t t;
 
     t = (ptr_t)dtprop_to_u64(dtprop_reg_addr(dtpi));
-    dtprop_next(dtpi);
+    dtprop_next_n(dtpi, dt_addr_cells(dtpi->node));
 
     return t;
 }
@@ -496,7 +533,7 @@ dtprop_reg_nextlen(struct dt_prop_iter* dtpi)
     size_t t;
 
     t = (size_t)dtprop_to_u64(dtprop_reg_len(dtpi));
-    dtprop_next(dtpi);
+    dtprop_next_n(dtpi, dt_size_cells(dtpi->node));
 
     return t;
 }
@@ -510,13 +547,13 @@ dtprop_range_childbus(struct dt_prop_iter* dtpi)
 static inline dt_enc_t
 dtprop_range_parentbus(struct dt_prop_iter* dtpi)
 {
-    return dtprop_extract(dtpi, dtpi->node->addr_c);
+    return dtprop_extract(dtpi, dt_addr_cells(dtpi->node));
 }
 
 static inline dt_enc_t
 dtprop_range_len(struct dt_prop_iter* dtpi)
 {
-    return dtprop_extract(dtpi, dtpi->node->addr_c * 2);
+    return dtprop_extract(dtpi, dt_addr_cells(dtpi->node) * 2);
 }
 
 #endif /* __LUNAIX_DEVTREE_H */

@@ -40,7 +40,7 @@ __destory_key(struct dt_intr_mapkey* key)
 static inline unsigned int
 __interrupt_keysize(struct dt_node_base* base)
 {
-    return base->addr_c + base->intr_c;
+    return dt_size_cells(base) + base->intr_c;
 }
 
 static void
@@ -83,7 +83,7 @@ __get_connected_nexus(struct dt_node_base* base)
 }
 
 void
-resolve_interrupt_map(struct dt_node* node)
+dt_resolve_interrupt_map(struct dt_node* node)
 {
     struct dt_intr_node* inode;
     struct dt_intr_map* imap;
@@ -135,7 +135,7 @@ resolve_interrupt_map(struct dt_node* node)
 }
 
 struct dt_prop_val*
-resolve_interrupt(struct dt_node* node)
+dt_resolve_interrupt(struct dt_node* node)
 {
     struct dt_node_base* nexus;
     struct dt_intr_node* i_nexus, *i_node;
@@ -154,16 +154,16 @@ resolve_interrupt(struct dt_node* node)
         return &i_node->intr.arr;
     }
 
-    keylen = nexus->addr_c + nexus->intr_c;
+    keylen = __interrupt_keysize(nexus);
     key = (struct dt_intr_mapkey) {
         .val = valloc(keylen * sizeof(int)),
         .size = keylen
     };
 
     memcpy( key.val, 
-            node->reg.encoded, nexus->addr_c * sizeof(int));
+            node->reg.encoded, dt_addr_cells(nexus) * sizeof(int));
     
-    memcpy(&key.val[nexus->addr_c],
+    memcpy(&key.val[dt_addr_cells(nexus)],
             i_node->intr.arr.encoded, nexus->intr_c * sizeof(int));
 
     __mask_key(&key, &i_nexus->map->key_mask);
@@ -175,7 +175,9 @@ resolve_interrupt(struct dt_node* node)
         {
             return &pos->parent_props;
         }
-    } 
+    }
+
+    __destory_key(&key);
 }
 
 bool

@@ -433,7 +433,7 @@ __resolve_inter_map()
 
     llist_for_each(pos, n, &dtctx.nodes, nodes)
     {
-        resolve_interrupt_map(BASE_TO_DTNODE(pos));
+        dt_resolve_interrupt_map(BASE_TO_DTNODE(pos));
     }
 }
 
