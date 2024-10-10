@@ -1,4 +1,4 @@
-use("vga")
+# use("vga")
 
 sources([
     "gfxm.c"

@@ -109,6 +109,7 @@
 #define DEV_GFXA 12
 #define DEV_VGA 13
 #define DEV_ACPI 14
+#define DEV_INTC 15
 
 struct devident
 {

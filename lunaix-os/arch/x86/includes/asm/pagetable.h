@@ -58,7 +58,6 @@ typedef struct __pte pte_t;
 #define KERNEL_RDONLY           ( KERNEL_PAGE | _PTE_NX )
 #define KERNEL_ROEXEC           ( KERNEL_PAGE | _PTE_X  )
 #define KERNEL_PGTAB            ( KERNEL_PAGE | _PTE_W )
-#define KERNEL_DEFAULT            KERNEL_PGTAB
 
 #define USER_PAGE               ( _PTE_P | _PTE_U )
 #define USER_EXEC               ( USER_PAGE | _PTE_X )

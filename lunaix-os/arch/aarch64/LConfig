@@ -1,0 +1,21 @@
+
+@Group()
+def aarch64():
+    add_to_collection(architecture_support)
+
+    @Collection("MMU")
+    def mmu_feature():
+
+        @Term("Page Granularity")
+        def aa64_page_gran():
+            type(["4K", "16K", "64K"])
+
+            default("4K")
+
+        @Term("OA Size")
+        def aa64_oa_size():
+            type([52, 48])
+
+            default(48)
+
+    return v(arch) in ["aarch64"]

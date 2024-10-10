@@ -14,7 +14,7 @@ struct hart_transition
     struct {
         struct hart_state state;
         struct exec_param eret;
-    } compact transfer;
+    } transfer;
 };
 
 bool
