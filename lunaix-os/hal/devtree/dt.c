@@ -3,7 +3,7 @@
 
 #include <klibc/string.h>
 
-#include <hal/devtree.h>
+#include "devtree.h"
 
 LOG_MODULE("dtb")
 
@@ -242,37 +242,6 @@ __parse_stdnode_prop(struct fdt_iter* it, struct dt_node* node)
 }
 
 static bool
-__parse_stdintr_prop(struct fdt_iter* it, struct dt_intr_node* node)
-{
-    if (propeq(it, "interrupt-map")) {
-        __mkprop_ptr(it, &node->intr_map);
-    }
-
-    else if (propeq(it, "interrupt-map-mask")) {
-        __mkprop_ptr(it, &node->intr_map_mask);
-    }
-
-    else if (propeq(it, "interrupt-parent")) {
-        node->parent_hnd = __prop_getu32(it);
-    }
-
-    else if (propeq(it, "interrupt-extended")) {
-        node->intr.extended = true;
-        __mkprop_ptr(it, &node->intr.arr);
-    }
-
-    else if (!node->intr.extended && propeq(it, "interrupts")) {
-        __mkprop_ptr(it, &node->intr.arr);
-    }
-
-    else {
-        return false;
-    }
-
-    return true;
-}
-
-static bool
 __parse_stdflags(struct fdt_iter* it, struct dt_node_base* node)
 {
     if (propeq(it, "dma-coherent")) {
@@ -365,6 +334,9 @@ __init_node(struct dt_node_base* node)
 {
     hashtable_init(node->_op_bucket);
     llist_init_head(&node->children);
+
+    if (node->parent)
+        node->_std = node->parent->_std;
 }
 
 static inline void
@@ -388,14 +360,14 @@ __expand_extended_intr(struct dt_intr_node* intrupt)
     }
 
     arr = intrupt->intr.arr;
-    node = DT_NODE(intrupt);
+    node = INTR_TO_DTNODE(intrupt);
 
     llist_init_head(&intrupt->intr.values);
     
     dt_decode(&it, &node->base, &arr, 1);
     
     dt_phnd_t phnd;
-    while(dtprop_next(&it)) {
+    do {
         phnd   = dtprop_to_u32(it.prop_loc);
         master = dt_resolve_phandle(phnd);
 
@@ -414,7 +386,8 @@ __expand_extended_intr(struct dt_intr_node* intrupt)
 
         llist_append(&intrupt->intr.values, &intr_prop->props);
         dtprop_next_n(&it, intr_prop->val.size);
-    }
+        
+    } while(dtprop_next(&it));
 }
 
 static void
@@ -427,8 +400,9 @@ __resolve_phnd_references()
     
     llist_for_each(pos, n, &dtctx.nodes, nodes)
     {
-        node = (struct dt_node*)pos;
+        node = BASE_TO_DTNODE(pos);
         intrupt = &node->intr;
+
         if (!node->base.intr_c) {
             continue;
         }
@@ -449,6 +423,17 @@ __resolve_phnd_references()
         intrupt->parent = &parent->intr;
 
         __expand_extended_intr(intrupt);
+    }
+}
+
+static void
+__resolve_inter_map()
+{
+    struct dt_node_base *pos, *n;
+
+    llist_for_each(pos, n, &dtctx.nodes, nodes)
+    {
+        dt_resolve_interrupt_map(BASE_TO_DTNODE(pos));
     }
 }
 
@@ -494,16 +479,16 @@ dt_load(ptr_t dtb_dropoff)
         if (!node) {
             // need new node
             if (unlikely(is_root_level)) {
-                node = valloc(sizeof(struct dt_root));
+                node = vzalloc(sizeof(struct dt_root));
                 __init_node(node);
             }
             else {
-                node = valloc(sizeof(struct dt_node));
+                node = vzalloc(sizeof(struct dt_node));
                 prev = depth[it.depth - 2];
+                node->parent = prev;
 
                 __init_node_regular((struct dt_node*)node);
                 llist_append(&prev->children, &node->siblings);
-                node->parent = prev;
 
                 llist_append(&dtctx.nodes, &node->nodes);
             }
@@ -524,22 +509,9 @@ dt_load(ptr_t dtb_dropoff)
     dtctx.root = (struct dt_root*)depth[0];
 
     __resolve_phnd_references();
+    __resolve_inter_map();
 
-    return true;
-}
-
-static bool
-__name_starts_with(struct dt_node_base* node, const char* name)
-{
-    int i = 0;
-    const char* be_matched = node->name;
-
-    while (be_matched[i] && name[i])
-    {
-        if (be_matched[i] != name[i]) {
-            return false;
-        }
-    }
+    INFO("device tree loaded");
 
     return true;
 }
@@ -558,20 +530,47 @@ dt_resolve_phandle(dt_phnd_t phandle)
     return NULL;
 }
 
+static bool
+__byname_predicate(struct dt_node_iter* iter, struct dt_node_base* node)
+{
+    int i = 0;
+    const char* be_matched = node->name;
+    const char* name = (const char*)iter->closure;
+
+    while (be_matched[i] && name[i])
+    {
+        if (be_matched[i] != name[i]) {
+            return false;
+        }
+
+        i++;
+    }
+
+    return true;
+}
+
 void
-dt_begin_find(struct dt_node_iter* iter, 
+dt_begin_find_byname(struct dt_node_iter* iter, 
               struct dt_node* node, const char* name)
+{
+    dt_begin_find(iter, node, __byname_predicate, name);
+}
+
+void
+dt_begin_find(struct dt_node_iter* iter, struct dt_node* node, 
+              node_predicate_t pred, void* closure)
 {
     node = node ? : (struct dt_node*)dtctx.root;
 
     iter->head = &node->base;
     iter->matched = NULL;
-    iter->name = name;
+    iter->closure = closure;
+    iter->pred = pred;
 
     struct dt_node_base *pos, *n;
     llist_for_each(pos, n, &node->base.children, siblings)
     {
-        if (__name_starts_with(pos, name)) {
+        if (pred(iter, pos)) {
             iter->matched = pos;
             break;
         }
@@ -596,7 +595,7 @@ dt_find_next(struct dt_node_iter* iter,
     {
         pos = list_next(pos, struct dt_node_base, siblings);
 
-        if (!__name_starts_with(pos, iter->name)) {
+        if (!iter->pred(iter, pos)) {
             continue;
         }
 
@@ -608,7 +607,7 @@ dt_find_next(struct dt_node_iter* iter,
 }
 
 struct dt_prop_val*
-dt_getprop(struct dt_node* node, const char* name)
+dt_getprop(struct dt_node_base* base, const char* name)
 {
     struct hstr hashed_name;
     struct dt_prop *pos, *n;
@@ -618,7 +617,7 @@ dt_getprop(struct dt_node* node, const char* name)
     hstr_rehash(&hashed_name, HSTR_FULL_HASH);
     hash = hashed_name.hash;
 
-    hashtable_hash_foreach(node->base._op_bucket, hash, pos, n, ht)
+    hashtable_hash_foreach(base->_op_bucket, hash, pos, n, ht)
     {
         if (HSTR_EQ(&pos->key, &hashed_name)) {
             return &pos->val;
