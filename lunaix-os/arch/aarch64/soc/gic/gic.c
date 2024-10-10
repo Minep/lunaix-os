@@ -413,8 +413,8 @@ gic_configure_pe(struct arm_gic* gic, struct gic_pe* pe)
 /* ****** Interrupt Life-cycle Management ****** */
 
 
-static struct gic_interrupt*
-__gic_install_int(struct gic_int_param* param, isr_cb handler, bool alloc)
+struct gic_interrupt*
+gic_install_int(struct gic_int_param* param, isr_cb handler, bool alloc)
 {
     unsigned int iv;
     struct gic_idomain* domain;
@@ -573,7 +573,7 @@ isrm_ivexalloc(isr_cb handler)
         .trigger = GIC_TRIG_EDGE,
     };
 
-    intr = __gic_install_int(&param, handler, true);
+    intr = gic_install_int(&param, handler, true);
     
     return intr->intid;
 }
@@ -642,7 +642,7 @@ isrm_msialloc(isr_cb handler)
     if (gic.msi_via_spi) {
         param.class = GIC_SPI;
 
-        intid = __gic_install_int(&param, handler, true);
+        intid = gic_install_int(&param, handler, true);
         msiv.msi_addr  = gic_regptr(gic.mmrs.dist_base, GICD_SETSPI_NSR);
         goto done;
     }
@@ -651,14 +651,14 @@ isrm_msialloc(isr_cb handler)
         return invalid_msi_vector;
     }
 
-    if (unlikely(gic.mmrs.its)) {
-        // TODO 
+    if (unlikely(llist_empty(&gic.its))) {
+        // FIXME The MSI interface need rework
         WARN("ITS-base MSI is yet unsupported.");
         return invalid_msi_vector;
     }
 
     param.class = GIC_LPI;
-    intid = __gic_install_int(&param, handler, true);
+    intid = gic_install_int(&param, handler, true);
     msiv.msi_addr = gic_regptr(gic.pes[0]._rd->base, GICR_SETLPIR);
 
 done:
@@ -675,7 +675,7 @@ isrm_bind_dtnode(struct dt_intr_node* node, isr_cb handler)
     struct gic_int_param param;
     struct gic_interrupt* installed;
 
-    val = resolve_interrupt(INTR_TO_DTNODE(node));
+    val = dt_resolve_interrupt(INTR_TO_DTNODE(node));
     if (!val) {
         return EINVAL;
     }
@@ -688,7 +688,7 @@ isrm_bind_dtnode(struct dt_intr_node* node, isr_cb handler)
     gic_dtprop_interpret(&param, val, 3);
     param.cpu_id = 0;
 
-    installed = __gic_install_int(&param, handler, false);
+    installed = gic_install_int(&param, handler, false);
 
     return installed->intid;
 }
@@ -713,6 +713,8 @@ gic_init()
     {
         gic_configure_pe(&gic, &gic.pes[i]);
     }
+
+    gic_configure_its(&gic);
 }
 
 static struct device_def dev_arm_gic = {

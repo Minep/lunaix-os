@@ -61,6 +61,11 @@ typedef unsigned long gicreg64_t;
 #define GICR_PENDBASER       REG_INDEX(0x0078)
 #define GICR_SETLPIR         REG_INDEX(0x0040)
 
+#define GITS_CTLR            REG_INDEX(0x0000)
+#define GITS_TYPER           REG_INDEX(0x0004)
+#define GITS_CBASER          REG_INDEX(0x0080)
+#define GITS_BASER           REG_INDEX(0x0100)
+
 #define GICD_CTLR_G1SEN      BITFLAG(2)
 #define GICD_CTLR_G1NSEN     BITFLAG(1)
 #define GICD_CTLR_G0EN       BITFLAG(0)
@@ -86,5 +91,29 @@ typedef unsigned long gicreg64_t;
 
 #define GICR_CTLR_RWP        BITFLAG(31)
 #define GICR_CTLR_EnLPI      BITFLAG(0)
+
+#define GITS_CTLR_QS         BITFLAG(31)
+#define GITS_CTLR_EN         BITFLAG(0)
+
+#define GITS_TYPER_CIL       BITFLAG(36)
+#define GITS_TYPER_CIDbits   BITFIELD(35, 32)
+#define GITS_TYPER_HCC       BITFIELD(31, 24)
+#define GITS_TYPER_PTA       BITFLAG(19)
+#define GITS_TYPER_Devbits   BITFIELD(17, 13)
+#define GITS_TYPER_ID_bits   BITFIELD(12, 8)
+#define GITS_TYPER_ITTe_sz   BITFIELD(7, 4)
+
+#define GITS_BASER_VALID     BITFLAG(63)
+#define GITS_BASER_ICACHE    BITFIELD(61, 59)
+#define GITS_BASER_OCACHE    BITFIELD(55, 53)
+#define GITS_BASER_PA        BITFIELD(47, 12)
+#define GITS_BASER_SHARE     BITFIELD(11, 10)
+#define GITS_BASER_SIZE      BITFIELD(7, 0)
+
+#define GITS_BASERn_TYPE     BITFIELD(58, 56)
+#define GITS_BASERn_EntSz    BITFIELD(52, 48)
+#define GITS_BASERn_PGSZ     BITFIELD(9, 8)
+
+#define GITS_CWRRD_OFF       BITFIELD(19, 5)
 
 #endif /* __LUNAIX_AA64_GIC_H */

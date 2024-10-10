@@ -10,6 +10,7 @@
 #include <asm/aa64_gic.h>
 #include <asm-generic/isrm.h>
 
+// nr of cpus, must be 1
 #define NR_CPU      1
 #define gic_bmp     PREP_BITMAP(gicreg_t, gic_intr, BMP_ORIENT_LSB)
 
@@ -147,18 +148,81 @@ struct gic_pe
     };
 };
 
-struct gic_its
+struct gic_its_regs
 {
     gicreg_t base[FRAME_LEN];        // control regs
     gicreg_t trn_space[FRAME_LEN];   // translation space
 } compact align(4);
 
-struct gic_its_v41
+struct gic_its_regs_v41
 {
     gicreg_t base[FRAME_LEN];        // control regs
     gicreg_t trn_space[FRAME_LEN];   // translation space
     gicreg_t vsgi_space[FRAME_LEN];  // vSGI space (v4.1+)
 } compact align(4);
+
+struct gic_its_cmdqeue
+{
+    gicreg64_t base;
+    gicreg_t   wr_ptr;
+    gicreg_t   rd_ptr;  
+} compact align(4);
+
+struct gic_its_cmd
+{
+    gicreg64_t dw[4];
+};
+
+struct gic_its_devmap
+{
+    struct hlist_node node;
+    unsigned int devid;
+    unsigned int next_evtid;
+};
+
+struct gic_its
+{
+    struct llist_header its;
+
+    struct {
+        unsigned int nr_devid;
+        unsigned int nr_evtid;
+        unsigned int nr_cid;
+        unsigned int sz_itte;
+
+        bool pta;
+        bool ext_cids;
+    };
+
+    union {
+        struct gic_its_regs* reg;
+        struct gic_its_regs_v41* reg_v41;
+        ptr_t  reg_ptr;
+    };
+
+    struct {
+        union {
+            struct gic_its_cmdqeue *cmd_queue;
+            ptr_t  cmd_queue_ptr;
+        };
+        
+        union {
+            struct gic_its_cmd *cmds;
+            ptr_t cmds_ptr;
+        };
+
+        unsigned int max_cmd;
+    };
+
+    union {
+        struct {
+            gicreg_t base[8];
+        } *tables;
+        ptr_t  table_ptr;
+    };
+
+    DECLARE_HASHTABLE(devmaps, 8);
+};
 
 typedef unsigned char lpi_entry_t;
 
@@ -179,11 +243,9 @@ struct arm_gic
 
     struct {
         gicreg_t* dist_base;
-        union {
-            struct gic_its* its;
-            struct gic_its_v41* its_v41;
-        };
     } mmrs;
+
+    struct llist_header its;
 
     struct {
         ptr_t prop_pa;
@@ -209,5 +271,18 @@ gic_create_from_dt(struct arm_gic* gic);
 unsigned int;
 gic_dtprop_interpret(struct gic_int_param* param, 
                      struct dt_prop_val* val, int width);
+
+struct gic_its*
+gic_its_create(struct arm_gic* gic, ptr_t regs);
+
+void
+gic_configure_its(struct arm_gic* gic);
+
+struct gic_interrupt*
+gic_install_int(struct gic_int_param* param, isr_cb handler, bool alloc);
+
+unsigned int
+gic_its_map_lpi(struct gic_its* its, 
+                unsigned int devid, unsigned int lpid);
 
 #endif /* __LUNAIX_GIC_H */
