@@ -23,7 +23,7 @@ ahci_pci_bind(struct device_def* def, struct device* dev)
     
     assert(pci_capability_msi(ahci_dev));
 
-    msiv = isrm_msialloc(ahci_hba_isr);
+    msiv = isrm_msi_alloc_simple(dev, 0, ahci_hba_isr);
     pci_setup_msi(ahci_dev, msiv);
 
     struct ahci_driver_param param = {

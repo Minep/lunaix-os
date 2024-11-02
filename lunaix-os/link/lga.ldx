@@ -74,6 +74,16 @@
 
     . = ALIGN(8);
 
+    PROVIDE(__lga_lunainit_on_sysconf_start = .);
+
+    KEEP(*(.lga.lunainit.c_sysconf));
+
+    PROVIDE(__lga_lunainit_on_sysconf_end = .);
+
+    /* ---- */
+
+    . = ALIGN(8);
+
     PROVIDE(__lga_lunainit_on_earlyboot_start = .);
 
     KEEP(*(.lga.lunainit.c_earlyboot));

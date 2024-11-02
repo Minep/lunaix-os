@@ -1,6 +1,6 @@
 #include <hal/acpi/acpi.h>
 
-#include <lunaix/device.h>
+#include <lunaix/owloysius.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
@@ -68,7 +68,7 @@ acpi_locate_rsdp()
 }
 
 static int
-acpi_init(struct device_def* devdef)
+__gather_acpi_table()
 {
     acpi_rsdp_t* rsdp = acpi_locate_rsdp();
 
@@ -105,8 +105,4 @@ acpi_init(struct device_def* devdef)
     return 0;
 }
 
-struct device_def acpi_sysdev = { .name = "ACPI Proxy",
-                                  .class =
-                                    DEVCLASS(DEVIF_FMW, DEVFN_CFG, DEV_ACPI),
-                                  .init = acpi_init };
-EXPORT_DEVICE(acpi, &acpi_sysdev, load_sysconf);
+owloysius_fetch_init(__gather_acpi_table, on_sysconf);

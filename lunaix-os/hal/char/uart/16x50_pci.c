@@ -79,7 +79,7 @@ pci16650_binder(struct device_def* def, struct device* dev)
 
             uart = uart16x50_pmio_create(bar->start);
 #else
-            WARN("plaform configured to not support pmio access.")
+            WARN("plaform configured to not support pmio access.");
             continue;
 #endif
         } else 
@@ -100,7 +100,7 @@ pci16650_binder(struct device_def* def, struct device* dev)
             continue;
         }
 
-        msiv = isrm_msialloc(uart_msi_irq_handler);
+        msiv = isrm_msi_alloc_simple(dev, 0, uart_msi_irq_handler);
         isrm_set_payload(msi_vect(msiv), __ptr(uart));
         pci_setup_msi(pcidev, msiv);
 

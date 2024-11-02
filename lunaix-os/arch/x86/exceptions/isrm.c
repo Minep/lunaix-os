@@ -1,5 +1,5 @@
 #include <lunaix/spike.h>
-#include <lunaix/owloysius.h>
+#include <lunaix/device.h>
 #include <asm/x86_isrm.h>
 
 #include "asm/x86.h"
@@ -165,17 +165,43 @@ isrm_notify_eos(cpu_t id)
     isrm_notify_eoi(id, LUNAIX_SCHED);
 }
 
+msienv_t
+isrm_msi_start(struct device* dev)
+{
+    /*
+     *  In x86, the MSI topology is rather simple, as the only
+     *  source is the PCI itself, and the write destination is
+     *  explictly defined in specification, so we don't need the
+     *  msienv to hold dynamically probed address
+     */
+    return NULL;
+}
+
+int
+isrm_msi_avaliable(msienv_t msienv)
+{
+    return 1;
+}
+
 msi_vector_t
-isrm_msialloc(isr_cb handler)
+isrm_msi_alloc(msienv_t msienv, cpu_t cpu, int index, isr_cb handler)
 {
     unsigned int iv = isrm_ivexalloc(handler);
 
+    // we ignore the cpu redirection for now.
     return (msi_vector_t){ 
-        .msi_addr  = 0xfee00000,
+        .msi_addr  = __APIC_BASE_PADDR,
         .msi_data  = iv,
         .mapped_iv = iv
     };
 }
+
+void
+isrm_msi_done(msienv_t msienv)
+{
+    return;
+}
+
 
 int
 isrm_bind_dtnode(struct dt_intr_node* node)
@@ -184,8 +210,8 @@ isrm_bind_dtnode(struct dt_intr_node* node)
 }
 
 
-static void
-__intc_init()
+static int
+__intc_init(struct device_def* devdef)
 {
     apic_init();
     ioapic_init();
@@ -193,5 +219,14 @@ __intc_init()
     arch_intc_ctx.name = "i386_apic";
     arch_intc_ctx.irq_attach = ioapic_irq_remap;
     arch_intc_ctx.notify_eoi = apic_on_eoi;
+
+    return 0;
 }
-owloysius_fetch_init(__intc_init, on_earlyboot);
+
+
+static struct device_def i386_intc = {
+    .class = DEVCLASS(DEVIF_SOC, DEVFN_CFG, DEV_INTC),
+    .name  = "i386 APIC",
+    .init  = __intc_init
+};
+EXPORT_DEVICE(i386_intc, &i386_intc, load_sysconf);

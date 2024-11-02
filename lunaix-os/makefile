@@ -48,7 +48,6 @@ tool:
 	@$(MAKE) $(MKFLAGS) -C scripts all -I $(mkinc_dir)
 
 .NOTPARALLEL:
-export KCMD=$(CMDLINE)
 export LBUILD ARCH MODE
 all: $(kbuild_dir) tool kernel
 
