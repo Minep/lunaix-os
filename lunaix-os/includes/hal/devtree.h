@@ -7,6 +7,8 @@
 #include <lunaix/ds/hashtable.h>
 #include <lunaix/boot_generic.h>
 
+#include <klibc/string.h>
+
 #define le(v) ((((v) >> 24) & 0x000000ff)  |\
                (((v) << 8)  & 0x00ff0000)  |\
                (((v) >> 8)  & 0x0000ff00)  |\
@@ -34,7 +36,10 @@
 
 typedef unsigned int* dt_enc_t;
 typedef unsigned int  dt_phnd_t;
-typedef bool (*node_predicate_t)(struct dt_node_iter*, struct dt_node*);
+
+struct dt_node_base;
+struct dt_node_iter;
+typedef bool (*node_predicate_t)(struct dt_node_iter*, struct dt_node_base*);
 
 
 #define PHND_NULL    ((dt_phnd_t)-1)
@@ -83,7 +88,7 @@ struct dt_prop_val
         {
             union {
                 const char*  str_val;
-                const char** str_lst;
+                const char*  str_lst;
             };
             ptr_t        ptr_val;
             
@@ -147,6 +152,7 @@ struct dt_node_base
     };
 
     void* obj;
+    void* binded_dev;
 };
 
 struct dt_root
@@ -221,7 +227,7 @@ struct dt_node
     struct dt_prop_val  ranges;
     struct dt_prop_val  dma_ranges;
 };
-
+#define dt_parent(node) ((node)->base.parent)
 
 struct dt_intr_prop
 {
@@ -436,6 +442,11 @@ dt_decode(struct dt_prop_iter* dtpi, struct dt_node_base* node,
 
 #define dtprop_extract(dtpi, off) \
             ( (dt_enc_t) (&(dtpi)->prop_loc[(off)]) )
+
+#define dtprop_strlst_foreach(pos, prop)    \
+        for (pos = (prop)->str_lst; \
+             pos <= &(prop)->str_lst[(prop)->size]; \
+             pos = &pos[strlen(pos) + 1])
 
 static inline bool
 dtprop_next_n(struct dt_prop_iter* dtpi, int n)

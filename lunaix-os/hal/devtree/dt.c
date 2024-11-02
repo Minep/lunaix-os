@@ -1,8 +1,6 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/syslog.h>
 
-#include <klibc/string.h>
-
 #include "devtree.h"
 
 LOG_MODULE("dtb")
@@ -124,39 +122,6 @@ void
 fdt_memrsvd_itend(struct fdt_memrsvd_iter* rsvdi)
 {
     rsvdi->block = NULL;
-}
-
-static inline bool
-propeq(struct fdt_iter* it, const char* key)
-{
-    return streq(fdtit_prop_key(it), key);
-}
-
-static inline void
-__mkprop_val32(struct fdt_iter* it, struct dt_prop_val* val)
-{
-    val->u32_val = le(*(u32_t*)&it->prop[1]);
-    val->size = le(it->prop->len);
-}
-
-static inline void
-__mkprop_val64(struct fdt_iter* it, struct dt_prop_val* val)
-{
-    val->u64_val = le64(*(u64_t*)&it->prop[1]);
-    val->size = le(it->prop->len);
-}
-
-static inline void
-__mkprop_ptr(struct fdt_iter* it, struct dt_prop_val* val)
-{
-    val->ptr_val = __ptr(&it->prop[1]);
-    val->size = le(it->prop->len);
-}
-
-static inline u32_t
-__prop_getu32(struct fdt_iter* it)
-{
-    return le(*(u32_t*)&it->prop[1]);
 }
 
 static bool
@@ -297,7 +262,7 @@ __fill_node(struct fdt_iter* it, struct dt_node* node)
         return;
     }
 
-    if (__parse_stdintr_prop(it, &node->intr)) {
+    if (parse_stdintr_prop(it, &node->intr)) {
         return;
     }
 

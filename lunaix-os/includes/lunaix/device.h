@@ -12,6 +12,8 @@
 #include <lunaix/iopoll.h>
 #include <lunaix/types.h>
 
+#include <hal/devtreem.h>
+
 #include <usr/lunaix/device.h>
 
 /**
@@ -172,6 +174,10 @@ struct device
     DEVICE_METADATA;
 
     capability_list_t capabilities;
+
+#ifdef CONFIG_USE_DEVICETREE
+    devtree_link_t devtree_node;
+#endif
 
     /* -- device state -- */
 
