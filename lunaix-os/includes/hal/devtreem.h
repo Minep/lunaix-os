@@ -12,6 +12,8 @@ struct device;
 
 typedef struct dt_node* devtree_link_t;
 
+#define dt_node_morpher     morphable_attrs(dt_node, mobj)
+
 struct dtm_vendor_bag
 {
     struct hstr vendor;
@@ -37,7 +39,7 @@ dtm_try_create(struct device_def* def, struct dt_node* node);
 
 #include <lunaix/types.h>
 
-typedef struct { } devtree_link_t;
+typedef void* devtree_link_t;
 
 static inline void
 dtm_register_entry(struct device_def* def, 

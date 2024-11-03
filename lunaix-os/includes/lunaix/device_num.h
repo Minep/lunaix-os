@@ -124,4 +124,10 @@ struct devclass
     u32_t hash;
 };
 
+static inline int
+devclass_mkvar(struct devclass* class)
+{
+    return class->variant++;
+}
+
 #endif /* __LUNAIX_DEVICE_NUM_H */

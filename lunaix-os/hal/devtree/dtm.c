@@ -181,7 +181,7 @@ found:
     dev->devtree_node = node;
     
     int err;
-    if ((err = devdef->bind(devdef, dev))) {
+    if ((err = devdef->create(devdef, dev))) {
         WARN("failed to bind devtree node %s, err=%d", base->name, err);
         device_remove(dev);
         return NULL;

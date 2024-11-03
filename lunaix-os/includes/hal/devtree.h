@@ -6,6 +6,7 @@
 #include <lunaix/ds/hstr.h>
 #include <lunaix/ds/hashtable.h>
 #include <lunaix/boot_generic.h>
+#include <lunaix/changeling.h>
 
 #include <klibc/string.h>
 
@@ -218,6 +219,8 @@ struct dt_intr_node
 
 struct dt_node
 {
+    morph_t mobj;
+    
     struct dt_node_base base;
     struct dt_intr_node intr;
     

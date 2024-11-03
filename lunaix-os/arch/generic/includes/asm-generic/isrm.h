@@ -79,6 +79,13 @@ msi_vector_t
 isrm_msi_alloc(msienv_t msienv, cpu_t cpu, int index, isr_cb handler);
 
 /**
+ * @brief Set the sideband information will be used for upcoming
+ *        allocations
+ */
+void
+isrm_msi_set_sideband(msienv_t msienv, ptr_t sideband);
+
+/**
  * @brief Done MSI allocation
  */
 void

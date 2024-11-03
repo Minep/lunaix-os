@@ -197,10 +197,17 @@ isrm_msi_alloc(msienv_t msienv, cpu_t cpu, int index, isr_cb handler)
 }
 
 void
+isrm_msi_set_sideband(msienv_t msienv, ptr_t sideband)
+{
+    return;
+}
+
+void
 isrm_msi_done(msienv_t msienv)
 {
     return;
 }
+
 
 
 int

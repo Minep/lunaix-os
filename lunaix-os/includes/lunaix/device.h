@@ -11,6 +11,7 @@
 #include <lunaix/ds/mutex.h>
 #include <lunaix/iopoll.h>
 #include <lunaix/types.h>
+#include <lunaix/changeling.h>
 
 #include <hal/devtreem.h>
 
@@ -210,6 +211,9 @@ struct device
     } ops;
 };
 
+struct device_def;
+typedef int (*devdef_load_fn)(struct device_def*);
+
 struct device_def
 {
     struct llist_header dev_list;
@@ -220,17 +224,29 @@ struct device_def
     struct devclass class;
 
     /**
-     * @brief Called when the driver is required to initialize itself.
+     * @brief 
+     * Called when driver is required to register itself to the system
+     * All registration code should put it here.
+     * 
+     * ad tabulam -  
+     *      "to the record" in latin. just in case anyone wonders.
+     *      I am ran out of naming idea... have to improvise :)
      *
      */
-    int (*init)(struct device_def*);
+    devdef_load_fn ad_tabulam;
 
     /**
-     * @brief Called when the driver is required to bind with a device. This is
-     * the case for a real-hardware-oriented driver
+     * @brief Called when the driver is loaded at it's desired load stage
      *
      */
-    int (*bind)(struct device_def*, struct device*);
+    devdef_load_fn load;
+
+    /**
+     * @brief Called when the driver is required to create device instance
+     * This is for device with their own preference of creation
+     * object that hold parameter for such creation is provided by second argument.
+     */
+    int (*create)(struct device_def*, morph_t*);
 
     /**
      * @brief Called when a driver is requested to detach from the device and
@@ -302,6 +318,12 @@ device_create(struct device* dev,
 
 struct device*
 device_alloc(struct device_meta* parent, u32_t type, void* underlay);
+
+static inline void
+device_set_devtree_node(struct device* dev, devtree_link_t node)
+{
+    dev->devtree_node = node;
+}
 
 static inline struct device* must_inline
 device_allocsys(struct device_meta* parent, void* underlay)

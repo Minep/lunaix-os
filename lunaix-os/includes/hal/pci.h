@@ -4,20 +4,11 @@
 #include <lunaix/device.h>
 #include <lunaix/ds/ldga.h>
 #include <lunaix/ds/llist.h>
+#include <lunaix/ds/hashtable.h>
 #include <lunaix/types.h>
+#include <lunaix/changeling.h>
 
 #include <asm-generic/isrm.h>
-
-#define EXPORT_PCI_DEVICE(id, pci_devdef, stage)                               \
-    EXPORT_DEVICE(id, &(pci_devdef)->devdef, stage)
-
-#define PCI_MATCH_EXACT -1
-#define PCI_MATCH_ANY 0
-#define PCI_MATCH_VENDOR 0xffff
-
-#define PCI_TDEV 0x0
-#define PCI_TPCIBRIDGE 0x1
-#define PCI_TCARDBRIDGE 0x2
 
 #define PCI_VENDOR_INVLD 0xffff
 
@@ -65,8 +56,6 @@
 #define PCILOC_DEV(loc) (((loc) >> 3) & 0x1f)
 #define PCILOC_FN(loc) ((loc) & 0x7)
 
-#define PCI_ID_ANY (-1)
-
 typedef unsigned int pci_reg_t;
 typedef u16_t pciaddr_t;
 
@@ -84,17 +73,9 @@ struct pci_base_addr
     u32_t type;
 };
 
-struct pci_device
+struct pci_probe
 {
-    struct device dev;
-    struct llist_header dev_chain;
-    struct hlist_node dev_cache;
-
-    struct
-    {
-        struct device* dev;
-        struct device_def* def;
-    } binding;
+    morph_t mobj;
 
     pciaddr_t loc;
     u16_t intr_info;
@@ -103,48 +84,24 @@ struct pci_device
     u32_t cspace_base;
     u32_t msi_loc;
     struct pci_base_addr bar[6];
-};
-#define PCI_DEVICE(devbase) (container_of((devbase), struct pci_device, dev))
 
-struct pci_device_list
+    struct device* bind;
+};
+#define pci_probe_morpher   morphable_attrs(pci_probe, mobj)
+
+typedef bool (*pci_id_checker_t)(struct pci_probe*);
+
+struct pci_registry
 {
-    struct llist_header peers;
-    struct pci_device* pcidev;
+    struct hlist_node entries;
+    struct device_def* definition;
+
+    pci_id_checker_t check_compact;
+    devdef_load_fn proxyed_load;
 };
 
-typedef void* (*pci_drv_init)(struct pci_device*);
-
-#define PCI_DEVIDENT(vendor, id)                                               \
-    ((((id) & 0xffff) << 16) | (((vendor) & 0xffff)))
-
-struct pci_device_def
-{
-    struct device_def devdef;
-
-    bool (*test_compatibility)(struct pci_device_def*, struct pci_device*);
-};
-#define pcidev_def(dev_def_ptr)                                                \
-    container_of((dev_def_ptr), struct pci_device_def, devdef)
-
-#define binded_pcidev(pcidev) ((pcidev)->binding.def)
-
-/**
- * @brief 根据类型代码（Class Code）去在拓扑中寻找一个设备
- * 类型代码请参阅： PCI LB Spec. Appendix D.
- *
- * @return struct pci_device*
- */
-struct pci_device* pci_get_device_by_class(u32_t class);
-
-/**
- * @brief 根据设备商ID和设备ID，在拓扑中寻找一个设备
- *
- * @param vendorId
- * @param deviceId
- * @return struct pci_device*
- */
-struct pci_device*
-pci_get_device_by_id(u16_t vendorId, u16_t deviceId);
+bool
+pci_register_driver(struct device_def* def, pci_id_checker_t checker);
 
 /**
  * @brief 初始化PCI设备的基地址寄存器。返回由该基地址代表的，
@@ -157,54 +114,73 @@ pci_get_device_by_id(u16_t vendorId, u16_t deviceId);
  * @return size_t
  */
 size_t
-pci_bar_sizing(struct pci_device* dev, u32_t* bar_out, u32_t bar_num);
+pci_bar_sizing(struct pci_probe* probe, u32_t* bar_out, u32_t bar_num);
 
 /**
  * @brief Bind an abstract device instance to the pci device
  *
  * @param pcidev pci device
- * @param devobj abstract device instance
+ * @param dev abstract device instance
  */
-void
-pci_bind_instance(struct pci_device* pcidev, void* devobj);
+static inline void
+pci_bind_instance(struct pci_probe* probe, struct device* dev)
+{
+    probe->bind = dev;
 
-void
-pci_probe_bar_info(struct pci_device* device);
+}
 
-void
-pci_setup_msi(struct pci_device* device, msi_vector_t msiv);
+msienv_t
+pci_msi_start(struct pci_probe* probe);
 
-void
-pci_probe_msi_info(struct pci_device* device);
+msi_vector_t
+pci_msi_setup_at(msienv_t msienv, struct pci_probe* probe, 
+                 int i, isr_cb handler);
+
+static inline void
+pci_msi_done(msienv_t env)
+{
+    isrm_msi_done(env);
+}
+
+static inline msi_vector_t
+pci_msi_setup_simple(struct pci_probe* probe, isr_cb handler)
+{
+    msienv_t env;
+    msi_vector_t msiv;
+    
+    env = pci_msi_start(probe);
+    msiv = pci_msi_setup_at(env, probe, 0, handler);
+    pci_msi_done(env);
+
+    return msiv;
+}
 
 int
-pci_bind_definition(struct pci_device_def* pcidev_def, bool* more);
+pci_bind_driver(struct pci_registry* reg);
 
-int
-pci_bind_definition_all(struct pci_device_def* pcidef);
 
 static inline unsigned int
-pci_device_vendor(struct pci_device* pcidev)
+pci_device_vendor(struct pci_probe* probe)
 {
-    return PCI_DEV_VENDOR(pcidev->device_info);
+    return PCI_DEV_VENDOR(probe->device_info);
 }
 
 static inline unsigned int
-pci_device_devid(struct pci_device* pcidev)
+pci_device_devid(struct pci_probe* probe)
 {
-    return PCI_DEV_DEVID(pcidev->device_info);
+    return PCI_DEV_DEVID(probe->device_info);
 }
 
 static inline unsigned int
-pci_device_class(struct pci_device* pcidev)
+pci_device_class(struct pci_probe* probe)
 {
-    return PCI_DEV_CLASS(pcidev->class_info);
+    return PCI_DEV_CLASS(probe->class_info);
 }
 
 static inline struct pci_base_addr*
-pci_device_bar(struct pci_device* pcidev, int index)
+pci_device_bar(struct pci_probe* probe, int index)
 {
-    return &pcidev->bar[index];
+    return &probe->bar[index];
 }
 
 static inline void
@@ -213,6 +189,11 @@ pci_cmd_set_mmio(pci_reg_t* cmd)
     *cmd |= PCI_RCMD_MM_ACCESS;
 }
 
+static inline ptr_t
+pci_requester_id(struct pci_probe* probe)
+{
+    return probe->loc;
+}
 
 static inline void
 pci_cmd_set_pmio(pci_reg_t* cmd)
@@ -245,19 +226,19 @@ pci_bar_mmio_space(struct pci_base_addr* bar)
 }
 
 static inline bool
-pci_capability_msi(struct pci_device* pcidev)
+pci_capability_msi(struct pci_probe* probe)
 {
-    return !!pcidev->msi_loc;
+    return !!probe->msi_loc;
 }
 
 static inline int
-pci_intr_irq(struct pci_device* pcidev)
+pci_intr_irq(struct pci_probe* probe)
 {
-    return PCI_INTR_IRQ(pcidev->intr_info);
+    return PCI_INTR_IRQ(probe->intr_info);
 }
 
 void
-pci_apply_command(struct pci_device* pcidev, pci_reg_t cmd);
+pci_apply_command(struct pci_probe* probe, pci_reg_t cmd);
 
 pci_reg_t
 pci_read_cspace(ptr_t base, int offset);

@@ -1,10 +1,13 @@
 #include <lunaix/device.h>
 #include <lunaix/fs/twifs.h>
 #include <lunaix/status.h>
+#include <lunaix/syslog.h>
 
 #include <klibc/hash.h>
 
 #include <klibc/strfmt.h>
+
+LOG_MODULE("devdb")
 
 static DECLARE_HASHTABLE(dev_registry, 32);
 static DECLARE_HASHTABLE(dev_byif, 8);
@@ -26,7 +29,7 @@ device_scan_drivers()
     hashtable_init(dev_registry);
     hashtable_init(dev_byif);
 
-    int idx = 0;
+    int idx = 0, errno;
     struct device_def* devdef;
     ldga_foreach(devdefs, struct device_def*, idx, devdef)
     {
@@ -36,6 +39,15 @@ device_scan_drivers()
 
         if (!devdef->name) {
             devdef->name = "<unspecified>";
+        }
+
+        errno = devdef->ad_tabulam(devdef);
+        if (errno) {
+            ERROR("driver unable to register %xh:%xh.%d (err=%d)",
+                    devdef->class.fn_grp, 
+                    devdef->class.device,
+                    devdef->class.variant, errno);
+            continue;
         }
 
         hashtable_hash_in(dev_registry, &devdef->hlist, hash);
@@ -91,7 +103,7 @@ device_definitions_byif(int if_type)
         struct device_def* devdef;                                             \
         ldga_foreach(dev_##stage, struct device_def*, idx, devdef)             \
         {                                                                      \
-            devdef->init(devdef);                                              \
+            devdef->load(devdef);                                              \
         }                                                                      \
     })
 #define device_load_on_stage(stage) __device_load_on_stage(stage)

@@ -58,22 +58,26 @@ static u32_t palette[] = {
 #define VGA_REG_OFF 0x0400
 
 static int
-vga_pci_bind(struct device_def* devdef, struct device* pcidev_base)
+vga_pci_bind(struct device_def* devdef, morph_t* obj)
 {
-    struct pci_device* pcidev = PCI_DEVICE(pcidev_base);
+    struct pci_probe* probe;
 
-    struct pci_base_addr* fb = &pcidev->bar[0];
-    struct pci_base_addr* mmio = &pcidev->bar[2];
+    struct pci_base_addr* fb;
+    struct pci_base_addr* mmio;
+
+    probe = changeling_reveal(obj, pci_probe_morpher);
+    fb    = &probe->bar[0];
+    mmio  = &probe->bar[2];
 
     if (PCI_BAR_ADDR_IO(mmio->type)) {
         return EINVAL;
     }
 
-    pci_reg_t cmd = pci_read_cspace(pcidev->cspace_base, PCI_REG_STATUS_CMD);
+    pci_reg_t cmd = pci_read_cspace(probe->cspace_base, PCI_REG_STATUS_CMD);
 
     cmd |= (PCI_RCMD_MM_ACCESS | PCI_RCMD_DISABLE_INTR | PCI_RCMD_BUS_MASTER);
 
-    pci_write_cspace(pcidev->cspace_base, PCI_REG_STATUS_CMD, cmd);
+    pci_write_cspace(probe->cspace_base, PCI_REG_STATUS_CMD, cmd);
 
     ptr_t fb_mapped = ioremap(fb->start, FB256K);
     ptr_t mmio_mapped = ioremap(mmio->start, mmio->size);
@@ -96,27 +100,24 @@ vga_pci_bind(struct device_def* devdef, struct device* pcidev_base)
     return 0;
 }
 
-static int
-vga_pci_init(struct device_def* def)
-{
-    return pci_bind_definition_all(pcidev_def(def));
-}
-
-#define VGA_PCI_CLASS 0x30000
 
 static bool
-vga_pci_compat(struct pci_device_def* def, 
-                struct pci_device* pcidev)
+vga_pci_compat(struct pci_probe* probe)
 {
-    return pci_device_class(pcidev) == VGA_PCI_CLASS;
+#define VGA_PCI_CLASS 0x30000
+    return pci_device_class(probe) == VGA_PCI_CLASS;
 }
 
+static int
+vga_pci_register(struct device_def* def)
+{
+    return !pci_register_driver(def, vga_pci_compat);
+}
 
-static struct pci_device_def vga_pci_devdef = {
-    .devdef = { .class = DEVCLASS(DEVIF_PCI, DEVFN_DISP, DEV_VGA),
-                .name = "Generic VGA",
-                .init = vga_pci_init,
-                .bind = vga_pci_bind },
-    .test_compatibility = vga_pci_compat
+static struct device_def vga_pci_devdef = {
+    .class = DEVCLASS(DEVIF_PCI, DEVFN_DISP, DEV_VGA),
+    .name = "Generic VGA",
+    .ad_tabulam = vga_pci_register,
+    .create = vga_pci_bind,
 };
-EXPORT_PCI_DEVICE(vga_pci, &vga_pci_devdef, load_onboot);
+EXPORT_DEVICE(vga_pci, &vga_pci_devdef, load_onboot);
