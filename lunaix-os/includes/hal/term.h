@@ -43,17 +43,17 @@ typedef struct rbuffer** lbuf_ref_t;
 
 struct term;
 
-struct termport_cap_ops
+struct termport_pot_ops
 {
     void (*set_speed)(struct device*, speed_t);
     void (*set_clkbase)(struct device*, unsigned int);
     void (*set_cntrl_mode)(struct device*, tcflag_t);
 };
 
-struct termport_capability
+struct termport_potens
 {
-    CAPABILITY_META;
-    struct termport_cap_ops* cap_ops;
+    POTENS_META;
+    struct termport_pot_ops* ops;
     struct term* term;
 };
 
@@ -66,7 +66,7 @@ struct term
     char* scratch_pad;
     pid_t fggrp;
 
-    struct termport_capability* tp_cap;
+    struct termport_potens* tp_cap;
     waitq_t line_in_event;
 
     /* -- POSIX.1-2008 compliant fields -- */
@@ -120,19 +120,19 @@ int
 lcntl_transform_outseq(struct term* tdev);
 
 static inline void
-term_cap_set_operations(struct termport_capability* cap, 
-                        struct termport_cap_ops* ops)
+term_cap_set_operations(struct termport_potens* cap, 
+                        struct termport_pot_ops* ops)
 {
-    cap->cap_ops = ops;
+    cap->ops = ops;
 }
 
 void
-term_notify_data_avaliable(struct termport_capability* cap);
+term_notify_data_avaliable(struct termport_potens* cap);
 
 #define termport_default_ops                                    \
     ({                                                          \
-        extern struct termport_cap_ops default_termport_cap_ops;\
-        &default_termport_cap_ops;                              \
+        extern struct termport_pot_ops default_termport_pot_ops;\
+        &default_termport_pot_ops;                              \
     })
 
 #endif /* __LUNAIX_TERM_H */

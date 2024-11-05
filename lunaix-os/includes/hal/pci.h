@@ -97,7 +97,6 @@ struct pci_registry
     struct device_def* definition;
 
     pci_id_checker_t check_compact;
-    devdef_load_fn proxyed_load;
 };
 
 bool

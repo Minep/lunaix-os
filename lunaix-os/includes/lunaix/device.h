@@ -8,6 +8,7 @@
 #include <lunaix/ds/hstr.h>
 #include <lunaix/ds/ldga.h>
 #include <lunaix/ds/llist.h>
+#include <lunaix/ds/list.h>
 #include <lunaix/ds/mutex.h>
 #include <lunaix/iopoll.h>
 #include <lunaix/types.h>
@@ -78,14 +79,8 @@
 #define DEVCLASS(devif, devfn, dev)                                            \
     (struct devclass)                                                          \
     {                                                                          \
-        .fn_grp = DEV_FNGRP(devif, devfn), .device = (dev), .variant = 0       \
-    }
-
-#define DEVCLASSV(devif, devfn, dev, devvar)                                   \
-    (struct devclass)                                                          \
-    {                                                                          \
-        .fn_grp = DEV_FNGRP(devif, devfn), .device = (dev),                    \
-        .variant = (devvar)                                                    \
+        .fn_grp = DEV_FNGRP(dev_if(devif), dev_fn(devfn)),                     \
+        .device = dev_id(dev), .variant = 0                                    \
     }
 
 #define DEV_STRUCT_MAGIC_MASK 0x56454440U
@@ -103,26 +98,48 @@
 #define DEV_IFSEQ 0x1 // sequential (character) device
 #define DEV_IFSYS 0x3 // a system device
 
-struct capability_meta
+/**
+ * A potens is a capability of the device
+ *      ("potens", means "capable" in latin)
+ * 
+ * A device can have multiple capabilities 
+ *      (or "potentes", plural form of potens)
+ * 
+ * A group of devices with same capability will forms
+ *  a "globus potentis" or "capability group". The
+ *  group is completely a logical formation, meaning
+ *  that it is not explictly coded.
+ * 
+ * The idea of potens is to provide a unified and yet
+ *  opaque method to decouple the device provide raw
+ *  functionalities with any higher abstraction, such
+ *  as other subsystem, or standard-compilance wrapper
+ *  (e.g., POSIX terminal)
+ */
+struct potens_meta
 {
-    struct llist_header caps;
-    unsigned int cap_type;
+    struct llist_header potentes;
+    unsigned int pot_type;
 };
 
-#define CAPABILITY_META                     \
-    union {                                 \
-        struct capability_meta cap_meta;    \
-        struct {                            \
-            struct llist_header caps;       \
-            unsigned int cap_type;          \
-        };                                  \
+#define POTENS_META                                     \
+    union {                                             \
+        struct potens_meta pot_meta;                    \
+        struct {                                        \
+            struct llist_header potentes;               \
+            unsigned int pot_type;                      \
+        };                                              \
     }
 
-#define get_capability(cap, cap_type)       \
-    container_of((cap), cap_type, cap_meta)
-#define cap_meta(cap) (&(cap)->cap_meta)
+#define get_potens(cap, pot_type)       \
+    container_of((cap), pot_type, pot_meta)
+#define pot_meta(cap) (&(cap)->pot_meta)
 
-typedef struct llist_header capability_list_t;
+/**
+ * List of potentes of a device, pay attention to 
+ * the spelling, "potentium", genitive plural of "potens".
+ */
+typedef struct llist_header potentium_list_t;
 
 
 struct device_meta
@@ -174,7 +191,7 @@ struct device
 
     DEVICE_METADATA;
 
-    capability_list_t capabilities;
+    potentium_list_t potentium;
 
 #ifdef CONFIG_USE_DEVICETREE
     devtree_link_t devtree_node;
@@ -212,7 +229,13 @@ struct device
 };
 
 struct device_def;
-typedef int (*devdef_load_fn)(struct device_def*);
+typedef int (*devdef_ldfn)(struct device_def*);
+
+struct device_ldfn_chain
+{
+    struct device_ldfn_chain* chain;
+    devdef_ldfn load;
+};
 
 struct device_def
 {
@@ -221,7 +244,18 @@ struct device_def
     struct hlist_node hlist_if;
     char* name;
 
+    union
+    {
+        struct {
+            bool no_default_realm : 1;
+        };
+        int val;
+    } flags;
+    
+
     struct devclass class;
+
+    struct device_ldfn_chain* load_chain;
 
     /**
      * @brief 
@@ -233,13 +267,13 @@ struct device_def
      *      I am ran out of naming idea... have to improvise :)
      *
      */
-    devdef_load_fn ad_tabulam;
+    devdef_ldfn ad_tabulam;
 
     /**
      * @brief Called when the driver is loaded at it's desired load stage
      *
      */
-    devdef_load_fn load;
+    devdef_ldfn load;
 
     /**
      * @brief Called when the driver is required to create device instance
@@ -255,6 +289,14 @@ struct device_def
      */
     int (*free)(struct device_def*, void* instance);
 };
+
+#define def_device_name(dev_n)          .name = dev_n
+#define def_device_class(_if, fn, dev)  .class = DEVCLASS(_if, fn, dev)
+#define def_on_register(fn)             .ad_tabulam = fn
+#define def_on_load(fn)                 .load = fn
+#define def_on_create(fn)               .create = fn
+#define def_on_free(fn)                 .free = fn
+#define def_non_trivial                 .flags.no_default_realm = true
 
 static inline bool must_inline
 valid_device_ref(void* maybe_dev) {
@@ -378,20 +420,21 @@ device_scan_drivers();
 
 /*------ Capability ------*/
 
-struct capability_meta*
-alloc_capability(int cap, unsigned int size);
+struct potens_meta*
+alloc_potens(int cap, unsigned int size);
 
-#define new_capability(cap_type, cap_impl)\
-    ((cap_impl*)alloc_capability((cap_type), sizeof(cap_impl)))
+#define new_capability(pot_type, cap_impl)\
+    ((cap_impl*)alloc_potens((pot_type), sizeof(cap_impl)))
 
-#define new_capability_marker(cap_type)\
-    (alloc_capability((cap_type), sizeof(struct capability_meta)))
+#define new_capability_marker(pot_type)\
+    (alloc_potens((pot_type), sizeof(struct potens_meta)))
 
 void
-device_grant_capability(struct device* dev, struct capability_meta* cap);
+device_grant_potens(struct device* dev, struct potens_meta* cap);
 
-struct capability_meta*
-device_get_capability(struct device* dev, unsigned int cap_type);
+struct potens_meta*
+device_get_potens(struct device* dev, unsigned int pot_type);
+
 /*------ Load hooks ------*/
 
 void
@@ -402,6 +445,21 @@ device_postboot_load();
 
 void
 device_sysconf_load();
+
+/**
+ * @brief Add the loader to the chain, used by device domain
+ *        to inject their custom loading logic to the hook
+ */
+void
+device_chain_loader(struct device_def* def, devdef_ldfn fn);
+
+/**
+ * @brief Walk the chain and load in a use-and-burnt fashion.
+ *        the chain will be deleted and freed after loading,
+ *        regardless successful or not.
+ */
+void
+device_chain_load_once(struct device_def* def);
 
 static inline void
 device_lock(struct device* dev)

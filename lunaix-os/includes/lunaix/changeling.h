@@ -5,11 +5,11 @@
 #include <lunaix/ds/llist.h>
 #include <lunaix/spike.h>
 
-#define CHLG_ID   0x0a4c43
+#define CHLG_ID   (unsigned short)0x4c43
 
 enum changeling_idents
 {
-    chlg_anon,
+    chlg_anon = 0,
     #include "changeling.lst"
 };
 
@@ -52,8 +52,10 @@ typedef struct changeling morph_t;
 #define __changeling_try_reveal(chlg, struct_name, field)                      \
     ({                                                                         \
         struct struct_name* __r = NULL;                                        \
-        if ((chlg)->sig == CHLG_ID && (chlg)->ident == chlg_##struct_name)     \
-            __r = container_of(chlg, struct struct_name, field);               \
+        if (chlg                                                               \
+            && (chlg)->sig == CHLG_ID                                          \
+            && (chlg)->ident == chlg_##struct_name                             \
+           ) __r = container_of(chlg, struct struct_name, field);              \
         __r;                                                                   \
     })
 #define changeling_try_reveal(chlg, morpher)     \

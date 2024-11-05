@@ -41,7 +41,11 @@ device_scan_drivers()
             devdef->name = "<unspecified>";
         }
 
-        errno = devdef->ad_tabulam(devdef);
+        errno = 0;
+        if (devdef->ad_tabulam) {
+            errno = devdef->ad_tabulam(devdef);
+        }
+
         if (errno) {
             ERROR("driver unable to register %xh:%xh.%d (err=%d)",
                     devdef->class.fn_grp, 
@@ -103,7 +107,7 @@ device_definitions_byif(int if_type)
         struct device_def* devdef;                                             \
         ldga_foreach(dev_##stage, struct device_def*, idx, devdef)             \
         {                                                                      \
-            devdef->load(devdef);                                              \
+            device_chain_load_once(devdef);                                    \
         }                                                                      \
     })
 #define device_load_on_stage(stage) __device_load_on_stage(stage)

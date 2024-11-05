@@ -29,11 +29,6 @@ ahci_pci_create(struct device_def* def, morph_t* morphed)
     
     assert(pci_capability_msi(probe));
 
-    dev = device_allocvol(NULL, ahci_drv);
-
-    device_setname(dev_meta(dev), 
-                   "pci-ahci%d", devclass_mkvar(&def->class));
-
     msiv = pci_msi_setup_simple(probe, ahci_hba_isr);
 
     struct ahci_driver_param param = {
@@ -43,7 +38,12 @@ ahci_pci_create(struct device_def* def, morph_t* morphed)
     };
 
     ahci_drv = ahci_driver_init(&param);
-    pci_bind_instance(probe, ahci_drv);
+    dev = device_allocvol(NULL, ahci_drv);
+
+    device_setname(dev_meta(dev), 
+                   "pci-ahci%d", devclass_mkvar(&def->class));
+
+    pci_bind_instance(probe, dev);
 
     return 0;
 }
@@ -61,10 +61,14 @@ ahci_pci_register(struct device_def* def)
 }
 
 
-static struct device_def ahcidef = {
-    .class = DEVCLASS(DEVIF_PCI, DEVFN_STORAGE, DEV_SATA),
-    .name = "Generic AHCI (pci-bus)",
-    .ad_tabulam = ahci_pci_register,
-    .create = ahci_pci_create
+static struct device_def ahcidef = 
+{
+    def_device_class(PCI, STORAGE, SATA),
+    def_device_name("Generic AHCI (pci-bus)"),
+
+    def_on_register(ahci_pci_register),
+    def_on_create(ahci_pci_create),
+
+    def_non_trivial
 };
 EXPORT_DEVICE(ahci, &ahcidef, load_postboot);

@@ -18,7 +18,7 @@ com_irq_handler(const struct hart_state* hstate)
 }
 
 static int
-upiom_init(struct device_def* def)
+upiom_load(struct device_def* def)
 {
     int irq3 = 3, irq4 = 4;
     u16_t ioports[] = { 0x3F8, 0x2F8, 0x3E8, 0x2E8 };
@@ -57,8 +57,8 @@ upiom_init(struct device_def* def)
 }
 
 static struct device_def uart_pmio_def = {
-    .class = DEVCLASS(DEVIF_SOC, DEVFN_CHAR, DEV_UART16550),
-    .name = "16550 UART (pmio, isa-bus)",
-    .init = upiom_init
+    def_device_class(SOC, CHAR, UART16550),
+    def_device_name("16550 UART (pmio, isa-bus)"),
+    def_on_load(upiom_load)
 };
 EXPORT_DEVICE(uart16550_pmio, &uart_pmio_def, load_onboot);

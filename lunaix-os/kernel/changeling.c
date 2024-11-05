@@ -6,9 +6,9 @@ static DEFINE_LLIST(chrysallidis);
 void
 changeling_init(morph_t* parent, morph_t* chlg, unsigned int id)
 {
-    chlg->ident = CHLG_ID;
-    chlg->sig   = id;
-    chlg->ref   = 0;
+    chlg->sig     = CHLG_ID;
+    chlg->ident   = id;
+    chlg->ref     = 0;
 
     if (!parent) {
         llist_append(&chrysallidis, &chlg->sibs);

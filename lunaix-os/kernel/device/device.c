@@ -77,7 +77,7 @@ device_create(struct device* dev,
     dev->dev_type = type;
 
     device_init_meta(dev_meta(dev), parent, DEV_STRUCT);
-    llist_init_head(&dev->capabilities);
+    llist_init_head(&dev->potentium);
     mutex_init(&dev->lock);
     iopoll_init_evt_q(&dev->pollers);
 }
@@ -290,6 +290,57 @@ device_alert_poller(struct device* dev, int poll_evt)
 {
     dev->poll_evflags = poll_evt;
     iopoll_wake_pollers(&dev->pollers);
+}
+
+void
+device_chain_loader(struct device_def* def, devdef_ldfn fn)
+{
+    struct device_ldfn_chain* node;
+
+    node = valloc(sizeof(*node));
+    node->load = fn;
+
+    if (!def->load_chain) {
+        node->chain = NULL;
+    }
+    else {
+        node->chain = def->load_chain;
+    }
+
+    def->load_chain = node;
+}
+
+void
+device_chain_load_once(struct device_def* def)
+{
+    struct device_ldfn_chain *node, *next;
+
+    if (def->load) {
+        def->load(def);
+    }
+
+    node = def->load_chain;
+    def->load_chain = NULL;
+    
+    while (node)
+    {
+        node->load(def);
+        next = node->chain;
+        vfree(node);
+
+        node = next;
+    }
+
+    if (def->flags.no_default_realm) {
+        return;
+    }
+
+    if (!def->create) {
+        return;
+    }
+
+    def->create(def, NULL);
+    
 }
 
 __DEFINE_LXSYSCALL3(int, ioctl, int, fd, int, req, sc_va_list, _args)

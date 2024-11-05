@@ -33,7 +33,7 @@ struct serial_dev
     struct rbuffer rxbuf;
     int wr_len;
 
-    struct capability_meta* tp_cap;
+    struct potens_meta* tp_cap;
 
     /**
      * @brief Write buffer to TX. The return code indicate

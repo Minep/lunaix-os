@@ -115,9 +115,12 @@ vga_pci_register(struct device_def* def)
 }
 
 static struct device_def vga_pci_devdef = {
-    .class = DEVCLASS(DEVIF_PCI, DEVFN_DISP, DEV_VGA),
-    .name = "Generic VGA",
-    .ad_tabulam = vga_pci_register,
-    .create = vga_pci_bind,
+    def_device_class(PCI, DISP, VGA),
+    def_device_name("Generic VGA"),
+    
+    def_on_register(vga_pci_register),
+    def_on_create(vga_pci_bind),
+
+    def_non_trivial
 };
 EXPORT_DEVICE(vga_pci, &vga_pci_devdef, load_onboot);

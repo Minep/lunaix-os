@@ -185,7 +185,7 @@ rtc_getcnt(struct hwrtc* rtc)
 }
 
 static int
-rtc_init(struct device_def* devdef)
+rtc_load(struct device_def* devdef)
 {
     u8_t reg = rtc_read_reg(RTC_REG_A);
     reg = (reg & ~0x7f) | RTC_FREQUENCY_1024HZ | RTC_DIVIDER_33KHZ;
@@ -220,8 +220,8 @@ rtc_init(struct device_def* devdef)
 }
 
 static struct device_def devrtc_mc146818 = {
-    .name = "MC146818 RTC",
-    .class = DEVCLASS(DEVIF_SOC, DEVFN_TIME, DEV_RTC),
-    .init = rtc_init
+    def_device_class(SOC, TIME, RTC),
+    def_device_name("MC146818 RTC"),
+    def_on_load(rtc_load)
 };
 EXPORT_DEVICE(mc146818, &devrtc_mc146818, load_timedev);

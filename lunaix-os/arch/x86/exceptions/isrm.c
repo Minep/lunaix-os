@@ -218,7 +218,7 @@ isrm_bind_dtnode(struct dt_intr_node* node)
 
 
 static int
-__intc_init(struct device_def* devdef)
+__intc_create(struct device_def* devdef, morph_t* obj)
 {
     apic_init();
     ioapic_init();
@@ -232,8 +232,8 @@ __intc_init(struct device_def* devdef)
 
 
 static struct device_def i386_intc = {
-    .class = DEVCLASS(DEVIF_SOC, DEVFN_CFG, DEV_INTC),
-    .name  = "i386 APIC",
-    .init  = __intc_init
+    def_device_class(SOC, CFG, INTC),
+    def_device_name("i386 apic"),
+    def_on_create(__intc_create)
 };
 EXPORT_DEVICE(i386_intc, &i386_intc, load_sysconf);

@@ -27,7 +27,7 @@
 
 struct console
 {
-    struct capability_meta* tp_cap;
+    struct potens_meta* tp_cap;
     struct lx_timer* flush_timer;
     struct fifo_buf output;
     struct fifo_buf input;
@@ -92,8 +92,8 @@ __lxconsole_listener(struct input_device* dev)
 
     fifo_putone(&lx_console.input, ttychr);
 
-    struct termport_capability* tpcap;
-    tpcap = get_capability(lx_console.tp_cap, typeof(*tpcap));
+    struct termport_potens* tpcap;
+    tpcap = get_potens(lx_console.tp_cap, typeof(*tpcap));
     term_notify_data_avaliable(tpcap);
     
     pwake_all(&lx_reader);
@@ -298,13 +298,13 @@ lxconsole_spawn_ttydev(struct device_def* devdef)
     waitq_init(&lx_reader);
     input_add_listener(__lxconsole_listener);
 
-    struct termport_capability* tp_cap;
+    struct termport_potens* tp_cap;
 
-    tp_cap = new_capability(TERMPORT_CAP, struct termport_capability);
+    tp_cap = new_capability(TERMPORT_CAP, struct termport_potens);
     term_cap_set_operations(tp_cap, termport_default_ops);
     
-    lx_console.tp_cap = cap_meta(tp_cap);
-    device_grant_capability(tty_dev, lx_console.tp_cap);
+    lx_console.tp_cap = pot_meta(tp_cap);
+    device_grant_potens(tty_dev, lx_console.tp_cap);
 
     register_device(tty_dev, &devdef->class, "vcon");
 
@@ -314,8 +314,8 @@ lxconsole_spawn_ttydev(struct device_def* devdef)
 }
 
 static struct device_def lxconsole_def = {
-    .name = "Lunaix Virtual Console",
-    .class = DEVCLASS(DEVIF_NON, DEVFN_TTY, DEV_BUILTIN),
-    .init = lxconsole_spawn_ttydev
+    def_device_name("Lunaix Virtual Console"),
+    def_device_class(NON, TTY, BUILTIN),
+    def_on_load(lxconsole_spawn_ttydev)
 };
 EXPORT_DEVICE(lxconsole, &lxconsole_def, load_onboot);

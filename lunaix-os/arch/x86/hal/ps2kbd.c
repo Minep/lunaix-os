@@ -215,7 +215,7 @@ ps2_device_post_cmd(char cmd, char arg)
 }
 
 static int
-ps2_kbd_init(struct device_def* devdef)
+ps2_kbd_create(struct device_def* devdef, morph_t* obj)
 {
 
     memset(&cmd_q, 0, sizeof(cmd_q));
@@ -569,8 +569,8 @@ ps2_issue_dev_cmd(char cmd, u16_t arg)
 }
 
 static struct device_def devrtc_i8042kbd = {
-    .name = "i8042 Keyboard",
-    .class = DEVCLASS(DEVIF_SOC, DEVFN_INPUT, DEV_KBD),
-    .init = ps2_kbd_init
+    def_device_class(SOC, INPUT, KBD),
+    def_device_name("i8042 Keyboard"),
+    def_on_create(ps2_kbd_create)
 };
 EXPORT_DEVICE(i8042_kbd, &devrtc_i8042kbd, load_onboot);

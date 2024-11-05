@@ -1,0 +1,6 @@
+dev_if(SOC),
+dev_if(PCI),
+dev_if(USB),
+dev_if(SPI),
+dev_if(I2C),
+dev_if(FMW),

@@ -68,47 +68,27 @@
 #define DEV_IF(fngrp) ((fngrp) >> 16)
 #define DEV_FN(fngrp) (((fngrp) & 0xffff))
 
-#define DEVIF_NON 0x0
-#define DEVIF_SOC 0x1
-#define DEVIF_PCI 0x2
-#define DEVIF_USB 0x3
-#define DEVIF_SPI 0x4
-#define DEVIF_I2C 0x5
-#define DEVIF_FMW 0x6
+#define dev_if(x)      DEVIF_##x
+#define dev_fn(x)      DEVFN_##x
+#define dev_id(x)        DEV_##x
 
-#define DEVFN_PSEUDO 0x0
-#define DEVFN_CHAR 0x1
-#define DEVFN_STORAGE 0x4
-#define DEVFN_INPUT 0x5
-#define DEVFN_TIME 0x6
-#define DEVFN_BUSIF 0x7
-#define DEVFN_TTY 0x8
-#define DEVFN_DISP 0x9
-#define DEVFN_CFG 0xa
+enum devnum_if
+{
+    dev_if(NON),
+    #include "devnum_if.lst"
+};
 
-#define DEV_BUILTIN 0
-#define DEV_BUILTIN_NULL 0
-#define DEV_BUILTIN_ZERO 1
-#define DEV_BUILTIN_KMSG 2
+enum devnum_fn
+{
+    dev_fn(NON),
+    #include "devnum_fn.lst"
+};
 
-#define DEV_VTERM 1
-#define DEV_RNG 2
-#define DEV_RTC 3
-#define DEV_SATA 4
-#define DEV_NVME 5
-#define DEV_PCI 6
-#define DEV_UART16550 7
-
-#define DEV_TIMER 8
-#define DEV_TIMER_APIC 0
-#define DEV_TIMER_HEPT 1
-
-#define DEV_NULL 9
-#define DEV_ZERO 10
-#define DEV_KBD 11
-#define DEV_GFXA 12
-#define DEV_VGA 13
-#define DEV_INTC 14
+enum devnum
+{
+    dev_id(NON),
+    #include "devnum.lst"
+};
 
 struct devident
 {

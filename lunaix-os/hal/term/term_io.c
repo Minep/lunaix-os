@@ -99,7 +99,7 @@ term_flush(struct term* tdev)
 }
 
 void
-term_notify_data_avaliable(struct termport_capability* cap)
+term_notify_data_avaliable(struct termport_potens* cap)
 {
     struct term* term;
     struct device* term_chrdev;

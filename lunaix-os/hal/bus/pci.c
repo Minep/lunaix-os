@@ -106,6 +106,7 @@ __pci_add_prober(pciaddr_t loc, ptr_t pci_base, int devinfo)
     prober->device_info = devinfo;
     prober->cspace_base = pci_base;
     prober->intr_info = intr;
+    prober->loc = loc;
 
     changeling_morph(pci_probers, prober->mobj, pci_probe_morpher);
 
@@ -195,7 +196,7 @@ pci_probe_device(pciaddr_t pci_loc)
     {
         prober = changeling_reveal(pos, pci_probe_morpher);
         if (prober->loc == pci_loc) {
-            pci_log_device(pos);
+            pci_log_device(prober);
             return;
         }
     }
@@ -229,15 +230,7 @@ __pci_proxied_devdef_load(struct device_def* def)
     reg = __pci_registry_get(def);
     assert(reg);
 
-    if (reg->proxyed_load) {
-        errno = reg->proxyed_load(def);
-    }
-
-    if (!errno) {
-        errno = pci_bind_driver(reg);
-    }
-
-    return errno;
+    return pci_bind_driver(reg);
 }
 
 bool
@@ -261,8 +254,7 @@ pci_register_driver(struct device_def* def, pci_id_checker_t checker)
         .definition = def,
     };
 
-    reg->proxyed_load = def->load;
-    def->load = __pci_proxied_devdef_load;
+    device_chain_loader(def, __pci_proxied_devdef_load);
 
     hash = hash_32(__ptr(def), HSTR_FULL_HASH);
     hashtable_hash_in(pci_drivers, &reg->entries, hash);
@@ -331,7 +323,7 @@ pci_msi_start(struct pci_probe* probe)
 
     msienv_t env;
     
-    env = isrm_msi_start(pci_bridge->devtree_node);
+    env = isrm_msi_start(pci_bridge);
     isrm_msi_set_sideband(env, pci_requester_id(probe));
 
     return env;
@@ -541,16 +533,12 @@ EXPORT_TWIFS_PLUGIN(pci_devs, pci_build_fsmapping);
 /*---------- PCI 3.0 HBA device definition ----------*/
 
 static int
-pci_load_devices(struct device_def* def)
+pci_register(struct device_def* def)
 {
     pci_probers = changeling_spawn_anon(NULL);
 
-    pci_scan();
-
     return 0;
 }
-
-struct device_def pci_def;
 
 static int
 pci_create(struct device_def* def, morph_t* obj)
@@ -563,11 +551,17 @@ pci_create(struct device_def* def, morph_t* obj)
     device_set_devtree_node(pci_bridge, devtree_node);
 
     register_device(pci_bridge, &def->class, "pci_bridge");
+
+    pci_scan();
+
+    return 0;
 }
 
 static struct device_def pci_def = {
-    .name = "Generic PCI",
-    .class = DEVCLASS(DEVIF_SOC, DEVFN_BUSIF, DEV_PCI),
-    .load = pci_load_devices
+    def_device_name("Generic PCI"),
+    def_device_class(SOC, BUSIF, PCI),
+
+    def_on_register(pci_register),
+    def_on_create(pci_create)
 };
 EXPORT_DEVICE(pci3hba, &pci_def, load_sysconf);

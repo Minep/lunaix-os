@@ -119,9 +119,12 @@ pci16650_create(struct device_def* def, morph_t* obj)
 }
 
 static struct device_def uart_pci_def = {
-    .class = DEVCLASS(DEVIF_PCI, DEVFN_CHAR, DEV_UART16550),
-    .name = "16550 UART (PCI/MMIO)",
-    .ad_tabulam = pci16550_register,
-    .create = pci16650_create
+    def_device_class(PCI, CHAR, UART16550),
+    def_device_name("16550 UART (PCI/MMIO)"),
+    
+    def_on_register(pci16550_register),
+    def_on_create(pci16650_create),
+
+    def_non_trivial
 };
 EXPORT_DEVICE(uart16550_pci, &uart_pci_def, load_onboot);

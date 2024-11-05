@@ -47,8 +47,8 @@ serial_end_recv(struct serial_dev* sdev)
 
     pwake_one(&sdev->wq_rxdone);
 
-    struct termport_capability* tpcap;
-    tpcap = get_capability(sdev->tp_cap, typeof(*tpcap));
+    struct termport_potens* tpcap;
+    tpcap = get_potens(sdev->tp_cap, typeof(*tpcap));
     term_notify_data_avaliable(tpcap);
 }
 
@@ -256,7 +256,7 @@ __serial_set_cntrl_mode(struct device* dev, tcflag_t cflag)
 
 #define RXBUF_SIZE 512
 
-static struct termport_cap_ops tpcap_ops = {
+static struct termport_pot_ops tppot_ops = {
     .set_cntrl_mode = __serial_set_cntrl_mode,
     .set_clkbase = __serial_set_baseclk,
     .set_speed = __serial_set_speed
@@ -279,18 +279,18 @@ serial_create(struct devclass* class, char* if_ident)
     sdev->dev = dev;
     dev->underlay = sdev;
 
-    struct termport_capability* tp_cap = 
-        new_capability(TERMPORT_CAP, struct termport_capability);
+    struct termport_potens* tp_cap = 
+        new_capability(TERMPORT_CAP, struct termport_potens);
     
-    term_cap_set_operations(tp_cap, &tpcap_ops);
-    sdev->tp_cap = cap_meta(tp_cap);
+    term_cap_set_operations(tp_cap, &tppot_ops);
+    sdev->tp_cap = pot_meta(tp_cap);
 
     waitq_init(&sdev->wq_rxdone);
     waitq_init(&sdev->wq_txdone);
     rbuffer_init(&sdev->rxbuf, valloc(RXBUF_SIZE), RXBUF_SIZE);
     llist_append(&serial_devs, &sdev->sdev_list);
     
-    device_grant_capability(dev, cap_meta(tp_cap));
+    device_grant_potens(dev, pot_meta(tp_cap));
 
     register_device(dev, class, "%s%d", if_ident, class->variant);
 

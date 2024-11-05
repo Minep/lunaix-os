@@ -92,6 +92,6 @@ clock_init()
             continue;
         }
 
-        pos->init(pos);
+        pos->load(pos);
     }
 }

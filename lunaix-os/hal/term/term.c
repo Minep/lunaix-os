@@ -12,7 +12,7 @@
 
 #define LCNTL_TABLE_LEN (sizeof(line_controls) / sizeof(struct term_lcntl*))
 
-static struct devclass termdev_class = DEVCLASS(DEVIF_NON, DEVFN_TTY, DEV_VTERM);
+static struct devclass termdev_class = DEVCLASS(NON, TTY, VTERM);
 
 struct device* sysconsole = NULL;
 
@@ -81,7 +81,7 @@ term_exec_cmd(struct device* dev, u32_t req, va_list args)
             tios->c_baud = term->iospeed;
         } break;
         case TDEV_TCSETATTR: {
-            struct termport_cap_ops* cap_ops;
+            struct termport_pot_ops* pot_ops;
             struct termios* tios = va_arg(args, struct termios*);
 
             term->iflags = tios->c_iflag;
@@ -96,16 +96,16 @@ term_exec_cmd(struct device* dev, u32_t req, va_list args)
                 goto done;
             }
 
-            cap_ops = term->tp_cap->cap_ops;
+            pot_ops = term->tp_cap->ops;
 
             if (tios->c_baud != term->iospeed) {
                 term->iospeed = tios->c_baud;
 
-                cap_ops->set_speed(term->chdev, tios->c_baud);
+                pot_ops->set_speed(term->chdev, tios->c_baud);
             }
 
             if (old_cf != tios->c_cflag) {
-                cap_ops->set_cntrl_mode(term->chdev, tios->c_cflag);
+                pot_ops->set_cntrl_mode(term->chdev, tios->c_cflag);
             }
         } break;
         default:
@@ -182,8 +182,8 @@ term_create(struct device* chardev, char* suffix)
 {
     struct term* terminal;
     struct device* tdev;
-    struct capability_meta* termport_cap;
-    struct capability_meta* tios_cap;
+    struct potens_meta* termport_cap;
+    struct potens_meta* tios_cap;
 
     terminal = vzalloc(sizeof(struct term));
     if (!terminal) {
@@ -209,17 +209,17 @@ term_create(struct device* chardev, char* suffix)
         register_device(tdev, &termdev_class, "tty%d", termdev_class.variant++);
     }
 
-    termport_cap = device_get_capability(chardev, TERMPORT_CAP);
+    termport_cap = device_get_potens(chardev, TERMPORT_CAP);
     if (termport_cap) {
         terminal->tp_cap = 
-            get_capability(termport_cap, struct termport_capability);
+            get_potens(termport_cap, struct termport_potens);
         
-        assert(terminal->tp_cap->cap_ops);
+        assert(terminal->tp_cap->ops);
         terminal->tp_cap->term = terminal;
     }
 
     tios_cap = new_capability_marker(TERMIOS_CAP);
-    device_grant_capability(tdev, tios_cap);
+    device_grant_potens(tdev, tios_cap);
 
     load_default_setting(terminal);
 
