@@ -29,21 +29,6 @@ arch_preinit()
     isrm_bindiv(LUNAIX_SYS_CALL, syscall_hndlr);
 }
 
-struct hwtimer*
-select_platform_timer()
-{
-    struct hwtimer* timer;
-
-    timer = apic_hwtimer_context();
-    if (timer->supported(timer)) {
-        return timer;
-    }
-
-    // TODO select alternatives...
-
-    fail("no timer to use.");
-}
-
 void
 update_tss()
 {

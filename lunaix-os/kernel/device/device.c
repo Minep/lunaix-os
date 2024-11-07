@@ -15,8 +15,6 @@ static DEFINE_LLIST(root_list);
 
 static volatile u32_t devid = 0;
 
-struct devclass default_devclass = {};
-
 void
 device_setname_vargs(struct device_meta* dev, char* fmt, va_list args)
 {
@@ -28,7 +26,8 @@ device_setname_vargs(struct device_meta* dev, char* fmt, va_list args)
 }
 
 void
-device_register_generic(struct device_meta* devm, struct devclass* class, char* fmt, ...)
+device_register_generic(struct device_meta* devm, struct devclass* class, 
+                        char* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -39,9 +38,10 @@ device_register_generic(struct device_meta* devm, struct devclass* class, char* 
 
     if (class && valid_device_subtype_ref(devm, DEV_STRUCT)) {
         struct device* dev = to_dev(devm);
-        dev->ident = (struct devident){ .fn_grp = class->fn_grp,
-                                        .unique = DEV_UNIQUE(class->device,
-                                                             class->variant) };
+        dev->ident = (struct devident) { 
+            .fn_grp = class->fn_grp,
+            .unique = DEV_UNIQUE(class->device, class->variant) 
+        };
     }
 
     devm->dev_uid = devid++;
@@ -58,7 +58,8 @@ device_register_generic(struct device_meta* devm, struct devclass* class, char* 
 }
 
 static void
-device_init_meta(struct device_meta* dmeta, struct device_meta* parent, unsigned int subtype) 
+device_init_meta(struct device_meta* dmeta, 
+                 struct device_meta* parent, unsigned int subtype) 
 {
     dmeta->magic = DEV_STRUCT_MAGIC_MASK | subtype;
     dmeta->parent = parent;
@@ -153,7 +154,8 @@ device_addcat(struct device_meta* parent, char* name_fmt, ...)
 }
 
 struct device_alias*
-device_addalias(struct device_meta* parent, struct device_meta* aliased, char* name_fmt, ...)
+device_addalias(struct device_meta* parent, 
+                struct device_meta* aliased, char* name_fmt, ...)
 {
     va_list args;
     va_start(args, name_fmt);

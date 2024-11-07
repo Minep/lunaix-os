@@ -8,7 +8,6 @@
 #include <asm/pagetable.h>
 
 #include <hal/serial.h>
-#include <hal/term.h>
 
 LOG_MODULE("serial")
 
@@ -47,9 +46,7 @@ serial_end_recv(struct serial_dev* sdev)
 
     pwake_one(&sdev->wq_rxdone);
 
-    struct termport_potens* tpcap;
-    tpcap = get_potens(sdev->tp_cap, typeof(*tpcap));
-    term_notify_data_avaliable(tpcap);
+    term_notify_data_avaliable(sdev->tp_cap);
 }
 
 void
@@ -265,8 +262,12 @@ static struct termport_pot_ops tppot_ops = {
 struct serial_dev*
 serial_create(struct devclass* class, char* if_ident)
 {
-    struct serial_dev* sdev = vzalloc(sizeof(struct serial_dev));
-    struct device* dev = device_allocseq(dev_meta(serial_cat), sdev);
+    struct serial_dev* sdev;
+    struct device* dev;
+    
+    sdev = vzalloc(sizeof(struct serial_dev));
+    dev = device_allocseq(dev_meta(serial_cat), sdev);
+
     dev->ops.read = __serial_read;
     dev->ops.read_page = __serial_read_page;
     dev->ops.read_async = __serial_read_async;
@@ -279,27 +280,18 @@ serial_create(struct devclass* class, char* if_ident)
     sdev->dev = dev;
     dev->underlay = sdev;
 
-    struct termport_potens* tp_cap = 
-        new_capability(TERMPORT_CAP, struct termport_potens);
-    
-    term_cap_set_operations(tp_cap, &tppot_ops);
-    sdev->tp_cap = pot_meta(tp_cap);
-
     waitq_init(&sdev->wq_rxdone);
     waitq_init(&sdev->wq_txdone);
     rbuffer_init(&sdev->rxbuf, valloc(RXBUF_SIZE), RXBUF_SIZE);
     llist_append(&serial_devs, &sdev->sdev_list);
     
-    device_grant_potens(dev, pot_meta(tp_cap));
-
-    register_device(dev, class, "%s%d", if_ident, class->variant);
-
-    term_create(dev, if_ident);
+    register_device_var(dev, class, "%s", if_ident);
 
     INFO("interface: %s, %xh:%xh.%d", dev->name_val, 
             class->fn_grp, class->device, class->variant);
 
-    class->variant++;
+    sdev->tp_cap = term_attach_potens(dev, &tppot_ops, if_ident);
+
     return sdev;
 }
 

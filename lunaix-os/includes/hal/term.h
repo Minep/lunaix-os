@@ -26,21 +26,6 @@ typedef struct rbuffer** lbuf_ref_t;
 #define ref_next(lbuf) (&(lbuf)->next)
 #define deref(bref) (*(bref))
 
-/**
- * @brief Communication port capability that a device is supported natively, 
- *          or able to emulate low level serial transmission behaviour specify 
- *          by POSIX1-2008, section 11.
- * 
- */
-#define TERMPORT_CAP 0x4d524554U
-
-/**
- * @brief A termios capability that a device provide interfaces which is 
- *          compliant to POSIX1-2008
- * 
- */
-#define TERMIOS_CAP 0x534f4954U
-
 struct term;
 
 struct termport_pot_ops
@@ -84,8 +69,9 @@ struct term
 
 extern struct device* sysconsole;
 
-struct term*
-term_create(struct device* chardev, char* suffix);
+struct termport_potens*
+term_attach_potens(struct device* chardev, 
+                   struct termport_pot_ops* ops, char* suffix);
 
 int
 term_bind(struct term* tdev, struct device* chdev);
@@ -119,20 +105,7 @@ lcntl_transform_inseq(struct term* tdev);
 int
 lcntl_transform_outseq(struct term* tdev);
 
-static inline void
-term_cap_set_operations(struct termport_potens* cap, 
-                        struct termport_pot_ops* ops)
-{
-    cap->ops = ops;
-}
-
 void
 term_notify_data_avaliable(struct termport_potens* cap);
-
-#define termport_default_ops                                    \
-    ({                                                          \
-        extern struct termport_pot_ops default_termport_pot_ops;\
-        &default_termport_pot_ops;                              \
-    })
 
 #endif /* __LUNAIX_TERM_H */

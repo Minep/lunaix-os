@@ -298,17 +298,9 @@ lxconsole_spawn_ttydev(struct device_def* devdef)
     waitq_init(&lx_reader);
     input_add_listener(__lxconsole_listener);
 
-    struct termport_potens* tp_cap;
-
-    tp_cap = new_capability(TERMPORT_CAP, struct termport_potens);
-    term_cap_set_operations(tp_cap, termport_default_ops);
-    
-    lx_console.tp_cap = pot_meta(tp_cap);
-    device_grant_potens(tty_dev, lx_console.tp_cap);
-
     register_device(tty_dev, &devdef->class, "vcon");
 
-    term_create(tty_dev, "VCON");
+    term_attach_potens(tty_dev, NULL, "VCON");
 
     return 0;
 }

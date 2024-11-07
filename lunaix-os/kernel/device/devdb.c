@@ -35,7 +35,7 @@ device_scan_drivers()
     {
         struct devclass* devc = &devdef->class;
         u32_t hash = hash_dev(devc->fn_grp, devc->device);
-        devc->hash = hash;
+        devdef->class_hash = hash;
 
         if (!devdef->name) {
             devdef->name = "<unspecified>";
@@ -76,7 +76,7 @@ devdef_byclass(struct devclass* devc)
     struct device_def *pos, *n;
     hashtable_hash_foreach(dev_registry, hash, pos, n, hlist)
     {
-        if (pos->class.hash != hash) {
+        if (pos->class_hash != hash) {
             continue;
         }
         if (devclass_eq(devc, &pos->class)) {

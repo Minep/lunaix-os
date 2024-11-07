@@ -10,7 +10,7 @@
 enum changeling_idents
 {
     chlg_anon = 0,
-    #include "changeling.lst"
+    #include <listings/changeling.lst>
 };
 
 /**

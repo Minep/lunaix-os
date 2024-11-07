@@ -5,7 +5,10 @@ dev_id(BUILTIN_KMSG),
 
 dev_id(VTERM),
 dev_id(RNG),
+
 dev_id(RTC),
+dev_id(RTC_86LEGACY),
+
 dev_id(SATA),
 dev_id(NVME),
 dev_id(PCI),

@@ -118,22 +118,38 @@
  */
 struct potens_meta
 {
+    struct device* owner;
+    
     struct llist_header potentes;
     unsigned int pot_type;
 };
 
-#define POTENS_META                                     \
-    union {                                             \
-        struct potens_meta pot_meta;                    \
-        struct {                                        \
-            struct llist_header potentes;               \
-            unsigned int pot_type;                      \
-        };                                              \
+#define POTENS_META                                         \
+    struct {                                                \
+        union {                                             \
+            struct potens_meta pot_meta;                    \
+            struct {                                        \
+                struct llist_header potentes;               \
+                unsigned int pot_type;                      \
+            };                                              \
+        };                                                  \
     }
 
-#define get_potens(cap, pot_type)       \
-    container_of((cap), pot_type, pot_meta)
-#define pot_meta(cap) (&(cap)->pot_meta)
+#define get_potens(cap, pot_struct)       \
+    container_of((cap), pot_struct, pot_meta)
+#define potens_meta(cap) (&(cap)->pot_meta)
+#define potens_dev(cap) (potens_meta(cap)->owner)
+
+#define potens(name)   POTENS_##name
+
+#define potens_check_unique(dev, pot_type)                   \
+            !device_get_potens(dev, pot_type)
+
+enum device_potens_type
+{
+    potens(NON),
+    #include <listings/device_potens.lst>
+};
 
 /**
  * List of potentes of a device, pay attention to 
@@ -253,7 +269,10 @@ struct device_def
     } flags;
     
 
-    struct devclass class;
+    struct {
+        struct devclass class;
+        unsigned int class_hash;
+    };
 
     struct device_ldfn_chain* load_chain;
 
@@ -347,10 +366,17 @@ void
 device_setname(struct device_meta* dev, char* fmt, ...);
 
 void
-device_register_generic(struct device_meta* dev, struct devclass* class, char* fmt, ...);
+device_register_generic(struct device_meta* dev, struct devclass* class, 
+                        char* fmt, ...);
 
 #define register_device(dev, class, fmt, ...) \
             device_register_generic(dev_meta(dev), class, fmt, ## __VA_ARGS__)
+
+#define register_device_var(dev, class, fmt, ...) \
+            ({device_register_generic(                                     \
+                    dev_meta(dev), class,                                  \
+                    fmt "%d", ## __VA_ARGS__, (class)->variant);           \
+              devclass_mkvar(class); })
 
 void
 device_create(struct device* dev,
@@ -423,10 +449,10 @@ device_scan_drivers();
 struct potens_meta*
 alloc_potens(int cap, unsigned int size);
 
-#define new_capability(pot_type, cap_impl)\
-    ((cap_impl*)alloc_potens((pot_type), sizeof(cap_impl)))
+#define new_potens(pot_type, pot_struct)\
+    ((pot_struct*)alloc_potens((pot_type), sizeof(pot_struct)))
 
-#define new_capability_marker(pot_type)\
+#define new_potens_marker(pot_type)\
     (alloc_potens((pot_type), sizeof(struct potens_meta)))
 
 void

@@ -2,34 +2,51 @@
 #include <lunaix/fs/twimap.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/status.h>
+#include <lunaix/syslog.h>
 
 #include <hal/hwrtc.h>
 
-const struct hwrtc* sysrtc;
-static int rtc_count = 0;
+const struct hwrtc_potens* sysrtc = NULL;
 
-DEFINE_LLIST(rtcs);
+static DEFINE_LLIST(rtcs);
+
+LOG_MODULE("hwrtc")
 
 void
 hwrtc_walltime(datetime_t* dt)
 {
-    sysrtc->get_walltime(sysrtc, dt);
+    sysrtc->ops->get_walltime(sysrtc, dt);
+}
+
+static inline struct hwrtc_potens*
+__rtc_potens(struct device* wrapper)
+{
+    struct potens_meta* pot;
+    pot = device_get_potens(wrapper, potens(HWRTC));
+    return ({ assert(pot); get_potens(pot, struct hwrtc_potens); });
 }
 
 static int
-hwrtc_ioctl(struct device* dev, u32_t req, va_list args)
+__hwrtc_ioctl(struct device* dev, u32_t req, va_list args)
 {
-    struct hwrtc* rtc = (struct hwrtc*)dev->underlay;
+    struct hwrtc_potens* pot;
+    struct hwrtc_potens_ops* ops;
+    struct device* rtcdev;
+
+    rtcdev = (struct device*) dev->underlay;
+    pot = __rtc_potens(rtcdev);
+    ops = pot->ops;
+
     switch (req) {
         case RTCIO_IMSK:
-            rtc->set_mask(rtc);
+            ops->set_proactive(pot, false);
             break;
         case RTCIO_IUNMSK:
-            rtc->cls_mask(rtc);
+            ops->set_proactive(pot, true);
             break;
         case RTCIO_SETDT:
             datetime_t* dt = va_arg(args, datetime_t*);
-            rtc->set_walltime(rtc, dt);
+            ops->set_walltime(pot, dt);
             break;
         case RTCIO_SETFREQ:
             ticks_t* freq = va_arg(args, ticks_t*);
@@ -38,75 +55,105 @@ hwrtc_ioctl(struct device* dev, u32_t req, va_list args)
                 return EINVAL;
             }
             if (*freq) {
-                return rtc->chfreq(rtc, *freq);
+                return ops->chfreq(pot, *freq);
             }
 
-            *freq = rtc->base_freq;
+            *freq = pot->base_freq;
 
             break;
         default:
-            return EINVAL;
+            return rtcdev->ops.exec_cmd(dev, req, args);
     }
 
     return 0;
 }
 
 static int
-hwrtc_read(struct device* dev, void* buf, size_t offset, size_t len)
+__hwrtc_read(struct device* dev, void* buf, size_t offset, size_t len)
 {
-    struct hwrtc* rtc = (struct hwrtc*)dev->underlay;
-    *((ticks_t*)buf) = rtc->get_counts(rtc);
+    struct hwrtc_potens* pot;
+
+    pot = __rtc_potens((struct device*)dev->underlay);
+    *((ticks_t*)buf) = pot->live;
 
     return sizeof(ticks_t);
 }
 
-struct hwrtc*
-hwrtc_alloc_new(char* name)
-{
-    struct hwrtc* rtc_instance = valloc(sizeof(struct hwrtc));
+static struct devclass proxy_rtc_clas = DEVCLASS(NON, TIME, RTC);
 
-    if (!rtc_instance) {
+static void
+__hwrtc_create_proxy(struct hwrtc_potens* pot, struct device* raw_rtcdev)
+{
+    struct device* dev;
+
+    dev = device_allocsys(NULL, raw_rtcdev);
+
+    dev->ops.exec_cmd = __hwrtc_ioctl;
+    dev->ops.read = __hwrtc_read;
+
+    register_device_var(dev, &proxy_rtc_clas, "rtc");
+
+    pot->rtc_proxy = dev;
+}
+
+struct hwrtc_potens*
+hwrtc_attach_potens(struct device* raw_rtcdev, struct hwrtc_potens_ops* ops)
+{
+    struct hwrtc_potens* hwpot;
+
+    if (!potens_check_unique(raw_rtcdev, potens(HWRTC)))
+    {
         return NULL;
     }
 
-    llist_append(&rtcs, &rtc_instance->rtc_list);
+    hwpot = new_potens(potens(HWRTC), struct hwrtc_potens);
+    hwpot->ops = ops;
+    
+    device_grant_potens(raw_rtcdev, potens_meta(hwpot));
+    llist_append(&rtcs, &hwpot->rtc_potentes);
 
-    rtc_instance->id = rtc_count++;
-    rtc_instance->name = name;
-    struct device* rtcdev = device_allocsys(NULL, rtc_instance);
+    __hwrtc_create_proxy(hwpot, raw_rtcdev);
 
-    rtcdev->ops.exec_cmd = hwrtc_ioctl;
-    rtcdev->ops.read = hwrtc_read;
-
-    rtc_instance->rtc_dev = rtcdev;
-
-    return rtc_instance;
+    return hwpot;
 }
 
 void
-hwrtc_register(struct devclass* class, struct hwrtc* rtc)
+hwrtc_init()
 {
-    if (unlikely(!sysrtc)) {
-        sysrtc = rtc;
+    assert(!llist_empty(&rtcs));
+
+    sysrtc = list_entry(rtcs.next, struct hwrtc_potens, rtc_potentes);
+    
+    if (!sysrtc->ops->calibrate) {
+        return;
     }
 
-    class->variant = rtc->id;
-    register_device(rtc->rtc_dev, class, "rtc%d", rtc->id);
+    int err = sysrtc->ops->calibrate(sysrtc);
+    if (err) {
+        FATAL("failed to calibrate rtc. name='%s', err=%d", 
+                potens_dev(sysrtc)->name_val, err);
+    }
 }
 
 static void
 __hwrtc_readinfo(struct twimap* mapping)
 {
-    struct hwrtc* rtc = twimap_data(mapping, struct hwrtc*);
-    twimap_printf(mapping, "name: %s\n", rtc->name);
-    twimap_printf(mapping, "frequency: %dHz\n", rtc->base_freq);
-    twimap_printf(mapping, "ticks count: %d\n", rtc->get_counts(rtc));
-    twimap_printf(mapping,
-                  "ticking: %s\n",
-                  (rtc->state & RTC_STATE_MASKED) ? "no" : "yes");
+    struct hwrtc_potens* pot;
+    struct device* owner;
+
+    pot = twimap_data(mapping, struct hwrtc_potens*);
+    owner = pot->pot_meta.owner;
+
+    twimap_printf(mapping, "device: %x.%x\n", 
+                    owner->ident.fn_grp, owner->ident.unique);
+
+    twimap_printf(mapping, "frequency: %dHz\n", pot->base_freq);
+    twimap_printf(mapping, "ticks count: %d\n", pot->live);
+    twimap_printf(mapping, "ticking: %s\n",
+                  (pot->state & RTC_STATE_MASKED) ? "no" : "yes");
 
     datetime_t dt;
-    rtc->get_walltime(rtc, &dt);
+    pot->ops->get_walltime(pot, &dt);
 
     twimap_printf(
         mapping, "recorded date: %d/%d/%d\n", dt.year, dt.month, dt.day);
@@ -116,18 +163,18 @@ __hwrtc_readinfo(struct twimap* mapping)
 }
 
 static void
-hwrtc_twifs_export(struct hwrtc* rtc)
+hwrtc_twifs_export(struct hwrtc_potens* pot)
 {
-    const char* name = rtc->rtc_dev->name.value;
-    struct twimap* rtc_mapping = twifs_mapping(NULL, rtc, name);
+    const char* name = pot->rtc_proxy->name_val;
+    struct twimap* rtc_mapping = twifs_mapping(NULL, pot, name);
     rtc_mapping->read = __hwrtc_readinfo;
 }
 
 static void
 hwrtc_twifs_export_all()
 {
-    struct hwrtc *pos, *next;
-    llist_for_each(pos, next, &rtcs, rtc_list)
+    struct hwrtc_potens *pos, *next;
+    llist_for_each(pos, next, &rtcs, rtc_potentes)
     {
         hwrtc_twifs_export(pos);
     }

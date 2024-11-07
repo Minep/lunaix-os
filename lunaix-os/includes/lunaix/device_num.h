@@ -75,19 +75,19 @@
 enum devnum_if
 {
     dev_if(NON),
-    #include "devnum_if.lst"
+    #include <listings/devnum_if.lst>
 };
 
 enum devnum_fn
 {
     dev_fn(NON),
-    #include "devnum_fn.lst"
+    #include <listings/devnum_fn.lst>
 };
 
 enum devnum
 {
     dev_id(NON),
-    #include "devnum.lst"
+    #include <listings/devnum.lst>
 };
 
 struct devident
@@ -101,7 +101,6 @@ struct devclass
     u32_t fn_grp;
     u32_t device;
     u32_t variant;
-    u32_t hash;
 };
 
 static inline int

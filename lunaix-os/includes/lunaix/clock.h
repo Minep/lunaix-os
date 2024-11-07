@@ -6,8 +6,8 @@
 #include <hal/hwrtc.h>
 #include <hal/hwtimer.h>
 
-extern const struct hwrtc* sysrtc;
-extern const struct hwtimer* systimer;
+extern const struct hwrtc_potens* sysrtc;
+extern const struct hwtimer_pot* systimer;
 
 void
 clock_init();

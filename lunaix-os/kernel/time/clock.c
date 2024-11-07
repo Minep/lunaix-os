@@ -19,12 +19,8 @@ __clock_read_datetime(struct twimap* map)
     clock_walltime(&dt);
     twimap_printf(map,
                   "%.4d-%.2d-%.2d %.2d:%.2d:%.2d",
-                  dt.year,
-                  dt.month,
-                  dt.day,
-                  dt.hour,
-                  dt.minute,
-                  dt.second);
+                  dt.year, dt.month, dt.day,
+                  dt.hour, dt.minute, dt.second);
 }
 
 void
@@ -78,20 +74,11 @@ clock_systime()
 void
 clock_walltime(datetime_t* datetime)
 {
-    sysrtc->get_walltime(sysrtc, datetime);
+    sysrtc->ops->get_walltime(sysrtc, datetime);
 }
 
 void
 clock_init()
 {
-    int idx = 0;
-    struct device_def* pos;
-    foreach_exported_device_of(load_timedev, idx, pos)
-    {
-        if (pos->class.device != DEV_RTC) {
-            continue;
-        }
-
-        pos->load(pos);
-    }
+    hwrtc_init();
 }

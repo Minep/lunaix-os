@@ -15,6 +15,7 @@ void
 device_grant_potens(struct device* dev, struct potens_meta* cap)
 {
     llist_append(&dev->potentium, &cap->potentes);
+    cap->owner = dev;
 }
 
 struct potens_meta*

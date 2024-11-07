@@ -6,6 +6,7 @@
 #include <lunaix/ds/mutex.h>
 #include <lunaix/ds/waitq.h>
 #include <lunaix/ds/rbuffer.h>
+#include <hal/term.h>
 
 #include <usr/lunaix/serial.h>
 
@@ -33,7 +34,7 @@ struct serial_dev
     struct rbuffer rxbuf;
     int wr_len;
 
-    struct potens_meta* tp_cap;
+    struct termport_potens* tp_cap;
 
     /**
      * @brief Write buffer to TX. The return code indicate
