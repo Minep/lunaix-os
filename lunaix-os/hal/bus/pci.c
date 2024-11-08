@@ -108,7 +108,7 @@ __pci_add_prober(pciaddr_t loc, ptr_t pci_base, int devinfo)
     prober->intr_info = intr;
     prober->loc = loc;
 
-    changeling_morph(pci_probers, prober->mobj, pci_probe_morpher);
+    changeling_morph_anon(pci_probers, prober->mobj, pci_probe_morpher);
 
     __pci_probe_msi_info(prober);
     __pci_probe_bar_info(prober);
@@ -535,7 +535,7 @@ EXPORT_TWIFS_PLUGIN(pci_devs, pci_build_fsmapping);
 static int
 pci_register(struct device_def* def)
 {
-    pci_probers = changeling_spawn_anon(NULL);
+    pci_probers = changeling_spawn(NULL, "pci_realm");
 
     return 0;
 }

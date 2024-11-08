@@ -1,4 +1,3 @@
-
 #include <lunaix/device.h>
 #include <lunaix/fs.h>
 #include <lunaix/fs/twifs.h>
@@ -7,22 +6,20 @@
 #include <lunaix/spike.h>
 #include <lunaix/syscall.h>
 #include <lunaix/syscall_utils.h>
+#include <lunaix/owloysius.h>
 
 #include <klibc/strfmt.h>
 #include <klibc/string.h>
 
 static DEFINE_LLIST(root_list);
 
-static volatile u32_t devid = 0;
+morph_t* device_mobj_root;
 
 void
 device_setname_vargs(struct device_meta* dev, char* fmt, va_list args)
 {
-    size_t strlen = ksnprintfv(dev->name_val, fmt, DEVICE_NAME_SIZE, args);
-
-    dev->name = HSTR(dev->name_val, strlen);
-
-    hstr_rehash(&dev->name, HSTR_FULL_HASH);
+    ksnprintfv(dev->name_val, fmt, DEVICE_NAME_SIZE, args);
+    changeling_setname(dev_mobj(dev), dev->name_val);
 }
 
 void
@@ -30,13 +27,17 @@ device_register_generic(struct device_meta* devm, struct devclass* class,
                         char* fmt, ...)
 {
     va_list args;
+    morph_t* morphed, *parent;
+
+    morphed = &devm->mobj;
     va_start(args, fmt);
 
     if (fmt) {
         device_setname_vargs(devm, fmt, args);
     }
 
-    if (class && valid_device_subtype_ref(devm, DEV_STRUCT)) {
+    if (class && morph_type_of(morphed, device_morpher)) 
+    {
         struct device* dev = to_dev(devm);
         dev->ident = (struct devident) { 
             .fn_grp = class->fn_grp,
@@ -44,40 +45,21 @@ device_register_generic(struct device_meta* devm, struct devclass* class,
         };
     }
 
-    devm->dev_uid = devid++;
-
-    struct device_meta* parent = devm->parent;
+    parent = morphed->parent;
     if (parent) {
-        assert(valid_device_subtype_ref(parent, DEV_CAT));
-        llist_append(&parent->children, &devm->siblings);
-    } else {
-        llist_append(&root_list, &devm->siblings);
+        changeling_attach(parent, morphed);
     }
 
     va_end(args);
 }
 
-static void
-device_init_meta(struct device_meta* dmeta, 
-                 struct device_meta* parent, unsigned int subtype) 
-{
-    dmeta->magic = DEV_STRUCT_MAGIC_MASK | subtype;
-    dmeta->parent = parent;
-
-    llist_init_head(&dmeta->children);
-}
-
 void
-device_create(struct device* dev,
-              struct device_meta* parent,
-              u32_t type,
-              void* underlay)
+device_create(struct device* dev, struct device_meta* parent,
+              u32_t type, void* underlay)
 {
-    dev->magic = DEV_STRUCT_MAGIC;
     dev->underlay = underlay;
     dev->dev_type = type;
 
-    device_init_meta(dev_meta(dev), parent, DEV_STRUCT);
     llist_init_head(&dev->potentium);
     mutex_init(&dev->lock);
     iopoll_init_evt_q(&dev->pollers);
@@ -93,6 +75,7 @@ device_alloc(struct device_meta* parent, u32_t type, void* underlay)
     }
 
     device_create(dev, parent, type, underlay);
+    changeling_morph(dev_morph(parent), dev->mobj, NULL, device_morpher);
 
     return dev;
 }
@@ -106,8 +89,9 @@ device_alloc_alias(struct device_meta* parent, struct device_meta* aliased)
         return NULL;
     }
 
-    device_init_meta(dev_meta(dev), parent, DEV_ALIAS);
     dev->alias = aliased;
+    changeling_ref(dev_mobj(aliased));
+    changeling_morph(dev_morph(parent), dev->mobj, NULL, devalias_morpher);
 
     return dev;
 }
@@ -121,11 +105,10 @@ device_alloc_cat(struct device_meta* parent)
         return NULL;
     }
 
-    device_init_meta(dev_meta(dev), parent, DEV_CAT);
+    changeling_morph(dev_morph(parent), dev->mobj, NULL, devcat_morpher);
 
     return dev;
 }
-
 
 void
 device_setname(struct device_meta* dev, char* fmt, ...)
@@ -169,65 +152,11 @@ device_addalias(struct device_meta* parent,
     return dev;
 }
 
-struct device_meta*
-device_getbyid(struct llist_header* devlist, u32_t id)
-{
-    devlist = devlist ? devlist : &root_list;
-    struct device_meta *pos, *n;
-    llist_for_each(pos, n, devlist, siblings)
-    {
-        if (pos->dev_uid == id) {
-            return pos;
-        }
-    }
-
-    return NULL;
-}
-
-struct device_meta*
-device_getbyhname(struct device_meta* root_dev, struct hstr* name)
-{
-    struct llist_header* devlist = root_dev ? &root_dev->children : &root_list;
-    struct device_meta *pos, *n;
-    llist_for_each(pos, n, devlist, siblings)
-    {
-        if (HSTR_EQ(&pos->name, name)) {
-            return pos;
-        }
-    }
-
-    return NULL;
-}
-
-struct device_meta*
-device_getbyname(struct device_meta* root_dev, const char* name, size_t len)
-{
-    struct hstr hname = HSTR(name, len);
-    hstr_rehash(&hname, HSTR_FULL_HASH);
-
-    return device_getbyhname(root_dev, &hname);
-}
-
 void
 device_remove(struct device_meta* dev)
 {
-    llist_delete(&dev->siblings);
+    changeling_isolate(&dev->mobj);
     vfree(dev);
-}
-
-struct device_meta*
-device_getbyoffset(struct device_meta* root_dev, int offset)
-{
-    struct llist_header* devlist = root_dev ? &root_dev->children : &root_list;
-    struct device_meta *pos, *n;
-    int off = 0;
-    llist_for_each(pos, n, devlist, siblings)
-    {
-        if (off++ >= offset) {
-            return pos;
-        }
-    }
-    return NULL;
 }
 
 void
@@ -247,44 +176,35 @@ device_populate_info(struct device* dev, struct dev_info* devinfo)
     devinfo->dev_name.buf[buflen - 1] = 0;
 }
 
-struct device_meta*
-resolve_device_meta(void* maybe_dev) {
-    if (!valid_device_ref(maybe_dev)) {
+morph_t*
+resolve_device_morph(void* maybe_dev)
+{
+    struct device_alias* da = NULL;
+    morph_t *morphed;
+    
+    morphed = morphed_ptr(maybe_dev);
+
+    if (!is_changeling(morphed)) {
         return NULL;
     }
 
-    struct device_meta* dm = (struct device_meta*)maybe_dev;
-    unsigned int subtype = dm->magic ^ DEV_STRUCT_MAGIC_MASK;
-    
-    switch (subtype)
+    if (morph_type_of(morphed, device_morpher)) 
     {
-        case DEV_STRUCT:
-        case DEV_CAT:
-            return dm;
-        
-        case DEV_ALIAS: {
-            struct device_meta* aliased_dm = dm;
-            
-            while(valid_device_subtype_ref(aliased_dm, DEV_ALIAS)) {
-                aliased_dm = to_aliasdev(aliased_dm)->alias;
-            }
-
-            return aliased_dm;
-        }
-        default:
-            return NULL;
-    }
-}
-
-struct device*
-resolve_device(void* maybe_dev) {
-    struct device_meta* dm = resolve_device_meta(maybe_dev);
-    
-    if (!valid_device_subtype_ref(dm, DEV_STRUCT)) {
-        return NULL;
+        return morphed;
     }
 
-    return to_dev(dm);
+    if (morph_type_of(morphed, devcat_morpher)) 
+    {
+        return morphed;
+    }
+
+    while(morph_type_of(morphed, devalias_morpher)) 
+    {
+        da = changeling_reveal(morphed, devalias_morpher);
+        morphed = &da->alias->mobj;
+    }
+
+    return morphed;
 }
 
 void
@@ -358,7 +278,7 @@ __DEFINE_LXSYSCALL3(int, ioctl, int, fd, int, req, sc_va_list, _args)
     }
 
     struct device* dev = resolve_device(fd_s->file->inode->data);
-    if (!valid_device_subtype_ref(dev, DEV_STRUCT)) {
+    if (!dev) {
         errno = ENODEV;
         goto done;
     }
@@ -379,3 +299,10 @@ __DEFINE_LXSYSCALL3(int, ioctl, int, fd, int, req, sc_va_list, _args)
 done:
     return DO_STATUS_OR_RETURN(errno);
 }
+
+static void
+__device_subsys_init()
+{
+    device_mobj_root = changeling_spawn(NULL, "devices");
+}
+owloysius_fetch_init(__device_subsys_init, on_sysconf);

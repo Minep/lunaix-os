@@ -44,16 +44,6 @@
 
     . = ALIGN(8);
 
-    PROVIDE(__lga_dev_ld_timedev_start = .);
-
-    KEEP(*(.lga.devdefs.ld_timedev));
-
-    PROVIDE(__lga_dev_ld_timedev_end = .);
-
-    /* ---- */
-
-    . = ALIGN(8);
-
     PROVIDE(__lga_dev_ld_post_start = .);
 
     KEEP(*(.lga.devdefs.ld_post));

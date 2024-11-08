@@ -1,14 +1,13 @@
 #ifndef __LUNAIX_DEVICE_H
 #define __LUNAIX_DEVICE_H
 
-#define DEVICE_NAME_SIZE 32
+#define DEVICE_NAME_SIZE 16
 
 #include <lunaix/device_num.h>
 #include <lunaix/ds/hashtable.h>
 #include <lunaix/ds/hstr.h>
 #include <lunaix/ds/ldga.h>
 #include <lunaix/ds/llist.h>
-#include <lunaix/ds/list.h>
 #include <lunaix/ds/mutex.h>
 #include <lunaix/iopoll.h>
 #include <lunaix/types.h>
@@ -45,13 +44,6 @@
 #define load_sysconf ld_sysconf
 
 /**
- * @brief Mark the device definition should be loaded as time device, for
- * example a real time clock device. Such device will be loaded and managed by
- * clock subsystem
- */
-#define load_timedev ld_timedev
-
-/**
  * @brief Mark the device definition should be loaded automatically during the
  * bootstrapping stage. Most of the driver do load there.
  *
@@ -83,20 +75,13 @@
         .device = dev_id(dev), .variant = 0                                    \
     }
 
-#define DEV_STRUCT_MAGIC_MASK 0x56454440U
-#define DEV_STRUCT 0xc
-#define DEV_CAT 0xd
-#define DEV_ALIAS 0xf
-
-#define DEV_STRUCT_MAGIC (DEV_STRUCT_MAGIC_MASK | DEV_STRUCT)
-#define DEV_CAT_MAGIC (DEV_STRUCT_MAGIC_MASK | DEV_CAT)
-#define DEV_ALIAS_MAGIC (DEV_STRUCT_MAGIC_MASK | DEV_ALIAS)
-
 #define DEV_MSKIF 0x00000003
-
 #define DEV_IFVOL 0x0 // volumetric (block) device
 #define DEV_IFSEQ 0x1 // sequential (character) device
 #define DEV_IFSYS 0x3 // a system device
+
+#define dev_object_root         \
+        ({ extern morph_t* device_mobj_root; device_mobj_root; })
 
 /**
  * A potens is a capability of the device
@@ -136,7 +121,7 @@ struct potens_meta
     }
 
 #define get_potens(cap, pot_struct)       \
-    container_of((cap), pot_struct, pot_meta)
+            container_of((cap), pot_struct, pot_meta)
 #define potens_meta(cap) (&(cap)->pot_meta)
 #define potens_dev(cap) (potens_meta(cap)->owner)
 
@@ -158,39 +143,35 @@ enum device_potens_type
 typedef struct llist_header potentium_list_t;
 
 
-struct device_meta
-{
-    u32_t magic;
-    struct llist_header siblings;
-    struct llist_header children;
-    struct device_meta* parent;
-    struct hstr name;
-    
-    u32_t dev_uid;
-    
-    char name_val[DEVICE_NAME_SIZE];
-};
+#define DEVICE_META_FIELD                       \
+    struct {                                    \
+        morph_t mobj;                           \
+        char name_val[DEVICE_NAME_SIZE];        \
+    };
 
 #define DEVICE_METADATA                             \
     union {                                         \
         struct device_meta meta;                    \
-        struct {                                    \
-            u32_t magic;                            \
-            struct llist_header siblings;           \
-            struct llist_header children;           \
-            struct device_meta* parent;             \
-            struct hstr name;                       \
-                                                    \
-            u32_t dev_uid;                          \
-                                                    \
-            char name_val[DEVICE_NAME_SIZE];        \
-        };                                          \
-    }                                              
+        DEVICE_META_FIELD;                          \
+    }   
 
-#define dev_meta(dev) (&(dev)->meta)
-#define to_dev(dev) (container_of(dev,struct device, meta))
-#define to_catdev(dev) (container_of(dev,struct device_cat, meta))
-#define to_aliasdev(dev) (container_of(dev,struct device_alias, meta))
+#define devmeta_morpher      morphable_attrs(device_meta, mobj)
+#define devalias_morpher     morphable_attrs(device_alias, mobj)
+#define devcat_morpher       morphable_attrs(device_cat, mobj)
+#define device_morpher       morphable_attrs(device, mobj)
+
+#define dev_meta(dev)       (&(dev)->meta)
+#define dev_mobj(dev)       (&(dev)->mobj)
+#define dev_morph(dev)      ({ likely(dev) ? &(dev)->mobj : dev_object_root; })
+#define dev_uid(dev)        (morpher_uid(&(dev)->mobj))
+#define to_dev(dev)         (container_of(dev,struct device, meta))
+#define to_catdev(dev)      (container_of(dev,struct device_cat, meta))
+#define to_aliasdev(dev)    (container_of(dev,struct device_alias, meta))
+
+struct device_meta
+{
+    DEVICE_META_FIELD;
+};
 
 struct device_alias {
     DEVICE_METADATA;
@@ -317,29 +298,8 @@ struct device_def
 #define def_on_free(fn)                 .free = fn
 #define def_non_trivial                 .flags.no_default_realm = true
 
-static inline bool must_inline
-valid_device_ref(void* maybe_dev) {
-    if (!maybe_dev) 
-        return false;
-        
-    unsigned int magic = ((struct device_meta*)maybe_dev)->magic;
-    return (magic ^ DEV_STRUCT_MAGIC_MASK) <= 0xfU;
-}
-
-static inline bool must_inline
-valid_device_subtype_ref(void* maybe_dev, unsigned int subtype) {
-    if (!maybe_dev) 
-        return false;
-    
-    unsigned int magic = ((struct device_meta*)maybe_dev)->magic;
-    return (magic ^ DEV_STRUCT_MAGIC_MASK) == subtype;
-}
-
-struct device*
-resolve_device(void* maybe_dev);
-
-struct device_meta*
-resolve_device_meta(void* maybe_dev);
+morph_t*
+resolve_device_morph(void* maybe_dev);
 
 #define mark_device_doing_write(dev_ptr) (dev_ptr)->poll_evflags &= ~_POLLOUT
 #define mark_device_done_write(dev_ptr) (dev_ptr)->poll_evflags |= _POLLOUT
@@ -354,6 +314,12 @@ static inline u32_t
 device_id_from_class(struct devclass* class)
 {
     return ((class->device & 0xffff) << 16) | ((class->variant & 0xffff));
+}
+
+static inline struct device*
+resolve_device(void* maybe_dev) {
+    morph_t* mobj = resolve_device_morph(maybe_dev);
+    return changeling_try_reveal(mobj, device_morpher);
 }
 
 void
@@ -412,25 +378,14 @@ device_allocvol(struct device_meta* parent, void* underlay)
 }
 
 struct device_alias*
-device_addalias(struct device_meta* parent, struct device_meta* aliased, char* name_fmt, ...);
+device_addalias(struct device_meta* parent, struct device_meta* aliased, 
+                char* name_fmt, ...);
 
 struct device_cat*
 device_addcat(struct device_meta* parent, char* name_fmt, ...);
 
 void
 device_remove(struct device_meta* dev);
-
-struct device_meta*
-device_getbyid(struct llist_header* devlist, u32_t id);
-
-struct device_meta*
-device_getbyhname(struct device_meta* root_dev, struct hstr* name);
-
-struct device_meta*
-device_getbyname(struct device_meta* root_dev, const char* name, size_t len);
-
-struct device_meta*
-device_getbyoffset(struct device_meta* root_dev, int pos);
 
 struct hbucket*
 device_definitions_byif(int if_type);
