@@ -35,9 +35,6 @@ void
 hwtimer_init(u32_t hertz, void* tick_callback);
 
 ticks_t
-hwtimer_base_frequency();
-
-ticks_t
 hwtimer_current_systicks();
 
 ticks_t

@@ -10,9 +10,6 @@ extern const struct hwrtc_potens* sysrtc;
 extern const struct hwtimer_pot* systimer;
 
 void
-clock_init();
-
-void
 clock_walltime(datetime_t* datetime);
 
 /**
@@ -25,5 +22,11 @@ clock_systime();
 
 time_t
 clock_unixtime();
+
+static inline void
+clock_init()
+{
+    hwrtc_init();
+}
 
 #endif /* __LUNAIX_CLOCK_H */

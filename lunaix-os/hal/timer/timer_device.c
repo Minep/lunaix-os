@@ -9,13 +9,6 @@ static struct device_alias* timer_alias;
 static DEFINE_LLIST(timer_devices);
 
 ticks_t
-hwtimer_base_frequency()
-{
-    assert(systimer);
-    return systimer->base_freq;
-}
-
-ticks_t
 hwtimer_current_systicks()
 {
     assert(systimer);
@@ -26,7 +19,7 @@ ticks_t
 hwtimer_to_ticks(u32_t value, int unit)
 {
     assert(systimer);
-    
+
     // in case system frequency is less than 1000Hz
     if (unit != TIME_MS) {
         return systimer->running_freq * unit * value;

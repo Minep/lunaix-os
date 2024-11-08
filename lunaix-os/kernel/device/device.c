@@ -204,7 +204,7 @@ resolve_device_morph(void* maybe_dev)
         morphed = &da->alias->mobj;
     }
 
-    return morphed;
+    return da ? morphed : NULL;
 }
 
 void

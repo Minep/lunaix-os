@@ -76,9 +76,3 @@ clock_walltime(datetime_t* datetime)
 {
     sysrtc->ops->get_walltime(sysrtc, datetime);
 }
-
-void
-clock_init()
-{
-    hwrtc_init();
-}
