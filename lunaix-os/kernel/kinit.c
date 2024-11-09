@@ -123,7 +123,6 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     /* Setup kernel memory layout and services */
     kmem_init(bhctx);
 
-    __remap_and_load_dtb(bhctx);
 
     boot_parse_cmdline(bhctx);
 
@@ -133,6 +132,8 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     device_scan_drivers();
 
     initfn_invoke_sysconf();
+    
+    __remap_and_load_dtb(bhctx);
     device_sysconf_load();
 
     // TODO register devtree hooks

@@ -113,8 +113,18 @@ struct dt_prop
     struct dt_prop_val  val;
 };
 
+struct dt_prop_table
+{
+    union {
+        struct hbucket    other_props[0];
+        struct hbucket    _op_bucket[8];
+    };
+};
+
 struct dt_node_base
 {
+    morph_t mobj;
+
     union {
         struct {
             unsigned char addr_c;
@@ -136,24 +146,15 @@ struct dt_node_base
     };
 
     struct dt_node_base  *parent;
-    struct llist_header   children;
-    struct llist_header   siblings;
     struct llist_header   nodes;
-    struct hlist_node     phnd_link;
-
-    const char*           name;
 
     struct dt_prop_val    compat;
-    const char*           model;
     dt_phnd_t             phandle;
 
-    union {
-        struct hbucket    other_props[0];
-        struct hbucket    _op_bucket[8];
-    };
+    struct dt_prop_table* props;
 
     void* obj;
-    void* binded_dev;
+    morph_t* binded_dev;
 };
 
 struct dt_root
@@ -219,9 +220,11 @@ struct dt_intr_node
 
 struct dt_node
 {
-    morph_t mobj;
+    union {
+        morph_t mobj;
+        struct dt_node_base base;
+    };
     
-    struct dt_node_base base;
     struct dt_intr_node intr;
     
     struct dt_prop_val  reg;
@@ -231,6 +234,8 @@ struct dt_node
     struct dt_prop_val  dma_ranges;
 };
 #define dt_parent(node) ((node)->base.parent)
+#define dt_morpher       morphable_attrs(dt_node, mobj)
+#define dt_mobj(node)   (&(node)->mobj)
 
 struct dt_intr_prop
 {
@@ -386,6 +391,9 @@ dt_found_any(struct dt_node_iter* iter)
 {
     return !!iter->matched;
 }
+
+struct dt_context*
+dt_main_context();
 
 
 /****

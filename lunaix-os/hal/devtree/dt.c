@@ -1,10 +1,12 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/syslog.h>
+#include <lunaix/owloysius.h>
 
 #include "devtree.h"
 
 LOG_MODULE("dtb")
 
+static morph_t* devtree_obj_root;
 static struct dt_context dtctx;
 
 void 
@@ -134,15 +136,9 @@ __parse_stdbase_prop(struct fdt_iter* it, struct dt_node_base* node)
     if (propeq(it, "compatible")) {
         __mkprop_ptr(it, &node->compat);
     } 
-    
-    else if (propeq(it, "model")) {
-        node->model = (const char*)&prop[1];
-    } 
 
     else if (propeq(it, "phandle")) {
         node->phandle = __prop_getu32(it);
-        hashtable_hash_in(dtctx.phnds_table, 
-                          &node->phnd_link, node->phandle);
     }
     
     else if (propeq(it, "#address-cells")) {
@@ -228,6 +224,25 @@ __parse_stdflags(struct fdt_iter* it, struct dt_node_base* node)
     return true;
 }
 
+static inline void
+__dt_node_set_name(struct dt_node_base* node, const char* name)
+{
+    changeling_setname(&node->mobj, name);
+}
+
+static inline void
+__init_prop_table(struct dt_node_base* node)
+{
+    struct dt_prop_table* propt;
+
+    propt = valloc(sizeof(*propt));
+    hashtable_init(propt->_op_bucket);
+}
+
+#define prop_table_add(node, prop)                                             \
+            hashtable_hash_in( (node)->props->_op_bucket,                      \
+                              &(prop)->ht, (prop)->key.hash);
+
 static void
 __parse_other_prop(struct fdt_iter* it, struct dt_node_base* node)
 {
@@ -242,9 +257,8 @@ __parse_other_prop(struct fdt_iter* it, struct dt_node_base* node)
     __mkprop_ptr(it, &prop->val);
 
     hstr_rehash(&prop->key, HSTR_FULL_HASH);
-    hash = prop->key.hash;
 
-    hashtable_hash_in(node->_op_bucket, &prop->ht, hash);
+    prop_table_add(node, prop);
 }
 
 static void
@@ -297,11 +311,16 @@ __fill_root(struct fdt_iter* it, struct dt_root* node)
 static inline void
 __init_node(struct dt_node_base* node)
 {
-    hashtable_init(node->_op_bucket);
-    llist_init_head(&node->children);
+    morph_t* parent;
 
-    if (node->parent)
+    parent = devtree_obj_root;
+    if (node->parent) {
+        parent = node->mobj.parent;
         node->_std = node->parent->_std;
+    }
+
+    __init_prop_table(node);
+    changeling_morph_anon(parent, node->mobj, dt_morpher);
 }
 
 static inline void
@@ -453,12 +472,11 @@ dt_load(ptr_t dtb_dropoff)
                 node->parent = prev;
 
                 __init_node_regular((struct dt_node*)node);
-                llist_append(&prev->children, &node->siblings);
 
                 llist_append(&dtctx.nodes, &node->nodes);
             }
 
-            node->name = (const char*)&it.pos[1];
+            __dt_node_set_name(node, (const char*)&it.pos[1]);
         }
 
         if (unlikely(is_root_level)) {
@@ -485,7 +503,7 @@ struct dt_node*
 dt_resolve_phandle(dt_phnd_t phandle)
 {
     struct dt_node_base *pos, *n;
-    hashtable_hash_foreach(dtctx.phnds_table, phandle, pos, n, phnd_link)
+    llist_for_each(pos, n, &dtctx.nodes, nodes)
     {
         if (pos->phandle == phandle) {
             return (struct dt_node*)pos;
@@ -499,7 +517,7 @@ static bool
 __byname_predicate(struct dt_node_iter* iter, struct dt_node_base* node)
 {
     int i = 0;
-    const char* be_matched = node->name;
+    const char* be_matched = HSTR_VAL(node->mobj.name);
     const char* name = (const char*)iter->closure;
 
     while (be_matched[i] && name[i])
@@ -532,11 +550,13 @@ dt_begin_find(struct dt_node_iter* iter, struct dt_node* node,
     iter->closure = closure;
     iter->pred = pred;
 
-    struct dt_node_base *pos, *n;
-    llist_for_each(pos, n, &node->base.children, siblings)
+    morph_t *pos, *n;
+    struct dt_node_base* base;
+    changeling_for_each(pos, n, &node->mobj)
     {
-        if (pred(iter, pos)) {
-            iter->matched = pos;
+        base = &changeling_reveal(pos, dt_morpher)->base;
+        if (pred(iter, base)) {
+            iter->matched = base;
             break;
         }
     }
@@ -550,21 +570,23 @@ dt_find_next(struct dt_node_iter* iter,
         return false;
     }
 
-    struct dt_node_base *pos, *head;
+    struct dt_node *node;
+    morph_t *pos, *head;
 
-    head = iter->head;
-    pos = iter->matched;
-    *matched = pos;
+    head = dt_mobj(iter->head);
+    pos  = dt_mobj(iter->matched);
+    *matched = iter->matched;
 
-    while (&pos->siblings != &head->children)
+    while (&pos->sibs != &head->subs)
     {
-        pos = list_next(pos, struct dt_node_base, siblings);
+        pos = list_next(pos, morph_t, sibs);
+        node = changeling_reveal(pos, dt_morpher);
 
-        if (!iter->pred(iter, pos)) {
+        if (!iter->pred(iter, &node->base)) {
             continue;
         }
 
-        iter->matched = pos;
+        iter->matched = &node->base;
         return true;
     }
 
@@ -582,7 +604,7 @@ dt_getprop(struct dt_node_base* base, const char* name)
     hstr_rehash(&hashed_name, HSTR_FULL_HASH);
     hash = hashed_name.hash;
 
-    hashtable_hash_foreach(base->_op_bucket, hash, pos, n, ht)
+    hashtable_hash_foreach(base->props->_op_bucket, hash, pos, n, ht)
     {
         if (HSTR_EQ(&pos->key, &hashed_name)) {
             return &pos->val;
@@ -591,3 +613,16 @@ dt_getprop(struct dt_node_base* base, const char* name)
 
     return NULL;
 }
+
+struct dt_context*
+dt_main_context()
+{
+    return &dtctx;
+}
+
+static void
+__init_devtree()
+{
+    devtree_obj_root = changeling_spawn(NULL, NULL);
+}
+owloysius_fetch_init(__init_devtree, on_sysconf);

@@ -8,32 +8,28 @@ struct device;
 
 #include "devtree.h"
 #include <lunaix/ds/hashtable.h>
+#include <lunaix/ds/list.h>
 #include <klibc/hash.h>
 
 typedef struct dt_node* devtree_link_t;
 
 #define dt_node_morpher     morphable_attrs(dt_node, mobj)
 
-struct dtm_vendor_bag
+struct dtm_driver_info
 {
-    struct hstr vendor;
-    struct hlist_node peers; 
-    DECLARE_HASHTABLE(models, 16);
+    struct list_node node;
+    const char* pattern;
 };
 
-struct dtm_model_entry
+struct dtm_driver_record
 {
-    struct hstr model;
-    struct hlist_node peers;
-    struct device_def* devdef;
+    struct hlist_node node;
+    struct list_head infos;
+    struct device_def* def;
 };
 
-bool
-dtm_register_entry(struct device_def* def, 
-                    const char* vendor, const char* model);
-
-struct device*
-dtm_try_create(struct device_def* def, struct dt_node* node);
+void
+dtm_register_entry(struct device_def* def, const char* pattern);
 
 #else
 
@@ -42,16 +38,9 @@ dtm_try_create(struct device_def* def, struct dt_node* node);
 typedef void* devtree_link_t;
 
 static inline void
-dtm_register_entry(struct device_def* def, 
-                    const char* vendor, const char* model)
+dtm_register_entry(struct device_def* def, const char* pattern)
 {
     return;
-}
-
-static inline struct device*
-dtm_try_create(struct device_def* def, struct dt_node* node)
-{
-    return NULL;
 }
 
 #endif

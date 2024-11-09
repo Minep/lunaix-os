@@ -3,202 +3,206 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/syslog.h>
 #include <lunaix/owloysius.h>
+#include <lunaix/status.h>
 
 #include <klibc/string.h>
 
 LOG_MODULE("dtm")
 
 static DECLARE_HASHTABLE(registry,    32);
-static struct dtm_vendor_bag generic_drvs;
 static struct device_cat* dt_category;
 
-#define locate_entry(type, table, h_key, field)                                 \
-    ({                                                                          \
-        type *pos, *n, *found;                                                  \
-                                                                                \
-        found = NULL;                                                           \
-        hashtable_hash_foreach(table, HSTR_HASH(h_key), pos, n, peers)          \
-        {                                                                       \
-            if (HSTR_EQ(&pos->field, &h_key))                                   \
-            {                                                                   \
-                found = pos;                                                    \
-                break;                                                          \
-            }                                                                   \
-        }                                                                       \
-        found;                                                                  \
-    })
-
-static struct dtm_vendor_bag*
-__locate_vendor(struct hstr* vendor)
+struct figura
 {
-    return locate_entry(struct dtm_vendor_bag, registry, *vendor, vendor);
-}
+    char val;
+    bool optional;
+};
 
-static struct dtm_model_entry*
-__locate_model(struct dtm_vendor_bag* bag, struct hstr* model)
+#define hash(def)   ((unsigned int)__ptr(def))
+
+static struct dtm_driver_record*
+__locate_record(struct device_def* def)
 {
-    return locate_entry(struct dtm_model_entry, bag->models, *model, model);
-}
+    struct dtm_driver_record *p, *n;
 
-static int split_by(const char* compat, char delim,
-                        char** part1, int* part1_len, 
-                        char** part2, int* part2_len)
-{
-    int pos = 0;
-    size_t len = strlen(compat);
-
-    while (pos < len && compat[pos++] != delim);
-    
-    *part1 = &compat[0];
-    *part1_len = pos;
-
-    if (pos == len) {
-        return 1;
-    }
-
-    *part2 = &compat[pos];
-    *part2_len = len - pos;
-
-    return 2;
-}
-
-bool
-dtm_register_entry(struct device_def* def, 
-                    const char* vendor, const char* model)
-{
-    struct hstr h_vendor, h_model;
-
-    struct dtm_vendor_bag* vendor_bag;
-    struct dtm_model_entry* model_ent;
-
-    h_model  = HSTR(model, strlen(model));
-    hstr_rehash(&h_model, HSTR_FULL_HASH);
-
-    if (vendor) {
-        h_vendor = HSTR(vendor, strlen(vendor));
-        hstr_rehash(&h_vendor, HSTR_FULL_HASH);
-
-        vendor_bag = __locate_vendor(vendor);
-        if (!vendor_bag) {
-            vendor_bag = valloc(sizeof(*vendor_bag));
-            vendor_bag->vendor = h_vendor;
-            hashtable_init(vendor_bag->models);
-
-            hashtable_hash_in(registry, 
-                            &vendor_bag->peers, HSTR_HASH(h_vendor));
-        }
-    }
-    else {
-        vendor_bag = &generic_drvs;
-    }
-
-    model_ent = __locate_model(vendor_bag, &h_model);
-    if (model_ent) {
-        WARN("device: %s,%s already registered, ignored.", vendor, model);
-        return false;
-    }
-
-    model_ent = valloc(sizeof(*model_ent));
-    model_ent->model = h_model;
-    model_ent->devdef = def;
-
-    hashtable_hash_in(vendor_bag->models, 
-                      &model_ent->peers, HSTR_HASH(h_model));
-
-    return true;
-}
-
-static struct device_def*
-__try_get_devdef(const char* compat)
-{
-    int parts;
-    char *vendor, *model;
-    size_t vendor_len, model_len;
-    struct dtm_vendor_bag* vendor_bag;
-
-    struct hstr h_vendor, h_model;
-
-    parts = split_by(compat, ',',
-                    &vendor, &vendor_len, &model, &model_len);
-        
-    if (parts == 1) {
-        h_model = HSTR(vendor, vendor_len);
-        vendor_bag = &generic_drvs;
-    }
-    else {
-        h_vendor = HSTR(vendor, vendor_len);
-        h_model  = HSTR(model, model_len);
-        hstr_rehash(&h_vendor, HSTR_FULL_HASH);
-
-        vendor_bag = __locate_vendor(&h_vendor);
-
-        if (!vendor_bag) {
-            return NULL;
-        } 
-    }
-
-    hstr_rehash(&h_model, HSTR_FULL_HASH);
-
-    return __locate_model(vendor_bag, &h_model);
-}
-
-struct device_meta*
-dtm_try_create(struct dt_node* node)
-{
-    const char* compat;
-    struct device_def* devdef;
-    struct device *dev;
-    struct device_meta *parent_dev;
-    struct dt_node_base* base;
-
-    base = &node->base;
-    parent_dev = dev_meta((struct device*)dt_parent(node)->binded_dev);
-    parent_dev = parent_dev ? : dt_category;
-
-    if (!base->compat.size) {
-        struct device_cat* devcat;
-        devcat = device_addcat(parent_dev, base->name);
-        base->binded_dev = devcat;
-
-        return dev_meta(devcat);
-    }
-
-    dtprop_strlst_foreach(compat, &base->compat)
+    hashtable_hash_foreach(registry, hash(def), p, n, node)
     {
-        devdef = __try_get_devdef(compat);
-
-        if (devdef) {
-            goto found;
+        if (p->def == def) {
+            return p;
         }
     }
 
     return NULL;
+}
 
-found:
-    dev = vzalloc(sizeof(*dev));
-    
-    dev = device_allocsys(parent_dev, NULL);
-    dev->devtree_node = node;
-    
-    int err;
-    if ((err = devdef->create(devdef, dev))) {
-        WARN("failed to bind devtree node %s, err=%d", base->name, err);
-        device_remove(dev);
-        return NULL;
+
+static inline void
+__get_patternlet(const char* str, unsigned i, size_t len, 
+                 struct figura* fig)
+{
+    fig->optional = (i + 1 < len && str[i + 1] == '?');
+
+    if (i >= len) {
+        fig->val = 0;
+        return;
     }
 
-    register_device(dev, &devdef->class, base->name);
+    fig->val = str[i];
+}
 
-    return dev;
+static bool
+__try_match(const char* str, const char* pattern, size_t pat_sz)
+{
+    unsigned j = 0, i = 0;
+    int saved_star = -1, saved_pos = 0;
+    size_t str_sz = strlen(str);
+
+    char c;
+    struct figura p0, p1;
+
+    while (i < str_sz) {
+        c = str[i++];
+        __get_patternlet(pattern, j, pat_sz, &p0);
+        __get_patternlet(pattern, j + 1, pat_sz, &p1);
+
+        if (p0.val == c) {
+            j += 1 + !!p0.optional;
+            saved_pos = (int)i;
+            continue;
+        }
+
+        if (p0.val == '*') {
+            saved_pos = i;
+            saved_star = (int)j;
+
+            if (p1.optional || p1.val == c) {
+                ++j; --i;
+            }
+
+            continue;
+        }
+
+        if (p0.optional) {
+            --i; j += 2;
+            continue;
+        }
+
+        if (saved_star < 0) {
+            return false;
+        }
+
+        j = (unsigned)saved_star;
+        i = (unsigned)saved_pos;
+    }
+    
+    return j + 1 >= pat_sz;
+}
+
+static struct device_meta*
+__try_create_categorical(struct dt_node_base *p)
+{
+    if (!p) return NULL;
+
+    struct device_meta* parent = NULL;
+    struct device_cat* cat;
+
+    parent = __try_create_categorical(p->parent);
+    parent = parent ?: dev_meta(dt_category);
+
+    if (!p->compat.size) {
+        return parent;
+    }
+
+    cat = device_addcat(parent, HSTR_VAL(dt_mobj(p)->name));
+    p->binded_dev = dev_mobj(cat);
+
+    return dev_meta(cat);
+}
+
+static bool
+compat_matched(struct dtm_driver_record* rec, struct dt_node_base *base)
+{
+    const char *compat;
+    struct dtm_driver_info *p, *n;
+
+    list_for_each(p, n, rec->infos.first, node)
+    {
+        size_t pat_len = strlen(p->pattern);
+        dtprop_strlst_foreach(compat, &base->compat)
+        {
+            if (__try_match(compat, p->pattern, pat_len)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+static int
+dtm_try_create_from(struct device_def* def)
+{
+    int err;
+    const char *name;
+    struct dt_context* dtctx;
+    struct dtm_driver_record* rec;
+    struct dt_node_base *p, *n;
+    
+    dtctx = dt_main_context();
+
+    rec = __locate_record(def);
+    if (!rec) {
+        return ENOENT;
+    }
+
+    llist_for_each(p, n, &dtctx->nodes, nodes)
+    {
+        if (!p->compat.size) {
+            continue;
+        }
+
+        if (!compat_matched(rec, p)) {
+            continue;
+        }
+
+        __try_create_categorical(p);
+
+        if ((err = def->create(def, dt_mobj(p)))) {
+            name = HSTR_VAL(dt_mobj(p)->name);
+            WARN("failed to bind devtree node %s, err=%d", name, err);
+        }
+    }
+
+    return 0;
+}
+
+void
+dtm_register_entry(struct device_def* def, const char* pattern)
+{
+    struct dtm_driver_info* info;
+    struct dtm_driver_record* record;
+    
+    info = valloc(sizeof(*info));
+    info->pattern = pattern;
+
+    record = __locate_record(def);
+    if (!record) {
+        record = valloc(sizeof(*record));
+        record->def = def;
+        list_head_init(&record->infos);
+
+        hashtable_hash_in(registry, &record->node, hash(def));
+    }
+
+    list_add(&record->infos, &info->node);
+
+    device_chain_loader(def, dtm_try_create_from);
 }
 
 static void
 dtm_init()
 {
-    generic_drvs = (struct dtm_vendor_bag) { };
-
     hashtable_init(registry);
-    hashtable_init(generic_drvs.models);
 
     dt_category = device_addcat(NULL, "tree");
 }
