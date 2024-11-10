@@ -14,7 +14,8 @@ W := -Wall -Wextra -Werror \
 		-Wno-discarded-qualifiers\
 		-Werror=incompatible-pointer-types
 
-OFLAGS := -fno-omit-frame-pointer
+OFLAGS := -fno-omit-frame-pointer	\
+	      -finline-small-functions
 
 CFLAGS := -std=gnu99 $(OFLAGS) $(W) -g
 

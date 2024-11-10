@@ -13,7 +13,7 @@ DECLARE_HASHTABLE(gfxa_idset, 8);
 struct device_cat* gfxa_devcat = NULL;
 static int id = 0;
 
-static struct devclass gfxa_class = DEVCLASS(NON, DISP, GFXA);
+static struct devclass gfxa_class = DEVCLASS(GENERIC, DISP, GFXA);
 
 static int
 __gfxa_cmd_router(struct device* dev, u32_t req, va_list args)

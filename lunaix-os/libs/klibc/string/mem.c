@@ -1,7 +1,7 @@
 #include <klibc/string.h>
 #include <lunaix/types.h>
 
-void* weak
+void* _weak
 memcpy(void* dest, const void* src, unsigned long num)
 {
     for (size_t i = 0; i < num; i++) {
@@ -11,7 +11,7 @@ memcpy(void* dest, const void* src, unsigned long num)
     return dest;
 }
 
-void* weak
+void* _weak
 memmove(void* dest, const void* src, unsigned long num)
 {
     u8_t* dest_ptr = (u8_t*)dest;
@@ -28,7 +28,7 @@ memmove(void* dest, const void* src, unsigned long num)
     return dest;
 }
 
-void* weak
+void* _weak
 memset(void* ptr, int value, unsigned long num)
 {
     for (size_t i = 0; i < num; i++) {
@@ -38,7 +38,7 @@ memset(void* ptr, int value, unsigned long num)
     return ptr;
 }
 
-int weak
+int _weak
 memcmp(const void* ptr1, const void* ptr2, unsigned long num)
 {
     u8_t* p1 = (u8_t*)ptr1;

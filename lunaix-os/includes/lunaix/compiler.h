@@ -7,14 +7,14 @@
 #define __section(name)         __attribute__((section(name)))
 #define weak_alias(name)        __attribute__((weak, alias(name)))
 #define optimize(opt)           __attribute__((optimize(opt)))
-#define weak                    __attribute__((weak))
+#define _weak                    __attribute__((weak))
 #define noret                   __attribute__((noreturn))
 #define must_inline             __attribute__((always_inline))
 #define must_emit               __attribute__((used))
 #define unreachable             __builtin_unreachable()
 #define no_inline               __attribute__((noinline))
 
-#define _default                weak
+#define _default                _weak
 
 #define msbiti                  (sizeof(int) * 8 - 1)
 #define clz(bits)               __builtin_clz(bits)

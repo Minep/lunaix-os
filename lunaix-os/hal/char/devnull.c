@@ -45,7 +45,7 @@ pdev_nulldev_create(struct device_def* def, morph_t* obj)
 
 static struct device_def devnull_def = {
     def_device_name("edendi"),
-    def_device_class(NON, PSEUDO, NIHIL),
+    def_device_class(LUNAIX, PSEUDO, NIHIL),
     def_on_create(pdev_nulldev_create)
 };
 EXPORT_DEVICE(nulldev, &devnull_def, load_onboot);

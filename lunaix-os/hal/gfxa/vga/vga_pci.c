@@ -115,7 +115,7 @@ vga_pci_register(struct device_def* def)
 }
 
 static struct device_def vga_pci_devdef = {
-    def_device_class(PCI, DISP, VGA),
+    def_device_class(GENERIC, DISP, VGA),
     def_device_name("Generic VGA"),
     
     def_on_register(vga_pci_register),

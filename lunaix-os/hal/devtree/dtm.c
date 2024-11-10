@@ -113,8 +113,13 @@ __try_create_categorical(struct dt_node_base *p)
         return parent;
     }
 
-    cat = device_addcat(parent, HSTR_VAL(dt_mobj(p)->name));
-    p->binded_dev = dev_mobj(cat);
+    if (p->binded_dev) {
+        cat = changeling_reveal(p->binded_dev, devcat_morpher);
+    }
+    else {
+        cat = device_addcat(parent, HSTR_VAL(dt_mobj(p)->name));
+        p->binded_dev = dev_mobj(cat);
+    }
 
     return dev_meta(cat);
 }

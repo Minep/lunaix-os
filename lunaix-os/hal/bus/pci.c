@@ -559,7 +559,7 @@ pci_create(struct device_def* def, morph_t* obj)
 
 static struct device_def pci_def = {
     def_device_name("Generic PCI"),
-    def_device_class(SOC, BUSIF, PCI),
+    def_device_class(GENERIC, BUSIF, PCI),
 
     def_on_register(pci_register),
     def_on_create(pci_create)

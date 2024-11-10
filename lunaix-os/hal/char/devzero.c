@@ -31,7 +31,7 @@ pdev_zerodev_create(struct device_def* def, morph_t* obj)
 
 static struct device_def devzero_def = {
     def_device_name("nihil"),
-    def_device_class(NON, PSEUDO, ZERO),
+    def_device_class(LUNAIX, PSEUDO, ZERO),
     def_on_create(pdev_zerodev_create)
 };
 EXPORT_DEVICE(zerodev, &devzero_def, load_onboot);

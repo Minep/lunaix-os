@@ -4,5 +4,5 @@ sources([
     "devdb.c",
     "devfs.c",
     "input.c",
-    "poll.c"
+    "poll.c",
 ])

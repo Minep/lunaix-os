@@ -307,7 +307,7 @@ lxconsole_spawn_ttydev(struct device_def* devdef)
 
 static struct device_def lxconsole_def = {
     def_device_name("Lunaix Virtual Console"),
-    def_device_class(NON, TTY, BUILTIN),
+    def_device_class(LUNAIX, TTY, VTERM),
     def_on_load(lxconsole_spawn_ttydev)
 };
 EXPORT_DEVICE(lxconsole, &lxconsole_def, load_onboot);

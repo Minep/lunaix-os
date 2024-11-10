@@ -79,7 +79,7 @@ __hwrtc_read(struct device* dev, void* buf, size_t offset, size_t len)
     return sizeof(ticks_t);
 }
 
-static struct devclass proxy_rtc_clas = DEVCLASS(NON, TIME, RTC);
+static struct devclass proxy_rtc_clas = DEVCLASS(LUNAIX, TIME, RTC);
 
 static void
 __hwrtc_create_proxy(struct hwrtc_potens* pot, struct device* raw_rtcdev)

@@ -130,7 +130,7 @@ __apic_timer_load(struct device_def* def)
 
 static struct device_def x86_apic_timer = 
 {
-    def_device_class(SOC, TIME, TIMER_APIC),
+    def_device_class(INTEL, TIME, TIMER_APIC),
     def_device_name("Intel APIC Timer"),
     
     def_on_load(__apic_timer_load)

@@ -15,7 +15,7 @@ LOG_MODULE("term");
 
 #define LCNTL_TABLE_LEN (sizeof(line_controls) / sizeof(struct term_lcntl*))
 
-static struct devclass termdev_class = DEVCLASS(NON, TTY, VTERM);
+static struct devclass termdev_class = DEVCLASS(LUNAIX, TTY, VTERM);
 
 struct device* sysconsole = NULL;
 

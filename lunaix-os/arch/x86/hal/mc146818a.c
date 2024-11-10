@@ -216,7 +216,7 @@ rtc_load(struct device_def* devdef)
 }
 
 static struct device_def devrtc_mc146818 = {
-    def_device_class(SOC, TIME, RTC_86LEGACY),
+    def_device_class(INTEL, TIME, RTC),
     def_device_name("x86 legacy RTC"),
     def_on_load(rtc_load)
 };

@@ -232,7 +232,7 @@ __intc_create(struct device_def* devdef, morph_t* obj)
 
 
 static struct device_def i386_intc = {
-    def_device_class(SOC, CFG, INTC),
+    def_device_class(INTEL, CFG, INTC),
     def_device_name("i386 apic"),
     def_on_create(__intc_create)
 };

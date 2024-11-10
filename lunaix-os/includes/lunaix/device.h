@@ -68,10 +68,10 @@
  * @brief Declare a device class
  *
  */
-#define DEVCLASS(devif, devfn, dev)                                            \
+#define DEVCLASS(vendor, devfn, dev)                                           \
     (struct devclass)                                                          \
     {                                                                          \
-        .fn_grp = DEV_FNGRP(dev_if(devif), dev_fn(devfn)),                     \
+        .fn_grp = DEV_FNGRP(dev_vn(vendor), dev_fn(devfn)),                    \
         .device = dev_id(dev), .variant = 0                                    \
     }
 
@@ -461,5 +461,43 @@ device_locked(struct device* dev)
 }
 
 #define devprintf_expand(devident) (devident)->fn_grp, (devident)->unique
+
+
+/**
+ * 
+ * Device def hooks extern
+ * 
+ */
+
+static int
+default_onregister_hook(struct device_def* def)
+{
+    return 0;
+}
+
+static int
+default_onload_hook(struct device_def* def)
+{
+    return 0;
+}
+
+static int
+default_oncreate_hook(struct device_def* def, morph_t* morphed)
+{
+    return 0;
+}
+
+#define extern_hook_register(name)  \
+            int weak_alias("default_onregister_hook") \
+                name(struct device_def* def)
+
+#define extern_hook_load(name)  \
+            int weak_alias("default_onload_hook") \
+                name(struct device_def* def)
+
+#define extern_hook_create(name)  \
+            int weak_alias("default_oncreate_hook") \
+                name(struct device_def* def, morph_t* morphed)
+
 
 #endif /* __LUNAIX_DEVICE_H */

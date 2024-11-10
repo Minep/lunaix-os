@@ -58,24 +58,24 @@
 
 */
 
-#define DEV_FNGRP(if_, function)                                               \
-    (((if_) & 0xffff) << 16) | ((function) & 0xffff)
+#define DEV_FNGRP(vendor, function)                                            \
+    (((vendor) & 0xffff) << 16) | ((function) & 0xffff)
 #define DEV_UNIQUE(devkind, variant)                                           \
     (((devkind) & 0xffff) << 16) | ((variant) & 0xffff)
 #define DEV_KIND_FROM(unique) ((unique) >> 16)
 #define DEV_VAR_FROM(unique) ((unique) & 0xffff)
 
-#define DEV_IF(fngrp) ((fngrp) >> 16)
+#define DEV_VN(fngrp) ((fngrp) >> 16)
 #define DEV_FN(fngrp) (((fngrp) & 0xffff))
 
-#define dev_if(x)      DEVIF_##x
+#define dev_vn(x)      DEVVN_##x
 #define dev_fn(x)      DEVFN_##x
 #define dev_id(x)        DEV_##x
 
-enum devnum_if
+enum devnum_vn
 {
-    dev_if(NON),
-    #include <listings/devnum_if.lst>
+    dev_vn(GENERIC),
+    #include <listings/devnum_vn.lst>
 };
 
 enum devnum_fn

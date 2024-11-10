@@ -63,7 +63,7 @@ ahci_pci_register(struct device_def* def)
 
 static struct device_def ahcidef = 
 {
-    def_device_class(PCI, STORAGE, SATA),
+    def_device_class(GENERIC, STORAGE, SATA),
     def_device_name("Generic AHCI (pci-bus)"),
 
     def_on_register(ahci_pci_register),

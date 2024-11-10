@@ -69,7 +69,7 @@ pdev_randdev_create(struct device_def* devdef, morph_t* obj)
 }
 
 static struct device_def devrandx86_def = {
-    def_device_class(SOC, CHAR, RNG),
+    def_device_class(INTEL, CHAR, RNG),
     def_device_name("x86 On-Chip RNG"),
     def_on_create(pdev_randdev_create)
 };

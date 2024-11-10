@@ -13,6 +13,7 @@ LOG_MODULE("16x50-pci")
 
 static DEFINE_LLIST(pci_ports);
 
+
 static void
 uart_msi_irq_handler(const struct hart_state* hstate)
 {
@@ -34,7 +35,7 @@ uart_intx_irq_handler(const struct hart_state* hstate)
 }
 
 static bool
-pci16650_check_compat(struct pci_probe* probe)
+pci16x50_check_compat(struct pci_probe* probe)
 {
     unsigned int classid;
     classid = pci_device_class(probe);
@@ -42,14 +43,14 @@ pci16650_check_compat(struct pci_probe* probe)
     return (classid & 0xffff00) == PCI_DEVICE_16x50_UART;
 }
 
-static int
-pci16550_register(struct device_def* def)
+int
+pci16x50_pci_register(struct device_def* def)
 {
-    return !pci_register_driver(def, pci16650_check_compat);
+    return !pci_register_driver(def, pci16x50_check_compat);
 }
 
-static int
-pci16650_create(struct device_def* def, morph_t* obj)
+int
+pci16x50_pci_create(struct device_def* def, morph_t* obj)
 {
     struct pci_base_addr* bar;
     struct pci_probe* probe;
@@ -117,14 +118,3 @@ pci16650_create(struct device_def* def, morph_t* obj)
 
     return 0;
 }
-
-static struct device_def uart_pci_def = {
-    def_device_class(PCI, CHAR, UART16550),
-    def_device_name("16550 UART (PCI/MMIO)"),
-    
-    def_on_register(pci16550_register),
-    def_on_create(pci16650_create),
-
-    def_non_trivial
-};
-EXPORT_DEVICE(uart16550_pci, &uart_pci_def, load_onboot);

@@ -55,7 +55,7 @@ device_scan_drivers()
         }
 
         hashtable_hash_in(dev_registry, &devdef->hlist, hash);
-        hashtable_hash_in(dev_byif, &devdef->hlist_if, DEV_IF(devc->fn_grp));
+        hashtable_hash_in(dev_byif, &devdef->hlist_if, DEV_VN(devc->fn_grp));
 
         llist_append(&dev_registry_flat, &devdef->dev_list);
     }
@@ -149,7 +149,7 @@ __devdb_twifs_lsdb(struct twimap* mapping)
     struct device_def* def = twimap_index(mapping, struct device_def*);
 
     int meta = def->class.fn_grp;
-    ksnprintf(flags, 64, "if=%x,fn=%x", DEV_IF(meta), DEV_FN(meta));
+    ksnprintf(flags, 64, "vn=%x, fn=%x", DEV_VN(meta), DEV_FN(meta));
 
     twimap_printf(mapping,
                   "%08xh:%04d \"%s\" %s\n",

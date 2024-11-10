@@ -569,7 +569,7 @@ ps2_issue_dev_cmd(char cmd, u16_t arg)
 }
 
 static struct device_def devrtc_i8042kbd = {
-    def_device_class(SOC, INPUT, KBD),
+    def_device_class(INTEL, INPUT, KBD),
     def_device_name("i8042 Keyboard"),
     def_on_create(ps2_kbd_create)
 };
