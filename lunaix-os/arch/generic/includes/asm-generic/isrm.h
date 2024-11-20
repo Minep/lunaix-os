@@ -42,22 +42,6 @@ void
 isrm_ivfree(int iv);
 
 /**
- * @brief Allocate an iv resource for os services
- *
- * @param iv
- */
-int
-isrm_ivosalloc(isr_cb handler);
-
-/**
- * @brief Allocate an iv resource for external events
- *
- * @param iv
- */
-int
-isrm_ivexalloc(isr_cb handler);
-
-/**
  * @brief Begin MSI allocation for given device
  *
  * @param iv
@@ -110,7 +94,7 @@ isrm_msi_alloc_simple(struct device* dev, cpu_t cpu, isr_cb handler)
  * @param node
  */
 int
-isrm_bind_dtnode(struct dt_intr_node* node);
+isrm_bind_dtn(struct dt_intr_node* node);
 
 /**
  * @brief Get the handler associated with the given iv

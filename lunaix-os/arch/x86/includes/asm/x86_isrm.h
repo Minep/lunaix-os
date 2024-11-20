@@ -23,5 +23,20 @@ isrm_bindiv(int iv, isr_cb handler);
 void
 isrm_irq_attach(int irq, int iv, cpu_t dest, u32_t flags);
 
+/**
+ * @brief Allocate an iv resource for os services
+ *
+ * @param iv
+ */
+int
+isrm_ivosalloc(isr_cb handler);
+
+/**
+ * @brief Allocate an iv resource for external events
+ *
+ * @param iv
+ */
+int
+isrm_ivexalloc(isr_cb handler);
 
 #endif /* __LUNAIX_X86_ISRM_H */

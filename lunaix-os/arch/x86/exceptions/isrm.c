@@ -211,7 +211,7 @@ isrm_msi_done(msienv_t msienv)
 
 
 int
-isrm_bind_dtnode(struct dt_intr_node* node)
+isrm_bind_dtn(struct dt_intr_node* node)
 {
     fail("not supported");
 }
