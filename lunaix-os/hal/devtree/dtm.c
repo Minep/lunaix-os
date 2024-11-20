@@ -50,6 +50,11 @@ __get_patternlet(const char* str, unsigned i, size_t len,
     fig->val = str[i];
 }
 
+/**
+ * A simplified regular expression matcher:
+ *      1. '*' matches any substring including empty string
+ *      2. '?' mark the prefixed character optional (an epsilon transition)
+ */
 static bool
 __try_match(const char* str, const char* pattern, size_t pat_sz)
 {
