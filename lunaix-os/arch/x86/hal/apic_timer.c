@@ -9,72 +9,45 @@
 #include <asm/x86_isrm.h>
 #include "asm/soc/apic.h"
 
-LOG_MODULE("APIC_TIMER")
+LOG_MODULE("timer(apic)")
 
 #define LVT_ENTRY_TIMER(vector, mode) (LVT_DELIVERY_FIXED | mode | vector)
 #define APIC_BASETICKS 0x100000
 
-// Don't optimize them! Took me an half hour to figure that out...
-
-static volatile u8_t apic_timer_done = 0;
-static volatile ticks_t base_freq = 0;
-static volatile ticks_t systicks = 0;
-
-static timer_tick_cb tick_cb = NULL;
-
 static void
 temp_intr_routine_apic_timer(const struct hart_state* state)
 {
-    apic_timer_done = 1;
+    struct hwtimer_pot* pot;
+
+    pot = (struct hwtimer_pot*)isrm_get_payload(state);
+    pot->systick_raw = (ticks_t)-1;
 }
 
 static void
 apic_timer_tick_isr(const struct hart_state* state)
 {
-    systicks++;
+    struct hwtimer_pot* pot;
 
-    if (likely((ptr_t)tick_cb)) {
-        tick_cb();
+    pot = (struct hwtimer_pot*)isrm_get_payload(state);
+    pot->systick_raw++;
+
+    if (likely(__ptr(pot->callback))) {
+        pot->callback();
     }
 }
 
-static int
-apic_timer_check(struct hwtimer* hwt)
+static void
+__apic_timer_calibrate(struct hwtimer_pot* pot, u32_t hertz)
 {
-    // TODO check whether apic timer is supported
-    return 1;
-}
-
-static ticks_t
-apic_get_systicks()
-{
-    return systicks;
-}
-
-static ticks_t
-apic_get_base_freq()
-{
-    return base_freq;
-}
-
-void
-apic_timer_init(struct hwtimer* timer, u32_t hertz, timer_tick_cb timer_cb)
-{
-    ticks_t frequency = hertz;
-    tick_cb = timer_cb;
+    ticks_t base_freq = 0;
 
     cpu_disable_interrupt();
 
     // Setup APIC timer
 
-    // Remap the IRQ 8 (rtc timer's vector) to RTC_TIMER_IV in ioapic
-    //       (Remarks IRQ 8 is pin INTIN8)
-    //       See IBM PC/AT Technical Reference 1-10 for old RTC IRQ
-    //       See Intel's Multiprocessor Specification for IRQ - IOAPIC INTIN
-    //       mapping config.
-
     // grab ourselves these irq numbers
     u32_t iv_timer = isrm_ivexalloc(temp_intr_routine_apic_timer);
+    isrm_set_payload(iv_timer, __ptr(pot));
 
     // Setup a one-shot timer, we will use this to measure the bus speed. So we
     // can then calibrate apic timer to work at *nearly* accurate hz
@@ -107,55 +80,59 @@ apic_timer_init(struct hwtimer* timer, u32_t hertz, timer_tick_cb timer_cb)
 
     */
 
-#ifdef __LUNAIXOS_DEBUG__
-    if (frequency < 1000) {
-        WARN("Frequency too low. Millisecond timer might be dodgy.");
-    }
-#endif
-
-    apic_timer_done = 0;
-
-    sysrtc->cls_mask(sysrtc);
+    sysrtc->ops->set_proactive(sysrtc, true);
     apic_write_reg(APIC_TIMER_ICR, APIC_BASETICKS); // start APIC timer
 
-    // enable interrupt, just for our RTC start ticking!
+    pot->systick_raw = 0;
     cpu_enable_interrupt();
 
-    wait_until(apic_timer_done);
+    wait_until(!(pot->systick_raw + 1));
 
     cpu_disable_interrupt();
-
-    sysrtc->set_mask(sysrtc);
-
-    base_freq = sysrtc->get_counts(sysrtc);
-    base_freq = APIC_BASETICKS / base_freq * sysrtc->base_freq;
-
-    assert_msg(base_freq, "Fail to initialize timer (NOFREQ)");
-
-    kprintf("hw: %u Hz; os: %u Hz", base_freq, frequency);
-
-    // cleanup
     isrm_ivfree(iv_timer);
 
-    ticks_t tphz = base_freq / frequency;
-    timer->base_freq = base_freq;
-    apic_write_reg(APIC_TIMER_ICR, tphz);
+    sysrtc->ops->set_proactive(sysrtc, false);
+    
+    base_freq = sysrtc->live;
+    base_freq = APIC_BASETICKS / base_freq * sysrtc->base_freq;
+    pot->base_freq = base_freq;
+    pot->systick_raw = 0;
 
+    assert_msg(base_freq, "Fail to initialize timer (NOFREQ)");
+    INFO("hw: %u Hz; os: %u Hz", base_freq, hertz);
+
+    apic_write_reg(APIC_TIMER_ICR, base_freq / hertz);
+    
+    iv_timer = isrm_ivexalloc(apic_timer_tick_isr);
+    isrm_set_payload(iv_timer, __ptr(pot));
+    
     apic_write_reg(
-      APIC_TIMER_LVT,
-      LVT_ENTRY_TIMER(isrm_ivexalloc(apic_timer_tick_isr), LVT_TIMER_PERIODIC));
+        APIC_TIMER_LVT,
+        LVT_ENTRY_TIMER(iv_timer, LVT_TIMER_PERIODIC));
 }
 
-struct hwtimer*
-apic_hwtimer_context()
+static struct hwtimer_pot_ops potops = {
+    .calibrate = __apic_timer_calibrate,
+};
+
+static int
+__apic_timer_load(struct device_def* def)
 {
-    static struct hwtimer apic_hwt = {
-        .name = "apic_timer",
-        .class = DEVCLASSV(DEVIF_SOC, DEVFN_TIME, DEV_TIMER, DEV_TIMER_APIC),
-        .init = apic_timer_init,
-        .supported = apic_timer_check,
-        .systicks = apic_get_systicks
-    };
+    struct device* timer;
 
-    return &apic_hwt;
+    timer = device_allocsys(NULL, NULL);
+
+    hwtimer_attach_potens(timer, HWTIMER_MAX_PRECEDENCE, &potops);
+    register_device_var(timer, &def->class, "apic-timer");
+    return 0;
 }
+
+
+static struct device_def x86_apic_timer = 
+{
+    def_device_class(INTEL, TIME, TIMER_APIC),
+    def_device_name("Intel APIC Timer"),
+    
+    def_on_load(__apic_timer_load)
+};
+EXPORT_DEVICE(apic_timer, &x86_apic_timer, load_sysconf);

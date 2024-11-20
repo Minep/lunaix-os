@@ -58,57 +58,37 @@
 
 */
 
-#define DEV_FNGRP(if_, function)                                               \
-    (((if_) & 0xffff) << 16) | ((function) & 0xffff)
+#define DEV_FNGRP(vendor, function)                                            \
+    (((vendor) & 0xffff) << 16) | ((function) & 0xffff)
 #define DEV_UNIQUE(devkind, variant)                                           \
     (((devkind) & 0xffff) << 16) | ((variant) & 0xffff)
 #define DEV_KIND_FROM(unique) ((unique) >> 16)
 #define DEV_VAR_FROM(unique) ((unique) & 0xffff)
 
-#define DEV_IF(fngrp) ((fngrp) >> 16)
+#define DEV_VN(fngrp) ((fngrp) >> 16)
 #define DEV_FN(fngrp) (((fngrp) & 0xffff))
 
-#define DEVIF_NON 0x0
-#define DEVIF_SOC 0x1
-#define DEVIF_PCI 0x2
-#define DEVIF_USB 0x3
-#define DEVIF_SPI 0x4
-#define DEVIF_I2C 0x5
-#define DEVIF_FMW 0x6
+#define dev_vn(x)      DEVVN_##x
+#define dev_fn(x)      DEVFN_##x
+#define dev_id(x)        DEV_##x
 
-#define DEVFN_PSEUDO 0x0
-#define DEVFN_CHAR 0x1
-#define DEVFN_STORAGE 0x4
-#define DEVFN_INPUT 0x5
-#define DEVFN_TIME 0x6
-#define DEVFN_BUSIF 0x7
-#define DEVFN_TTY 0x8
-#define DEVFN_DISP 0x9
-#define DEVFN_CFG 0xa
+enum devnum_vn
+{
+    dev_vn(GENERIC),
+    #include <listings/devnum_vn.lst>
+};
 
-#define DEV_BUILTIN 0
-#define DEV_BUILTIN_NULL 0
-#define DEV_BUILTIN_ZERO 1
-#define DEV_BUILTIN_KMSG 2
+enum devnum_fn
+{
+    dev_fn(NON),
+    #include <listings/devnum_fn.lst>
+};
 
-#define DEV_VTERM 1
-#define DEV_RNG 2
-#define DEV_RTC 3
-#define DEV_SATA 4
-#define DEV_NVME 5
-#define DEV_PCI 6
-#define DEV_UART16550 7
-
-#define DEV_TIMER 8
-#define DEV_TIMER_APIC 0
-#define DEV_TIMER_HEPT 1
-
-#define DEV_NULL 9
-#define DEV_ZERO 10
-#define DEV_KBD 11
-#define DEV_GFXA 12
-#define DEV_VGA 13
-#define DEV_ACPI 14
+enum devnum
+{
+    dev_id(NON),
+    #include <listings/devnum.lst>
+};
 
 struct devident
 {
@@ -121,7 +101,12 @@ struct devclass
     u32_t fn_grp;
     u32_t device;
     u32_t variant;
-    u32_t hash;
 };
+
+static inline int
+devclass_mkvar(struct devclass* class)
+{
+    return class->variant++;
+}
 
 #endif /* __LUNAIX_DEVICE_NUM_H */

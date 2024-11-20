@@ -13,6 +13,7 @@
 
 #include <lunaix/types.h>
 #include <lunaix/hart_state.h>
+#include <lunaix/device.h>
 
 #include <hal/devtree.h>
 
@@ -27,6 +28,8 @@ typedef struct {
 #define msi_data(msiv)   ((msiv).msi_data)
 #define msi_vect(msiv)   ((msiv).mapped_iv)
 
+typedef void* msienv_t;
+
 void
 isrm_init();
 
@@ -39,28 +42,51 @@ void
 isrm_ivfree(int iv);
 
 /**
- * @brief Allocate an iv resource for os services
+ * @brief Begin MSI allocation for given device
  *
  * @param iv
  */
-int
-isrm_ivosalloc(isr_cb handler);
+msienv_t
+isrm_msi_start(struct device* dev);
 
 /**
- * @brief Allocate an iv resource for external events
- *
- * @param iv
+ * @brief Query number of msi avaliable for the device
  */
 int
-isrm_ivexalloc(isr_cb handler);
+isrm_msi_avaliable(msienv_t msienv);
 
 /**
- * @brief Allocate an iv resource for MSI use
- *
- * @param iv
+ * @brief Allocate a msi resource within defined msi resource list
+ *        for the device, indexed by `index`
  */
 msi_vector_t
-isrm_msialloc(isr_cb handler);
+isrm_msi_alloc(msienv_t msienv, cpu_t cpu, int index, isr_cb handler);
+
+/**
+ * @brief Set the sideband information will be used for upcoming
+ *        allocations
+ */
+void
+isrm_msi_set_sideband(msienv_t msienv, ptr_t sideband);
+
+/**
+ * @brief Done MSI allocation
+ */
+void
+isrm_msi_done(msienv_t msienv);
+
+static inline must_inline msi_vector_t
+isrm_msi_alloc_simple(struct device* dev, cpu_t cpu, isr_cb handler)
+{   
+    msi_vector_t v;
+    msienv_t env;
+
+    env = isrm_msi_start(dev);
+    v = isrm_msi_alloc(env, cpu, 0, handler);
+    isrm_msi_done(env);
+
+    return v;
+}
 
 /**
  * @brief Bind the iv according to given device tree node
@@ -68,7 +94,7 @@ isrm_msialloc(isr_cb handler);
  * @param node
  */
 int
-isrm_bind_dtnode(struct dt_intr_node* node);
+isrm_bind_dtn(struct dt_intr_node* node);
 
 /**
  * @brief Get the handler associated with the given iv

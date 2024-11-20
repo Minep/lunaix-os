@@ -3,26 +3,23 @@
 
 #include <hal/hwtimer.h>
 
-const struct hwtimer* systimer;
+const struct hwtimer_pot* systimer = NULL;
 
-ticks_t
-hwtimer_base_frequency()
-{
-    assert(systimer);
-    return systimer->base_freq;
-}
+static struct device_alias* timer_alias;
+static DEFINE_LLIST(timer_devices);
 
 ticks_t
 hwtimer_current_systicks()
 {
     assert(systimer);
-    return systimer->systicks();
+    return systimer->systick_raw;
 }
 
 ticks_t
 hwtimer_to_ticks(u32_t value, int unit)
 {
     assert(systimer);
+
     // in case system frequency is less than 1000Hz
     if (unit != TIME_MS) {
         return systimer->running_freq * unit * value;
@@ -33,34 +30,66 @@ hwtimer_to_ticks(u32_t value, int unit)
     return freq_ms * value;
 }
 
-static int
-__hwtimer_ioctl(struct device* dev, u32_t req, va_list args)
+static struct hwtimer_pot*
+__select_timer()
 {
-    struct hwtimer* hwt = (struct hwtimer*)dev->underlay;
-    switch (req) {
-        case TIMERIO_GETINFO:
-            // TODO
-            break;
+    struct hwtimer_pot *pos, *n, *sel = NULL;
 
-        default:
-            break;
+    llist_for_each(pos, n, &timer_devices, timers)
+    {
+        if (unlikely(!sel)) {
+            sel = pos;
+            continue;
+        }
+
+        if (sel->precedence < pos->precedence) {
+            sel = pos;
+        }
     }
-    return 0;
+
+    return sel;
 }
 
 void
 hwtimer_init(u32_t hertz, void* tick_callback)
 {
-    struct hwtimer* hwt_ctx = select_platform_timer();
+    struct hwtimer_pot* selected;
+    struct device* time_dev;
 
-    hwt_ctx->init(hwt_ctx, hertz, tick_callback);
-    hwt_ctx->running_freq = hertz;
+    selected = __select_timer();
 
-    systimer = hwt_ctx;
+    assert(selected);
+    systimer = selected;
 
-    struct device* timerdev = device_allocsys(NULL, hwt_ctx);
+    selected->callback = tick_callback;
+    selected->running_freq = hertz;
 
-    timerdev->ops.exec_cmd = __hwtimer_ioctl;
+    selected->ops->calibrate(selected, hertz);
 
-    register_device(timerdev, &hwt_ctx->class, hwt_ctx->name);
+    time_dev = potens_dev(selected);
+    timer_alias = device_addalias(NULL, dev_meta(time_dev), "timer");
+}
+
+
+struct hwtimer_pot*
+hwtimer_attach_potens(struct device* dev, int precedence, 
+                      struct hwtimer_pot_ops* ops)
+{
+    struct hwtimer_pot* hwpot;
+    struct potens_meta* pot;
+
+    if (!potens_check_unique(dev, potens(HWTIMER)))
+    {
+        return NULL;
+    }
+
+    hwpot = new_potens(potens(HWTIMER), struct hwtimer_pot);
+    hwpot->ops = ops;
+    hwpot->precedence = precedence;
+    
+    device_grant_potens(dev, potens_meta(hwpot));
+
+    llist_append(&timer_devices, &hwpot->timers);
+
+    return hwpot;
 }

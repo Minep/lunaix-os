@@ -17,8 +17,8 @@ com_irq_handler(const struct hart_state* hstate)
     uart_handle_irq_overlap(vector, &com_ports);
 }
 
-static int
-upiom_init(struct device_def* def)
+int
+isa16x50_create_once(struct device_def* def)
 {
     int irq3 = 3, irq4 = 4;
     u16_t ioports[] = { 0x3F8, 0x2F8, 0x3E8, 0x2E8 };
@@ -55,10 +55,3 @@ upiom_init(struct device_def* def)
 
     return 0;
 }
-
-static struct device_def uart_pmio_def = {
-    .class = DEVCLASS(DEVIF_SOC, DEVFN_CHAR, DEV_UART16550),
-    .name = "16550 UART (pmio, isa-bus)",
-    .init = upiom_init
-};
-EXPORT_DEVICE(uart16550_pmio, &uart_pmio_def, load_onboot);

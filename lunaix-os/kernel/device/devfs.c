@@ -65,17 +65,21 @@ devfs_write_page(struct v_inode* inode, void* buffer, size_t fpos)
 }
 
 int
-devfs_get_itype(struct device_meta* dm)
+devfs_get_itype(morph_t* obj)
 {
     int itype = VFS_IFDEV;
 
-    if (valid_device_subtype_ref(dm, DEV_CAT)) {
+    if (morph_type_of(obj, devcat_morpher)) {
         return VFS_IFDIR;
     }
 
-    struct device* dev = resolve_device(dm);
-    int dev_if = dev->dev_type & DEV_MSKIF;
+    struct device* dev = resolve_device(obj);
+
+    if (!dev) {
+        return itype;
+    }
     
+    int dev_if = dev->dev_type & DEV_MSKIF;
     if (dev_if == DEV_IFVOL) {
         itype |= VFS_IFVOLDEV;
     }
@@ -84,26 +88,38 @@ devfs_get_itype(struct device_meta* dm)
     return itype;
 }
 
-int
-devfs_get_dtype(struct device_meta* dev)
+static inline int
+devfs_get_dtype(morph_t* dev_morph)
 {
-    if (valid_device_subtype_ref(dev, DEV_CAT)) {
+    if (morph_type_of(dev_morph, devcat_morpher)) {
         return DT_DIR;
     }
     return DT_FILE;
 }
 
-int
-devfs_mknod(struct v_dnode* dnode, struct device_meta* dev)
+static inline morph_t*
+__try_resolve(struct v_inode* inode)
 {
-    assert(dev);
+    if (!inode->data) {
+        return dev_object_root;
+    }
 
-    struct v_inode* devnod = vfs_i_find(dnode->super_block, dev->dev_uid);
+    return resolve_device_morph(inode->data);
+}
+
+int
+devfs_mknod(struct v_dnode* dnode, morph_t* obj)
+{
+    struct v_inode* devnod;
+    
+    assert(obj);
+
+    devnod = vfs_i_find(dnode->super_block, morpher_uid(obj));
     if (!devnod) {
         if ((devnod = vfs_i_alloc(dnode->super_block))) {
-            devnod->id = dev->dev_uid;
-            devnod->data = dev;
-            devnod->itype = devfs_get_itype(dev);
+            devnod->id = morpher_uid(obj);
+            devnod->data = changeling_ref(obj);
+            devnod->itype = devfs_get_itype(obj);
 
             vfs_i_addhash(devnod);
         } else {
@@ -118,30 +134,28 @@ devfs_mknod(struct v_dnode* dnode, struct device_meta* dev)
 int
 devfs_dirlookup(struct v_inode* this, struct v_dnode* dnode)
 {
-    void* data = this->data;
-    struct device_meta* rootdev = resolve_device_meta(data);
+    morph_t *mobj, *root;
 
-    if (data && !rootdev) {
+    root = __try_resolve(this);
+    if (!root) {
         return ENOTDIR;
     }
 
-    struct device_meta* dev =
-      device_getbyhname(rootdev, &dnode->name);
-    
-    if (!dev) {
+    mobj = changeling_find(root, &dnode->name);
+    if (!mobj) {
         return ENOENT;
     }
 
-    return devfs_mknod(dnode, dev);
+    return devfs_mknod(dnode, mobj);
 }
 
 int
 devfs_readdir(struct v_file* file, struct dir_context* dctx)
 {
-    void* data = file->inode->data;
-    struct device_meta* rootdev = resolve_device_meta(data);
+    morph_t *mobj, *root;
 
-    if (data && !rootdev) {
+    root = __try_resolve(file->inode);
+    if (!root) {
         return ENOTDIR;
     }
 
@@ -149,15 +163,14 @@ devfs_readdir(struct v_file* file, struct dir_context* dctx)
         return 1;
     }
 
-    struct device_meta* dev =
-      device_getbyoffset(rootdev, file->f_pos - 2);
-    
-    if (!dev) {
+    mobj = changeling_get_at(root, file->f_pos - 2);
+    if (!mobj) {
         return 0;
     }
 
-    dctx->read_complete_callback(
-      dctx, dev->name.value, dev->name.len, devfs_get_dtype(dev));
+    dctx->read_complete_callback(dctx, 
+                                 mobj->name.value, mobj->name.len, 
+                                 devfs_get_dtype(mobj));
     return 1;
 }
 

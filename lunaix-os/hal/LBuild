@@ -8,4 +8,4 @@ use("timer")
 use("bus")
 
 if config("use_devicetree"):
-    sources("devtree.c")
+    use("devtree")

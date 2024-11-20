@@ -18,7 +18,7 @@ __zero_rd(struct device* dev, void* buf, size_t offset, size_t len)
 }
 
 static int
-pdev_zerodev_init(struct device_def* def)
+pdev_zerodev_create(struct device_def* def, morph_t* obj)
 {
     struct device* devzero = device_allocseq(NULL, NULL);
     devzero->ops.read_page = __zero_rd_pg;
@@ -30,7 +30,8 @@ pdev_zerodev_init(struct device_def* def)
 }
 
 static struct device_def devzero_def = {
-    .name = "zero",
-    .class = DEVCLASSV(DEVIF_NON, DEVFN_PSEUDO, DEV_ZERO, DEV_BUILTIN_ZERO),
-    .init = pdev_zerodev_init};
+    def_device_name("nihil"),
+    def_device_class(LUNAIX, PSEUDO, ZERO),
+    def_on_create(pdev_zerodev_create)
+};
 EXPORT_DEVICE(zerodev, &devzero_def, load_onboot);

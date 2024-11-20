@@ -55,7 +55,7 @@ static const unsigned int crc32_tab[] = {
  * @param size
  * @return unsigned int
  */
-unsigned int weak
+unsigned int _weak
 crc32b(unsigned char* data, unsigned int size)
 {
     unsigned int crc = (unsigned int)-1, i = 0;

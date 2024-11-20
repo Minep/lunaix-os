@@ -46,7 +46,7 @@ __interrupt_keysize(struct dt_node_base* base)
 static void
 __mask_key(struct dt_intr_mapkey* k, struct dt_intr_mapkey* mask)
 {
-    for (int i = 0; i < k->size; i++)
+    for (unsigned int i = 0; i < k->size; i++)
     {
         k->val[i] &= mask->val[i];
     }
@@ -59,7 +59,7 @@ __compare_key(struct dt_intr_mapkey* k1, struct dt_intr_mapkey* k2)
         return false;
     }
 
-    for (int i = 0; i < k1->size; i++)
+    for (unsigned int i = 0; i < k1->size; i++)
     {
         if (k1->val[i] != k2->val[i]) {
             return false;
@@ -173,11 +173,13 @@ dt_resolve_interrupt(struct dt_node* node)
     llist_for_each(pos, n, &i_nexus->map->mapent, ents) {
         if (__compare_key(&pos->key, &key))
         {
+            __destory_key(&key);
             return &pos->parent_props;
         }
     }
 
     __destory_key(&key);
+    return NULL;
 }
 
 bool

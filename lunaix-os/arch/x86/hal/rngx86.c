@@ -56,7 +56,7 @@ __rand_rd(struct device* dev, void* buf, size_t offset, size_t len)
 }
 
 int
-pdev_randdev_init(struct device_def* devdef)
+pdev_randdev_create(struct device_def* devdef, morph_t* obj)
 {
     // FIXME add check on cpuid for presence of rdrand
     struct device* devrand = device_allocseq(NULL, NULL);
@@ -69,7 +69,8 @@ pdev_randdev_init(struct device_def* devdef)
 }
 
 static struct device_def devrandx86_def = {
-    .name = "x86 On-Chip RNG",
-    .class = DEVCLASS(DEVIF_SOC, DEVFN_CHAR, DEV_RNG),
-    .init = pdev_randdev_init};
+    def_device_class(INTEL, CHAR, RNG),
+    def_device_name("x86 On-Chip RNG"),
+    def_on_create(pdev_randdev_create)
+};
 EXPORT_DEVICE(randdev, &devrandx86_def, load_onboot);

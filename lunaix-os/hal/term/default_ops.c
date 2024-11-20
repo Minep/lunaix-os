@@ -18,7 +18,7 @@ __tpcap_default_set_cntrl_mode(struct device* dev, tcflag_t cflag)
     
 }
 
-struct termport_cap_ops default_termport_cap_ops = {
+struct termport_pot_ops default_termport_pot_ops = {
     .set_cntrl_mode = __tpcap_default_set_cntrl_mode,
     .set_clkbase = __tpcap_default_set_baseclk,
     .set_speed = __tpcap_default_set_speed

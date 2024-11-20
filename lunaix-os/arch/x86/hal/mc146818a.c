@@ -24,8 +24,6 @@
 #define RTC_INDEX_PORT 0x70
 #define RTC_TARGET_PORT 0x71
 
-#define WITH_NMI_DISABLED 0x80
-
 #define RTC_CURRENT_CENTRY 20
 
 #define RTC_REG_YRS 0x9
@@ -58,35 +56,34 @@
 
 struct mc146818
 {
-    struct hwrtc* rtc_context;
+    struct hwrtc_potens* rtc_context;
     u32_t rtc_iv;
-    u32_t tick_counts;
 };
 
 #define rtc_state(data) ((struct mc146818*)(data))
 
-static u8_t
+static inline u8_t
 rtc_read_reg(u8_t reg_selector)
 {
     port_wrbyte(RTC_INDEX_PORT, reg_selector);
     return port_rdbyte(RTC_TARGET_PORT);
 }
 
-static void
+static inline void
 rtc_write_reg(u8_t reg_selector, u8_t val)
 {
     port_wrbyte(RTC_INDEX_PORT, reg_selector);
     port_wrbyte(RTC_TARGET_PORT, val);
 }
 
-static void
+static inline void
 rtc_enable_timer()
 {
     u8_t regB = rtc_read_reg(RTC_REG_B);
     rtc_write_reg(RTC_REG_B, regB | RTC_TIMER_ON);
 }
 
-static void
+static inline void
 rtc_disable_timer()
 {
     u8_t regB = rtc_read_reg(RTC_REG_B);
@@ -94,7 +91,7 @@ rtc_disable_timer()
 }
 
 static void
-rtc_getwalltime(struct hwrtc* rtc, datetime_t* datetime)
+rtc_getwalltime(struct hwrtc_potens* rtc, datetime_t* datetime)
 {
     datetime_t current;
 
@@ -116,7 +113,7 @@ rtc_getwalltime(struct hwrtc* rtc, datetime_t* datetime)
 }
 
 static void
-rtc_setwalltime(struct hwrtc* rtc, datetime_t* datetime)
+rtc_setwalltime(struct hwrtc_potens* rtc, datetime_t* datetime)
 {
     u8_t reg = rtc_read_reg(RTC_REG_B);
     reg = reg & ~RTC_SET;
@@ -134,59 +131,40 @@ rtc_setwalltime(struct hwrtc* rtc, datetime_t* datetime)
     rtc_write_reg(RTC_REG_B, reg & ~RTC_SET);
 }
 
-static int
-mc146818_check_support(struct hwrtc* rtc)
-{
-#if __ARCH__ == i386
-    return 1;
-#else
-    return 0;
-#endif
-}
-
 static void
 __rtc_tick(const struct hart_state* hstate)
 {
     struct mc146818* state = (struct mc146818*)isrm_get_payload(hstate);
 
-    state->tick_counts++;
+    state->rtc_context->live++;
 
     (void)rtc_read_reg(RTC_REG_C);
 }
 
 static void
-rtc_set_mask(struct hwrtc* rtc)
+rtc_set_proactive(struct hwrtc_potens* pot, bool proactive)
 {
-    rtc->state = RTC_STATE_MASKED;
-    rtc_disable_timer();
-}
-
-static void
-rtc_cls_mask(struct hwrtc* rtc)
-{
-    struct mc146818* state = rtc_state(rtc->data);
-
-    rtc->state = 0;
-    state->tick_counts = 0;
-    rtc_enable_timer();
+    if (proactive) {
+        pot->state = 0;
+        rtc_enable_timer();
+    }
+    else {
+        pot->state = RTC_STATE_MASKED;
+        rtc_disable_timer();
+    }
 }
 
 static int
-rtc_chfreq(struct hwrtc* rtc, int freq)
+rtc_chfreq(struct hwrtc_potens* rtc, int freq)
 {
     return ENOTSUP;
 }
 
 static int
-rtc_getcnt(struct hwrtc* rtc)
+__rtc_calibrate(struct hwrtc_potens* pot)
 {
-    struct mc146818* state = rtc_state(rtc->data);
-    return state->tick_counts;
-}
+    struct mc146818* state;
 
-static int
-rtc_init(struct device_def* devdef)
-{
     u8_t reg = rtc_read_reg(RTC_REG_A);
     reg = (reg & ~0x7f) | RTC_FREQUENCY_1024HZ | RTC_DIVIDER_33KHZ;
     rtc_write_reg(RTC_REG_A, reg);
@@ -197,31 +175,49 @@ rtc_init(struct device_def* devdef)
     // Make sure the rtc timer is disabled by default
     rtc_disable_timer();
 
-    struct hwrtc* rtc = hwrtc_alloc_new("mc146818");
-    struct mc146818* state = valloc(sizeof(struct mc146818));
+    pot->base_freq = RTC_TIMER_BASE_FREQUENCY;
 
-    state->rtc_context = rtc;
+    state = (struct mc146818*)potens_dev(pot)->underlay;
     state->rtc_iv = isrm_bindirq(PC_AT_IRQ_RTC, __rtc_tick);
-    isrm_set_payload(state->rtc_iv, (ptr_t)state);
+    isrm_set_payload(state->rtc_iv, __ptr(state));
 
-    rtc->state = RTC_STATE_MASKED;
-    rtc->data = state;
-    rtc->base_freq = RTC_TIMER_BASE_FREQUENCY;
-    rtc->get_walltime = rtc_getwalltime;
-    rtc->set_walltime = rtc_setwalltime;
-    rtc->set_mask = rtc_set_mask;
-    rtc->cls_mask = rtc_cls_mask;
-    rtc->get_counts = rtc_getcnt;
-    rtc->chfreq = rtc_chfreq;
+    return 0;
+}
 
-    hwrtc_register(&devdef->class, rtc);
+static struct hwrtc_potens_ops ops = {
+    .get_walltime  = rtc_getwalltime,
+    .set_walltime  = rtc_setwalltime,
+    .set_proactive = rtc_set_proactive,
+    .chfreq = rtc_chfreq,
+    .calibrate = __rtc_calibrate
+};
+
+static int
+rtc_load(struct device_def* devdef)
+{
+    struct device* dev;
+    struct mc146818* state;
+    struct hwrtc_potens* pot;
+ 
+    state = valloc(sizeof(struct mc146818));
+    dev = device_allocsys(NULL, state);
+
+    pot = hwrtc_attach_potens(dev, &ops);
+    if (!pot) {
+        return 1;
+    }
+
+    pot->state = RTC_STATE_MASKED;    
+    state->rtc_context = pot;
+
+    register_device(dev, &devdef->class, "mc146818");
 
     return 0;
 }
 
 static struct device_def devrtc_mc146818 = {
-    .name = "MC146818 RTC",
-    .class = DEVCLASS(DEVIF_SOC, DEVFN_TIME, DEV_RTC),
-    .init = rtc_init
+    def_device_class(INTEL, TIME, RTC),
+    def_device_name("x86 legacy RTC"),
+    def_on_load(rtc_load)
 };
-EXPORT_DEVICE(mc146818, &devrtc_mc146818, load_timedev);
+EXPORT_DEVICE(mc146818, &devrtc_mc146818, load_sysconf);

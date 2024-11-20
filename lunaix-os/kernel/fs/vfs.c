@@ -1660,20 +1660,20 @@ __DEFINE_LXSYSCALL2(int, fstat, int, fd, struct file_stat*, stat)
 
     if (check_device_node(vino)) {
         struct device* rdev = resolve_device(vino->data);
-        if (!rdev || rdev->magic != DEV_STRUCT_MAGIC) {
+        if (!rdev) {
             errno = EINVAL;
             goto done;
         }
 
         stat->st_rdev = (dev_t){.meta = rdev->ident.fn_grp,
                                 .unique = rdev->ident.unique,
-                                .index = rdev->dev_uid};
+                                .index = dev_uid(rdev) };
     }
 
     if (fdev) {
         stat->st_dev = (dev_t){.meta = fdev->ident.fn_grp,
                                .unique = fdev->ident.unique,
-                               .index = fdev->dev_uid};
+                               .index = dev_uid(fdev) };
     }
 
 done:

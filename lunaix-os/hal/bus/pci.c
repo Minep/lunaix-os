@@ -18,127 +18,151 @@
 
 LOG_MODULE("PCI")
 
-static DEFINE_LLIST(pci_devices);
-static DECLARE_HASHTABLE(pci_devcache, 8);
+/*
+    device instance for pci bridge, 
+    currently, lunaix only support one bridge controller.
+*/
+static struct device* pci_bridge;
 
-static struct device_cat* pcidev_cat;
-static struct device_def pci_def;
-
-void
-pci_probe_msi_info(struct pci_device* device);
+static morph_t* pci_probers;
+static DECLARE_HASHTABLE(pci_drivers, 8);
 
 static inline void
-pci_log_device(struct pci_device* pcidev)
+pci_log_device(struct pci_probe* probe)
 {
-    pciaddr_t loc = pcidev->loc;
-    struct device_def* binddef = pcidev->binding.def;
+    pciaddr_t loc = probe->loc;
 
     kprintf("pci.%03d:%02d:%02d, class=%p, vendor:dev=%04x:%04x",
             PCILOC_BUS(loc),
             PCILOC_DEV(loc),
             PCILOC_FN(loc),
-            pcidev->class_info,
-            PCI_DEV_VENDOR(pcidev->device_info),
-            PCI_DEV_DEVID(pcidev->device_info));
+            probe->class_info,
+            PCI_DEV_VENDOR(probe->device_info),
+            PCI_DEV_DEVID(probe->device_info));
 }
 
-static struct pci_device*
-pci_create_device(pciaddr_t loc, ptr_t pci_base, int devinfo)
+static void
+__pci_probe_msi_info(struct pci_probe* probe)
 {
+    // Note that Virtualbox have to use ICH9 chipset for MSI support.
+    // Qemu seems ok with default PIIX3, Bochs is pending to test...
+    //    See https://www.virtualbox.org/manual/ch03.html (section 3.5.1)
+    pci_reg_t status =
+      pci_read_cspace(probe->cspace_base, PCI_REG_STATUS_CMD) >> 16;
+
+    if (!(status & 0x10)) {
+        probe->msi_loc = 0;
+        return;
+    }
+
+    pci_reg_t cap_ptr = pci_read_cspace(probe->cspace_base, 0x34) & 0xff;
+    u32_t cap_hdr;
+
+    while (cap_ptr) {
+        cap_hdr = pci_read_cspace(probe->cspace_base, cap_ptr);
+        if ((cap_hdr & 0xff) == 0x5) {
+            // MSI
+            probe->msi_loc = cap_ptr;
+            return;
+        }
+        cap_ptr = (cap_hdr >> 8) & 0xff;
+    }
+}
+
+
+static void
+__pci_probe_bar_info(struct pci_probe* probe)
+{
+    u32_t bar;
+    struct pci_base_addr* ba;
+    for (size_t i = 0; i < PCI_BAR_COUNT; i++) {
+        ba = &probe->bar[i];
+        ba->size = pci_bar_sizing(probe, &bar, i + 1);
+        if (PCI_BAR_MMIO(bar)) {
+            ba->start = PCI_BAR_ADDR_MM(bar);
+            ba->type |= PCI_BAR_CACHEABLE(bar) ? BAR_TYPE_CACHABLE : 0;
+            ba->type |= BAR_TYPE_MMIO;
+        } else {
+            ba->start = PCI_BAR_ADDR_IO(bar);
+        }
+    }
+}
+
+static void
+__pci_add_prober(pciaddr_t loc, ptr_t pci_base, int devinfo)
+{
+    struct pci_probe* prober;
+    morph_t* probe_morph;
+
     pci_reg_t class = pci_read_cspace(pci_base, 0x8);
 
     u32_t devid = PCI_DEV_DEVID(devinfo);
     u32_t vendor = PCI_DEV_VENDOR(devinfo);
     pci_reg_t intr = pci_read_cspace(pci_base, 0x3c);
 
-    struct pci_device* device = vzalloc(sizeof(struct pci_device));
-    device->class_info = class;
-    device->device_info = devinfo;
-    device->cspace_base = pci_base;
-    device->intr_info = intr;
+    prober = vzalloc(sizeof(*prober));
 
-    device_create(&device->dev, dev_meta(pcidev_cat), DEV_IFSYS, NULL);
+    prober->class_info = class;
+    prober->device_info = devinfo;
+    prober->cspace_base = pci_base;
+    prober->intr_info = intr;
+    prober->loc = loc;
 
-    pci_probe_msi_info(device);
-    pci_probe_bar_info(device);
+    changeling_morph_anon(pci_probers, prober->mobj, pci_probe_morpher);
 
-    llist_append(&pci_devices, &device->dev_chain);
-    register_device(&device->dev, &pci_def.class, "%x", loc);
-    pci_def.class.variant++;
+    __pci_probe_msi_info(prober);
+    __pci_probe_bar_info(prober);
 
-    return device;
+    pci_log_device(prober);
 }
 
-int
-pci_bind_definition(struct pci_device_def* pcidef, bool* more)
+static int
+__pci_bind(struct pci_registry* reg, struct pci_probe* probe)
 {
-    if (!pcidef->devdef.bind) {
-        ERROR("pcidev %xh:%xh.%d is unbindable",
-              pcidef->devdef.class.fn_grp,
-              pcidef->devdef.class.device,
-              pcidef->devdef.class.variant);
+    int errno;
+    struct device_def* devdef;
+
+    if (probe->bind) {
+        return EEXIST;
+    }
+
+    if (!reg->check_compact(probe)) {
         return EINVAL;
     }
 
-    *more = false;
+    devdef = reg->definition;
+    errno = devdef->create(devdef, &probe->mobj);
 
-    bool bind_attempted = 0;
-    int errno = 0;
-
-    struct device_def* devdef;
-    struct pci_device *pos, *n;
-    llist_for_each(pos, n, &pci_devices, dev_chain)
-    {
-        if (binded_pcidev(pos)) {
-            continue;
-        }
-
-        bool matched;
-
-        assert(pcidef->test_compatibility);
-        matched = pcidef->test_compatibility(pcidef, pos);
-
-        if (!matched) {
-            continue;
-        }
-
-        if (bind_attempted) {
-            *more = true;
-            break;
-        }
-
-        bind_attempted = true;
-        devdef = &pcidef->devdef;
-        errno = devdef->bind(devdef, &pos->dev);
-
-        if (errno) {
-            ERROR("pci_loc:%x, bind (%xh:%xh.%d) failed, e=%d",
-                  pos->loc,
-                  devdef->class.fn_grp,
-                  devdef->class.device,
-                  devdef->class.variant,
-                  errno);
-            continue;
-        }
-
-        pos->binding.def = &pcidef->devdef;
+    if (errno) {
+        ERROR("pci_loc:%x, bind (%xh:%xh.%d) failed, e=%d",
+                probe->loc,
+                devdef->class.fn_grp,
+                devdef->class.device,
+                devdef->class.variant,
+                errno);
     }
 
     return errno;
 }
 
 int
-pci_bind_definition_all(struct pci_device_def* pcidef)
+pci_bind_driver(struct pci_registry* reg)
 {
-    int e = 0;
-    bool more = false;
-    do {
-        if ((e = pci_bind_definition(pcidef, &more))) {
-            break;
-        }
-    } while (more);
+    struct pci_probe* probe;
+    int errno = 0;
+    
+    morph_t *pos, *n;
+    changeling_for_each(pos, n, pci_probers)
+    {
+        probe = changeling_reveal(pos, pci_probe_morpher);
 
-    return e;
+        errno = __pci_bind(reg, probe);
+        if (errno) {
+            continue;
+        }
+    }
+
+    return errno;
 }
 
 void
@@ -166,21 +190,76 @@ pci_probe_device(pciaddr_t pci_loc)
         }
     }
 
-    struct pci_device *pos, *n;
-    hashtable_hash_foreach(pci_devcache, pci_loc, pos, n, dev_cache)
+    struct pci_probe* prober;
+    morph_t *pos, *n;
+    changeling_for_each(pos, n, pci_probers) 
     {
-        if (pos->loc == pci_loc) {
-            pci_log_device(pos);
+        prober = changeling_reveal(pos, pci_probe_morpher);
+        if (prober->loc == pci_loc) {
+            pci_log_device(prober);
             return;
         }
     }
 
-    struct pci_device* pcidev = pci_create_device(pci_loc, base, reg1);
-    if (pcidev) {
-        pcidev->loc = pci_loc;
-        hashtable_hash_in(pci_devcache, &pcidev->dev_cache, pci_loc);
-        pci_log_device(pcidev);
+    __pci_add_prober(pci_loc, base, reg1);
+}
+
+static struct pci_registry*
+__pci_registry_get(struct device_def* def)
+{
+    struct pci_registry *pos, *n;
+    unsigned int hash;
+
+    hash = hash_32(__ptr(def), HSTR_FULL_HASH);
+    hashtable_hash_foreach(pci_drivers, hash, pos, n, entries)
+    {
+        if (pos->definition == def) {
+            return pos;
+        }
     }
+
+    return NULL;
+}
+
+static int
+__pci_proxied_devdef_load(struct device_def* def)
+{
+    struct pci_registry* reg;
+    int errno = 0;
+
+    reg = __pci_registry_get(def);
+    assert(reg);
+
+    return pci_bind_driver(reg);
+}
+
+bool
+pci_register_driver(struct device_def* def, pci_id_checker_t checker)
+{
+    struct pci_registry* reg;
+    unsigned int hash;
+
+    if (!checker) {
+        return false;
+    }
+
+    if (__pci_registry_get(def)) {
+        return false;
+    }
+
+    reg = valloc(sizeof(*reg));
+    
+    *reg = (struct pci_registry) {
+        .check_compact = checker,
+        .definition = def,
+    };
+
+    device_chain_loader(def, __pci_proxied_devdef_load);
+
+    hash = hash_32(__ptr(def), HSTR_FULL_HASH);
+    hashtable_hash_in(pci_drivers, &reg->entries, hash);
+
+    return true;
 }
 
 void
@@ -191,144 +270,110 @@ pci_scan()
     }
 }
 
-void
-pci_probe_bar_info(struct pci_device* device)
-{
-    u32_t bar;
-    struct pci_base_addr* ba;
-    for (size_t i = 0; i < PCI_BAR_COUNT; i++) {
-        ba = &device->bar[i];
-        ba->size = pci_bar_sizing(device, &bar, i + 1);
-        if (PCI_BAR_MMIO(bar)) {
-            ba->start = PCI_BAR_ADDR_MM(bar);
-            ba->type |= PCI_BAR_CACHEABLE(bar) ? BAR_TYPE_CACHABLE : 0;
-            ba->type |= BAR_TYPE_MMIO;
-        } else {
-            ba->start = PCI_BAR_ADDR_IO(bar);
-        }
-    }
-}
-
-void
-pci_setup_msi(struct pci_device* device, msi_vector_t msiv)
+static void
+__pci_config_msi(struct pci_probe* probe, msi_vector_t msiv)
 {
     // PCI LB Spec. (Rev 3) Section 6.8 & 6.8.1
 
     ptr_t msi_addr = msi_addr(msiv);
     u32_t msi_data = msi_data(msiv);
 
-    pci_reg_t reg1 = pci_read_cspace(device->cspace_base, device->msi_loc);
+    pci_reg_t reg1 = pci_read_cspace(probe->cspace_base, probe->msi_loc);
     pci_reg_t msg_ctl = reg1 >> 16;
     int offset_cap64 = !!(msg_ctl & MSI_CAP_64BIT) * 4;
 
-    pci_write_cspace(device->cspace_base, 
-                     PCI_MSI_ADDR_LO(device->msi_loc), 
+    pci_write_cspace(probe->cspace_base, 
+                     PCI_MSI_ADDR_LO(probe->msi_loc), 
                      msi_addr);
     
     if (offset_cap64) {
-        pci_write_cspace(device->cspace_base, 
-                         PCI_MSI_ADDR_HI(device->msi_loc), 
+        pci_write_cspace(probe->cspace_base, 
+                         PCI_MSI_ADDR_HI(probe->msi_loc), 
                          (u64_t)msi_addr >> 32);
     }
 
-    pci_write_cspace(device->cspace_base,
-                     PCI_MSI_DATA(device->msi_loc, offset_cap64),
+    pci_write_cspace(probe->cspace_base,
+                     PCI_MSI_DATA(probe->msi_loc, offset_cap64),
                      msi_data & 0xffff);
 
     if ((msg_ctl & MSI_CAP_MASK)) {
         pci_write_cspace(
-          device->cspace_base, PCI_MSI_MASK(device->msi_loc, offset_cap64), 0);
+          probe->cspace_base, PCI_MSI_MASK(probe->msi_loc, offset_cap64), 0);
     }
 
     // manipulate the MSI_CTRL to allow device using MSI to request service.
     reg1 = (reg1 & 0xff8fffff) | 0x10000;
-    pci_write_cspace(device->cspace_base, device->msi_loc, reg1);
+    pci_write_cspace(probe->cspace_base, probe->msi_loc, reg1);
 }
 
-void
-pci_probe_msi_info(struct pci_device* device)
+msienv_t
+pci_msi_start(struct pci_probe* probe)
 {
-    // Note that Virtualbox have to use ICH9 chipset for MSI support.
-    // Qemu seems ok with default PIIX3, Bochs is pending to test...
-    //    See https://www.virtualbox.org/manual/ch03.html (section 3.5.1)
-    pci_reg_t status =
-      pci_read_cspace(device->cspace_base, PCI_REG_STATUS_CMD) >> 16;
+    /*
+        As a PCI bridge/root complex can be initialised from device tree node,
+        in that case, general information such as routing, rid remapping, 
+        are vital to all msi setup of all peripherals under it.
 
-    if (!(status & 0x10)) {
-        device->msi_loc = 0;
-        return;
-    }
+        Therefore, a wrapper around isrm_msi_* is needed in order to
+        improve overall readability and usability, where the bridge
+        device instance that contain these information will be 
+        automatically passed to the underlay as credential to perform
+        configuration.
+    */
 
-    pci_reg_t cap_ptr = pci_read_cspace(device->cspace_base, 0x34) & 0xff;
-    u32_t cap_hdr;
+    msienv_t env;
+    
+    env = isrm_msi_start(pci_bridge);
+    isrm_msi_set_sideband(env, pci_requester_id(probe));
 
-    while (cap_ptr) {
-        cap_hdr = pci_read_cspace(device->cspace_base, cap_ptr);
-        if ((cap_hdr & 0xff) == 0x5) {
-            // MSI
-            device->msi_loc = cap_ptr;
-            return;
-        }
-        cap_ptr = (cap_hdr >> 8) & 0xff;
-    }
+    return env;
+}
+
+msi_vector_t
+pci_msi_setup_at(msienv_t msienv, struct pci_probe* probe, 
+                 int i, isr_cb handler)
+{
+    msi_vector_t msiv;
+
+    msiv = isrm_msi_alloc(msienv, 0, i, handler);
+    __pci_config_msi(probe, msiv);
+
+    return msiv;
 }
 
 size_t
-pci_bar_sizing(struct pci_device* dev, u32_t* bar_out, u32_t bar_num)
+pci_bar_sizing(struct pci_probe* probe, u32_t* bar_out, u32_t bar_num)
 {
-    pci_reg_t bar = pci_read_cspace(dev->cspace_base, PCI_REG_BAR(bar_num));
+    pci_reg_t sized, bar;
+    
+    bar = pci_read_cspace(probe->cspace_base, PCI_REG_BAR(bar_num));
     if (!bar) {
         *bar_out = 0;
         return 0;
     }
 
-    pci_write_cspace(dev->cspace_base, PCI_REG_BAR(bar_num), 0xffffffff);
-    pci_reg_t sized =
-      pci_read_cspace(dev->cspace_base, PCI_REG_BAR(bar_num)) & ~0x1;
+    pci_write_cspace(probe->cspace_base, PCI_REG_BAR(bar_num), 0xffffffff);
+    
+    sized =
+      pci_read_cspace(probe->cspace_base, PCI_REG_BAR(bar_num)) & ~0x1;
+    
     if (PCI_BAR_MMIO(bar)) {
         sized = PCI_BAR_ADDR_MM(sized);
     }
+    
     *bar_out = bar;
-    pci_write_cspace(dev->cspace_base, PCI_REG_BAR(bar_num), bar);
+    pci_write_cspace(probe->cspace_base, PCI_REG_BAR(bar_num), bar);
+    
     return ~sized + 1;
 }
 
-struct pci_device*
-pci_get_device_by_id(u16_t vendorId, u16_t deviceId)
-{
-    u32_t dev_info = vendorId | (deviceId << 16);
-    struct pci_device *pos, *n;
-    llist_for_each(pos, n, &pci_devices, dev_chain)
-    {
-        if (pos->device_info == dev_info) {
-            return pos;
-        }
-    }
-
-    return NULL;
-}
-
-struct pci_device*
-pci_get_device_by_class(u32_t class)
-{
-    struct pci_device *pos, *n;
-    llist_for_each(pos, n, &pci_devices, dev_chain)
-    {
-        if (PCI_DEV_CLASS(pos->class_info) == class) {
-            return pos;
-        }
-    }
-
-    return NULL;
-}
-
 void
-pci_apply_command(struct pci_device* pcidev, pci_reg_t cmd)
+pci_apply_command(struct pci_probe* probe, pci_reg_t cmd)
 {
     pci_reg_t rcmd;
     ptr_t base;
 
-    base = pcidev->cspace_base;
+    base = probe->cspace_base;
     rcmd = pci_read_cspace(base, PCI_REG_STATUS_CMD);
 
     cmd  = cmd & 0xffff;
@@ -340,11 +385,13 @@ pci_apply_command(struct pci_device* pcidev, pci_reg_t cmd)
 static void
 __pci_read_cspace(struct twimap* map)
 {
-    struct pci_device* pcidev = (struct pci_device*)(map->data);
+    struct pci_probe* probe;
+
+    probe = twimap_data(map, struct pci_probe*);
 
     for (size_t i = 0; i < 256; i += sizeof(pci_reg_t)) {
         *(pci_reg_t*)(map->buffer + i) =
-          pci_read_cspace(pcidev->cspace_base, i);
+          pci_read_cspace(probe->cspace_base, i);
     }
 
     map->size_acc = 256;
@@ -355,32 +402,42 @@ __pci_read_cspace(struct twimap* map)
 static void
 __pci_read_revid(struct twimap* map)
 {
-    int class = twimap_data(map, struct pci_device*)->class_info;
-    twimap_printf(map, "0x%x", PCI_DEV_REV(class));
+    struct pci_probe* probe;
+
+    probe = twimap_data(map, struct pci_probe*);
+    twimap_printf(map, "0x%x", PCI_DEV_REV(probe->class_info));
 }
 
 static void
 __pci_read_class(struct twimap* map)
 {
-    int class = twimap_data(map, struct pci_device*)->class_info;
-    twimap_printf(map, "0x%x", PCI_DEV_CLASS(class));
+    struct pci_probe* probe;
+
+    probe = twimap_data(map, struct pci_probe*);
+    twimap_printf(map, "0x%x", PCI_DEV_CLASS(probe->class_info));
 }
 
 static void
 __pci_read_devinfo(struct twimap* map)
 {
-    int devinfo = twimap_data(map, struct pci_device*)->device_info;
-    twimap_printf(
-      map, "%x:%x", PCI_DEV_VENDOR(devinfo), PCI_DEV_DEVID(devinfo));
+    struct pci_probe* probe;
+
+    probe = twimap_data(map, struct pci_probe*);
+    twimap_printf(map, "%x:%x", 
+            PCI_DEV_VENDOR(probe->device_info), 
+            PCI_DEV_DEVID(probe->device_info));
 }
 
 static void
 __pci_bar_read(struct twimap* map)
 {
-    struct pci_device* pcidev = twimap_data(map, struct pci_device*);
-    int bar_index = twimap_index(map, int);
+    struct pci_probe* probe;
+    int bar_index;
 
-    struct pci_base_addr* bar = &pcidev->bar[bar_index];
+    probe = twimap_data(map, struct pci_probe*);
+    bar_index = twimap_index(map, int);
+
+    struct pci_base_addr* bar = &probe->bar[bar_index];
 
     if (!bar->start && !bar->size) {
         twimap_printf(map, "[%d] not present \n", bar_index);
@@ -415,17 +472,20 @@ __pci_bar_gonext(struct twimap* map)
 static void
 __pci_read_binding(struct twimap* map)
 {
-    struct pci_device* pcidev = twimap_data(map, struct pci_device*);
-    struct device_def* devdef = pcidev->binding.def;
-    if (!devdef) {
+    struct pci_probe* probe;
+    struct devident* devid;
+
+    probe = twimap_data(map, struct pci_probe*);
+    if (!probe->bind) {
         return;
     }
 
-    twimap_printf(map,
-                  "%xh:%xh.%d",
-                  devdef->class.fn_grp,
-                  devdef->class.device,
-                  devdef->class.variant);
+    devid = &probe->bind->ident;
+
+    twimap_printf(map, "%xh:%xh.%d",
+                  devid->fn_grp,
+                  DEV_KIND_FROM(devid->unique),
+                  DEV_VAR_FROM(devid->unique));
 }
 
 static void
@@ -438,29 +498,32 @@ void
 pci_build_fsmapping()
 {
     struct twifs_node *pci_class = twifs_dir_node(NULL, "pci"), *pci_dev;
-    struct pci_device *pos, *n;
     struct twimap* map;
+    struct pci_probe* probe;
+    morph_t *pos, *n;
 
-    map = twifs_mapping(pci_class, NULL, "rescan");
-    map->read = __pci_trigger_bus_rescan;
+    // TODO bus rescan is not ready yet
+    // map = twifs_mapping(pci_class, NULL, "rescan");
+    // map->read = __pci_trigger_bus_rescan;
 
-    llist_for_each(pos, n, &pci_devices, dev_chain)
+    changeling_for_each(pos, n, pci_probers)
     {
-        pci_dev = twifs_dir_node(pci_class, "%x", pos->loc);
+        probe = changeling_reveal(pos, pci_probe_morpher);
+        pci_dev = twifs_dir_node(pci_class, "%x", probe->loc);
 
-        map = twifs_mapping(pci_dev, pos, "config");
+        map = twifs_mapping(pci_dev, probe, "config");
         map->read = __pci_read_cspace;
 
-        map = twifs_mapping(pci_dev, pos, "revision");
+        map = twifs_mapping(pci_dev, probe, "revision");
         map->read = __pci_read_revid;
 
-        map = twifs_mapping(pci_dev, pos, "class");
+        map = twifs_mapping(pci_dev, probe, "class");
         map->read = __pci_read_class;
 
-        map = twifs_mapping(pci_dev, pos, "binding");
+        map = twifs_mapping(pci_dev, probe, "binding");
         map->read = __pci_read_binding;
 
-        map = twifs_mapping(pci_dev, pos, "io_bases");
+        map = twifs_mapping(pci_dev, probe, "io_bases");
         map->read = __pci_bar_read;
         map->go_next = __pci_bar_gonext;
     }
@@ -470,25 +533,35 @@ EXPORT_TWIFS_PLUGIN(pci_devs, pci_build_fsmapping);
 /*---------- PCI 3.0 HBA device definition ----------*/
 
 static int
-pci_load_devices(struct device_def* def)
+pci_register(struct device_def* def)
 {
-    pcidev_cat = device_addcat(NULL, "pci");
+    pci_probers = changeling_spawn(NULL, "pci_realm");
+
+    return 0;
+}
+
+static int
+pci_create(struct device_def* def, morph_t* obj)
+{
+    devtree_link_t devtree_node;
+
+    devtree_node = changeling_try_reveal(obj, dt_node_morpher);
+
+    pci_bridge = device_allocsys(NULL, NULL);
+    device_set_devtree_node(pci_bridge, devtree_node);
+
+    register_device(pci_bridge, &def->class, "pci_bridge");
 
     pci_scan();
 
     return 0;
 }
 
-void
-pci_bind_instance(struct pci_device* pcidev, void* devobj)
-{
-    pcidev->dev.underlay = devobj;
-    pcidev->binding.dev = devobj;
-}
-
 static struct device_def pci_def = {
-    .name = "Generic PCI",
-    .class = DEVCLASS(DEVIF_SOC, DEVFN_BUSIF, DEV_PCI),
-    .init = pci_load_devices
+    def_device_name("Generic PCI"),
+    def_device_class(GENERIC, BUSIF, PCI),
+
+    def_on_register(pci_register),
+    def_on_create(pci_create)
 };
 EXPORT_DEVICE(pci3hba, &pci_def, load_sysconf);

@@ -1,8 +1,8 @@
 sources([
     "device.c",
-    "capability.c",
+    "potentem.c",
     "devdb.c",
     "devfs.c",
     "input.c",
-    "poll.c"
+    "poll.c",
 ])

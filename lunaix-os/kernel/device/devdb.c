@@ -1,10 +1,13 @@
 #include <lunaix/device.h>
 #include <lunaix/fs/twifs.h>
 #include <lunaix/status.h>
+#include <lunaix/syslog.h>
 
 #include <klibc/hash.h>
 
 #include <klibc/strfmt.h>
+
+LOG_MODULE("devdb")
 
 static DECLARE_HASHTABLE(dev_registry, 32);
 static DECLARE_HASHTABLE(dev_byif, 8);
@@ -26,20 +29,33 @@ device_scan_drivers()
     hashtable_init(dev_registry);
     hashtable_init(dev_byif);
 
-    int idx = 0;
+    int idx = 0, errno;
     struct device_def* devdef;
     ldga_foreach(devdefs, struct device_def*, idx, devdef)
     {
         struct devclass* devc = &devdef->class;
         u32_t hash = hash_dev(devc->fn_grp, devc->device);
-        devc->hash = hash;
+        devdef->class_hash = hash;
 
         if (!devdef->name) {
             devdef->name = "<unspecified>";
         }
 
+        errno = 0;
+        if (devdef->ad_tabulam) {
+            errno = devdef->ad_tabulam(devdef);
+        }
+
+        if (errno) {
+            ERROR("driver unable to register %xh:%xh.%d (err=%d)",
+                    devdef->class.fn_grp, 
+                    devdef->class.device,
+                    devdef->class.variant, errno);
+            continue;
+        }
+
         hashtable_hash_in(dev_registry, &devdef->hlist, hash);
-        hashtable_hash_in(dev_byif, &devdef->hlist_if, DEV_IF(devc->fn_grp));
+        hashtable_hash_in(dev_byif, &devdef->hlist_if, DEV_VN(devc->fn_grp));
 
         llist_append(&dev_registry_flat, &devdef->dev_list);
     }
@@ -60,7 +76,7 @@ devdef_byclass(struct devclass* devc)
     struct device_def *pos, *n;
     hashtable_hash_foreach(dev_registry, hash, pos, n, hlist)
     {
-        if (pos->class.hash != hash) {
+        if (pos->class_hash != hash) {
             continue;
         }
         if (devclass_eq(devc, &pos->class)) {
@@ -91,7 +107,7 @@ device_definitions_byif(int if_type)
         struct device_def* devdef;                                             \
         ldga_foreach(dev_##stage, struct device_def*, idx, devdef)             \
         {                                                                      \
-            devdef->init(devdef);                                              \
+            device_chain_load_once(devdef);                                    \
         }                                                                      \
     })
 #define device_load_on_stage(stage) __device_load_on_stage(stage)
@@ -133,7 +149,7 @@ __devdb_twifs_lsdb(struct twimap* mapping)
     struct device_def* def = twimap_index(mapping, struct device_def*);
 
     int meta = def->class.fn_grp;
-    ksnprintf(flags, 64, "if=%x,fn=%x", DEV_IF(meta), DEV_FN(meta));
+    ksnprintf(flags, 64, "vn=%x, fn=%x", DEV_VN(meta), DEV_FN(meta));
 
     twimap_printf(mapping,
                   "%08xh:%04d \"%s\" %s\n",

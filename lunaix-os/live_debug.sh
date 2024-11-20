@@ -4,7 +4,7 @@ hmp_port=45454
 gdb_port=1234
 default_cmd="console=/dev/ttyS0"
 
-make CMDLINE=${default_cmd} ARCH=${ARCH} MODE=${MODE:-debug} all -j5 || exit -1
+make ARCH=${ARCH} MODE=${MODE:-debug} all -j5 || exit -1
 
 ./scripts/qemu.py \
     scripts/qemus/qemu_x86_dev.json \

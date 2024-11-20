@@ -1,0 +1,7 @@
+morphable(dt_node),
+morphable(pci_probe),
+
+morphable(device_meta),
+morphable(device_cat),
+morphable(device_alias),
+morphable(device),

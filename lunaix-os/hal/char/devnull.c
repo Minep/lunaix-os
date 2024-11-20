@@ -30,7 +30,7 @@ __null_rd(struct device* dev, void* buf, size_t offset, size_t len)
 }
 
 static int
-pdev_nulldev_init(struct device_def* def)
+pdev_nulldev_create(struct device_def* def, morph_t* obj)
 {
     struct device* devnull = device_allocseq(NULL, NULL);
     devnull->ops.write_page = __null_wr_pg;
@@ -44,7 +44,8 @@ pdev_nulldev_init(struct device_def* def)
 }
 
 static struct device_def devnull_def = {
-    .name = "null",
-    .class = DEVCLASSV(DEVIF_NON, DEVFN_PSEUDO, DEV_NULL, DEV_BUILTIN_NULL),
-    .init = pdev_nulldev_init};
+    def_device_name("edendi"),
+    def_device_class(LUNAIX, PSEUDO, NIHIL),
+    def_on_create(pdev_nulldev_create)
+};
 EXPORT_DEVICE(nulldev, &devnull_def, load_onboot);

@@ -8,35 +8,38 @@
 
 #define RTC_STATE_MASKED 0x1
 
-#define EXPORT_RTC_DEVICE(id, init_fn)                                         \
-    export_ldga_el(rtcdev, id, ptr_t, init_fn)
-
-struct hwrtc
+struct hwrtc_potens;
+struct hwrtc_potens_ops
 {
-    struct llist_header rtc_list;
-    struct device* rtc_dev;
+    void (*get_walltime)(struct hwrtc_potens*, datetime_t*);
+    void (*set_walltime)(struct hwrtc_potens*, datetime_t*);
+    void (*set_proactive)(struct hwrtc_potens*, bool);
+    int  (*chfreq)(struct hwrtc_potens*, int);
 
-    int id;
-    char* name;
-    void* data;
-    ticks_t base_freq;
-    int state;
-
-    void (*get_walltime)(struct hwrtc*, datetime_t*);
-    void (*set_walltime)(struct hwrtc*, datetime_t*);
-    void (*set_mask)(struct hwrtc*);
-    void (*cls_mask)(struct hwrtc*);
-    int (*get_counts)(struct hwrtc*);
-    int (*chfreq)(struct hwrtc*, int);
+    int (*calibrate)(struct hwrtc_potens*);
 };
 
-struct hwrtc*
-hwrtc_alloc_new(char* name);
+struct hwrtc_potens
+{
+    POTENS_META;
+
+    struct llist_header rtc_potentes;
+    struct device* rtc_proxy;
+
+    ticks_t base_freq;
+    volatile ticks_t live;
+    int state;
+
+    struct hwrtc_potens_ops* ops;
+};
+
+void
+hwrtc_init();
 
 void
 hwrtc_walltime(datetime_t* dt);
 
-void
-hwrtc_register(struct devclass* class, struct hwrtc* rtc);
+struct hwrtc_potens*
+hwrtc_attach_potens(struct device* raw_rtcdev, struct hwrtc_potens_ops* ops);
 
 #endif /* __LUNAIX_HWRTC_H */

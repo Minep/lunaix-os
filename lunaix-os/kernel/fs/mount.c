@@ -288,6 +288,7 @@ __DEFINE_LXSYSCALL4(int,
                     int,
                     options)
 {
+    struct device* device = NULL;
     struct v_dnode *dev = NULL, *mnt = NULL;
     int errno = 0;
 
@@ -308,16 +309,14 @@ __DEFINE_LXSYSCALL4(int,
         goto done;
     }
 
-    // By our convention.
-    // XXX could we do better?
-    struct device* device = NULL;
-
     if (dev) {
         if (!check_voldev_node(dev->inode)) {
             errno = ENOTDEV;
             goto done;
         }
-        device = (struct device*)dev->inode->data;
+
+        device = resolve_device(dev->inode->data);
+        assert(device);
     }
 
     errno = vfs_mount_at(fstype, device, mnt, options);

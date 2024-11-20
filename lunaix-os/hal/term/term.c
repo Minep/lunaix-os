@@ -5,16 +5,21 @@
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
 #include <lunaix/status.h>
+#include <lunaix/syslog.h>
 
 #include <usr/lunaix/ioctl_defs.h>
+
+LOG_MODULE("term");
 
 #define termdev(dev) ((struct term*)(dev)->underlay)
 
 #define LCNTL_TABLE_LEN (sizeof(line_controls) / sizeof(struct term_lcntl*))
 
-static struct devclass termdev_class = DEVCLASS(DEVIF_NON, DEVFN_TTY, DEV_VTERM);
+static struct devclass termdev_class = DEVCLASS(LUNAIX, TTY, VTERM);
 
 struct device* sysconsole = NULL;
+
+extern struct termport_pot_ops default_termport_pot_ops;
 
 static int
 term_exec_cmd(struct device* dev, u32_t req, va_list args)
@@ -81,7 +86,7 @@ term_exec_cmd(struct device* dev, u32_t req, va_list args)
             tios->c_baud = term->iospeed;
         } break;
         case TDEV_TCSETATTR: {
-            struct termport_cap_ops* cap_ops;
+            struct termport_pot_ops* pot_ops;
             struct termios* tios = va_arg(args, struct termios*);
 
             term->iflags = tios->c_iflag;
@@ -96,16 +101,16 @@ term_exec_cmd(struct device* dev, u32_t req, va_list args)
                 goto done;
             }
 
-            cap_ops = term->tp_cap->cap_ops;
+            pot_ops = term->tp_cap->ops;
 
             if (tios->c_baud != term->iospeed) {
                 term->iospeed = tios->c_baud;
 
-                cap_ops->set_speed(term->chdev, tios->c_baud);
+                pot_ops->set_speed(term->chdev, tios->c_baud);
             }
 
             if (old_cf != tios->c_cflag) {
-                cap_ops->set_cntrl_mode(term->chdev, tios->c_cflag);
+                pot_ops->set_cntrl_mode(term->chdev, tios->c_cflag);
             }
         } break;
         default:
@@ -177,13 +182,13 @@ alloc_term_buffer(struct term* terminal, size_t sz_hlf)
     terminal->scratch_pad = valloc(sz_hlf);
 }
 
-struct term*
-term_create(struct device* chardev, char* suffix)
+struct termport_potens*
+term_attach_potens(struct device* chardev, 
+                   struct termport_pot_ops* ops, char* suffix)
 {
     struct term* terminal;
     struct device* tdev;
-    struct capability_meta* termport_cap;
-    struct capability_meta* tios_cap;
+    struct termport_potens* tp_cap;
 
     terminal = vzalloc(sizeof(struct term));
     if (!terminal) {
@@ -206,24 +211,22 @@ term_create(struct device* chardev, char* suffix)
         int cdev_var = DEV_VAR_FROM(chardev->ident.unique);
         register_device(tdev, &termdev_class, "tty%s%d", suffix, cdev_var);
     } else {
-        register_device(tdev, &termdev_class, "tty%d", termdev_class.variant++);
+        register_device_var(tdev, &termdev_class, "tty");
     }
 
-    termport_cap = device_get_capability(chardev, TERMPORT_CAP);
-    if (termport_cap) {
-        terminal->tp_cap = 
-            get_capability(termport_cap, struct termport_capability);
-        
-        assert(terminal->tp_cap->cap_ops);
-        terminal->tp_cap->term = terminal;
-    }
+    INFO("spawned: %s", tdev->name_val);
 
-    tios_cap = new_capability_marker(TERMIOS_CAP);
-    device_grant_capability(tdev, tios_cap);
+    tp_cap = new_potens(potens(TERMPORT), struct termport_potens);
+    tp_cap->ops = ops ?: &default_termport_pot_ops;
+
+    terminal->tp_cap = tp_cap;
+    tp_cap->term = terminal;
+
+    device_grant_potens(tdev, potens_meta(tp_cap));
 
     load_default_setting(terminal);
 
-    return terminal;
+    return tp_cap;
 }
 
 int

@@ -9,32 +9,6 @@
 
 #define TIMER_MODE_PERIODIC 0x1
 
-struct lx_timer_context
-{
-    struct lx_timer* active_timers;
-    /**
-     * @brief timer hardware base frequency (ticks per seconds)
-     *
-     */
-    ticks_t base_frequency;
-    /**
-     * @brief Desired system running frequency
-     *
-     */
-    ticks_t running_frequency;
-    /**
-     * @brief Ticks per hertz
-     *
-     */
-    ticks_t tphz;
-};
-
-struct timer_init_param
-{
-    struct lx_timer_context* context;
-    void* timer_update_isr;
-};
-
 struct lx_timer
 {
     struct llist_header link;
@@ -67,8 +41,5 @@ timer_run_ms(u32_t millisecond,
 
 struct lx_timer*
 timer_run(ticks_t ticks, void (*callback)(void*), void* payload, u8_t flags);
-
-struct lx_timer_context*
-timer_context();
 
 #endif /* __LUNAIX_TIMER_H */
