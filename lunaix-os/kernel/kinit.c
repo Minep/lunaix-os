@@ -123,7 +123,6 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     /* Setup kernel memory layout and services */
     kmem_init(bhctx);
 
-    __remap_and_load_dtb(bhctx);
 
     boot_parse_cmdline(bhctx);
 
@@ -132,19 +131,19 @@ kernel_bootstrap(struct boot_handoff* bhctx)
 
     device_scan_drivers();
 
+    initfn_invoke_sysconf();
+    
+    __remap_and_load_dtb(bhctx);
     device_sysconf_load();
 
-    invoke_init_function(on_earlyboot);
+    // TODO register devtree hooks
+    // TODO re-scan devtree to bind devices.
 
     clock_init();
     timer_init();
 
-    /*
-        TODO autoload these init function that do not have dependency between
-       them
-    */
+    initfn_invoke_earlyboot();
 
-    /* Let's get fs online as soon as possible, as things rely on them */
     vfs_init();
     fsm_init();
     input_init();
@@ -158,7 +157,7 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     must_success(vfs_mount_root("ramfs", NULL));
     must_success(vfs_mount("/dev", "devfs", NULL, 0));
     
-    invoke_init_function(on_boot);
+    initfn_invoke_boot();
 
     /* Finish up bootstrapping sequence, we are ready to spawn the root process
      * and start geting into uspace

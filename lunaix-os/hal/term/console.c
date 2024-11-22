@@ -35,7 +35,7 @@ setup_default_tty()
 
     assert(device_addalias(NULL, dev_meta(dev), "tty"));
     
-    if (!device_get_capability(dev, TERMIOS_CAP)) {
+    if (!device_get_potens(dev, potens(TERMPORT))) {
         FATAL("not a terminal device: %s", console_dev);
     }
 

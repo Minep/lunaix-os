@@ -44,16 +44,6 @@
 
     . = ALIGN(8);
 
-    PROVIDE(__lga_dev_ld_timedev_start = .);
-
-    KEEP(*(.lga.devdefs.ld_timedev));
-
-    PROVIDE(__lga_dev_ld_timedev_end = .);
-
-    /* ---- */
-
-    . = ALIGN(8);
-
     PROVIDE(__lga_dev_ld_post_start = .);
 
     KEEP(*(.lga.devdefs.ld_post));
@@ -69,6 +59,16 @@
     KEEP(*(.lga.fs));
 
     PROVIDE(__lga_fs_end = .);
+
+    /* ---- */
+
+    . = ALIGN(8);
+
+    PROVIDE(__lga_lunainit_on_sysconf_start = .);
+
+    KEEP(*(.lga.lunainit.c_sysconf));
+
+    PROVIDE(__lga_lunainit_on_sysconf_end = .);
 
     /* ---- */
 

@@ -244,4 +244,4 @@ __init_blkbuf()
     bb_zone = bcache_create_zone("blk_buf");
     bb_pile = cake_new_pile("blk_buf", sizeof(struct blk_buf), 1, 0);
 }
-owloysius_fetch_init(__init_blkbuf, on_earlyboot)
+owloysius_fetch_init(__init_blkbuf, on_sysconf)

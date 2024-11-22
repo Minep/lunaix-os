@@ -13,6 +13,7 @@ LOG_MODULE("16x50-pci")
 
 static DEFINE_LLIST(pci_ports);
 
+
 static void
 uart_msi_irq_handler(const struct hart_state* hstate)
 {
@@ -33,32 +34,31 @@ uart_intx_irq_handler(const struct hart_state* hstate)
     uart_handle_irq_overlap(vector, &pci_ports);
 }
 
-static int
-pci16550_init(struct device_def* def)
-{
-    return pci_bind_definition_all(pcidev_def(def));
-}
-
 static bool
-pci16650_check_compat(struct pci_device_def* def, 
-                      struct pci_device* pcidev)
+pci16x50_check_compat(struct pci_probe* probe)
 {
     unsigned int classid;
-    classid = pci_device_class(pcidev);
+    classid = pci_device_class(probe);
 
     return (classid & 0xffff00) == PCI_DEVICE_16x50_UART;
 }
 
-static int
-pci16650_binder(struct device_def* def, struct device* dev)
+int
+pci16x50_pci_register(struct device_def* def)
+{
+    return !pci_register_driver(def, pci16x50_check_compat);
+}
+
+int
+pci16x50_pci_create(struct device_def* def, morph_t* obj)
 {
     struct pci_base_addr* bar;
-    struct pci_device* pcidev;
+    struct pci_probe* probe;
     struct uart16550* uart;
     struct serial_dev* sdev;
     msi_vector_t msiv;
     
-    pcidev = PCI_DEVICE(dev);
+    probe = changeling_reveal(obj, pci_probe_morpher);
 
     pci_reg_t cmd = 0;
 
@@ -67,7 +67,7 @@ pci16650_binder(struct device_def* def, struct device* dev)
         cmd = 0;
         pci_cmd_set_msi(&cmd);
         
-        bar = pci_device_bar(pcidev, i);
+        bar = pci_device_bar(probe, i);
         if (bar->size == 0) {
             continue;
         }
@@ -75,17 +75,17 @@ pci16650_binder(struct device_def* def, struct device* dev)
         if (!pci_bar_mmio_space(bar)) {
 #ifdef CONFIG_PCI_PMIO
             pci_cmd_set_pmio(&cmd);
-            pci_apply_command(pcidev, cmd);
+            pci_apply_command(probe, cmd);
 
             uart = uart16x50_pmio_create(bar->start);
 #else
-            WARN("plaform configured to not support pmio access.")
+            WARN("plaform configured to not support pmio access.");
             continue;
 #endif
         } else 
         {
             pci_cmd_set_mmio(&cmd);
-            pci_apply_command(pcidev, cmd);
+            pci_apply_command(probe, cmd);
 
             uart = uart16x50_mmio_create(bar->start, bar->size);
         }
@@ -95,35 +95,26 @@ pci16650_binder(struct device_def* def, struct device* dev)
             continue;
         }
 
-        if (!pci_capability_msi(pcidev)) {
+        if (!pci_capability_msi(probe)) {
             WARN("failed to fallback to legacy INTx: not supported.");
             continue;
         }
 
-        msiv = isrm_msialloc(uart_msi_irq_handler);
+        sdev = uart_create_serial(uart, &def->class, &pci_ports, "PCI");
+
+        msiv = pci_msi_setup_simple(probe, uart_msi_irq_handler);
         isrm_set_payload(msi_vect(msiv), __ptr(uart));
-        pci_setup_msi(pcidev, msiv);
 
         INFO("base: 0x%x (%s), irq=%d (%s)", 
                 bar->start, 
                 pci_bar_mmio_space(bar) ? "mmio" : "pmio",
                 msi_vect(msiv), 
-                pci_capability_msi(pcidev) ? "msi" : "intx, re-routed");
+                pci_capability_msi(probe) ? "msi" : "intx, re-routed");
         
         uart->iv = msi_vect(msiv);
 
-        sdev = uart_create_serial(uart, &def->class, &pci_ports, "PCI");
-        pci_bind_instance(pcidev, sdev);
+        pci_bind_instance(probe, sdev->dev);
     }
 
     return 0;
 }
-
-static struct pci_device_def uart_pci_def = {
-    .devdef = { .class = DEVCLASS(DEVIF_PCI, DEVFN_CHAR, DEV_UART16550),
-                .name = "16550 UART (PCI/MMIO)",
-                .init = pci16550_init,
-                .bind = pci16650_binder },
-    .test_compatibility = pci16650_check_compat
-};
-EXPORT_PCI_DEVICE(uart16550_pci, &uart_pci_def, load_onboot);

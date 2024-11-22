@@ -26,34 +26,19 @@ typedef struct rbuffer** lbuf_ref_t;
 #define ref_next(lbuf) (&(lbuf)->next)
 #define deref(bref) (*(bref))
 
-/**
- * @brief Communication port capability that a device is supported natively, 
- *          or able to emulate low level serial transmission behaviour specify 
- *          by POSIX1-2008, section 11.
- * 
- */
-#define TERMPORT_CAP 0x4d524554U
-
-/**
- * @brief A termios capability that a device provide interfaces which is 
- *          compliant to POSIX1-2008
- * 
- */
-#define TERMIOS_CAP 0x534f4954U
-
 struct term;
 
-struct termport_cap_ops
+struct termport_pot_ops
 {
     void (*set_speed)(struct device*, speed_t);
     void (*set_clkbase)(struct device*, unsigned int);
     void (*set_cntrl_mode)(struct device*, tcflag_t);
 };
 
-struct termport_capability
+struct termport_potens
 {
-    CAPABILITY_META;
-    struct termport_cap_ops* cap_ops;
+    POTENS_META;
+    struct termport_pot_ops* ops;
     struct term* term;
 };
 
@@ -66,7 +51,7 @@ struct term
     char* scratch_pad;
     pid_t fggrp;
 
-    struct termport_capability* tp_cap;
+    struct termport_potens* tp_cap;
     waitq_t line_in_event;
 
     /* -- POSIX.1-2008 compliant fields -- */
@@ -84,8 +69,9 @@ struct term
 
 extern struct device* sysconsole;
 
-struct term*
-term_create(struct device* chardev, char* suffix);
+struct termport_potens*
+term_attach_potens(struct device* chardev, 
+                   struct termport_pot_ops* ops, char* suffix);
 
 int
 term_bind(struct term* tdev, struct device* chdev);
@@ -119,20 +105,7 @@ lcntl_transform_inseq(struct term* tdev);
 int
 lcntl_transform_outseq(struct term* tdev);
 
-static inline void
-term_cap_set_operations(struct termport_capability* cap, 
-                        struct termport_cap_ops* ops)
-{
-    cap->cap_ops = ops;
-}
-
 void
-term_notify_data_avaliable(struct termport_capability* cap);
-
-#define termport_default_ops                                    \
-    ({                                                          \
-        extern struct termport_cap_ops default_termport_cap_ops;\
-        &default_termport_cap_ops;                              \
-    })
+term_notify_data_avaliable(struct termport_potens* cap);
 
 #endif /* __LUNAIX_TERM_H */

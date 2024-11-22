@@ -6,6 +6,9 @@
 #include <lunaix/ds/hstr.h>
 #include <lunaix/ds/hashtable.h>
 #include <lunaix/boot_generic.h>
+#include <lunaix/changeling.h>
+
+#include <klibc/string.h>
 
 #define le(v) ((((v) >> 24) & 0x000000ff)  |\
                (((v) << 8)  & 0x00ff0000)  |\
@@ -35,6 +38,11 @@
 typedef unsigned int* dt_enc_t;
 typedef unsigned int  dt_phnd_t;
 typedef bool (*node_predicate_t)(struct dt_node_iter*, struct dt_node*);
+
+
+struct dt_node_base;
+struct dt_node_iter;
+typedef bool (*node_predicate_t)(struct dt_node_iter*, struct dt_node_base*);
 
 
 #define PHND_NULL    ((dt_phnd_t)-1)
@@ -83,7 +91,7 @@ struct dt_prop_val
         {
             union {
                 const char*  str_val;
-                const char** str_lst;
+                const char*  str_lst;
             };
             ptr_t        ptr_val;
             
@@ -107,8 +115,18 @@ struct dt_prop
     struct dt_prop_val  val;
 };
 
+struct dt_prop_table
+{
+    union {
+        struct hbucket    other_props[0];
+        struct hbucket    _op_bucket[8];
+    };
+};
+
 struct dt_node_base
 {
+    morph_t mobj;
+
     union {
         struct {
             unsigned char addr_c;
@@ -130,23 +148,15 @@ struct dt_node_base
     };
 
     struct dt_node_base  *parent;
-    struct llist_header   children;
-    struct llist_header   siblings;
     struct llist_header   nodes;
-    struct hlist_node     phnd_link;
-
-    const char*           name;
 
     struct dt_prop_val    compat;
-    const char*           model;
     dt_phnd_t             phandle;
 
-    union {
-        struct hbucket    other_props[0];
-        struct hbucket    _op_bucket[8];
-    };
+    struct dt_prop_table* props;
 
     void* obj;
+    morph_t* binded_dev;
 };
 
 struct dt_root
@@ -212,7 +222,11 @@ struct dt_intr_node
 
 struct dt_node
 {
-    struct dt_node_base base;
+    union {
+        morph_t mobj;
+        struct dt_node_base base;
+    };
+    
     struct dt_intr_node intr;
     
     struct dt_prop_val  reg;
@@ -221,7 +235,9 @@ struct dt_node
     struct dt_prop_val  ranges;
     struct dt_prop_val  dma_ranges;
 };
-
+#define dt_parent(node) ((node)->base.parent)
+#define dt_morpher       morphable_attrs(dt_node, mobj)
+#define dt_mobj(node)   (&(node)->mobj)
 
 struct dt_intr_prop
 {
@@ -378,6 +394,8 @@ dt_found_any(struct dt_node_iter* iter)
     return !!iter->matched;
 }
 
+struct dt_context*
+dt_main_context();
 
 /****
  * DT Main Functions: Node-binding
@@ -436,6 +454,11 @@ dt_decode(struct dt_prop_iter* dtpi, struct dt_node_base* node,
 
 #define dtprop_extract(dtpi, off) \
             ( (dt_enc_t) (&(dtpi)->prop_loc[(off)]) )
+
+#define dtprop_strlst_foreach(pos, prop)    \
+        for (pos = (prop)->str_lst; \
+             pos <= &(prop)->str_lst[(prop)->size]; \
+             pos = &pos[strlen(pos) + 1])
 
 static inline bool
 dtprop_next_n(struct dt_prop_iter* dtpi, int n)

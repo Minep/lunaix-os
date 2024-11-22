@@ -12,7 +12,7 @@
 /*  Auto-generated data  */
 
 #define extern_autogen(name)                                         \
-            weak unsigned long __mark_name(autogen,name)[] = {};     \
+            _weak unsigned long __mark_name(autogen,name)[] = {};     \
             extern unsigned long __mark_name(autogen,name)[];
 
 #define autogen_name(name)  __mark_name(autogen,name)

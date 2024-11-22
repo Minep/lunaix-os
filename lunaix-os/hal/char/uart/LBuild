@@ -1,6 +1,7 @@
 sources([
     "16x50_base.c",
     "16x50_mmio.c",
+    "16x50_dev.c",
 ])
 
 if config("xt_16x50"):

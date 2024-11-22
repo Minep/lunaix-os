@@ -16,6 +16,7 @@ sources([
     "lrud.c",
     "bcache.c",
     "syscall.c",
+    "changeling.c",
     "kprint/kp_records.c",
     "kprint/kprintf.c",
     "time/clock.c",

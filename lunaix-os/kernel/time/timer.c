@@ -25,7 +25,7 @@ LOG_MODULE("TIMER");
 static void
 timer_update();
 
-static volatile struct lx_timer_context* timer_ctx = NULL;
+static DEFINE_LLIST(timers);
 
 static volatile u32_t sched_ticks = 0;
 static volatile u32_t sched_ticks_counter = 0;
@@ -36,13 +36,6 @@ void
 timer_init_context()
 {
     timer_pile = cake_new_pile("timer", sizeof(struct lx_timer), 1, 0);
-    timer_ctx =
-      (struct lx_timer_context*)valloc(sizeof(struct lx_timer_context));
-
-    assert_msg(timer_ctx, "Fail to initialize timer contex");
-
-    timer_ctx->active_timers = (struct lx_timer*)cake_grab(timer_pile);
-    llist_init_head(&timer_ctx->active_timers->link);
 }
 
 void
@@ -51,8 +44,6 @@ timer_init()
     timer_init_context();
 
     hwtimer_init(SYS_TIMER_FREQUENCY_HZ, timer_update);
-
-    timer_ctx->base_frequency = hwtimer_base_frequency();
 
     sched_ticks = (SYS_TIMER_FREQUENCY_HZ * SCHED_TIME_SLICE) / 1000;
     sched_ticks_counter = 0;
@@ -92,7 +83,7 @@ timer_run(ticks_t ticks, void (*callback)(void*), void* payload, u8_t flags)
     timer->payload = payload;
     timer->flags = flags;
 
-    llist_append(&timer_ctx->active_timers->link, &timer->link);
+    llist_append(&timers, &timer->link);
 
     return timer;
 }
@@ -101,9 +92,8 @@ static void
 timer_update()
 {
     struct lx_timer *pos, *n;
-    struct lx_timer* timer_list_head = timer_ctx->active_timers;
 
-    llist_for_each(pos, n, &timer_list_head->link, link)
+    llist_for_each(pos, n, &timers, link)
     {
         if (--(pos->counter)) {
             continue;
@@ -126,10 +116,4 @@ timer_update()
         thread_stats_update_entering(false);
         schedule();
     }
-}
-
-struct lx_timer_context*
-timer_context()
-{
-    return (struct lx_timer_context*)timer_ctx;
 }

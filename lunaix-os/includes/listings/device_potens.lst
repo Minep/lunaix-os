@@ -1,0 +1,20 @@
+/**
+ * @brief Communication port capability that a device is supported natively, 
+ *          or able to emulate low level serial transmission behaviour specify 
+ *          by POSIX1-2008, section 11.
+ * 
+ */
+potens(TERMPORT),
+
+/**
+ * @brief Hardware timer capability that allow such device to be integrated
+          and utilised by timer subsystem
+ * 
+ */
+potens(HWTIMER),
+
+/**
+ * @brief RTC capability.
+ * 
+ */
+potens(HWRTC),
