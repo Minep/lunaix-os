@@ -96,9 +96,11 @@ struct dt_prop_val
                 dt_enc_t     encoded;
                 dt_phnd_t    phandle;
             };
-            u32_t        u32_val;
-
-            u64_t        u64_val;
+            
+            union {
+                u32_t        u32_val;
+                u64_t        u64_val;
+            }* uval;
         };
         unsigned int size;
     };
@@ -152,7 +154,6 @@ struct dt_node_base
 
     struct dt_prop_table* props;
 
-    void* obj;
     morph_t* binded_dev;
 };
 
@@ -193,8 +194,14 @@ struct dt_intr_node
     };
 
     struct {
-        bool extended;
-        bool valid;
+        union {
+            struct {
+                bool extended : 1;
+                bool valid : 1;
+            };
+            int flags;
+        };
+
         union {
             struct dt_prop_val   arr;
             struct llist_header  values; 
@@ -236,13 +243,12 @@ struct dt_intr_prop
     struct dt_prop_val   val;
 };
 
-struct dt_prop_iter
+struct dtpropi
 {
     struct dt_prop_val     *prop;
     struct dt_node_base    *node;
     dt_enc_t                prop_loc;
     dt_enc_t                prop_loc_next;
-    unsigned int            ent_sz;
 };
 
 struct dt_context
@@ -402,88 +408,175 @@ dt_found_any(struct dt_node_iter* iter)
 struct dt_context*
 dt_main_context();
 
+static inline u32_t
+dtp_u32(struct dt_prop_val* val)
+{
+    return le(val->uval->u32_val);
+}
+
+static inline u64_t
+dtp_u64(struct dt_prop_val* val)
+{
+    return le64(val->uval->u64_val);
+}
 
 /****
- * DT Main Functions: Node-binding
+ * DT Main Functions: Prop Extractor, for fixed size properties
+ ****/
+
+enum dtprop_types
+{
+    DTP_END = 0,
+    DTP_U32,
+    DTP_U64,
+    DTP_PHANDLE,
+    DTP_COMPX,
+};
+
+struct dtprop_def
+{
+    unsigned int cell;
+    unsigned int acc_sz;
+    enum dtprop_types type;
+};
+
+typedef struct dtprop_def dt_proplet[];
+
+struct dtprop_xval
+{
+    union {
+        u32_t u32;
+        ptr_t u64;
+        struct dt_node* phandle;
+        dt_enc_t composite;
+    };
+    struct dtprop_def* archetype;
+};
+
+struct dtpropx
+{
+    const struct dtprop_def* proplet;
+    int proplet_len;
+    int proplet_sz;
+
+    struct dt_prop_val* raw;
+    off_t row_loc;
+};
+
+#define dtprop_u32              (struct dtprop_def){ 1, 0, DTP_U32 }
+#define dtprop_u64              (struct dtprop_def){ 2, 0, DTP_U64 }
+#define dtprop_handle           (struct dtprop_def){ 1, 0, DTP_PHANDLE }
+#define dtprop_compx(cell)      (struct dtprop_def){ cell, 0, DTP_COMPX }
+#define dtprop_end              (struct dtprop_def){ 0, 0, DTP_END }
+#define dtprop_(type, cell)     (struct dtprop_def){ cell, 0, type }
+
+#define dtprop_reglike(base)                    \
+    ({                                          \
+        dt_proplet p = {                        \
+            dtprop_compx(base->addr_c),         \
+            dtprop_compx(base->sz_c),           \
+            dtprop_end                          \
+        };                                      \
+        dt_proplet;                             \
+    })
+
+#define dtprop_rangelike(node)                  \
+    ({                                          \
+        dt_proplet p = {                        \
+            dtprop_compx(base->addr_c),         \
+            dtprop_compx(base->parent->addr_c), \
+            dtprop_compx(base->sz_c),           \
+            dtprop_end                          \
+        };                                      \
+        dt_proplet;                             \
+    })
+
+#define dtprop_strlst_foreach(pos, prop)    \
+        for (pos = (prop)->str_lst; \
+             pos <= &(prop)->str_lst[(prop)->size - 1]; \
+             pos = &pos[strlen(pos) + 1])
+
+void
+dtpx_compile_proplet(struct dtprop_def* proplet);
+
+void
+dtpx_prepare_with(struct dtpropx* propx, struct dt_prop_val* prop,
+                  struct dtprop_def* proplet);
+
+#define dtproplet_compile(proplet)   \
+        dtpx_compile_proplet(proplet, \
+                          sizeof(proplet) / sizeof(struct dtprop_def))
+
+bool
+dtpx_goto_row(struct dtpropx*, int row);
+
+bool
+dtpx_next_row(struct dtpropx*);
+
+bool
+dtpx_extract_at(struct dtpropx*, struct dtprop_xval*, int col);
+
+bool
+dtpx_extract_loc(struct dtpropx*, struct dtprop_xval*, 
+                 int row, int col);
+
+bool
+dtpx_extract_row(struct dtpropx*, struct dtprop_xval*, int len);
+
+static inline u32_t
+dtpx_xvalu32(struct dtprop_xval* val){
+    return val->archetype->type == DTP_COMPX ?
+            le(*(u32_t*)val->composite) : val->u32;
+}
+
+static inline u64_t
+dtpx_xvalu64(struct dtprop_xval* val){
+    return val->archetype->type == DTP_COMPX ?
+            le64(*(u64_t*)val->composite) : val->u64;
+}
+
+/****
+ * DT Main Functions: Prop Iterator, for variable-sized property
  ****/
 
 static inline void
-dt_bind_object(struct dt_node_base* base, void* obj)
+dtpi_init(struct dtpropi* dtpi, struct dt_node_base* node, 
+          struct dt_prop_val* val)
 {
-    base->obj = obj;
-}
-
-static inline bool
-dt_has_binding(struct dt_node_base* base) 
-{
-    return base->obj != NULL;
-}
-
-#define dt_binding_of(node_base, type)  \
-    ((type)(node_base)->obj)
-
-
-/****
- * DT Main Functions: Prop decoders
- ****/
-
-static inline void
-dt_decode(struct dt_prop_iter* dtpi, struct dt_node_base* node, 
-                struct dt_prop_val* val, unsigned int ent_sz)
-{
-    *dtpi = (struct dt_prop_iter) {
+    *dtpi = (struct dtpropi) {
         .prop = val,
         .node = node,
         .prop_loc = val->encoded,
         .prop_loc_next = val->encoded,
-        .ent_sz = ent_sz
     };
 }
 
-#define dt_decode_reg(dtpi, node, field) \
-            dt_decode(dtpi, &(node)->base, &(node)->field, \
-                        dt_size_cells(&(node)->base) \
-                            + dt_addr_cells(&(node)->base))
-
-#define dt_decode_range(dtpi, node, field) \
-            dt_decode(dtpi, &(node)->base, &(node)->field, \
-                        dt_size_cells(&(node)->base) * 2 \
-                            + dt_addr_cells(&(node)->base))
-
-#define dt_decode_simple(dtpi, prop) \
-            dt_decode(dtpi, NULL, prop, 1);
-
-#define dtprop_off(dtpi) \
+#define dtpi_off(dtpi) \
             (unsigned int)(\
                 __ptr(dtpi->prop_loc_next) - __ptr(dtpi->prop->encoded) \
             )
 
-#define dtprop_extract(dtpi, off) \
+#define dtpi_get(dtpi, off) \
             ( (dt_enc_t) (&(dtpi)->prop_loc[(off)]) )
 
-#define dtprop_strlst_foreach(pos, prop)    \
-        for (pos = (prop)->str_lst; \
-             pos <= &(prop)->str_lst[(prop)->size]; \
-             pos = &pos[strlen(pos) + 1])
-
 static inline bool
-dtprop_next_n(struct dt_prop_iter* dtpi, int n)
+dtpi_nextn(struct dtpropi* dtpi, int n)
 {
     unsigned int off;
 
     dtpi->prop_loc = dtpi->prop_loc_next;
     dtpi->prop_loc_next += n;
 
-    off = dtprop_off(dtpi);
+    off = dtpi_off(dtpi);
     return off >= dtpi->prop->size;
 }
 
 static inline bool
-dtprop_prev_n(struct dt_prop_iter* dtpi, int n)
+dtpi_prevn(struct dtpropi* dtpi, int n)
 {
     unsigned int off;
 
-    off = dtprop_off(dtpi);
+    off = dtpi_off(dtpi);
     if (!off || off > dtpi->prop->size) {
         return false;
     }
@@ -495,94 +588,33 @@ dtprop_prev_n(struct dt_prop_iter* dtpi, int n)
 }
 
 static inline bool
-dtprop_next(struct dt_prop_iter* dtpi)
+dtpi_next(struct dtpropi* dtpi)
 {
-    return dtprop_next_n(dtpi, dtpi->ent_sz);
+    return dtpi_nextn(dtpi, 1);
 }
 
 static inline bool
-dtprop_prev(struct dt_prop_iter* dtpi)
+dtpi_prev(struct dtpropi* dtpi)
 {
-    return dtprop_prev_n(dtpi, dtpi->ent_sz);
-}
-
-static inline unsigned int
-dtprop_to_u32(dt_enc_t enc_val)
-{
-    return le(*enc_val);
-}
-
-#define dtprop_to_phnd(enc_val) \
-            (dt_phnd_t)dtprop_to_u32(enc_val)
-
-static inline u64_t
-dtprop_to_u64(dt_enc_t enc_val)
-{
-    return le64(*(u64_t*)enc_val);
+    return dtpi_prevn(dtpi, 1);
 }
 
 static inline u32_t
-dtprop_u32_at(struct dt_prop_iter* dtpi, int index)
+dtpi_u32_at(struct dtpropi* dtpi, int index)
 {
-    return dtprop_to_u32(dtprop_extract(dtpi, index));
+    return le(*dtpi_get(dtpi, index));
+}
+
+static inline struct dt_node*
+dtpi_refnode_at(struct dtpropi* dtpi, int index)
+{
+    return dt_resolve_phandle(le(*dtpi_get(dtpi, index)));
 }
 
 static inline u32_t
-dtprop_u64_at(struct dt_prop_iter* dtpi, int index)
+dtpi_u64_at(struct dtpropi* dtpi, int index)
 {
-    return dtprop_to_u64(dtprop_extract(dtpi, index));
-}
-
-static inline dt_enc_t
-dtprop_reg_addr(struct dt_prop_iter* dtpi)
-{
-    return dtprop_extract(dtpi, 0);
-}
-
-static inline ptr_t
-dtprop_reg_nextaddr(struct dt_prop_iter* dtpi)
-{
-    ptr_t t;
-
-    t = (ptr_t)dtprop_to_u64(dtprop_reg_addr(dtpi));
-    dtprop_next_n(dtpi, dt_addr_cells(dtpi->node));
-
-    return t;
-}
-
-static inline dt_enc_t
-dtprop_reg_len(struct dt_prop_iter* dtpi)
-{
-    return dtprop_extract(dtpi, dtpi->node->addr_c);
-}
-
-static inline size_t
-dtprop_reg_nextlen(struct dt_prop_iter* dtpi)
-{
-    size_t t;
-
-    t = (size_t)dtprop_to_u64(dtprop_reg_len(dtpi));
-    dtprop_next_n(dtpi, dt_size_cells(dtpi->node));
-
-    return t;
-}
-
-static inline dt_enc_t
-dtprop_range_childbus(struct dt_prop_iter* dtpi)
-{
-    return dtprop_extract(dtpi, 0);
-}
-
-static inline dt_enc_t
-dtprop_range_parentbus(struct dt_prop_iter* dtpi)
-{
-    return dtprop_extract(dtpi, dt_addr_cells(dtpi->node));
-}
-
-static inline dt_enc_t
-dtprop_range_len(struct dt_prop_iter* dtpi)
-{
-    return dtprop_extract(dtpi, dt_addr_cells(dtpi->node) * 2);
+    return le64(*(ptr_t*)dtpi_get(dtpi, index));
 }
 
 #endif /* __LUNAIX_DEVTREE_H */

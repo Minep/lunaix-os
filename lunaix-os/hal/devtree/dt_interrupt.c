@@ -87,7 +87,7 @@ dt_resolve_interrupt_map(struct dt_node* node)
 {
     struct dt_intr_node* inode;
     struct dt_intr_map* imap;
-    struct dt_prop_iter iter;
+    struct dtpropi iter;
 
     struct dt_intr_mapent *ent;
 
@@ -105,7 +105,7 @@ dt_resolve_interrupt_map(struct dt_node* node)
     
     __prepare_key(&imap->key_mask, imap->raw_mask.encoded, keysize);
 
-    dt_decode(&iter, &node->base, &imap->raw, 1);
+    dtpi_init(&iter, &node->base, &imap->raw);
 
     advance = 0;
     do 
@@ -116,20 +116,19 @@ dt_resolve_interrupt_map(struct dt_node* node)
         __prepare_key(&ent->key, iter.prop_loc, advance);
         __mask_key(&ent->key, &imap->key_mask);
 
-        parent_hnd = dtprop_to_phnd(dtprop_extract(&iter, advance));
-        ent->parent = &dt_resolve_phandle(parent_hnd)->base;
+        ent->parent = &dtpi_refnode_at(&iter, advance)->base;
 
         advance++;
         parent_keysize = __interrupt_keysize(ent->parent);
 
-        ent->parent_props.encoded = dtprop_extract(&iter, advance);
+        ent->parent_props.encoded = dtpi_get(&iter, advance);
         ent->parent_props.size = parent_keysize;
 
         advance += parent_keysize;
 
         llist_append(&imap->mapent, &ent->ents);
         
-    } while (dtprop_next_n(&iter, advance));
+    } while (dtpi_nextn(&iter, advance));
 
     imap->resolved = true;
 }

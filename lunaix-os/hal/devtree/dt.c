@@ -310,7 +310,9 @@ __set_parent(struct dt_node_base* parent, struct dt_node_base* node)
     node->parent = parent;
     
     if (parent) {
-        node->_std = parent->_std;
+        node->addr_c = parent->addr_c;
+        node->sz_c = parent->sz_c;
+        node->intr_c = parent->intr_c;
         parent_obj = dt_mobj(parent);
     }
 
@@ -329,7 +331,7 @@ __init_node_regular(struct dt_node* node)
 static void
 __expand_extended_intr(struct dt_intr_node* intrupt)
 {
-    struct dt_prop_iter it;
+    struct dtpropi it;
     struct dt_prop_val  arr;
     struct dt_node *node;
     struct dt_node *master;
@@ -344,11 +346,11 @@ __expand_extended_intr(struct dt_intr_node* intrupt)
 
     llist_init_head(&intrupt->intr.values);
     
-    dt_decode(&it, &node->base, &arr, 1);
+    dtpi_init(&it, &node->base, &arr);
     
     dt_phnd_t phnd;
     do {
-        phnd   = dtprop_to_u32(it.prop_loc);
+        phnd   = le(*it.prop_loc);
         master = dt_resolve_phandle(phnd);
 
         if (!master) {
@@ -365,9 +367,9 @@ __expand_extended_intr(struct dt_intr_node* intrupt)
         };
 
         llist_append(&intrupt->intr.values, &intr_prop->props);
-        dtprop_next_n(&it, intr_prop->val.size);
+        dtpi_nextn(&it, intr_prop->val.size);
         
-    } while(dtprop_next(&it));
+    } while(dtpi_next(&it));
 }
 
 static void
@@ -452,7 +454,9 @@ dt_load(ptr_t dtb_dropoff)
         }
 
         level = it.depth - 1;
-        node = level < 0 ? NULL : depth[level];
+        node = depth[level];
+
+        assert(level >= 0);
 
         if (it.state == FDT_STATE_NODE)
         {
@@ -464,19 +468,18 @@ dt_load(ptr_t dtb_dropoff)
 
             __dt_node_set_name(node, it.detail->extra_data);
 
+            if (level) {
+                __set_parent(depth[level - 1], &node->base);
+            }
+
             nr_nodes++;
             depth[level] = node;
             continue;
         }
         
-        if (level >= 0 && it.state == FDT_STATE_NODE_EXIT)
+        if (it.state == FDT_STATE_NODE_EXIT)
         {
-            child = depth[it.depth];
-            assert(child);
-
-            __set_parent(&node->base, &child->base);
             depth[it.depth] = NULL;
-
             continue;
         }
         
@@ -619,6 +622,144 @@ dt_getprop(struct dt_node_base* base, const char* name)
     }
 
     return NULL;
+}
+
+void
+dtpx_compile_proplet(struct dtprop_def* proplet)
+{
+    int i;
+    unsigned int acc = 0;
+    
+    for (i = 0; proplet[i].type && i < 10; ++i)
+    {
+        proplet[i].acc_sz = acc;
+        acc += proplet[i].cell;
+    }
+
+    if (proplet[i - 1].type && i == 10) {
+        FATAL("invalid proplet: no terminator detected");
+    }
+
+    proplet[i].acc_sz = acc;
+}
+
+void
+dtpx_prepare_with(struct dtpropx* propx, struct dt_prop_val* prop,
+                  struct dtprop_def* proplet)
+{
+    int i;
+    bool has_str = false;
+    
+    for (i = 0; proplet[i].type; ++i);
+
+    propx->proplet = proplet;
+    propx->proplet_len = i;
+    propx->proplet_sz = proplet[i].acc_sz;
+    propx->raw = prop;
+    propx->row_loc = 0;
+}
+
+bool
+dtpx_goto_row(struct dtpropx* propx, int row)
+{
+    off_t loc;
+
+    loc  = propx->proplet_sz;
+    loc *= row;
+
+    if (loc * sizeof(u32_t) >= propx->raw->size) {
+        return false;
+    }
+
+    propx->row_loc = loc;
+    return true;
+}
+
+bool
+dtpx_next_row(struct dtpropx* propx)
+{
+    off_t loc;
+
+    loc  = propx->row_loc;
+    loc += propx->proplet_sz;
+
+    if (loc * sizeof(u32_t) >= propx->raw->size) {
+        return false;
+    }
+
+    propx->row_loc = loc;
+    return true;
+}
+
+bool
+dtpx_extract_at(struct dtpropx* propx, 
+                struct dtprop_xval* val, int col)
+{
+    struct dtprop_def* def;
+    dt_enc_t raw;
+
+    if (unlikely(col >= propx->proplet_len)) {
+        return false;
+    }
+
+    def = &propx->proplet[col];
+    raw = &propx->raw->encoded[propx->row_loc + def->acc_sz];
+
+    val->archetype = def;
+
+    switch (def->type)
+    {
+        case DTP_U32:
+            val->u32 = le(*raw);
+            break;
+
+        case DTP_U64:
+            val->u64 = le64(*(ptr_t*)raw);
+            break;
+
+        case DTP_PHANDLE:
+        {
+            ptr_t hnd = le(*raw);
+            val->phandle = dt_resolve_phandle(hnd);
+        } break;
+
+        case DTP_COMPX:
+            val->composite = raw;
+            break;
+        
+        default:
+            break;
+    }
+}
+
+bool
+dtpx_extract_loc(struct dtpropx* propx, 
+                 struct dtprop_xval* val, int row, int col)
+{
+    ptr_t loc = propx->row_loc;
+
+    if (!dtpx_goto_row(propx, row))
+        return false;
+
+    
+    bool r = dtpx_extract_at(propx, val, col);
+    propx->row_loc = loc;
+    return r;
+}
+
+bool
+dtpx_extract_row(struct dtpropx* propx, struct dtprop_xval* vals, int len)
+{
+    assert(len == propx->proplet_len);
+
+    for (int i = 0; i < len; i++)
+    {
+        if (!dtpx_extract_at(propx, &vals[i], i)) {
+            return false;
+        }
+    }
+    
+    return true;
 }
 
 struct dt_context*

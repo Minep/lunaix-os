@@ -12,20 +12,6 @@ propeq(struct fdt_iter* it, const char* key)
 }
 
 static inline void
-__mkprop_val32(struct fdt_iter* it, struct dt_prop_val* val)
-{
-    val->u32_val = le(*(u32_t*)&it->prop[1]);
-    val->size = le(it->prop->len);
-}
-
-static inline void
-__mkprop_val64(struct fdt_iter* it, struct dt_prop_val* val)
-{
-    val->u64_val = le64(*(u64_t*)&it->prop[1]);
-    val->size = le(it->prop->len);
-}
-
-static inline void
 __mkprop_ptr(struct fdt_iter* it, struct dt_prop_val* val)
 {
     val->ptr_val = __ptr(&it->prop[1]);
