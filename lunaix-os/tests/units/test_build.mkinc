@@ -1,13 +1,5 @@
+MAKEFLAGS += --no-print-directory
 
-lunaix-root := $(LUNAIX_ROOT)
-unit-test-root := $(lunaix-root)/tests/units
-CFLAGS += -idirafter $(lunaix-root)/includes	\
-		  -isystem $(unit-test-root)/stubs/includes \
-		  -Wno-discarded-qualifiers \
-		  -g
+include $(LUNAIX_ROOT)/tests/shared/makefile
 
-include $(lunaix-root)/makeinc/utils.mkinc
-
-%.o: %.c
-	$(call status,CC,$(@F))
-	@$(CC) $(CFLAGS) -c $< -o $@
+CFLAGS += -isystem $(unit-test-root)/stubs/includes

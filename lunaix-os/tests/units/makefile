@@ -21,6 +21,9 @@ test-%:
 all: _ACT := all
 all: $(obj-stubs) $(test-dir)
 
+run: _ACT := run
+run: $(obj-stubs) $(test-dir)
+
 clean: _ACT := clean
 clean: $(test-dir)
 	@rm -f $(obj-stubs)
