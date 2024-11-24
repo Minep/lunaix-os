@@ -1,0 +1,1 @@
+../../../../hal/devtree/devtree.h
