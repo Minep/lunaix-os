@@ -30,7 +30,7 @@ struct hstr
 #define HSTR_LEN(hstr)  ((hstr).len)
 #define HSTR_HASH(hstr) ((hstr).hash)
 
-inline void
+static inline void
 hstr_rehash(struct hstr* hash_str, u32_t truncate_to)
 {
     hash_str->hash = strhash_32(hash_str->value, truncate_to);

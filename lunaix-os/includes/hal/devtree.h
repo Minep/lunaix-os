@@ -5,7 +5,6 @@
 #include <lunaix/ds/llist.h>
 #include <lunaix/ds/hstr.h>
 #include <lunaix/ds/hashtable.h>
-#include <lunaix/boot_generic.h>
 #include <lunaix/changeling.h>
 
 #include <klibc/string.h>
@@ -17,10 +16,10 @@
 
 #define le64(v) (((u64_t)le(v & 0xffffffff) << 32) | le(v >> 32))
 
-#define be(v) ((((v) << 24) & 0x000000ff)  |\
-               (((v) >> 8)  & 0x00ff0000)  |\
-               (((v) << 8)  & 0x0000ff00)  |\
-               (((v) >> 24) & 0xff000000))
+#define be(v) ((((v) & 0x000000ff) << 24)  |\
+               (((v) & 0x00ff0000) >> 8 )  |\
+               (((v) & 0x0000ff00) << 8 )  |\
+               (((v) & 0xff000000) >> 24))
 
 #define FDT_MAGIC       be(0xd00dfeed)
 #define FDT_NOD_BEGIN   be(0x00000001)
@@ -157,14 +156,6 @@ struct dt_node_base
     morph_t* binded_dev;
 };
 
-struct dt_root
-{
-    struct dt_node_base base;
-
-    const char*         serial;
-    const char*         chassis;
-};
-
 struct dt_intr_prop;
 
 struct dt_intr_mapkey
@@ -262,9 +253,17 @@ struct dt_context
     };
 
     struct llist_header   nodes;
-    struct dt_root       *root;
+    struct dt_node       *root;
     struct hbucket        phnds_table[16];
     const char           *str_block;
+};
+
+enum fdt_state {
+    FDT_STATE_START,
+    FDT_STATE_NODE,
+    FDT_STATE_NODE_EXIT,
+    FDT_STATE_PROP,
+    FDT_STATE_END,
 };
 
 struct fdt_iter
@@ -273,10 +272,18 @@ struct fdt_iter
         struct fdt_token      *pos;
         struct fdt_prop       *prop;
         struct fdt_node_head  *node_head;
+        struct {
+            struct fdt_token token;
+            char extra_data[0];
+        } *detail;
     };
 
+    struct fdt_token* next;
+    
     const char* str_block;
     int depth;
+    enum fdt_state state;
+    bool invalid;
 };
 
 struct fdt_memrsvd_iter
@@ -328,7 +335,7 @@ fdt_memrsvd_itend(struct fdt_memrsvd_iter* rsvdi);
 static inline char*
 fdtit_prop_key(struct fdt_iter* fdti)
 {
-    return &fdti->str_block[fdti->prop->nameoff];
+    return &fdti->str_block[le(fdti->prop->nameoff)];
 }
 
 

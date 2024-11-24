@@ -9,6 +9,7 @@
 !scripts
 !usr
 !link
+!tests
 
 !.gitignore
 !*.md

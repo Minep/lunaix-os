@@ -24,7 +24,9 @@ fdt_itbegin(struct fdt_iter* fdti, struct fdt_header* fdt_hdr)
     
     *fdti = (struct fdt_iter) {
         .pos = tok,
-        .str_block = str_blk
+        .next = tok,
+        .str_block = str_blk,
+        .state = FDT_STATE_START,
     };
 }
 
@@ -40,7 +42,7 @@ fdt_itnext(struct fdt_iter* fdti)
     struct fdt_token *current;
     struct fdt_prop  *prop;
 
-    current = fdti->pos;
+    current = fdti->next;
     if (!current) {
         return false;
     }
@@ -51,36 +53,50 @@ fdt_itnext(struct fdt_iter* fdti)
             continue;
         }
 
-        if (fdt_prop(current)) {
-            prop    = (struct fdt_prop*) current;
-            current = offset(current, prop->len);
-            continue;
+        if (fdt_node(current)) {
+            fdti->state = FDT_STATE_NODE;
+            fdti->depth++;
+            goto done;
         }
         
         if (fdt_node_end(current)) {
+            if (!fdti->depth) {
+                fdti->state = FDT_STATE_END;
+                break;
+            }
+
+            fdti->state = FDT_STATE_NODE_EXIT;
             fdti->depth--;
-            continue;
-        }
-        
-        // node begin
-
-        fdti->depth++;
-        if (fdti->depth == 1) {
-            // enter root node
-            break;
-        }
-
-        while (!fdt_prop(current) && !fdt_node_end(current)) {
-            current++;
+            goto done;
         }
 
         if (fdt_prop(current)) {
-            break;
+            fdti->state = FDT_STATE_PROP;
+            goto done;
         }
-        
+
+        fdti->invalid = true;
+
         current++;
-        
-    } while (fdt_nope(current) && fdti->depth > 0);
+    } while (!fdti->invalid && fdti->state != FDT_STATE_END);
+
+    return false;
+    
+done:
+    fdti->pos = current;
+
+    ptr_t moves = sizeof(struct fdt_token);
+
+    if (fdti->state == FDT_STATE_PROP) {
+        moves = le(fdti->prop->len);
+        moves += sizeof(struct fdt_prop);
+    } 
+    else if (fdti->state == FDT_STATE_NODE) {
+        moves += strlen(fdti->detail->extra_data) + 1;
+    }
+
+    moves = ROUNDUP(moves, sizeof(struct fdt_token));
+    fdti->next = offset(current, moves);
 
     return fdti->depth > 0;
 }
@@ -225,7 +241,7 @@ __parse_stdflags(struct fdt_iter* it, struct dt_node_base* node)
 }
 
 static inline void
-__dt_node_set_name(struct dt_node_base* node, const char* name)
+__dt_node_set_name(struct dt_node* node, const char* name)
 {
     changeling_setname(&node->mobj, name);
 }
@@ -237,6 +253,8 @@ __init_prop_table(struct dt_node_base* node)
 
     propt = valloc(sizeof(*propt));
     hashtable_init(propt->_op_bucket);
+
+    node->props = propt;
 }
 
 #define prop_table_add(node, prop)                                             \
@@ -283,50 +301,28 @@ __fill_node(struct fdt_iter* it, struct dt_node* node)
     __parse_other_prop(it, &node->base);
 }
 
-static void
-__fill_root(struct fdt_iter* it, struct dt_root* node)
-{
-    if (__parse_stdflags(it, &node->base)) {
-        return;
-    }
-    
-    if (__parse_stdbase_prop(it, &node->base)) {
-        return;
-    }
-
-    struct fdt_prop* prop;
-
-    prop = it->prop;
-    if (propeq(it, "serial-number")) {
-        node->serial = (const char*)&prop[1];
-    }
-
-    else if (propeq(it, "chassis-type")) {
-        node->chassis = (const char*)&prop[1];
-    }
-
-    __parse_other_prop(it, &node->base);
-}
-
 static inline void
-__init_node(struct dt_node_base* node)
+__set_parent(struct dt_node_base* parent, struct dt_node_base* node)
 {
-    morph_t* parent;
-
-    parent = devtree_obj_root;
-    if (node->parent) {
-        parent = node->mobj.parent;
-        node->_std = node->parent->_std;
+    morph_t* parent_obj;
+    
+    parent_obj   = devtree_obj_root;
+    node->parent = parent;
+    
+    if (parent) {
+        node->_std = parent->_std;
+        parent_obj = dt_mobj(parent);
     }
 
-    __init_prop_table(node);
-    changeling_morph_anon(parent, node->mobj, dt_morpher);
+    changeling_attach(parent_obj, dt_mobj(node));
 }
 
 static inline void
 __init_node_regular(struct dt_node* node)
 {
-    __init_node(&node->base);
+    __init_prop_table(&node->base);
+    changeling_morph_anon(NULL, node->mobj, dt_morpher);
+ 
     node->intr.parent_hnd = PHND_NULL;
 }
 
@@ -427,11 +423,11 @@ dt_load(ptr_t dtb_dropoff)
     dtctx.reloacted_dtb = dtb_dropoff;
 
     if (dtctx.fdt->magic != FDT_MAGIC) {
-        ERROR("invalid dtb, unexpected magic: 0x%x", dtctx.fdt->magic);
+        ERROR("invalid dtb, unexpected magic: 0x%x, expect: 0x%x", dtctx.fdt->magic, FDT_MAGIC);
         return false;
     }
 
-    size_t str_off = le(dtctx.fdt->size_dt_strings);
+    size_t str_off = le(dtctx.fdt->off_dt_strings);
     dtctx.str_block = offset_t(dtb_dropoff, const char, str_off);
 
     llist_init_head(&dtctx.nodes);
@@ -439,17 +435,15 @@ dt_load(ptr_t dtb_dropoff)
 
     struct fdt_iter it;
     struct fdt_token* tok;
-    struct dt_node_base *node, *prev;
+    struct dt_node *node, *child;
     
-    struct dt_node_base* depth[16];
-    bool is_root_level, filled;
+    struct dt_node* depth[16] = { NULL };
+    int level, nr_nodes = 0;
 
     node = NULL;
-    depth[0] = NULL;
     fdt_itbegin(&it, dtctx.fdt);
     
     while (fdt_itnext(&it)) {
-        is_root_level = it.depth == 1;
 
         if (it.depth >= 16) {
             // tree too deep
@@ -457,44 +451,57 @@ dt_load(ptr_t dtb_dropoff)
             return false;
         }
 
-        depth[it.depth] = NULL;
-        node = depth[it.depth - 1];
+        level = it.depth - 1;
+        node = level < 0 ? NULL : depth[level];
 
-        if (!node) {
-            // need new node
-            if (unlikely(is_root_level)) {
-                node = vzalloc(sizeof(struct dt_root));
-                __init_node(node);
-            }
-            else {
-                node = vzalloc(sizeof(struct dt_node));
-                prev = depth[it.depth - 2];
-                node->parent = prev;
+        if (it.state == FDT_STATE_NODE)
+        {
+            assert(!node);
 
-                __init_node_regular((struct dt_node*)node);
+            node = vzalloc(sizeof(struct dt_node));
+            __init_node_regular(node);
+            llist_append(&dtctx.nodes, &node->base.nodes);
 
-                llist_append(&dtctx.nodes, &node->nodes);
-            }
+            __dt_node_set_name(node, it.detail->extra_data);
 
-            __dt_node_set_name(node, (const char*)&it.pos[1]);
+            nr_nodes++;
+            depth[level] = node;
+            continue;
         }
+        
+        if (level >= 0 && it.state == FDT_STATE_NODE_EXIT)
+        {
+            child = depth[it.depth];
+            assert(child);
 
-        if (unlikely(is_root_level)) {
-            __fill_root(&it, (struct dt_root*)node);
+            __set_parent(&node->base, &child->base);
+            depth[it.depth] = NULL;
+
+            continue;
         }
-        else {
-            __fill_node(&it, (struct dt_node*)node);
+        
+        assert(node);
+
+        if (it.state == FDT_STATE_PROP)
+        {
+            __fill_node(&it, node);
         }
+    }
+
+    if (it.invalid)
+    {
+        FATAL("invalid dtb. state: %d, token: 0x%x", 
+                it.state, it.pos->token);
     }
 
     fdt_itend(&it);
 
-    dtctx.root = (struct dt_root*)depth[0];
+    dtctx.root = depth[0];
 
     __resolve_phnd_references();
     __resolve_inter_map();
 
-    INFO("device tree loaded");
+    INFO("%d nodes loaded.", nr_nodes);
 
     return true;
 }
