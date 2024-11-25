@@ -13,7 +13,7 @@ dtspec_create(struct dtn* node, struct dtp_val* map,
     struct dtpropi it;
     struct dtspec_map* spec;
     struct dtspec_mapent* ent;
-    struct dtp_val val, *field;
+    struct dtp_val val = {}, *field;
     int keysz, p_keysz;
 
     assert(ops->child_keysz);
@@ -58,7 +58,7 @@ dtspec_create(struct dtn* node, struct dtp_val* map,
 static bool
 __try_match(struct dtspec_key* given, struct dtspec_key* against)
 {
-    for (int i = 0; i < given->size; i++)
+    for (unsigned int i = 0; i < given->size; i++)
     {
         if (given->val[i] != against->val[i])
             return false;
@@ -92,7 +92,7 @@ dtspec_lookup(struct dtspec_map* map, struct dtspec_key* key)
 void
 dtspec_applymask(struct dtspec_map* map, struct dtspec_key* key)
 {
-    for (int i = 0; i < map->mask.size; i++)
+    for (unsigned int i = 0; i < map->mask.size; i++)
     {
         key->val[i] &= map->mask.val[i];
     }

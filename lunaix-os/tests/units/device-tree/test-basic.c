@@ -103,7 +103,7 @@ testcase_child2(struct dt_context* ctx)
 
     begin_testcase("dtpx-mixed");
 
-    struct dtprop_xval xvals[4];
+    struct dtprop_xval xvals[5];
     dt_proplet mixed_array = { 
         dtprop_handle, dtprop_u32, dtprop_u32, dtprop_u32, dtprop_u32,
         dtprop_end

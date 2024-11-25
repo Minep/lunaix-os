@@ -68,8 +68,10 @@ struct fdt_prop
     u32_t len;
     u32_t nameoff;
 
-    u32_t val[0];
-    char  val_str[0];
+    union {
+        u32_t val[0];
+        char  val_str[0];
+    } _be;
 } _be compact align(4);
 
 union dtp_baseval

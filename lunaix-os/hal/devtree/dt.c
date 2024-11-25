@@ -724,6 +724,8 @@ dtpx_extract_at(struct dtpropx* propx,
         default:
             break;
     }
+
+    return true;
 }
 
 bool

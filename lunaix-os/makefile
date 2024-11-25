@@ -76,5 +76,6 @@ clean:
 	@rm -rf $(kbuild_dir) || exit 1
 	@rm -rf .builder || exit 1
 
+export CFLAGS=-include $(lbuild_config_h)
 unit-test:
 	@$(MAKE) $(MKFLAGS) -C tests/units run 
