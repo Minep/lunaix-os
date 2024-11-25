@@ -104,7 +104,7 @@ __try_match(const char* str, const char* pattern, size_t pat_sz)
 }
 
 static struct device_meta*
-__try_create_categorical(struct dt_node_base *p)
+__try_create_categorical(struct dtn_base *p)
 {
     if (!p) return NULL;
 
@@ -130,7 +130,7 @@ __try_create_categorical(struct dt_node_base *p)
 }
 
 static bool
-compat_matched(struct dtm_driver_record* rec, struct dt_node_base *base)
+compat_matched(struct dtm_driver_record* rec, struct dtn_base *base)
 {
     const char *compat;
     struct dtm_driver_info *p, *n;
@@ -156,7 +156,7 @@ dtm_try_create_from(struct device_def* def)
     const char *name;
     struct dt_context* dtctx;
     struct dtm_driver_record* rec;
-    struct dt_node_base *p, *n;
+    struct dtn_base *p, *n;
     
     dtctx = dt_main_context();
 

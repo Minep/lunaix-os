@@ -9,7 +9,8 @@
 #define MAX_DTB_SZ (2 * 1024 * 1024)
 
 #ifndef TEST_DTBFILE
-#error "no test dtb file given"
+#warning "no test dtb file given"
+#define TEST_DTBFILE ""
 #endif
 
 extern void init_export___init_devtree();

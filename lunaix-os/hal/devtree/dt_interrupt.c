@@ -20,10 +20,10 @@ __get_map(struct dt_intr_node* node)
 }
 
 static void
-__prepare_key(struct dt_intr_mapkey* key, 
+__prepare_key(struct dt_speckey* key, 
               dt_enc_t key_raw, unsigned int keylen)
 {
-    *key = (struct dt_intr_mapkey) {
+    *key = (struct dt_speckey) {
         .val = valloc(keylen * sizeof(int)),
         .size = keylen
     };
@@ -32,19 +32,19 @@ __prepare_key(struct dt_intr_mapkey* key,
 }
 
 static inline void
-__destory_key(struct dt_intr_mapkey* key)
+__destory_key(struct dt_speckey* key)
 {
     vfree(key->val);
 }
 
 static inline unsigned int
-__interrupt_keysize(struct dt_node_base* base)
+__interrupt_keysize(struct dtn_base* base)
 {
-    return dt_size_cells(base) + base->intr_c;
+    return base->addr_c + base->intr_c;
 }
 
-static void
-__mask_key(struct dt_intr_mapkey* k, struct dt_intr_mapkey* mask)
+void
+dt_speckey_mask(struct dt_speckey* k, struct dt_speckey* mask)
 {
     for (unsigned int i = 0; i < k->size; i++)
     {
@@ -53,7 +53,7 @@ __mask_key(struct dt_intr_mapkey* k, struct dt_intr_mapkey* mask)
 }
 
 static bool
-__compare_key(struct dt_intr_mapkey* k1, struct dt_intr_mapkey* k2)
+__compare_key(struct dt_speckey* k1, struct dt_speckey* k2)
 {
     if (k1->size != k2->size) {
         return false;
@@ -69,10 +69,10 @@ __compare_key(struct dt_intr_mapkey* k1, struct dt_intr_mapkey* k2)
     return true;
 }
 
-static struct dt_node_base*
-__get_connected_nexus(struct dt_node_base* base)
+static struct dtn_base*
+__get_connected_nexus(struct dtn_base* base)
 {
-    struct dt_node_base* current;
+    struct dtn_base* current;
 
     current = base;
     while (current && !current->intr_neuxs) {
@@ -83,62 +83,49 @@ __get_connected_nexus(struct dt_node_base* base)
 }
 
 void
-dt_resolve_interrupt_map(struct dt_node* node)
+dt_resolve_interrupt_map(struct dtn* node)
 {
-    struct dt_intr_node* inode;
     struct dt_intr_map* imap;
-    struct dtpropi iter;
-
+    struct dtpropi it;
+    struct dtp_val val;
     struct dt_intr_mapent *ent;
 
     unsigned int keysize, parent_keysize;
-    unsigned int advance;
-    dt_phnd_t parent_hnd;
     
-    inode = &node->intr;
-    if (likely(!inode->map)) {
+    imap = node->intr.map;
+    if (likely(!imap)) {
         return;
     }
 
-    imap = inode->map;
     keysize = __interrupt_keysize(&node->base);
-    
     __prepare_key(&imap->key_mask, imap->raw_mask.encoded, keysize);
 
-    dtpi_init(&iter, &node->base, &imap->raw);
+    dtpi_init(&it, &imap->raw);
 
-    advance = 0;
-    do 
+    while (dtpi_has_next(&it)) 
     {
-        advance = keysize;
         ent = valloc(sizeof(*ent));
 
-        __prepare_key(&ent->key, iter.prop_loc, advance);
-        __mask_key(&ent->key, &imap->key_mask);
+        dtpi_next_val(&it, &val, keysize);
+        __prepare_key(&ent->key, val.encoded, keysize);
 
-        ent->parent = &dtpi_refnode_at(&iter, advance)->base;
+        ent->parent = &dtpi_next_hnd(&it)->base;
 
-        advance++;
         parent_keysize = __interrupt_keysize(ent->parent);
+        dtpi_next_val(&it, &ent->parent_props, parent_keysize);
 
-        ent->parent_props.encoded = dtpi_get(&iter, advance);
-        ent->parent_props.size = parent_keysize;
-
-        advance += parent_keysize;
-
-        llist_append(&imap->mapent, &ent->ents);
-        
-    } while (dtpi_nextn(&iter, advance));
+        llist_append(&imap->mapent, &ent->ents);        
+    };
 
     imap->resolved = true;
 }
 
-struct dt_prop_val*
-dt_resolve_interrupt(struct dt_node* node)
+struct dtp_val*
+dt_resolve_interrupt(struct dtn* node)
 {
-    struct dt_node_base* nexus;
+    struct dtn_base* nexus;
     struct dt_intr_node* i_nexus, *i_node;
-    struct dt_intr_mapkey key;
+    struct dt_speckey key;
     unsigned int keylen;
 
     if (!node->intr.intr.valid) {
@@ -154,18 +141,18 @@ dt_resolve_interrupt(struct dt_node* node)
     }
 
     keylen = __interrupt_keysize(nexus);
-    key = (struct dt_intr_mapkey) {
+    key = (struct dt_speckey) {
         .val = valloc(keylen * sizeof(int)),
         .size = keylen
     };
 
     memcpy( key.val, 
-            node->reg.encoded, dt_addr_cells(nexus) * sizeof(int));
+            node->reg.encoded, nexus->addr_c * sizeof(int));
     
-    memcpy(&key.val[dt_addr_cells(nexus)],
+    memcpy(&key.val[nexus->addr_c],
             i_node->intr.arr.encoded, nexus->intr_c * sizeof(int));
 
-    __mask_key(&key, &i_nexus->map->key_mask);
+    dt_speckey_mask(&key, &i_nexus->map->key_mask);
 
     struct dt_intr_mapent *pos, *n;
 

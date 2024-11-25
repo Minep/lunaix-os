@@ -1,13 +1,13 @@
 include test_build.mkinc
 
+tests := basic inheritence intrmap
+
 obj = dut/dt_interrupt.o \
 	  dut/dt.o \
 	  dut/changeling.o \
 
-dtbs := samples/inheritence.dtb	\
-		samples/basic.dtb
+dtbs := $(addprefix samples/,$(addsuffix .dtb,$(tests)))
 
-tests := basic inheritence
 tests := $(addsuffix .test,$(tests))
 run_tests := $(addprefix run.,$(tests))
 
@@ -22,6 +22,7 @@ load.%.o:: load.c
 	@$(CC) $(CFLAGS) -DTEST_DTBFILE=\"samples/$*.dtb\" -c $^ -o $@
 
 %.test: $(obj-shared) $(obj-stubs) $(obj) test-%.o load.%.o
+	$(call status,LD,$@)
 	@$(CC) $^ -o $@
 
 run.%.test: %.test
@@ -33,4 +34,4 @@ all: $(dtbs) $(tests)
 run: $(dtbs) $(tests) $(run_tests)
 
 clean:
-	@rm -f *.o test samples/*.dtb
+	@rm -f *.o $(obj) $(test) $(dtbs)

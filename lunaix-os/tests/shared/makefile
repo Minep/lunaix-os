@@ -8,6 +8,7 @@ test-shared-root := $(test-root)/shared
 CFLAGS += -idirafter $(lunaix-root)/includes	\
 		  -I $(test-root)/includes \
 		  -Wno-discarded-qualifiers \
+		  -Wno-scalar-storage-order \
 		  -g
 
 

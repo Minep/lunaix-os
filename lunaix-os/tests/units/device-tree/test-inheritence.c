@@ -2,15 +2,15 @@
 #include <testing/basic.h>
 #include <unistd.h>
 
-static inline struct dt_node* 
-get_node(struct dt_node* parent, const char* name)
+static inline struct dtn* 
+get_node(struct dtn* parent, const char* name)
 {
-    struct dt_node_iter it;
-    struct dt_node* node;
+    struct dtn_iter it;
+    struct dtn* node;
     
     dt_begin_find_byname(&it, parent, name);
     
-    node = (struct dt_node*)it.matched;
+    node = (struct dtn*)it.matched;
     expect_notnull(node);
 
     return node;
@@ -27,7 +27,7 @@ run_test(int argc, const char* argv[])
     }
 
     struct dt_context* ctx;
-    struct dt_node* node;
+    struct dtn* node;
 
     ctx = dt_main_context();
 

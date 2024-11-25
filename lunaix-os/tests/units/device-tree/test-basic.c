@@ -2,17 +2,17 @@
 #include <testing/basic.h>
 #include <unistd.h>
 
-static inline struct dt_node* 
+static inline struct dtn* 
 validate_node(struct dt_context* ctx, 
               const char* name, const char* compat)
 {
-    struct dt_node_iter it;
-    struct dt_node* node = ctx->root;
+    struct dtn_iter it;
+    struct dtn* node = ctx->root;
 
     
     dt_begin_find_byname(&it, node, name);
     
-    node = (struct dt_node*)it.matched;
+    node = (struct dtn*)it.matched;
 
     expect_notnull(node);
     expect_str(node->base.compat.str_val, compat);
@@ -25,7 +25,7 @@ validate_node(struct dt_context* ctx,
 static void
 testcase_rootfield(struct dt_context* ctx)
 {
-    struct dt_node* node = ctx->root;
+    struct dtn* node = ctx->root;
 
     begin_testcase("root");
 
@@ -39,8 +39,8 @@ testcase_rootfield(struct dt_context* ctx)
 static void
 testcase_child1(struct dt_context* ctx)
 {
-    struct dt_node* node;
-    struct dt_prop_val* val;
+    struct dtn* node;
+    struct dtp_val* val;
 
     begin_testcase("trivial-props");
     
@@ -75,10 +75,10 @@ testcase_child1(struct dt_context* ctx)
 static void
 testcase_child2(struct dt_context* ctx)
 {
-    struct dt_node* node;
+    struct dtn* node;
     struct dtpropx propx;
     struct dtprop_xval val;
-    struct dt_prop_val* prop;
+    struct dtp_val* prop;
     
     begin_testcase("dtpx-reg");
     
@@ -140,10 +140,10 @@ testcase_child2(struct dt_context* ctx)
 static void
 testcase_child3(struct dt_context* ctx)
 {
-    struct dt_node* node;
+    struct dtn* node;
     struct dtpropx propx;
     struct dtprop_xval val;
-    struct dt_prop_val* prop;
+    struct dtp_val* prop;
     
     begin_testcase("simple-flags");
     

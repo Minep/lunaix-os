@@ -11,7 +11,7 @@ struct device;
 #include <lunaix/ds/list.h>
 #include <klibc/hash.h>
 
-typedef struct dt_node* devtree_link_t;
+typedef struct dtn* devtree_link_t;
 
 #define dt_node_morpher     morphable_attrs(dt_node, mobj)
 

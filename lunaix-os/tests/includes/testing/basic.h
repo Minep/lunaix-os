@@ -70,6 +70,9 @@ struct test_context
 #define expect_false(val)  \
     _expect(!val, "true", "false", "<%s>")
 
+#define testcase(name, body)    \
+    do { begin_testcase(name); body; end_testcase(); } while(0)
+
 void
 begin_testcase(const char* name);
 

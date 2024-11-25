@@ -16,8 +16,8 @@ fdt_itbegin(struct fdt_iter* fdti, struct fdt_header* fdt_hdr)
     struct fdt_token* tok;
     const char* str_blk;
 
-    off_str    = le(fdt_hdr->off_dt_strings);
-    off_struct = le(fdt_hdr->off_dt_struct);
+    off_str    = fdt_hdr->off_dt_strings;
+    off_struct = fdt_hdr->off_dt_struct;
 
     tok = offset_t(fdt_hdr, struct fdt_token, off_struct);
     str_blk = offset_t(fdt_hdr, const char, off_str);
@@ -88,7 +88,7 @@ done:
     ptr_t moves = sizeof(struct fdt_token);
 
     if (fdti->state == FDT_STATE_PROP) {
-        moves = le(fdti->prop->len);
+        moves = fdti->prop->len;
         moves += sizeof(struct fdt_prop);
     } 
     else if (fdti->state == FDT_STATE_NODE) {
@@ -113,7 +113,7 @@ void
 fdt_memrsvd_itbegin(struct fdt_memrsvd_iter* rsvdi, 
                     struct fdt_header* fdt_hdr)
 {
-    size_t off = le(fdt_hdr->off_mem_rsvmap);
+    size_t off = fdt_hdr->off_mem_rsvmap;
     
     rsvdi->block = 
         offset_t(fdt_hdr, typeof(*rsvdi->block), off);
@@ -143,7 +143,7 @@ fdt_memrsvd_itend(struct fdt_memrsvd_iter* rsvdi)
 }
 
 static bool
-__parse_stdbase_prop(struct fdt_iter* it, struct dt_node_base* node)
+__parse_stdbase_prop(struct fdt_iter* it, struct dtn_base* node)
 {
     struct fdt_prop* prop;
 
@@ -170,7 +170,7 @@ __parse_stdbase_prop(struct fdt_iter* it, struct dt_node_base* node)
     } 
     
     else if (propeq(it, "status")) {
-        char peek = *(char*)&it->prop[1];
+        char peek = it->prop->val_str[0];
         if (peek == 'o') {
             node->status = STATUS_OK;
         }
@@ -193,7 +193,7 @@ __parse_stdbase_prop(struct fdt_iter* it, struct dt_node_base* node)
 }
 
 static bool
-__parse_stdnode_prop(struct fdt_iter* it, struct dt_node* node)
+__parse_stdnode_prop(struct fdt_iter* it, struct dtn* node)
 {
     if (propeq(it, "reg")) {
         __mkprop_ptr(it, &node->reg);
@@ -219,7 +219,7 @@ __parse_stdnode_prop(struct fdt_iter* it, struct dt_node* node)
 }
 
 static bool
-__parse_stdflags(struct fdt_iter* it, struct dt_node_base* node)
+__parse_stdflags(struct fdt_iter* it, struct dtn_base* node)
 {
     if (propeq(it, "dma-coherent")) {
         node->dma_coherent = true;
@@ -241,15 +241,15 @@ __parse_stdflags(struct fdt_iter* it, struct dt_node_base* node)
 }
 
 static inline void
-__dt_node_set_name(struct dt_node* node, const char* name)
+__dt_node_set_name(struct dtn* node, const char* name)
 {
     changeling_setname(&node->mobj, name);
 }
 
 static inline void
-__init_prop_table(struct dt_node_base* node)
+__init_prop_table(struct dtn_base* node)
 {
-    struct dt_prop_table* propt;
+    struct dtp_table* propt;
 
     propt = valloc(sizeof(*propt));
     hashtable_init(propt->_op_bucket);
@@ -262,9 +262,9 @@ __init_prop_table(struct dt_node_base* node)
                               &(prop)->ht, (prop)->key.hash);
 
 static void
-__parse_other_prop(struct fdt_iter* it, struct dt_node_base* node)
+__parse_other_prop(struct fdt_iter* it, struct dtn_base* node)
 {
-    struct dt_prop* prop;
+    struct dtp* prop;
     const char* key;
     unsigned int hash;
 
@@ -280,7 +280,7 @@ __parse_other_prop(struct fdt_iter* it, struct dt_node_base* node)
 }
 
 static void
-__fill_node(struct fdt_iter* it, struct dt_node* node)
+__fill_node(struct fdt_iter* it, struct dtn* node)
 {
     if (__parse_stdflags(it, &node->base)) {
         return;
@@ -302,7 +302,7 @@ __fill_node(struct fdt_iter* it, struct dt_node* node)
 }
 
 static inline void
-__set_parent(struct dt_node_base* parent, struct dt_node_base* node)
+__set_parent(struct dtn_base* parent, struct dtn_base* node)
 {
     morph_t* parent_obj;
     
@@ -320,7 +320,7 @@ __set_parent(struct dt_node_base* parent, struct dt_node_base* node)
 }
 
 static inline void
-__init_node_regular(struct dt_node* node)
+__init_node_regular(struct dtn* node)
 {
     __init_prop_table(&node->base);
     changeling_morph_anon(NULL, node->mobj, dt_morpher);
@@ -332,9 +332,8 @@ static void
 __expand_extended_intr(struct dt_intr_node* intrupt)
 {
     struct dtpropi it;
-    struct dt_prop_val  arr;
-    struct dt_node *node;
-    struct dt_node *master;
+    struct dtp_val  arr;
+    struct dtn *master;
     struct dt_intr_prop* intr_prop;
 
     if (!intrupt->intr.extended) {
@@ -342,41 +341,34 @@ __expand_extended_intr(struct dt_intr_node* intrupt)
     }
 
     arr = intrupt->intr.arr;
-    node = INTR_TO_DTNODE(intrupt);
 
     llist_init_head(&intrupt->intr.values);
     
-    dtpi_init(&it, &node->base, &arr);
+    dtpi_init(&it, &arr);
     
-    dt_phnd_t phnd;
-    do {
-        phnd   = le(*it.prop_loc);
-        master = dt_resolve_phandle(phnd);
+    while(dtpi_has_next(&it)) 
+    {
+        master = dtpi_next_hnd(&it);
 
         if (!master) {
-            WARN("dtb: (intr_extended) malformed phandle: %d", phnd);
+            WARN("(intr_extended) malformed phandle");
             continue;
         }
 
         intr_prop = valloc(sizeof(*intr_prop));
         
         intr_prop->master = &master->intr;
-        intr_prop->val = (struct dt_prop_val) {
-            .encoded = it.prop_loc_next,
-            .size    = master->base.intr_c
-        };
+        dtpi_next_val(&it, &intr_prop->val, master->base.intr_c);
 
         llist_append(&intrupt->intr.values, &intr_prop->props);
-        dtpi_nextn(&it, intr_prop->val.size);
-        
-    } while(dtpi_next(&it));
+    };
 }
 
 static void
 __resolve_phnd_references()
 {
-    struct dt_node_base *pos, *n;
-    struct dt_node *node, *parent, *default_parent;
+    struct dtn_base *pos, *n;
+    struct dtn *node, *parent, *default_parent;
     struct dt_intr_node* intrupt;
     dt_phnd_t phnd;
     
@@ -390,7 +382,7 @@ __resolve_phnd_references()
         }
 
         phnd = intrupt->parent_hnd;
-        default_parent = (struct dt_node*)node->base.parent;
+        default_parent = (struct dtn*)node->base.parent;
         parent = default_parent;
 
         if (phnd != PHND_NULL) {
@@ -411,7 +403,7 @@ __resolve_phnd_references()
 static void
 __resolve_inter_map()
 {
-    struct dt_node_base *pos, *n;
+    struct dtn_base *pos, *n;
 
     llist_for_each(pos, n, &dtctx.nodes, nodes)
     {
@@ -429,7 +421,7 @@ dt_load(ptr_t dtb_dropoff)
         return false;
     }
 
-    size_t str_off = le(dtctx.fdt->off_dt_strings);
+    size_t str_off = dtctx.fdt->off_dt_strings;
     dtctx.str_block = offset_t(dtb_dropoff, const char, str_off);
 
     llist_init_head(&dtctx.nodes);
@@ -437,9 +429,9 @@ dt_load(ptr_t dtb_dropoff)
 
     struct fdt_iter it;
     struct fdt_token* tok;
-    struct dt_node *node, *child;
+    struct dtn *node, *child;
     
-    struct dt_node* depth[16] = { NULL };
+    struct dtn* depth[16] = { NULL };
     int level, nr_nodes = 0;
 
     node = NULL;
@@ -462,14 +454,14 @@ dt_load(ptr_t dtb_dropoff)
         {
             assert(!node);
 
-            node = vzalloc(sizeof(struct dt_node));
+            node = vzalloc(sizeof(struct dtn));
             __init_node_regular(node);
             llist_append(&dtctx.nodes, &node->base.nodes);
 
             __dt_node_set_name(node, it.detail->extra_data);
 
             if (level) {
-                __set_parent(depth[level - 1], &node->base);
+                __set_parent(&depth[level - 1]->base, &node->base);
             }
 
             nr_nodes++;
@@ -509,14 +501,14 @@ dt_load(ptr_t dtb_dropoff)
     return true;
 }
 
-struct dt_node*
+struct dtn*
 dt_resolve_phandle(dt_phnd_t phandle)
 {
-    struct dt_node_base *pos, *n;
+    struct dtn_base *pos, *n;
     llist_for_each(pos, n, &dtctx.nodes, nodes)
     {
         if (pos->phandle == phandle) {
-            return (struct dt_node*)pos;
+            return (struct dtn*)pos;
         }
     }
 
@@ -524,7 +516,7 @@ dt_resolve_phandle(dt_phnd_t phandle)
 }
 
 static bool
-__byname_predicate(struct dt_node_iter* iter, struct dt_node_base* node)
+__byname_predicate(struct dtn_iter* iter, struct dtn_base* node)
 {
     int i = 0;
     const char* be_matched = HSTR_VAL(node->mobj.name);
@@ -543,17 +535,17 @@ __byname_predicate(struct dt_node_iter* iter, struct dt_node_base* node)
 }
 
 void
-dt_begin_find_byname(struct dt_node_iter* iter, 
-              struct dt_node* node, const char* name)
+dt_begin_find_byname(struct dtn_iter* iter, 
+              struct dtn* node, const char* name)
 {
     dt_begin_find(iter, node, __byname_predicate, name);
 }
 
 void
-dt_begin_find(struct dt_node_iter* iter, struct dt_node* node, 
+dt_begin_find(struct dtn_iter* iter, struct dtn* node, 
               node_predicate_t pred, void* closure)
 {
-    node = node ? : (struct dt_node*)dtctx.root;
+    node = node ? : (struct dtn*)dtctx.root;
 
     iter->head = &node->base;
     iter->matched = NULL;
@@ -561,7 +553,7 @@ dt_begin_find(struct dt_node_iter* iter, struct dt_node* node,
     iter->pred = pred;
 
     morph_t *pos, *n;
-    struct dt_node_base* base;
+    struct dtn_base* base;
     changeling_for_each(pos, n, &node->mobj)
     {
         base = &changeling_reveal(pos, dt_morpher)->base;
@@ -573,14 +565,14 @@ dt_begin_find(struct dt_node_iter* iter, struct dt_node* node,
 }
 
 bool
-dt_find_next(struct dt_node_iter* iter,
-             struct dt_node_base** matched)
+dt_find_next(struct dtn_iter* iter,
+             struct dtn_base** matched)
 {
     if (!dt_found_any(iter)) {
         return false;
     }
 
-    struct dt_node *node;
+    struct dtn *node;
     morph_t *pos, *head;
 
     head = dt_mobj(iter->head);
@@ -603,11 +595,11 @@ dt_find_next(struct dt_node_iter* iter,
     return false;
 }
 
-struct dt_prop_val*
-dt_getprop(struct dt_node_base* base, const char* name)
+struct dtp_val*
+dt_getprop(struct dtn_base* base, const char* name)
 {
     struct hstr hashed_name;
-    struct dt_prop *pos, *n;
+    struct dtp *pos, *n;
     unsigned int hash;
 
     hashed_name = HSTR(name, strlen(name));
@@ -644,7 +636,7 @@ dtpx_compile_proplet(struct dtprop_def* proplet)
 }
 
 void
-dtpx_prepare_with(struct dtpropx* propx, struct dt_prop_val* prop,
+dtpx_prepare_with(struct dtpropx* propx, struct dtp_val* prop,
                   struct dtprop_def* proplet)
 {
     int i;
@@ -696,35 +688,37 @@ dtpx_extract_at(struct dtpropx* propx,
                 struct dtprop_xval* val, int col)
 {
     struct dtprop_def* def;
-    dt_enc_t raw;
+    union dtp_baseval* raw;
+    dt_enc_t enc;
 
     if (unlikely(col >= propx->proplet_len)) {
         return false;
     }
 
     def = &propx->proplet[col];
-    raw = &propx->raw->encoded[propx->row_loc + def->acc_sz];
+    enc = &propx->raw->encoded[propx->row_loc + def->acc_sz];
+    raw = (union dtp_baseval*)enc;
 
     val->archetype = def;
 
     switch (def->type)
     {
         case DTP_U32:
-            val->u32 = le(*raw);
+            val->u32 = raw->u32_val;
             break;
 
         case DTP_U64:
-            val->u64 = le64(*(ptr_t*)raw);
+            val->u64 = raw->u64_val;
             break;
 
         case DTP_PHANDLE:
         {
-            ptr_t hnd = le(*raw);
+            ptr_t hnd = raw->phandle;
             val->phandle = dt_resolve_phandle(hnd);
         } break;
 
         case DTP_COMPX:
-            val->composite = raw;
+            val->composite = enc;
             break;
         
         default:
