@@ -70,7 +70,11 @@ clean-user:
 clean:
 	@$(MAKE) $(MKFLAGS) -C usr clean -I $(mkinc_dir)
 	@$(MAKE) $(MKFLAGS) -C scripts clean -I $(mkinc_dir)
+	@$(MAKE) $(MKFLAGS) -C tests/units clean
 	@$(MAKE) -f kernel.mk clean -I $(mkinc_dir)
 	
 	@rm -rf $(kbuild_dir) || exit 1
 	@rm -rf .builder || exit 1
+
+unit-test:
+	@$(MAKE) $(MKFLAGS) -C tests/units run 

@@ -8,13 +8,16 @@ main(int argc, const char* argv[])
 {
     __test_ctx = calloc(sizeof(*__test_ctx), 1);
 
+    printf("\n");
+
     run_test(argc, argv);
 
     printf(
-        "All test done: %d passed, %d failed\n\n",
+        "All test done: %d passed, %d failed\n",
         __test_ctx->stats.total_passed,
         __test_ctx->stats.total_failed
     );
+    printf("************\n\n");
 
     exit(__test_ctx->stats.total_failed > 0);
 }

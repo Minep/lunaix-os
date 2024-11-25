@@ -150,9 +150,7 @@ struct dtn_base
     morph_t* binded_dev;
 };
 
-struct dt_intr_prop;
-
-struct dt_speckey
+struct dtspec_key
 {
     union {
         union dtp_baseval *bval;
@@ -161,25 +159,21 @@ struct dt_speckey
     unsigned int      size;
 };
 
-struct dt_intr_mapent
+struct dtspec_mapent
 {
     struct llist_header ents;
-
-    struct dt_speckey key;
-
-    struct dtn_base* parent;
-    struct dtp_val parent_props;
+    const struct dtspec_key child_spec;
+    
+    struct dtn* parent;
+    const struct dtspec_key parent_spec;
 };
 
-struct dt_intr_map 
+struct dtspec_map
 {
-    struct dtp_val       raw;
-    struct dtp_val       raw_mask;
+    const struct dtspec_key mask;
+    const struct dtspec_key pass_thru;
 
-    struct dt_speckey    key_mask;
-    struct llist_header      mapent;
-
-    bool resolved;
+    struct llist_header ents;
 };
 
 struct dt_intr_node
@@ -204,13 +198,8 @@ struct dt_intr_node
         };
     } intr;
 
-    struct dt_intr_map* map;
+    struct dtspec_map* map;
 };
-#define INTR_TO_DTNODE(intr_node) \
-        (container_of(intr_node, struct dtn, intr))
-
-#define BASE_TO_DTNODE(base_node) \
-        (container_of(base_node, struct dtn, base))
 
 struct dtn
 {
@@ -230,6 +219,8 @@ struct dtn
 #define dt_parent(node) ((node)->base.parent)
 #define dt_morpher       morphable_attrs(dtn, mobj)
 #define dt_mobj(node)   (&(node)->mobj)
+#define dtn_from(base_node) \
+        (container_of(base_node, struct dtn, base))
 
 struct dt_intr_prop
 {
@@ -346,15 +337,45 @@ dt_resolve_phandle(dt_phnd_t phandle);
 struct dtp_val*
 dt_getprop(struct dtn_base* base, const char* name);
 
-struct dtp_val*
-dt_resolve_interrupt(struct dtn* node);
-
 void
 dt_resolve_interrupt_map(struct dtn* node);
 
-void
-dt_speckey_mask(struct dt_speckey* k, struct dt_speckey* mask);
+/****
+ * DT Main Functions: Generic specifier map
+ ****/
 
+struct dtspec_create_ops
+{
+    int (*child_keysz)(struct dtn*);
+    int (*parent_keysz)(struct dtn*);
+    struct dtp_val* (*get_mask)(struct dtn*);
+    struct dtp_val* (*get_passthru)(struct dtn*);
+};
+
+struct dtspec_map*
+dtspec_create(struct dtn* node, struct dtp_val* map,
+              const struct dtspec_create_ops* ops);
+
+struct dtspec_mapent*
+dtspec_lookup(struct dtspec_map*, struct dtspec_key*);
+
+void
+dtspec_applymask(struct dtspec_map*, struct dtspec_key*);
+
+void
+dtspec_free(struct dtspec_map*);
+
+void
+dtspec_cpykey(struct dtspec_key* dest, struct dtspec_key* src);
+
+void
+dtspec_freekey(struct dtspec_key* key);
+
+static inline bool
+dtspec_nullkey(struct dtspec_key* key)
+{
+    return !key || !key->size;
+}
 
 /****
  * DT Main Functions: Node-finder
@@ -400,7 +421,7 @@ dtp_u64(struct dtp_val* val)
 }
 
 static inline void
-dtp_speckey(struct dt_speckey* key, struct dtp_val* prop)
+dtp_speckey(struct dtspec_key* key, struct dtp_val* prop)
 {
     key->size = prop->size / sizeof(u32_t);
     key->val  = prop->encoded;
@@ -546,7 +567,7 @@ dtpi_init(struct dtpropi* dtpi, struct dtp_val* val)
 static inline bool
 dtpi_has_next(struct dtpropi* dtpi)
 {
-    return dtpi->loc >= dtpi->prop->size / sizeof(u32_t);
+    return dtpi->loc < dtpi->prop->size / sizeof(u32_t);
 }
 
 static inline u32_t

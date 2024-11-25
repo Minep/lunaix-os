@@ -374,7 +374,7 @@ __resolve_phnd_references()
     
     llist_for_each(pos, n, &dtctx.nodes, nodes)
     {
-        node = BASE_TO_DTNODE(pos);
+        node = dtn_from(pos);
         intrupt = &node->intr;
 
         if (!node->base.intr_c) {
@@ -407,7 +407,7 @@ __resolve_inter_map()
 
     llist_for_each(pos, n, &dtctx.nodes, nodes)
     {
-        dt_resolve_interrupt_map(BASE_TO_DTNODE(pos));
+        dt_resolve_interrupt_map(dtn_from(pos));
     }
 }
 

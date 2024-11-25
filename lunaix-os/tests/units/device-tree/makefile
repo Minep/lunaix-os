@@ -4,6 +4,7 @@ tests := basic inheritence intrmap
 
 obj = dut/dt_interrupt.o \
 	  dut/dt.o \
+	  dut/dtspec.o \
 	  dut/changeling.o \
 
 dtbs := $(addprefix samples/,$(addsuffix .dtb,$(tests)))
