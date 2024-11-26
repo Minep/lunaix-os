@@ -27,18 +27,21 @@ struct test_context
     } stats;
 };
 
+#define fmt_passed  "\x1b[32;49mpassed\x1b[0m"
+#define fmt_failed  "\x1b[31;49mfailed\x1b[0m"
+
 #define active_context      \
     ({ extern struct test_context* __test_ctx; __test_ctx; })
 
 #define _expect(expr, act, exp, type_fmt)                                   \
     do {                                                                    \
         int failed = !(expr);                                               \
-        printf("  @%s:%d ....... ", __FILE__, __LINE__);                    \
+        printf("  @%s:%03d ....... ", __FILE__, __LINE__);                    \
         if (failed)                                                         \
-            printf("failed. (expect: " type_fmt ", got: " type_fmt ")\n",   \
+            printf(fmt_failed ". (expect: " type_fmt ", got: " type_fmt ")\n",\
                     exp, act);                                              \
         else                                                                \
-            printf("passed.\n");                                            \
+            printf(fmt_passed ".\n");                                       \
         active_context->stats.countings[failed]++;                          \
     } while(0)
 
@@ -62,7 +65,10 @@ struct test_context
     _expect(!strcmp(str_a, str_b), str_a, str_b, "'%s'")
 
 #define expect_notnull(ptr)  \
-    _expect(ptr != NULL, "not null", "null", "<%s>")
+    _expect(ptr != NULL, "null", "not null", "<%s>")
+
+#define expect_null(ptr)  \
+    _expect(ptr == NULL, "not null", "null", "<%s>")
 
 #define expect_true(val)  \
     _expect(val, "false", "true", "<%s>")

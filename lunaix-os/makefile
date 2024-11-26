@@ -77,5 +77,5 @@ clean:
 	@rm -rf .builder || exit 1
 
 export CFLAGS=-include $(lbuild_config_h)
-unit-test:
+unit-test: $(lbuild_config_h)
 	@$(MAKE) $(MKFLAGS) -C tests/units run 

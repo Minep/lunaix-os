@@ -2,6 +2,7 @@
 #include <testing/basic.h>
 
 extern void *calloc(size_t, size_t);
+extern void  free(void *);
 
 #define be(v) ((((v) & 0x000000ff) << 24)  |\
                (((v) & 0x00ff0000) >> 8 )  |\
@@ -11,7 +12,7 @@ extern void *calloc(size_t, size_t);
 static void
 map_and_mask_test(struct dtn* node)
 {
-    struct dt_intr_node* intrn;
+    struct dtn_intr* intrn;
     struct dtspec_map *map;
     struct dtspec_key *mask, *key, test_key;
 
@@ -86,6 +87,7 @@ map_and_mask_test(struct dtn* node)
         expect_int(ent->parent_spec.bval->raw[1], 1);
     });
 
+    free(test_key.val);
 }
 
 void

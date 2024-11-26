@@ -26,4 +26,4 @@ run: $(obj-stubs) $(test-dir)
 
 clean: _ACT := clean
 clean: $(test-dir)
-	@rm -f $(obj-stubs)
+	@rm -f $(obj-stubs) $(obj-shared)

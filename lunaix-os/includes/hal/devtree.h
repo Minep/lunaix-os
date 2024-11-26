@@ -93,9 +93,8 @@ struct dtp_val
             };
             ptr_t        ptr_val;
             dt_enc_t     encoded;
-            u32_t _be    *raw;
             
-            union dtp_baseval* uval;
+            union dtp_baseval* ref;
         };
         unsigned int size;
     };
@@ -136,20 +135,19 @@ struct dtn_base
             bool dma_coherent  : 1;
             bool dma_ncoherent : 1;
             bool intr_controll : 1;
-            bool intr_neuxs    : 1;
         };
         unsigned int    flags;
     };
 
-    struct dtn_base  *parent;
-    struct llist_header   nodes;
+    struct dtn_base         *parent;
+    struct llist_header      nodes;
 
-    struct dtp_val    compat;
-    dt_phnd_t             phandle;
+    struct dtp_val           compat;
+    dt_phnd_t                phandle;
 
-    struct dtp_table* props;
+    struct dtp_table        *props;
 
-    morph_t* binded_dev;
+    morph_t                 *binded_dev;
 };
 
 struct dtspec_key
@@ -178,27 +176,35 @@ struct dtspec_map
     struct llist_header ents;
 };
 
-struct dt_intr_node
+struct dtspec_intr
+{
+    struct dtn *domain;
+
+    struct llist_header  ispecs;
+    struct dtp_val   val;
+};
+
+struct dtn_intr
 {
     union {
-        struct dt_intr_node *parent;
+        struct dtn *parent;
         dt_phnd_t parent_hnd;
     };
 
-    struct {
-        union {
-            struct {
-                bool extended : 1;
-                bool valid : 1;
-            };
-            int flags;
+    union {
+        struct {
+            bool extended : 1;
+            bool valid : 1;
         };
+        int flags;
+    };
 
-        union {
-            struct dtp_val   arr;
-            struct llist_header  values; 
-        };
-    } intr;
+    union {
+        struct dtp_val       raw_ispecs;
+        struct llist_header  ext_ispecs; 
+    };
+    
+    int nr_intrs;
 
     struct dtspec_map* map;
 };
@@ -210,27 +216,19 @@ struct dtn
         struct dtn_base base;
     };
     
-    struct dt_intr_node intr;
+    struct dtn_intr intr;
     
     struct dtp_val  reg;
-    struct dtp_val  vreg;
 
     struct dtp_val  ranges;
     struct dtp_val  dma_ranges;
 };
-#define dt_parent(node) ((node)->base.parent)
+#define dt_parent(node)  ((node)->base.parent)
 #define dt_morpher       morphable_attrs(dtn, mobj)
-#define dt_mobj(node)   (&(node)->mobj)
+#define dt_mobj(node)    (&(node)->mobj)
+#define dt_name(node)    morpher_name(dt_mobj(node))
 #define dtn_from(base_node) \
         (container_of(base_node, struct dtn, base))
-
-struct dt_intr_prop
-{
-    struct dt_intr_node *master;
-
-    struct llist_header  props;
-    struct dtp_val   val;
-};
 
 struct dt_context
 {
@@ -342,6 +340,16 @@ dt_getprop(struct dtn_base* base, const char* name);
 void
 dt_resolve_interrupt_map(struct dtn* node);
 
+struct dtn* 
+dt_interrupt_at(struct dtn* node, int idx, struct dtp_val* int_spec);
+
+static inline void
+dtp_val_set(struct dtp_val* val, dt_enc_t raw, unsigned cells)
+{
+    val->encoded = raw;
+    val->size = cells * sizeof(u32_t);
+}
+
 /****
  * DT Main Functions: Generic specifier map
  ****/
@@ -413,13 +421,13 @@ dt_main_context();
 static inline u32_t
 dtp_u32(struct dtp_val* val)
 {
-    return val->uval->u32_val;
+    return val->ref->u32_val;
 }
 
 static inline u64_t
 dtp_u64(struct dtp_val* val)
 {
-    return val->uval->u64_val;
+    return val->ref->u64_val;
 }
 
 static inline void
@@ -607,8 +615,7 @@ dtpi_next_val(struct dtpropi* dtpi, struct dtp_val* val, int cells)
     }
 
     off_t loc = dtpi->loc;
-    val->encoded = &dtpi->prop->encoded[loc];
-    val->size = cells * sizeof(u32_t);
+    dtp_val_set(val, &dtpi->prop->encoded[loc], cells);
 
     dtpi->loc += cells;
     return true;

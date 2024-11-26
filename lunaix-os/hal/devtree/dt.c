@@ -199,10 +199,6 @@ __parse_stdnode_prop(struct fdt_iter* it, struct dtn* node)
         __mkprop_ptr(it, &node->reg);
     }
 
-    else if (propeq(it, "virtual-reg")) {
-        __mkprop_ptr(it, &node->vreg);
-    }
-
     else if (propeq(it, "ranges")) {
         __mkprop_ptr(it, &node->ranges);
     }
@@ -329,39 +325,46 @@ __init_node_regular(struct dtn* node)
 }
 
 static void
-__expand_extended_intr(struct dt_intr_node* intrupt)
+__expand_extended_intr(struct dtn_intr* intrupt)
 {
     struct dtpropi it;
     struct dtp_val  arr;
-    struct dtn *master;
-    struct dt_intr_prop* intr_prop;
+    struct dtn *domain;
+    struct dtspec_intr* ispec;
+    int nr_intrs = 0;
 
-    if (!intrupt->intr.extended) {
-        return;
+    if (!intrupt->extended) {
+        nr_intrs  = intrupt->raw_ispecs.size / sizeof(u32_t);
+        nr_intrs /= intrupt->parent->base.intr_c; 
+        goto done;
     }
 
-    arr = intrupt->intr.arr;
+    arr = intrupt->raw_ispecs;
 
-    llist_init_head(&intrupt->intr.values);
+    llist_init_head(&intrupt->ext_ispecs);
     
     dtpi_init(&it, &arr);
-    
+
     while(dtpi_has_next(&it)) 
     {
-        master = dtpi_next_hnd(&it);
+        domain = dtpi_next_hnd(&it);
 
-        if (!master) {
+        if (!domain) {
             WARN("(intr_extended) malformed phandle");
             continue;
         }
 
-        intr_prop = valloc(sizeof(*intr_prop));
+        ispec = valloc(sizeof(*ispec));
         
-        intr_prop->master = &master->intr;
-        dtpi_next_val(&it, &intr_prop->val, master->base.intr_c);
+        ispec->domain = domain;
+        dtpi_next_val(&it, &ispec->val, domain->base.intr_c);
 
-        llist_append(&intrupt->intr.values, &intr_prop->props);
+        llist_append(&intrupt->ext_ispecs, &ispec->ispecs);
+        nr_intrs++;
     };
+
+done:
+    intrupt->nr_intrs = nr_intrs;
 }
 
 static void
@@ -369,7 +372,7 @@ __resolve_phnd_references()
 {
     struct dtn_base *pos, *n;
     struct dtn *node, *parent, *default_parent;
-    struct dt_intr_node* intrupt;
+    struct dtn_intr* intrupt;
     dt_phnd_t phnd;
     
     llist_for_each(pos, n, &dtctx.nodes, nodes)
@@ -377,7 +380,7 @@ __resolve_phnd_references()
         node = dtn_from(pos);
         intrupt = &node->intr;
 
-        if (!node->base.intr_c) {
+        if (intrupt->parent_hnd == PHND_NULL) {
             continue;
         }
 
@@ -394,7 +397,7 @@ __resolve_phnd_references()
             parent = default_parent;
         }
 
-        intrupt->parent = &parent->intr;
+        intrupt->parent = parent;
 
         __expand_extended_intr(intrupt);
     }

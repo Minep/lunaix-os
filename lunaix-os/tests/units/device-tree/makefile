@@ -1,6 +1,6 @@
 include test_build.mkinc
 
-tests := basic inheritence intrmap
+tests := basic inheritence intrmap interrupts
 
 obj = dut/dt_interrupt.o \
 	  dut/dt.o \

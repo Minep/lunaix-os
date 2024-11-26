@@ -33,26 +33,61 @@ dt_resolve_interrupt_map(struct dtn* node)
     node->intr.map = dtspec_create(node, map, &ops);
 }
 
+struct dtn* 
+dt_interrupt_at(struct dtn* node, int idx, struct dtp_val* int_spec)
+{
+    int int_cells;
+    dt_enc_t raw_specs;
+    struct dtn_intr* intr;
+    struct dtn* intr_domain;
+
+    intr = &node->intr;
+    if (!intr->valid || idx >= intr->nr_intrs) {
+        return NULL;
+    }
+    
+    if (!intr->extended) {
+        intr_domain = intr->parent;
+        int_cells = intr_domain->base.intr_c;
+        
+        raw_specs = &intr->raw_ispecs.encoded[int_cells * idx];
+        dtp_val_set(int_spec, raw_specs, int_cells);
+
+        return intr_domain;
+    }
+
+    struct dtspec_intr *p, *n;
+    llist_for_each(p, n, &intr->ext_ispecs, ispecs)
+    {
+        if (!(idx--)) {
+            *int_spec = p->val;
+            return p->domain;
+        }
+    }
+
+    return NULL;
+}
+
 bool
-parse_stdintr_prop(struct fdt_iter* it, struct dt_intr_node* node)
+parse_stdintr_prop(struct fdt_iter* it, struct dtn_intr* node)
 {
     if (propeq(it, "interrupt-parent")) {
         node->parent_hnd = __prop_getu32(it);
     }
 
-    else if (propeq(it, "interrupt-extended")) {
-        node->intr.extended = true;
-        __mkprop_ptr(it, &node->intr.arr);
+    else if (propeq(it, "interrupts-extended")) {
+        node->extended = true;
+        __mkprop_ptr(it, &node->raw_ispecs);
     }
 
-    else if (!node->intr.extended && propeq(it, "interrupts")) {
-        node->intr.valid = true;
-        __mkprop_ptr(it, &node->intr.arr);
+    else if (!node->extended && propeq(it, "interrupts")) {
+        __mkprop_ptr(it, &node->raw_ispecs);
     }
 
     else {
         return false;
     }
 
+    node->valid = true;
     return true;
 }
