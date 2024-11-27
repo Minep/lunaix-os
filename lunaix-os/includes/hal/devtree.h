@@ -21,6 +21,11 @@
 #define STATUS_RSVD     2
 #define STATUS_FAIL     3
 
+#define PHND_NULL    ((dt_phnd_t)-1)
+
+/////////////////////////////////
+///     DT Primitives
+/////////////////////////////////
 
 typedef unsigned int*     dt_enc_t;
 typedef unsigned int      dt_phnd_t;
@@ -29,50 +34,11 @@ struct dtn_base;
 struct dtn_iter;
 typedef bool (*node_predicate_t)(struct dtn_iter*, struct dtn_base*);
 
-
-#define PHND_NULL    ((dt_phnd_t)-1)
-
-struct fdt_header {
-    u32_t magic;
-    u32_t totalsize;
-    u32_t off_dt_struct;
-    u32_t off_dt_strings;
-    u32_t off_mem_rsvmap;
-    u32_t version;
-    u32_t last_comp_version;
-    u32_t boot_cpuid_phys;
-    u32_t size_dt_strings;
-    u32_t size_dt_struct;
-} _be;
-
-struct fdt_memrsvd_ent 
+struct dtpropi
 {
-    u64_t addr;
-    u64_t size;
-} _be align(8);
-
-struct fdt_token 
-{
-    u32_t token;
-} _be compact align(4);
-
-struct fdt_node_head
-{
-    struct fdt_token token;
-    char name[0];
-} _be;
-
-struct fdt_prop
-{
-    struct fdt_token token;
-    u32_t len;
-    u32_t nameoff;
-
-    union {
-        u32_t val[0];
-        char  val_str[0];
-    } _be;
-} _be compact align(4);
+    struct dtp_val     *prop;
+    off_t loc;
+};
 
 union dtp_baseval
 {
@@ -100,6 +66,153 @@ struct dtp_val
     };
 };
 
+/////////////////////////////////
+///     FDT Constructs
+/////////////////////////////////
+
+struct fdt_header {
+    u32_t magic;
+    u32_t totalsize;
+    u32_t off_dt_struct;
+    u32_t off_dt_strings;
+    u32_t off_mem_rsvmap;
+    u32_t version;
+    u32_t last_comp_version;
+    u32_t boot_cpuid_phys;
+    u32_t size_dt_strings;
+    u32_t size_dt_struct;
+} _be;
+
+struct fdt_memrsvd_ent 
+{
+    u64_t addr;
+    u64_t size;
+} _be align(8);
+
+
+struct fdt_token 
+{
+    u32_t token;
+} _be compact align(4);
+
+struct fdt_prop
+{
+    struct fdt_token token;
+    u32_t len;
+    u32_t nameoff;
+
+    union {
+        u32_t val[0];
+        char  val_str[0];
+    } _be;
+} _be compact align(4);
+
+struct fdt_loc
+{
+    union {
+        struct fdt_token        *token;
+        struct fdt_prop         *prop;
+        struct fdt_memrsvd_ent  *rsvd_ent;
+        ptr_t                    ptr;
+        struct {
+            struct fdt_token token;
+            char name[0];
+        } *node;
+    };
+};
+typedef struct fdt_loc fdt_loc_t;
+
+
+enum fdt_state {
+    FDT_STATE_START,
+    FDT_STATE_NODE,
+    FDT_STATE_NODE_EXIT,
+    FDT_STATE_PROP,
+    FDT_STATE_END,
+};
+
+enum fdtit_mode {
+    FDT_RSVDMEM,
+    FDT_STRUCT,
+};
+
+enum fdt_mem_type {
+    FDT_MEM_RSVD,
+    FDT_MEM_RSVD_DYNAMIC,
+    FDT_MEM_FREE
+};
+
+struct fdt_rsvdmem_attrs
+{
+    size_t total_size;
+    ptr_t alignment;
+    
+    union {
+        struct {
+            bool nomap    : 1;
+            bool reusable : 1;
+        };
+        int flags;
+    };
+};
+
+struct dt_memory_node
+{
+    ptr_t base;
+    ptr_t size;
+    enum fdt_mem_type type;
+
+    struct fdt_rsvdmem_attrs dyn_alloc_attr;
+};
+
+struct fdt_rsvd_mem
+{
+    u64_t base;
+    u64_t size;
+} _be align(8);
+
+struct fdt_blob
+{
+    union {
+        struct fdt_header* header;
+        ptr_t fdt_base;
+    };
+
+    fdt_loc_t root;
+    union {
+        const char* str_block;
+        ptr_t str_block_base;
+    };
+
+
+    union {
+        struct fdt_rsvd_mem* plat_rsvd;
+        ptr_t plat_rsvd_base;
+    };
+};
+
+struct fdt_memscan
+{
+    fdt_loc_t loc;
+    
+    struct dtpropi regit;
+
+    u32_t root_addr_c;
+    u32_t root_size_c;
+    enum fdt_mem_type node_type;
+
+    struct fdt_rsvdmem_attrs node_attr;
+};
+
+struct fdt_memrsvd_iter
+{
+    struct fdt_memrsvd_ent *block;
+};
+
+
+/////////////////////////////////
+///     DT Construct
+/////////////////////////////////
 
 struct dtp
 {
@@ -230,52 +343,6 @@ struct dtn
 #define dtn_from(base_node) \
         (container_of(base_node, struct dtn, base))
 
-struct dt_context
-{
-    union {
-        ptr_t reloacted_dtb;
-        struct fdt_header* fdt;
-    };
-
-    struct llist_header   nodes;
-    struct dtn       *root;
-    struct hbucket        phnds_table[16];
-    const char           *str_block;
-};
-
-enum fdt_state {
-    FDT_STATE_START,
-    FDT_STATE_NODE,
-    FDT_STATE_NODE_EXIT,
-    FDT_STATE_PROP,
-    FDT_STATE_END,
-};
-
-struct fdt_iter
-{
-    union {
-        struct fdt_token      *pos;
-        struct fdt_prop       *prop;
-        struct fdt_node_head  *node_head;
-        struct {
-            struct fdt_token token;
-            char extra_data[0];
-        } *detail;
-    };
-
-    struct fdt_token* next;
-    
-    const char* str_block;
-    int depth;
-    enum fdt_state state;
-    bool invalid;
-};
-
-struct fdt_memrsvd_iter
-{
-    struct fdt_memrsvd_ent *block;
-};
-
 struct dtn_iter
 {
     struct dtn_base* head;
@@ -284,49 +351,75 @@ struct dtn_iter
     node_predicate_t pred;
 };
 
+struct dt_context
+{
+    struct fdt_blob         fdt;
+
+    struct llist_header     nodes;
+    struct dtn             *root;
+    struct hbucket          phnds_table[16];
+    const char             *str_block;
+};
 
 
-/****
- * FDT Related
- ****/
+/////////////////////////////////
+///     FDT Methods
+/////////////////////////////////
 
 #define fdt_prop(tok) ((tok)->token == FDT_PROP)
 #define fdt_node(tok) ((tok)->token == FDT_NOD_BEGIN)
-#define fdt_node_end(tok) ((tok)->token == FDT_NOD_END)
 #define fdt_nope(tok) ((tok)->token == FDT_NOP)
-
-void 
-fdt_itbegin(struct fdt_iter* fdti, struct fdt_header* fdt_hdr);
-
-void 
-fdt_itend(struct fdt_iter* fdti);
-
-bool 
-fdt_itnext(struct fdt_iter* fdti);
-
-bool 
-fdt_itnext_at(struct fdt_iter* fdti, int level);
+#define fdt_eof(tok)  ((tok)->token == FDT_END)
+#define fdt_node_end(tok) \
+    ((tok)->token == FDT_NOD_END || (tok)->token == FDT_END)
 
 void
-fdt_memrsvd_itbegin(struct fdt_memrsvd_iter* rsvdi, 
-                    struct fdt_header* fdt_hdr);
+fdt_load(struct fdt_blob* fdt, ptr_t base);
+
+fdt_loc_t
+fdt_next_token(fdt_loc_t loc, int* depth);
 
 bool
-fdt_memrsvd_itnext(struct fdt_memrsvd_iter* rsvdi);
+fdt_next_sibling(fdt_loc_t loc, fdt_loc_t* loc_out);
 
-void
-fdt_memrsvd_itend(struct fdt_memrsvd_iter* rsvdi);
+bool
+fdt_next_boot_rsvdmem(struct fdt_blob*, fdt_loc_t*, struct dt_memory_node*);
+
+fdt_loc_t
+fdt_descend_into(fdt_loc_t loc);
+
+static inline fdt_loc_t
+fdt_ascend_from(fdt_loc_t loc) 
+{
+    while (fdt_next_sibling(loc, &loc));
+
+    loc.token++;
+    return loc;
+}
+
+bool
+fdt_memscan_begin(struct fdt_memscan*, const struct fdt_blob*);
+
+bool
+fdt_memscan_nextnode(struct fdt_memscan*, struct fdt_blob*);
+
+bool
+fdt_memscan_nextrange(struct fdt_memscan*, struct dt_memory_node*);
+
+bool
+fdt_find_prop(const struct fdt_blob*, fdt_loc_t, 
+              const char*, struct dtp_val*);
 
 static inline char*
-fdtit_prop_key(struct fdt_iter* fdti)
+fdt_prop_key(struct fdt_blob* fdt, fdt_loc_t loc)
 {
-    return &fdti->str_block[fdti->prop->nameoff];
+    return &fdt->str_block[loc.prop->nameoff];
 }
 
 
-/****
- * DT Main Functions: General
- ****/
+/////////////////////////////////
+///     DT General Methods
+/////////////////////////////////
 
 bool
 dt_load(ptr_t dtb_dropoff);
@@ -350,9 +443,11 @@ dtp_val_set(struct dtp_val* val, dt_enc_t raw, unsigned cells)
     val->size = cells * sizeof(u32_t);
 }
 
-/****
- * DT Main Functions: Generic specifier map
- ****/
+
+//////////////////////////////////////
+///     DT Methods: Specifier Map
+//////////////////////////////////////
+
 
 struct dtspec_create_ops
 {
@@ -387,9 +482,10 @@ dtspec_nullkey(struct dtspec_key* key)
     return !key || !key->size;
 }
 
-/****
- * DT Main Functions: Node-finder
- ****/
+
+//////////////////////////////////////
+///     DT Methods: Node query
+//////////////////////////////////////
 
 void
 dt_begin_find_byname(struct dtn_iter* iter, 
@@ -437,9 +533,10 @@ dtp_speckey(struct dtspec_key* key, struct dtp_val* prop)
     key->val  = prop->encoded;
 }
 
-/****
- * DT Main Functions: Prop Extractor, for fixed size properties
- ****/
+
+//////////////////////////////////////
+///     DT Prop Extractor
+//////////////////////////////////////
 
 enum dtprop_types
 {
@@ -555,15 +652,10 @@ dtpx_xvalu64(struct dtprop_xval* val){
             val->cval->u64_val : val->u64;
 }
 
-/****
- * DT Main Functions: Prop Iterator, for variable-sized property
- ****/
 
-struct dtpropi
-{
-    struct dtp_val     *prop;
-    off_t loc;
-};
+//////////////////////////////////////
+///     DT Prop Iterator
+//////////////////////////////////////
 
 static inline void
 dtpi_init(struct dtpropi* dtpi, struct dtp_val* val)
@@ -572,6 +664,21 @@ dtpi_init(struct dtpropi* dtpi, struct dtp_val* val)
         .prop = val,
         .loc = 0
     };
+}
+
+static inline void
+dtpi_init_empty(struct dtpropi* dtpi)
+{
+    *dtpi = (struct dtpropi) {
+        .prop = 0,
+        .loc = 0
+    };
+}
+
+static inline bool
+dtpi_is_empty(struct dtpropi* dtpi)
+{
+    return !dtpi->prop;
 }
 
 static inline bool

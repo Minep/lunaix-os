@@ -69,19 +69,19 @@ dt_interrupt_at(struct dtn* node, int idx, struct dtp_val* int_spec)
 }
 
 bool
-parse_stdintr_prop(struct fdt_iter* it, struct dtn_intr* node)
+parse_stdintr_prop(struct fdt_blob* fdt, fdt_loc_t loc, struct dtn_intr* node)
 {
-    if (propeq(it, "interrupt-parent")) {
-        node->parent_hnd = __prop_getu32(it);
+    if (propeq(fdt, loc, "interrupt-parent")) {
+        node->parent_hnd = __prop_getu32(loc);
     }
 
-    else if (propeq(it, "interrupts-extended")) {
+    else if (propeq(fdt, loc, "interrupts-extended")) {
         node->extended = true;
-        __mkprop_ptr(it, &node->raw_ispecs);
+        __mkprop_ptr(loc, &node->raw_ispecs);
     }
 
-    else if (!node->extended && propeq(it, "interrupts")) {
-        __mkprop_ptr(it, &node->raw_ispecs);
+    else if (!node->extended && propeq(fdt, loc, "interrupts")) {
+        __mkprop_ptr(loc, &node->raw_ispecs);
     }
 
     else {

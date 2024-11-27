@@ -1,6 +1,6 @@
 include test_build.mkinc
 
-tests := basic inheritence intrmap interrupts
+tests := $(shell cat tests.txt)
 
 obj = dut/dt_interrupt.o \
 	  dut/dt.o \

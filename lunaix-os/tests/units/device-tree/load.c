@@ -15,8 +15,8 @@
 
 extern void init_export___init_devtree();
 
-bool
-my_load_dtb()
+ptr_t
+load_fdt()
 {
     int fd = open(TEST_DTBFILE, O_RDONLY);
     if (fd == -1) {
@@ -31,11 +31,16 @@ my_load_dtb()
     
     if (dtb == (ptr_t)-1) {
         printf("fail to map dtb: %s\n", strerror(errno));
-        return 1;
+        _exit(1);
     }
 
     close(fd);
-    init_export___init_devtree();
+    return dtb;
+}
 
-    return dt_load(dtb);
+bool
+my_load_dtb()
+{
+    init_export___init_devtree();
+    return dt_load(load_fdt());
 }

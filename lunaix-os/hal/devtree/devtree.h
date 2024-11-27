@@ -6,25 +6,25 @@
 #include <klibc/string.h>
 
 static inline bool
-propeq(struct fdt_iter* it, const char* key)
+propeq(struct fdt_blob* fdt, fdt_loc_t loc, const char* key)
 {
-    return streq(fdtit_prop_key(it), key);
+    return streq(fdt_prop_key(fdt, loc), key);
 }
 
 static inline void
-__mkprop_ptr(struct fdt_iter* it, struct dtp_val* val)
+__mkprop_ptr(fdt_loc_t loc, struct dtp_val* val)
 {
-    val->ptr_val = __ptr(it->prop->val);
-    val->size = it->prop->len;
+    val->ptr_val = __ptr(loc.prop->val);
+    val->size = loc.prop->len;
 }
 
 static inline u32_t
-__prop_getu32(struct fdt_iter* it)
+__prop_getu32(fdt_loc_t loc)
 {
-    return it->prop->val[0];
+    return loc.prop->val[0];
 }
 
 bool
-parse_stdintr_prop(struct fdt_iter* it, struct dtn_intr* node);
+parse_stdintr_prop(struct fdt_blob*, fdt_loc_t, struct dtn_intr*);
 
 #endif /* __LUNAIX_DEVTREE_H */

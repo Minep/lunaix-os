@@ -9,4 +9,7 @@
 bool
 my_load_dtb();
 
+ptr_t
+load_fdt();
+
 #endif /* __DTTEST_COMMON_H */

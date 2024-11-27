@@ -27,8 +27,8 @@ struct test_context
     } stats;
 };
 
-#define fmt_passed  "\x1b[32;49mpassed\x1b[0m"
-#define fmt_failed  "\x1b[31;49mfailed\x1b[0m"
+#define fmt_passed  "[\x1b[32;49mPASS\x1b[0m]"
+#define fmt_failed  "[\x1b[31;49mFAIL\x1b[0m]"
 
 #define active_context      \
     ({ extern struct test_context* __test_ctx; __test_ctx; })
@@ -38,10 +38,10 @@ struct test_context
         int failed = !(expr);                                               \
         printf("  @%s:%03d ....... ", __FILE__, __LINE__);                    \
         if (failed)                                                         \
-            printf(fmt_failed ". (expect: " type_fmt ", got: " type_fmt ")\n",\
+            printf(fmt_failed " (expect: " type_fmt ", got: " type_fmt ")\n",\
                     exp, act);                                              \
         else                                                                \
-            printf(fmt_passed ".\n");                                       \
+            printf(fmt_passed "\n");                                       \
         active_context->stats.countings[failed]++;                          \
     } while(0)
 

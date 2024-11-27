@@ -9,168 +9,306 @@ LOG_MODULE("dtb")
 static morph_t* devtree_obj_root;
 static struct dt_context dtctx;
 
-void 
-fdt_itbegin(struct fdt_iter* fdti, struct fdt_header* fdt_hdr)
+void
+fdt_load(struct fdt_blob* fdt, ptr_t base)
 {
-    unsigned int off_struct, off_str;
-    struct fdt_token* tok;
-    const char* str_blk;
+    struct fdt_header* hdr;
 
-    off_str    = fdt_hdr->off_dt_strings;
-    off_struct = fdt_hdr->off_dt_struct;
+    fdt->fdt_base = base;
 
-    tok = offset_t(fdt_hdr, struct fdt_token, off_struct);
-    str_blk = offset_t(fdt_hdr, const char, off_str);
-    
-    *fdti = (struct fdt_iter) {
-        .pos = tok,
-        .next = tok,
-        .str_block = str_blk,
-        .state = FDT_STATE_START,
-    };
-}
+    hdr = fdt->header;
+    if (hdr->magic != FDT_MAGIC) {
+        FATAL("invalid dtb, unexpected magic: 0x%x, expect: 0x%x", 
+                hdr->magic, FDT_MAGIC);
+    }
 
-void 
-fdt_itend(struct fdt_iter* fdti)
-{
-    fdti->pos = NULL;
+    fdt->plat_rsvd_base = base + hdr->off_mem_rsvmap;
+    fdt->str_block_base = base + hdr->off_dt_strings;
+    fdt->root.ptr       = base + hdr->off_dt_struct;
 }
 
 bool
-fdt_itnext(struct fdt_iter* fdti)
+fdt_next_boot_rsvdmem(struct fdt_blob* fdt, fdt_loc_t* loc, 
+                      struct dt_memory_node* mem)
 {
-    struct fdt_token *current;
-    struct fdt_prop  *prop;
+    fdt_loc_t current;
 
-    current = fdti->next;
-    if (!current) {
+    current = *loc;
+
+    if (!current.rsvd_ent->addr && !current.rsvd_ent->addr) {
         return false;
     }
+
+    mem->base = current.rsvd_ent->addr;
+    mem->size = current.rsvd_ent->size;
+    mem->type = FDT_MEM_RSVD;
+
+    current.rsvd_ent++;
+    *loc = current;
+
+    return true;
+}
+
+fdt_loc_t
+fdt_next_token(fdt_loc_t loc, int* delta_depth)
+{
+    int d = 0;
+
+    do {
+        if (fdt_node(loc.token)) {
+            d++;
+            loc.ptr += strlen(loc.node->name) + 1;
+            loc.ptr  = ROUNDUP(loc.ptr, sizeof(int));
+        }
+        else if (fdt_node_end(loc.token)) {
+            d--;
+        }
+        else if (fdt_prop(loc.token)) {
+            loc.ptr   += loc.prop->len + 2 * sizeof(int);
+            loc.ptr    = ROUNDUP(loc.ptr, sizeof(int));
+        }
+
+        loc.token++;
+    } while (fdt_nope(loc.token));
+
+    *delta_depth = d;
+    return loc;
+}
+
+bool
+fdt_next_sibling(fdt_loc_t loc, fdt_loc_t* loc_out)
+{
+    int depth = 0, new_depth = 0;
+
+    do {
+        loc = fdt_next_token(loc, &new_depth);
+        depth += new_depth;
+    } while (depth > 0);
+
+    *loc_out = loc;
+    return !fdt_node_end(loc.token);
+}
+
+fdt_loc_t
+fdt_descend_into(fdt_loc_t loc) 
+{
+    fdt_loc_t new_loc;
+    int depth = 0;
+
+    new_loc = fdt_next_token(loc, &depth);
+
+    return depth != 1 ? loc : new_loc;
+}
+
+bool
+fdt_find_prop(const struct fdt_blob* fdt, fdt_loc_t loc, 
+              const char* name, struct dtp_val* val)
+{
+    char* prop_name;
+
+    loc = fdt_descend_into(loc);
 
     do
     {
-        if (fdt_nope(current)) {
+        if (!fdt_prop(loc.token)) {
             continue;
         }
 
-        if (fdt_node(current)) {
-            fdti->state = FDT_STATE_NODE;
-            fdti->depth++;
-            goto done;
-        }
+        prop_name = fdt_prop_key(fdt, loc);
         
-        if (fdt_node_end(current)) {
-            if (!fdti->depth) {
-                fdti->state = FDT_STATE_END;
-                break;
-            }
-
-            fdti->state = FDT_STATE_NODE_EXIT;
-            fdti->depth--;
-            goto done;
+        if (!streq(prop_name, name)) {
+            continue;
         }
 
-        if (fdt_prop(current)) {
-            fdti->state = FDT_STATE_PROP;
-            goto done;
-        }
-
-        fdti->invalid = true;
-
-        current++;
-    } while (!fdti->invalid && fdti->state != FDT_STATE_END);
+        dtp_val_set(val, (dt_enc_t)loc.prop->val, loc.prop->len);
+        return true;
+    } while (fdt_next_sibling(loc, &loc));
 
     return false;
-    
-done:
-    fdti->pos = current;
-
-    ptr_t moves = sizeof(struct fdt_token);
-
-    if (fdti->state == FDT_STATE_PROP) {
-        moves = fdti->prop->len;
-        moves += sizeof(struct fdt_prop);
-    } 
-    else if (fdti->state == FDT_STATE_NODE) {
-        moves += strlen(fdti->detail->extra_data) + 1;
-    }
-
-    moves = ROUNDUP(moves, sizeof(struct fdt_token));
-    fdti->next = offset(current, moves);
-
-    return fdti->depth > 0;
-}
-
-bool 
-fdt_itnext_at(struct fdt_iter* fdti, int level)
-{
-    while (fdti->depth != level && fdt_itnext(fdti));
-    
-    return fdti->depth == level;
-}
-
-void
-fdt_memrsvd_itbegin(struct fdt_memrsvd_iter* rsvdi, 
-                    struct fdt_header* fdt_hdr)
-{
-    size_t off = fdt_hdr->off_mem_rsvmap;
-    
-    rsvdi->block = 
-        offset_t(fdt_hdr, typeof(*rsvdi->block), off);
-    
-    rsvdi->block = &rsvdi->block[-1];
 }
 
 bool
-fdt_memrsvd_itnext(struct fdt_memrsvd_iter* rsvdi)
+fdt_memscan_begin(struct fdt_memscan* mscan, const struct fdt_blob* fdt)
 {
-    struct fdt_memrsvd_ent* ent;
+    struct dtp_val val;
+    fdt_loc_t loc;
 
-    ent = rsvdi->block;
-    if (!ent) {
+    loc  = fdt->root;
+    loc  = fdt_descend_into(loc);
+
+    if (fdt_find_prop(fdt, loc, "#address-cells", &val))
+    {
+        mscan->root_addr_c = val.ref->u32_val;
+    }
+
+    if (fdt_find_prop(fdt, loc, "#size-cells", &val))
+    {
+        mscan->root_size_c = val.ref->u32_val;
+    }
+
+    mscan->loc = loc;
+}
+
+#define get_size(mscan, val)    \
+    (mscan->root_size_c == 1 ? (val)->ref->u32_val : (val)->ref->u64_val)
+
+#define get_addr(mscan, val)    \
+    (mscan->root_addr_c == 1 ? (val)->ref->u32_val : (val)->ref->u64_val)
+
+bool
+fdt_itnext_memory(struct fdt_memscan* mscan, struct fdt_blob* fdt)
+{
+    char* prop_name;
+
+    struct dtp_val val, reg_val;
+    fdt_loc_t loc;
+    struct dtpropi dtpi;
+    bool has_reg = false;
+
+    loc  = mscan->loc;
+
+restart:
+    while (fdt_next_sibling(loc, &loc))
+    {
+        if (!fdt_node(loc.token))
+            continue;
+
+        if (mscan->node_type != FDT_MEM_FREE) {
+            goto found;
+        }
+
+        if (streq(loc.node->name, "reserved-memory")) {
+            // dived into /reserved-memory, walking for childrens
+            mscan->node_type = FDT_MEM_RSVD;
+            loc = fdt_descend_into(loc);
+            continue;
+        }
+
+        if (!fdt_find_prop(fdt, loc, "device_type", &val))
+            continue;
+
+        if (!streq(val.str_val, "memory"))
+            continue;
+
+        goto found;
+    }
+
+    // emerged from /reserved-memory, resume walking for /memory
+    if (mscan->node_type != FDT_MEM_FREE) {
+        mscan->node_type = FDT_MEM_FREE;
+        goto restart;
+    }
+
+    return false;
+
+found:
+
+    dtpi_init_empty(&mscan->regit);
+
+    mscan->loc = loc;
+    has_reg = fdt_find_prop(fdt, loc, "reg", &val);
+    if (mscan->node_type == FDT_MEM_RSVD) {
+        goto do_rsvd_child;
+    }
+
+    if (!has_reg)
+    {
+        WARN("malformed memory node");
+        goto restart;
+    }
+
+    dtpi_init(&mscan->regit, &val);
+
+    return true;
+
+do_rsvd_child:
+    if (has_reg)
+    {
+        mscan->node_type = FDT_MEM_RSVD_DYNAMIC;
+
+        dtpi_init(&mscan->regit, &val);
+        return true;
+    }
+
+    if (!fdt_find_prop(fdt, loc, "size", &val)) {
+        WARN("malformed reserved memory child node");
+        goto restart;
+    }
+
+    mscan->node_type = FDT_MEM_RSVD;
+    mscan->node_attr.total_size = get_size(mscan, &val);
+
+    if (fdt_find_prop(fdt, loc, "no-map", &val)) {
+        mscan->node_attr.nomap = true;
+    }
+
+    if (fdt_find_prop(fdt, loc, "reusable", &val)) {
+        mscan->node_attr.reusable = true;
+    }
+
+    if (fdt_find_prop(fdt, loc, "alignment", &val)) {
+        mscan->node_attr.alignment = get_size(mscan, &val);
+    }
+
+    if (fdt_find_prop(fdt, loc, "alloc-ranges", &val)) {
+        dtpi_init(&mscan->regit, &val);
+    }
+
+    return true;
+}
+
+bool
+fdt_memscan_nextrange(struct fdt_memscan* mscan, struct dt_memory_node* mem)
+{
+    struct dtp_val val;
+
+    if (dtpi_is_empty(&mscan->regit)) {
         return false;
     }
 
-    rsvdi->block++;
+    if (dtpi_next_val(&mscan->regit, &val, mscan->root_addr_c)) {
+        mem->base = get_addr(mscan, &val);
+    }
 
-    return ent->addr || ent->size;
-}
+    if (dtpi_next_val(&mscan->regit, &val, mscan->root_size_c)) {
+        mem->base = get_size(mscan, &val);
+    }
 
-void
-fdt_memrsvd_itend(struct fdt_memrsvd_iter* rsvdi)
-{
-    rsvdi->block = NULL;
+    mem->type = mscan->node_type;
+    
+    if (mem->type == FDT_MEM_RSVD_DYNAMIC) {
+        mem->dyn_alloc_attr = mscan->node_attr;
+    }
+
+    return dtpi_has_next(&mscan->regit);
 }
 
 static bool
-__parse_stdbase_prop(struct fdt_iter* it, struct dtn_base* node)
+__parse_stdbase_prop(struct fdt_blob* fdt, fdt_loc_t loc, 
+                     struct dtn_base* node)
 {
-    struct fdt_prop* prop;
-
-    prop = it->prop;
-
-    if (propeq(it, "compatible")) {
-        __mkprop_ptr(it, &node->compat);
+    if (propeq(fdt, loc, "compatible")) {
+        __mkprop_ptr(loc, &node->compat);
     } 
 
-    else if (propeq(it, "phandle")) {
-        node->phandle = __prop_getu32(it);
+    else if (propeq(fdt, loc, "phandle")) {
+        node->phandle = __prop_getu32(loc);
     }
     
-    else if (propeq(it, "#address-cells")) {
-        node->addr_c = (char)__prop_getu32(it);
+    else if (propeq(fdt, loc, "#address-cells")) {
+        node->addr_c = (char)__prop_getu32(loc);
     } 
     
-    else if (propeq(it, "#size-cells")) {
-        node->sz_c = (char)__prop_getu32(it);
+    else if (propeq(fdt, loc, "#size-cells")) {
+        node->sz_c = (char)__prop_getu32(loc);
     } 
     
-    else if (propeq(it, "#interrupt-cells")) {
-        node->intr_c = (char)__prop_getu32(it);
+    else if (propeq(fdt, loc, "#interrupt-cells")) {
+        node->intr_c = (char)__prop_getu32(loc);
     } 
     
-    else if (propeq(it, "status")) {
-        char peek = it->prop->val_str[0];
+    else if (propeq(fdt, loc, "status")) {
+        char peek = loc.prop->val_str[0];
         if (peek == 'o') {
             node->status = STATUS_OK;
         }
@@ -193,18 +331,18 @@ __parse_stdbase_prop(struct fdt_iter* it, struct dtn_base* node)
 }
 
 static bool
-__parse_stdnode_prop(struct fdt_iter* it, struct dtn* node)
+__parse_stdnode_prop(struct fdt_blob* fdt, fdt_loc_t loc, struct dtn* node)
 {
-    if (propeq(it, "reg")) {
-        __mkprop_ptr(it, &node->reg);
+    if (propeq(fdt, loc, "reg")) {
+        __mkprop_ptr(loc, &node->reg);
     }
 
-    else if (propeq(it, "ranges")) {
-        __mkprop_ptr(it, &node->ranges);
+    else if (propeq(fdt, loc, "ranges")) {
+        __mkprop_ptr(loc, &node->ranges);
     }
 
-    else if (propeq(it, "dma-ranges")) {
-        __mkprop_ptr(it, &node->dma_ranges);
+    else if (propeq(fdt, loc, "dma-ranges")) {
+        __mkprop_ptr(loc, &node->dma_ranges);
     }
 
     else {
@@ -215,17 +353,17 @@ __parse_stdnode_prop(struct fdt_iter* it, struct dtn* node)
 }
 
 static bool
-__parse_stdflags(struct fdt_iter* it, struct dtn_base* node)
+__parse_stdflags(struct fdt_blob* fdt, fdt_loc_t loc, struct dtn_base* node)
 {
-    if (propeq(it, "dma-coherent")) {
+    if (propeq(fdt, loc, "dma-coherent")) {
         node->dma_coherent = true;
     }
 
-    else if (propeq(it, "dma-noncoherent")) {
+    else if (propeq(fdt, loc, "dma-noncoherent")) {
         node->dma_ncoherent = true;
     }
 
-    else if (propeq(it, "interrupt-controller")) {
+    else if (propeq(fdt, loc, "interrupt-controller")) {
         node->intr_controll = true;
     }
 
@@ -258,17 +396,17 @@ __init_prop_table(struct dtn_base* node)
                               &(prop)->ht, (prop)->key.hash);
 
 static void
-__parse_other_prop(struct fdt_iter* it, struct dtn_base* node)
+__parse_other_prop(struct fdt_blob* fdt, fdt_loc_t loc, struct dtn_base* node)
 {
     struct dtp* prop;
     const char* key;
     unsigned int hash;
 
     prop = valloc(sizeof(*prop));
-    key  = fdtit_prop_key(it);
+    key  = fdt_prop_key(fdt, loc);
 
     prop->key = HSTR(key, strlen(key));
-    __mkprop_ptr(it, &prop->val);
+    __mkprop_ptr(loc, &prop->val);
 
     hstr_rehash(&prop->key, HSTR_FULL_HASH);
 
@@ -276,25 +414,25 @@ __parse_other_prop(struct fdt_iter* it, struct dtn_base* node)
 }
 
 static void
-__fill_node(struct fdt_iter* it, struct dtn* node)
+__fill_node(struct fdt_blob* fdt, fdt_loc_t loc, struct dtn* node)
 {
-    if (__parse_stdflags(it, &node->base)) {
+    if (__parse_stdflags(fdt, loc, &node->base)) {
         return;
     }
 
-    if (__parse_stdbase_prop(it, &node->base)) {
+    if (__parse_stdbase_prop(fdt, loc, &node->base)) {
         return;
     }
 
-    if (__parse_stdnode_prop(it, node)) {
+    if (__parse_stdnode_prop(fdt, loc, node)) {
         return;
     }
 
-    if (parse_stdintr_prop(it, &node->intr)) {
+    if (parse_stdintr_prop(fdt, loc, &node->intr)) {
         return;
     }
 
-    __parse_other_prop(it, &node->base);
+    __parse_other_prop(fdt, loc, &node->base);
 }
 
 static inline void
@@ -417,43 +555,35 @@ __resolve_inter_map()
 bool
 dt_load(ptr_t dtb_dropoff)
 {
-    dtctx.reloacted_dtb = dtb_dropoff;
-
-    if (dtctx.fdt->magic != FDT_MAGIC) {
-        ERROR("invalid dtb, unexpected magic: 0x%x, expect: 0x%x", dtctx.fdt->magic, FDT_MAGIC);
-        return false;
-    }
-
-    size_t str_off = dtctx.fdt->off_dt_strings;
-    dtctx.str_block = offset_t(dtb_dropoff, const char, str_off);
-
     llist_init_head(&dtctx.nodes);
     hashtable_init(dtctx.phnds_table);
 
-    struct fdt_iter it;
-    struct fdt_token* tok;
-    struct dtn *node, *child;
+    struct fdt_blob *fdt;
+    struct dtn      *node,
+                    *stack[16] = { NULL };
     
-    struct dtn* depth[16] = { NULL };
-    int level, nr_nodes = 0;
+    int depth = 0, delta = 0, nr_nodes = 0;
+    fdt_loc_t  loc, next_loc;
 
-    node = NULL;
-    fdt_itbegin(&it, dtctx.fdt);
+    fdt = &dtctx.fdt;
+    fdt_load(&dtctx.fdt, dtb_dropoff);
+
+    loc = fdt->root;
     
-    while (fdt_itnext(&it)) {
+    while (!fdt_eof(loc.token)) 
+    {
+        next_loc = fdt_next_token(loc, &delta);
 
-        if (it.depth >= 16) {
+        if (depth >= 16) {
             // tree too deep
             ERROR("strange dtb, too deep to dive.");
             return false;
         }
 
-        level = it.depth - 1;
-        node = depth[level];
+        assert(depth >= 0);
+        node = stack[depth];
 
-        assert(level >= 0);
-
-        if (it.state == FDT_STATE_NODE)
+        if (fdt_node(loc.token))
         {
             assert(!node);
 
@@ -461,40 +591,34 @@ dt_load(ptr_t dtb_dropoff)
             __init_node_regular(node);
             llist_append(&dtctx.nodes, &node->base.nodes);
 
-            __dt_node_set_name(node, it.detail->extra_data);
+            __dt_node_set_name(node, loc.node->name);
 
-            if (level) {
-                __set_parent(&depth[level - 1]->base, &node->base);
+            if (depth) {
+                __set_parent(&stack[depth - 1]->base, &node->base);
             }
 
             nr_nodes++;
-            depth[level] = node;
-            continue;
+            stack[depth] = node;
         }
-        
-        if (it.state == FDT_STATE_NODE_EXIT)
-        {
-            depth[it.depth] = NULL;
-            continue;
-        }
-        
-        assert(node);
 
-        if (it.state == FDT_STATE_PROP)
+        else if (depth > 1 && fdt_node_end(loc.token))
         {
-            __fill_node(&it, node);
+            stack[depth - 1] = NULL;
         }
+
+        else if (fdt_prop(loc.token))
+        {
+            node = stack[depth - 1];
+
+            assert(depth && node);
+            __fill_node(fdt, loc, node);
+        }
+
+        depth += delta;
+        loc = next_loc;
     }
 
-    if (it.invalid)
-    {
-        FATAL("invalid dtb. state: %d, token: 0x%x", 
-                it.state, it.pos->token);
-    }
-
-    fdt_itend(&it);
-
-    dtctx.root = depth[0];
+    dtctx.root = stack[0];
 
     __resolve_phnd_references();
     __resolve_inter_map();
