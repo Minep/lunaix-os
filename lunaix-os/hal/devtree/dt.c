@@ -119,9 +119,13 @@ fdt_find_prop(const struct fdt_blob* fdt, fdt_loc_t loc,
         if (!streq(prop_name, name)) {
             continue;
         }
-
-        dtp_val_set(val, (dt_enc_t)loc.prop->val, loc.prop->len);
+        
+        if (likely(val)) {
+            val->encoded = (dt_enc_t)loc.prop->val;
+            val->size    = loc.prop->len;
+        }
         return true;
+        
     } while (fdt_next_sibling(loc, &loc));
 
     return false;
@@ -147,6 +151,7 @@ fdt_memscan_begin(struct fdt_memscan* mscan, const struct fdt_blob* fdt)
     }
 
     mscan->loc = loc;
+    mscan->node_type = FDT_MEM_FREE;
 }
 
 #define get_size(mscan, val)    \
@@ -156,25 +161,28 @@ fdt_memscan_begin(struct fdt_memscan* mscan, const struct fdt_blob* fdt)
     (mscan->root_addr_c == 1 ? (val)->ref->u32_val : (val)->ref->u64_val)
 
 bool
-fdt_itnext_memory(struct fdt_memscan* mscan, struct fdt_blob* fdt)
+fdt_memscan_nextnode(struct fdt_memscan* mscan, struct fdt_blob* fdt)
 {
     char* prop_name;
 
     struct dtp_val val, reg_val;
-    fdt_loc_t loc;
+    fdt_loc_t loc, next;
     struct dtpropi dtpi;
-    bool has_reg = false;
+    bool has_reg = false, found = false;
 
-    loc  = mscan->loc;
+    next = mscan->loc;
 
 restart:
-    while (fdt_next_sibling(loc, &loc))
+    do
     {
+        loc = next;
+        
         if (!fdt_node(loc.token))
             continue;
 
         if (mscan->node_type != FDT_MEM_FREE) {
-            goto found;
+            found = true;
+            continue;
         }
 
         if (streq(loc.node->name, "reserved-memory")) {
@@ -190,8 +198,10 @@ restart:
         if (!streq(val.str_val, "memory"))
             continue;
 
-        goto found;
-    }
+        found = true;
+    } while (fdt_next_sibling(loc, &next) && !found);
+
+    if (found) goto _found;
 
     // emerged from /reserved-memory, resume walking for /memory
     if (mscan->node_type != FDT_MEM_FREE) {
@@ -201,11 +211,12 @@ restart:
 
     return false;
 
-found:
+_found:
 
     dtpi_init_empty(&mscan->regit);
+    mscan->found = loc;
+    mscan->loc   = next;
 
-    mscan->loc = loc;
     has_reg = fdt_find_prop(fdt, loc, "reg", &val);
     if (mscan->node_type == FDT_MEM_RSVD) {
         goto do_rsvd_child;
@@ -222,29 +233,25 @@ found:
     return true;
 
 do_rsvd_child:
+
+    mscan->node_attr.nomap = fdt_find_prop(fdt, loc, "no-map", NULL);
+    mscan->node_attr.reusable = fdt_find_prop(fdt, loc, "reusable", NULL);
+
     if (has_reg)
     {
-        mscan->node_type = FDT_MEM_RSVD_DYNAMIC;
-
         dtpi_init(&mscan->regit, &val);
+        mscan->node_type = FDT_MEM_RSVD;
         return true;
     }
-
-    if (!fdt_find_prop(fdt, loc, "size", &val)) {
+    
+    if (!fdt_find_prop(fdt, loc, "size", &val)) 
+    {
         WARN("malformed reserved memory child node");
         goto restart;
     }
-
-    mscan->node_type = FDT_MEM_RSVD;
+    
+    mscan->node_type = FDT_MEM_RSVD_DYNAMIC;
     mscan->node_attr.total_size = get_size(mscan, &val);
-
-    if (fdt_find_prop(fdt, loc, "no-map", &val)) {
-        mscan->node_attr.nomap = true;
-    }
-
-    if (fdt_find_prop(fdt, loc, "reusable", &val)) {
-        mscan->node_attr.reusable = true;
-    }
 
     if (fdt_find_prop(fdt, loc, "alignment", &val)) {
         mscan->node_attr.alignment = get_size(mscan, &val);
@@ -266,12 +273,16 @@ fdt_memscan_nextrange(struct fdt_memscan* mscan, struct dt_memory_node* mem)
         return false;
     }
 
+    if (!dtpi_has_next(&mscan->regit)) {
+        return false;
+    }
+
     if (dtpi_next_val(&mscan->regit, &val, mscan->root_addr_c)) {
         mem->base = get_addr(mscan, &val);
     }
 
     if (dtpi_next_val(&mscan->regit, &val, mscan->root_size_c)) {
-        mem->base = get_size(mscan, &val);
+        mem->size = get_size(mscan, &val);
     }
 
     mem->type = mscan->node_type;
@@ -280,7 +291,7 @@ fdt_memscan_nextrange(struct fdt_memscan* mscan, struct dt_memory_node* mem)
         mem->dyn_alloc_attr = mscan->node_attr;
     }
 
-    return dtpi_has_next(&mscan->regit);
+    return true;
 }
 
 static bool

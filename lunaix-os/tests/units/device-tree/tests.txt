@@ -3,3 +3,4 @@ inheritence
 intrmap 
 interrupts 
 fdt-iter
+fdt-mem

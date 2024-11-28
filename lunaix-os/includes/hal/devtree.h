@@ -34,12 +34,6 @@ struct dtn_base;
 struct dtn_iter;
 typedef bool (*node_predicate_t)(struct dtn_iter*, struct dtn_base*);
 
-struct dtpropi
-{
-    struct dtp_val     *prop;
-    off_t loc;
-};
-
 union dtp_baseval
 {
     u32_t        u32_val;
@@ -50,20 +44,24 @@ union dtp_baseval
 
 struct dtp_val
 {
-    struct {
-        union
-        {
-            union {
-                const char*  str_val;
-                const char*  str_lst;
-            };
-            ptr_t        ptr_val;
-            dt_enc_t     encoded;
-            
-            union dtp_baseval* ref;
+    union
+    {
+        union {
+            const char*  str_val;
+            const char*  str_lst;
         };
-        unsigned int size;
+        ptr_t        ptr_val;
+        dt_enc_t     encoded;
+        
+        union dtp_baseval* ref;
     };
+    unsigned int size;
+};
+
+struct dtpropi
+{
+    struct dtp_val     prop;
+    off_t loc;
 };
 
 /////////////////////////////////
@@ -194,6 +192,7 @@ struct fdt_blob
 struct fdt_memscan
 {
     fdt_loc_t loc;
+    fdt_loc_t found;
     
     struct dtpropi regit;
 
@@ -661,7 +660,7 @@ static inline void
 dtpi_init(struct dtpropi* dtpi, struct dtp_val* val)
 {
     *dtpi = (struct dtpropi) {
-        .prop = val,
+        .prop = *val,
         .loc = 0
     };
 }
@@ -670,7 +669,7 @@ static inline void
 dtpi_init_empty(struct dtpropi* dtpi)
 {
     *dtpi = (struct dtpropi) {
-        .prop = 0,
+        .prop = { 0, 0 },
         .loc = 0
     };
 }
@@ -678,20 +677,20 @@ dtpi_init_empty(struct dtpropi* dtpi)
 static inline bool
 dtpi_is_empty(struct dtpropi* dtpi)
 {
-    return !dtpi->prop;
+    return !dtpi->prop.size;
 }
 
 static inline bool
 dtpi_has_next(struct dtpropi* dtpi)
 {
-    return dtpi->loc < dtpi->prop->size / sizeof(u32_t);
+    return dtpi->loc < dtpi->prop.size / sizeof(u32_t);
 }
 
 static inline u32_t
 dtpi_next_u32(struct dtpropi* dtpi) 
 {
     union dtp_baseval* val;
-    val = (union dtp_baseval*)&dtpi->prop->encoded[dtpi->loc++];
+    val = (union dtp_baseval*)&dtpi->prop.encoded[dtpi->loc++];
     return val->u32_val;
 }
 
@@ -701,7 +700,7 @@ dtpi_next_u64(struct dtpropi* dtpi)
     union dtp_baseval* val;
     off_t loc = dtpi->loc;
     dtpi->loc += 2;
-    val = (union dtp_baseval*)&dtpi->prop->encoded[loc];
+    val = (union dtp_baseval*)&dtpi->prop.encoded[loc];
     
     return val->u64_val;
 }
@@ -722,7 +721,7 @@ dtpi_next_val(struct dtpropi* dtpi, struct dtp_val* val, int cells)
     }
 
     off_t loc = dtpi->loc;
-    dtp_val_set(val, &dtpi->prop->encoded[loc], cells);
+    dtp_val_set(val, &dtpi->prop.encoded[loc], cells);
 
     dtpi->loc += cells;
     return true;
