@@ -27,6 +27,8 @@ typedef struct {
 #define msi_addr(msiv)   ((msiv).msi_addr)
 #define msi_data(msiv)   ((msiv).msi_data)
 #define msi_vect(msiv)   ((msiv).mapped_iv)
+#define check_msiv_invalid(msiv)  (msi_vect(msiv) == -1)
+#define invalid_msi_vector  ((msi_vector_t) { (ptr_t)-1, (reg_t)-1, -1 });
 
 typedef void* msienv_t;
 

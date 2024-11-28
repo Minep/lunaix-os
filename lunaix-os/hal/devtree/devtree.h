@@ -2,7 +2,6 @@
 #define __LUNAIX_DEVTREE_INTERNAL_H
 
 #include <hal/devtree.h>
-
 #include <klibc/string.h>
 
 static inline bool

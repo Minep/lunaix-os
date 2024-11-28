@@ -13,6 +13,7 @@
 #define must_emit               __attribute__((used))
 #define unreachable             __builtin_unreachable()
 #define no_inline               __attribute__((noinline))
+#define asmlinkage              
 
 #define _be                     __attribute__((scalar_storage_order ("big-endian")))
 #define _le                     __attribute__((scalar_storage_order ("little-endian")))
@@ -21,13 +22,16 @@
 
 #define msbiti                  (sizeof(int) * 8 - 1)
 #define clz(bits)               __builtin_clz(bits)
+#define ctz(bits)               __builtin_ctz(bits)
 
 #ifdef CONFIG_ARCH_BITS_64
 #define msbitl                  (sizeof(long) * 8 - 1)
 #define clzl(bits)              __builtin_clzl(bits)
+#define ctzl(bits)              __builtin_ctzl(bits)
 #else
 #define msbitl                  msbiti
 #define clzl(bits)              clz(bits)
+#define ctzl(bits)              ctz(bits)
 #endif
 
 #define sadd_of(a, b, of)       __builtin_sadd_overflow(a, b, of)
@@ -35,6 +39,8 @@
 #define umul_of(a, b, of)       __builtin_umul_overflow(a, b, of)
 #define umull_of(a, b, of)      __builtin_umull_overflow(a, b, of)
 #define offsetof(f, m)          __builtin_offsetof(f, m)
+#define select(cond, y, n)      __builtin_choose_expr(cond, y, n)
+#define is_const(v)             __builtin_constant_p(v)
 
 #define prefetch_rd(ptr, ll)    __builtin_prefetch((ptr), 0, ll)
 #define prefetch_wr(ptr, ll)    __builtin_prefetch((ptr), 1, ll)
@@ -60,5 +66,10 @@ spin()
         ;
     unreachable;
 }
+
+#ifdef CONFIG_ARCH_X86_32
+#undef  asmlinkage
+#define asmlinkage      __attribute__((regparm(0)))
+#endif
 
 #endif /* __LUNAIX_COMPILER_H */
