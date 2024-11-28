@@ -1,4 +1,4 @@
-morphable(dt_node),
+morphable(dtn),
 morphable(pci_probe),
 
 morphable(device_meta),

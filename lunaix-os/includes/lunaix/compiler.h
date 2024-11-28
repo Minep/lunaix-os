@@ -14,6 +14,9 @@
 #define unreachable             __builtin_unreachable()
 #define no_inline               __attribute__((noinline))
 
+#define _be                     __attribute__((scalar_storage_order ("big-endian")))
+#define _le                     __attribute__((scalar_storage_order ("little-endian")))
+
 #define _default                _weak
 
 #define msbiti                  (sizeof(int) * 8 - 1)

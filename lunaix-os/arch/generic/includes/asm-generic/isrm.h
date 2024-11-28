@@ -94,7 +94,7 @@ isrm_msi_alloc_simple(struct device* dev, cpu_t cpu, isr_cb handler)
  * @param node
  */
 int
-isrm_bind_dtn(struct dt_intr_node* node);
+isrm_bind_dtn(struct dtn_intr* node);
 
 /**
  * @brief Get the handler associated with the given iv

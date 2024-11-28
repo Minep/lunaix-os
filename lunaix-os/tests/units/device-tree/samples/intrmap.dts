@@ -1,0 +1,35 @@
+/dts-v1/;
+
+/ {
+    compatible = "simple-bus";
+    #address-cells = <1>;
+    #size-cells = <1>;
+
+    pic: pic@1 {
+        clock-frequency = <0>;
+        interrupt-controller;
+
+        #address-cells = <0>;
+        #interrupt-cells = <2>;
+    };
+
+    pci {
+        #interrupt-cells = <1>;
+        #size-cells = <2>;
+        #address-cells = <3>;
+        
+        interrupt-map-mask = <0xf800 0 0 7>;
+        interrupt-map = <
+            /* IDSEL 0x11 - PCI slot 1 */
+            0x8800 0 0 1 &pic 2 1 /* INTA */
+            0x8800 0 0 2 &pic 3 1 /* INTB */
+            0x8800 0 0 3 &pic 4 1 /* INTC */
+            0x8800 0 0 4 &pic 1 1 /* INTD */
+            /* IDSEL 0x12 - PCI slot 2 */
+            0x9000 0 0 1 &pic 3 1 /* INTA */
+            0x9000 0 0 2 &pic 4 1 /* INTB */
+            0x9000 0 0 3 &pic 1 1 /* INTC */
+            0x9000 0 0 4 &pic 2 1 /* INTD */
+        >;
+    };
+};

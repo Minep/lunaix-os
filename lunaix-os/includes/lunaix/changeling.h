@@ -50,6 +50,7 @@ typedef struct changeling morph_t;
 #define morphable_attrs(struct_name, field)     struct_name, field
 #define morphed_ptr(ptr_like)                   ((morph_t*)__ptr(ptr_like))
 #define morpher_uid(mobj)                       ((mobj)->uid)
+#define morpher_name(mobj)                      ((mobj)->name.value)
 
 #define __changeling_morph(parent, chlg, name, struct_name, field)             \
     ({                                                                         \

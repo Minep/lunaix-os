@@ -1,0 +1,1 @@
+../../../../hal/devtree/dt_interrupt.c

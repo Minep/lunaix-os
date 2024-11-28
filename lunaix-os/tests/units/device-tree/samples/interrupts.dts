@@ -1,0 +1,39 @@
+/dts-v1/;
+
+/ {
+    #address-cells = <0>;
+    #size-cells = <0>;
+
+    pic: pic@11 {
+        interrupt-controller;
+
+        #interrupt-cells = <2>;
+    };
+
+    pic2: pic@22 {
+        interrupt-controller;
+
+        #interrupt-cells = <1>;
+    };
+
+    pic3: pic@33 {
+        interrupt-controller;
+
+        #interrupt-cells = <4>;
+    };
+
+    dev@1 {
+        interrupt-parent = <&pic>;
+        interrupts = <1 2>;
+    };
+
+    dev@2 {
+        interrupt-parent = <&pic>;
+        interrupts = <1 1>, <1 2>, <2 2>;
+    };
+
+    dev@3 {
+        interrupt-parent = <&pic>;
+        interrupts-extended = <&pic 3 3>, <&pic2 1>, <&pic3 1 2 3 4>;
+    };
+};
