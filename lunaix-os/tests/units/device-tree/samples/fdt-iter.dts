@@ -1,0 +1,19 @@
+/dts-v1/;
+
+/ {
+    child@1 {
+        prop-child1;
+    };
+
+    child@2 {
+        prop-child2;
+
+        child@21 {
+            prop-child21;
+        };
+    };
+
+    child@3 {
+        prop-child3;
+    };
+};

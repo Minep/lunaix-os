@@ -5,47 +5,68 @@
 #include <lunaix/ds/llist.h>
 #include <lunaix/ds/hstr.h>
 #include <lunaix/ds/hashtable.h>
-#include <lunaix/boot_generic.h>
 #include <lunaix/changeling.h>
 
 #include <klibc/string.h>
 
-#define le(v) ((((v) >> 24) & 0x000000ff)  |\
-               (((v) << 8)  & 0x00ff0000)  |\
-               (((v) >> 8)  & 0x0000ff00)  |\
-               (((v) << 24) & 0xff000000))
-
-#define le64(v) (((u64_t)le(v & 0xffffffff) << 32) | le(v >> 32))
-
-#define be(v) ((((v) << 24) & 0x000000ff)  |\
-               (((v) >> 8)  & 0x00ff0000)  |\
-               (((v) << 8)  & 0x0000ff00)  |\
-               (((v) >> 24) & 0xff000000))
-
-#define FDT_MAGIC       be(0xd00dfeed)
-#define FDT_NOD_BEGIN   be(0x00000001)
-#define FDT_NOD_END     be(0x00000002)
-#define FDT_PROP        be(0x00000003)
-#define FDT_NOP         be(0x00000004)
-#define FDT_END         be(0x00000009)
+#define FDT_MAGIC       0xd00dfeedU
+#define FDT_NOD_BEGIN   0x00000001U
+#define FDT_NOD_END     0x00000002U
+#define FDT_PROP        0x00000003U
+#define FDT_NOP         0x00000004U
+#define FDT_END         0x00000009U
 
 #define STATUS_OK       0
 #define STATUS_DISABLE  1
 #define STATUS_RSVD     2
 #define STATUS_FAIL     3
 
-
-typedef unsigned int* dt_enc_t;
-typedef unsigned int  dt_phnd_t;
-typedef bool (*node_predicate_t)(struct dt_node_iter*, struct dt_node*);
-
-
-struct dt_node_base;
-struct dt_node_iter;
-typedef bool (*node_predicate_t)(struct dt_node_iter*, struct dt_node_base*);
-
-
 #define PHND_NULL    ((dt_phnd_t)-1)
+
+/////////////////////////////////
+///     DT Primitives
+/////////////////////////////////
+
+typedef unsigned int*     dt_enc_t;
+typedef unsigned int      dt_phnd_t;
+
+struct dtn_base;
+struct dtn_iter;
+typedef bool (*node_predicate_t)(struct dtn_iter*, struct dtn_base*);
+
+union dtp_baseval
+{
+    u32_t        u32_val;
+    u64_t        u64_val;
+    dt_phnd_t    phandle;
+    u32_t        raw[0];
+} _be;
+
+struct dtp_val
+{
+    union
+    {
+        union {
+            const char*  str_val;
+            const char*  str_lst;
+        };
+        ptr_t        ptr_val;
+        dt_enc_t     encoded;
+        
+        union dtp_baseval* ref;
+    };
+    unsigned int size;
+};
+
+struct dtpropi
+{
+    struct dtp_val     prop;
+    off_t loc;
+};
+
+/////////////////////////////////
+///     FDT Constructs
+/////////////////////////////////
 
 struct fdt_header {
     u32_t magic;
@@ -58,64 +79,148 @@ struct fdt_header {
     u32_t boot_cpuid_phys;
     u32_t size_dt_strings;
     u32_t size_dt_struct;
-};
+} _be;
 
 struct fdt_memrsvd_ent 
 {
     u64_t addr;
     u64_t size;
-} align(8);
+} _be align(8);
+
 
 struct fdt_token 
 {
     u32_t token;
-} compact align(4);
+} _be compact align(4);
 
-struct fdt_node_head
-{
-    struct fdt_token token;
-    char name[0];
-};
-
-struct fdt_prop 
+struct fdt_prop
 {
     struct fdt_token token;
     u32_t len;
     u32_t nameoff;
-} compact align(4);
 
-struct dt_prop_val
+    union {
+        u32_t val[0];
+        char  val_str[0];
+    } _be;
+} _be compact align(4);
+
+struct fdt_loc
 {
-    struct {
-        union
-        {
-            union {
-                const char*  str_val;
-                const char*  str_lst;
-            };
-            ptr_t        ptr_val;
-            
-            union {
-                dt_enc_t     encoded;
-                dt_phnd_t    phandle;
-            };
-            u32_t        u32_val;
+    union {
+        struct fdt_token        *token;
+        struct fdt_prop         *prop;
+        struct fdt_memrsvd_ent  *rsvd_ent;
+        ptr_t                    ptr;
+        struct {
+            struct fdt_token token;
+            char name[0];
+        } *node;
+    };
+};
+typedef struct fdt_loc fdt_loc_t;
 
-            u64_t        u64_val;
+
+enum fdt_state {
+    FDT_STATE_START,
+    FDT_STATE_NODE,
+    FDT_STATE_NODE_EXIT,
+    FDT_STATE_PROP,
+    FDT_STATE_END,
+};
+
+enum fdtit_mode {
+    FDT_RSVDMEM,
+    FDT_STRUCT,
+};
+
+enum fdt_mem_type {
+    FDT_MEM_RSVD,
+    FDT_MEM_RSVD_DYNAMIC,
+    FDT_MEM_FREE
+};
+
+struct fdt_rsvdmem_attrs
+{
+    size_t total_size;
+    ptr_t alignment;
+    
+    union {
+        struct {
+            bool nomap    : 1;
+            bool reusable : 1;
         };
-        unsigned int size;
+        int flags;
     };
 };
 
+struct dt_memory_node
+{
+    ptr_t base;
+    ptr_t size;
+    enum fdt_mem_type type;
 
-struct dt_prop
+    struct fdt_rsvdmem_attrs dyn_alloc_attr;
+};
+
+struct fdt_rsvd_mem
+{
+    u64_t base;
+    u64_t size;
+} _be align(8);
+
+struct fdt_blob
+{
+    union {
+        struct fdt_header* header;
+        ptr_t fdt_base;
+    };
+
+    fdt_loc_t root;
+    union {
+        const char* str_block;
+        ptr_t str_block_base;
+    };
+
+
+    union {
+        struct fdt_rsvd_mem* plat_rsvd;
+        ptr_t plat_rsvd_base;
+    };
+};
+
+struct fdt_memscan
+{
+    fdt_loc_t loc;
+    fdt_loc_t found;
+    
+    struct dtpropi regit;
+
+    u32_t root_addr_c;
+    u32_t root_size_c;
+    enum fdt_mem_type node_type;
+
+    struct fdt_rsvdmem_attrs node_attr;
+};
+
+struct fdt_memrsvd_iter
+{
+    struct fdt_memrsvd_ent *block;
+};
+
+
+/////////////////////////////////
+///     DT Construct
+/////////////////////////////////
+
+struct dtp
 {
     struct hlist_node   ht;
     struct hstr         key;
-    struct dt_prop_val  val;
+    struct dtp_val  val;
 };
 
-struct dt_prop_table
+struct dtp_table
 {
     union {
         struct hbucket    other_props[0];
@@ -123,7 +228,7 @@ struct dt_prop_table
     };
 };
 
-struct dt_node_base
+struct dtn_base
 {
     morph_t mobj;
 
@@ -142,254 +247,265 @@ struct dt_node_base
             bool dma_coherent  : 1;
             bool dma_ncoherent : 1;
             bool intr_controll : 1;
-            bool intr_neuxs    : 1;
         };
         unsigned int    flags;
     };
 
-    struct dt_node_base  *parent;
-    struct llist_header   nodes;
+    struct dtn_base         *parent;
+    struct llist_header      nodes;
 
-    struct dt_prop_val    compat;
-    dt_phnd_t             phandle;
+    struct dtp_val           compat;
+    dt_phnd_t                phandle;
 
-    struct dt_prop_table* props;
+    struct dtp_table        *props;
 
-    void* obj;
-    morph_t* binded_dev;
+    morph_t                 *binded_dev;
 };
 
-struct dt_root
-{
-    struct dt_node_base base;
-
-    const char*         serial;
-    const char*         chassis;
-};
-
-struct dt_intr_prop;
-
-struct dt_intr_mapkey
-{
-    unsigned int* val;
-    unsigned int  size;
-};
-
-struct dt_intr_mapent
-{
-    struct llist_header ents;
-
-    struct dt_intr_mapkey key;
-
-    struct dt_node_base* parent;
-    struct dt_prop_val parent_props;
-};
-
-struct dt_intr_map 
-{
-    struct dt_prop_val       raw;
-    struct dt_prop_val       raw_mask;
-
-    struct dt_intr_mapkey    key_mask;
-    struct llist_header      mapent;
-
-    bool resolved;
-};
-
-struct dt_intr_node
+struct dtspec_key
 {
     union {
-        struct dt_intr_node *parent;
+        union dtp_baseval *bval;
+        unsigned int*      val;
+    };
+    unsigned int      size;
+};
+
+struct dtspec_mapent
+{
+    struct llist_header ents;
+    const struct dtspec_key child_spec;
+    
+    struct dtn* parent;
+    const struct dtspec_key parent_spec;
+};
+
+struct dtspec_map
+{
+    const struct dtspec_key mask;
+    const struct dtspec_key pass_thru;
+
+    struct llist_header ents;
+};
+
+struct dtspec_intr
+{
+    struct dtn *domain;
+
+    struct llist_header  ispecs;
+    struct dtp_val   val;
+};
+
+struct dtn_intr
+{
+    union {
+        struct dtn *parent;
         dt_phnd_t parent_hnd;
     };
 
-    struct {
-        bool extended;
-        bool valid;
-        union {
-            struct dt_prop_val   arr;
-            struct llist_header  values; 
+    union {
+        struct {
+            bool extended : 1;
+            bool valid : 1;
         };
-    } intr;
+        int flags;
+    };
 
-    struct dt_intr_map* map;
+    union {
+        struct dtp_val       raw_ispecs;
+        struct llist_header  ext_ispecs; 
+    };
+    
+    int nr_intrs;
+
+    struct dtspec_map* map;
 };
-#define INTR_TO_DTNODE(intr_node) \
-        (container_of(intr_node, struct dt_node, intr))
 
-#define BASE_TO_DTNODE(base_node) \
-        (container_of(base_node, struct dt_node, base))
-
-struct dt_node
+struct dtn
 {
     union {
         morph_t mobj;
-        struct dt_node_base base;
+        struct dtn_base base;
     };
     
-    struct dt_intr_node intr;
+    struct dtn_intr intr;
     
-    struct dt_prop_val  reg;
-    struct dt_prop_val  vreg;
+    struct dtp_val  reg;
 
-    struct dt_prop_val  ranges;
-    struct dt_prop_val  dma_ranges;
+    struct dtp_val  ranges;
+    struct dtp_val  dma_ranges;
 };
-#define dt_parent(node) ((node)->base.parent)
-#define dt_morpher       morphable_attrs(dt_node, mobj)
-#define dt_mobj(node)   (&(node)->mobj)
+#define dt_parent(node)  ((node)->base.parent)
+#define dt_morpher       morphable_attrs(dtn, mobj)
+#define dt_mobj(node)    (&(node)->mobj)
+#define dt_name(node)    morpher_name(dt_mobj(node))
+#define dtn_from(base_node) \
+        (container_of(base_node, struct dtn, base))
 
-struct dt_intr_prop
+struct dtn_iter
 {
-    struct dt_intr_node *master;
-
-    struct llist_header  props;
-    struct dt_prop_val   val;
-};
-
-struct dt_prop_iter
-{
-    struct dt_prop_val     *prop;
-    struct dt_node_base    *node;
-    dt_enc_t                prop_loc;
-    dt_enc_t                prop_loc_next;
-    unsigned int            ent_sz;
-};
-
-struct dt_context
-{
-    union {
-        ptr_t reloacted_dtb;
-        struct fdt_header* fdt;
-    };
-
-    struct llist_header   nodes;
-    struct dt_root       *root;
-    struct hbucket        phnds_table[16];
-    const char           *str_block;
-};
-
-struct fdt_iter
-{
-    union {
-        struct fdt_token      *pos;
-        struct fdt_prop       *prop;
-        struct fdt_node_head  *node_head;
-    };
-
-    const char* str_block;
-    int depth;
-};
-
-struct fdt_memrsvd_iter
-{
-    struct fdt_memrsvd_ent *block;
-};
-
-struct dt_node_iter
-{
-    struct dt_node_base* head;
-    struct dt_node_base* matched;
+    struct dtn_base* head;
+    struct dtn_base* matched;
     void* closure;
     node_predicate_t pred;
 };
 
+struct dt_context
+{
+    struct fdt_blob         fdt;
+
+    struct llist_header     nodes;
+    struct dtn             *root;
+    struct hbucket          phnds_table[16];
+    const char             *str_block;
+};
 
 
-/****
- * FDT Related
- ****/
+/////////////////////////////////
+///     FDT Methods
+/////////////////////////////////
 
 #define fdt_prop(tok) ((tok)->token == FDT_PROP)
 #define fdt_node(tok) ((tok)->token == FDT_NOD_BEGIN)
-#define fdt_node_end(tok) ((tok)->token == FDT_NOD_END)
 #define fdt_nope(tok) ((tok)->token == FDT_NOP)
-
-void 
-fdt_itbegin(struct fdt_iter* fdti, struct fdt_header* fdt_hdr);
-
-void 
-fdt_itend(struct fdt_iter* fdti);
-
-bool 
-fdt_itnext(struct fdt_iter* fdti);
-
-bool 
-fdt_itnext_at(struct fdt_iter* fdti, int level);
+#define fdt_eof(tok)  ((tok)->token == FDT_END)
+#define fdt_node_end(tok) \
+    ((tok)->token == FDT_NOD_END || (tok)->token == FDT_END)
 
 void
-fdt_memrsvd_itbegin(struct fdt_memrsvd_iter* rsvdi, 
-                    struct fdt_header* fdt_hdr);
+fdt_load(struct fdt_blob* fdt, ptr_t base);
+
+fdt_loc_t
+fdt_next_token(fdt_loc_t loc, int* depth);
 
 bool
-fdt_memrsvd_itnext(struct fdt_memrsvd_iter* rsvdi);
+fdt_next_sibling(fdt_loc_t loc, fdt_loc_t* loc_out);
 
-void
-fdt_memrsvd_itend(struct fdt_memrsvd_iter* rsvdi);
+bool
+fdt_next_boot_rsvdmem(struct fdt_blob*, fdt_loc_t*, struct dt_memory_node*);
+
+fdt_loc_t
+fdt_descend_into(fdt_loc_t loc);
+
+static inline fdt_loc_t
+fdt_ascend_from(fdt_loc_t loc) 
+{
+    while (fdt_next_sibling(loc, &loc));
+
+    loc.token++;
+    return loc;
+}
+
+bool
+fdt_memscan_begin(struct fdt_memscan*, const struct fdt_blob*);
+
+bool
+fdt_memscan_nextnode(struct fdt_memscan*, struct fdt_blob*);
+
+bool
+fdt_memscan_nextrange(struct fdt_memscan*, struct dt_memory_node*);
+
+bool
+fdt_find_prop(const struct fdt_blob*, fdt_loc_t, 
+              const char*, struct dtp_val*);
 
 static inline char*
-fdtit_prop_key(struct fdt_iter* fdti)
+fdt_prop_key(struct fdt_blob* fdt, fdt_loc_t loc)
 {
-    return &fdti->str_block[fdti->prop->nameoff];
+    return &fdt->str_block[loc.prop->nameoff];
 }
 
 
-/****
- * DT Main Functions: General
- ****/
+/////////////////////////////////
+///     DT General Methods
+/////////////////////////////////
 
 bool
 dt_load(ptr_t dtb_dropoff);
 
-struct dt_node*
+struct dtn*
 dt_resolve_phandle(dt_phnd_t phandle);
 
-struct dt_prop_val*
-dt_getprop(struct dt_node_base* base, const char* name);
-
-struct dt_prop_val*
-dt_resolve_interrupt(struct dt_node* node);
+struct dtp_val*
+dt_getprop(struct dtn_base* base, const char* name);
 
 void
-dt_resolve_interrupt_map(struct dt_node* node);
+dt_resolve_interrupt_map(struct dtn* node);
 
-static inline unsigned int
-dt_addr_cells(struct dt_node_base* base)
-{
-    return base->parent ? base->parent->addr_c : base->addr_c;
-}
+struct dtn* 
+dt_interrupt_at(struct dtn* node, int idx, struct dtp_val* int_spec);
 
-static inline unsigned int
-dt_size_cells(struct dt_node_base* base)
+static inline void
+dtp_val_set(struct dtp_val* val, dt_enc_t raw, unsigned cells)
 {
-    return base->parent ? base->parent->sz_c : base->sz_c;
+    val->encoded = raw;
+    val->size = cells * sizeof(u32_t);
 }
 
 
-/****
- * DT Main Functions: Node-finder
- ****/
+//////////////////////////////////////
+///     DT Methods: Specifier Map
+//////////////////////////////////////
+
+
+struct dtspec_create_ops
+{
+    int (*child_keysz)(struct dtn*);
+    int (*parent_keysz)(struct dtn*);
+    struct dtp_val* (*get_mask)(struct dtn*);
+    struct dtp_val* (*get_passthru)(struct dtn*);
+};
+
+struct dtspec_map*
+dtspec_create(struct dtn* node, struct dtp_val* map,
+              const struct dtspec_create_ops* ops);
+
+struct dtspec_mapent*
+dtspec_lookup(struct dtspec_map*, struct dtspec_key*);
 
 void
-dt_begin_find_byname(struct dt_node_iter* iter, 
-                     struct dt_node* node, const char* name);
+dtspec_applymask(struct dtspec_map*, struct dtspec_key*);
 
 void
-dt_begin_find(struct dt_node_iter* iter, struct dt_node* node, 
+dtspec_free(struct dtspec_map*);
+
+void
+dtspec_cpykey(struct dtspec_key* dest, struct dtspec_key* src);
+
+void
+dtspec_freekey(struct dtspec_key* key);
+
+static inline bool
+dtspec_nullkey(struct dtspec_key* key)
+{
+    return !key || !key->size;
+}
+
+
+//////////////////////////////////////
+///     DT Methods: Node query
+//////////////////////////////////////
+
+void
+dt_begin_find_byname(struct dtn_iter* iter, 
+                     struct dtn* node, const char* name);
+
+void
+dt_begin_find(struct dtn_iter* iter, struct dtn* node, 
               node_predicate_t pred, void* closure);
 
 static inline void
-dt_end_find(struct dt_node_iter* iter)
+dt_end_find(struct dtn_iter* iter)
 {
     // currently do nothing, keep only for semantic
 }
 
 bool
-dt_find_next(struct dt_node_iter* iter,
-             struct dt_node_base** matched);
+dt_find_next(struct dtn_iter* iter,
+             struct dtn_base** matched);
 
 static inline bool
-dt_found_any(struct dt_node_iter* iter)
+dt_found_any(struct dtn_iter* iter)
 {
     return !!iter->matched;
 }
@@ -397,186 +513,218 @@ dt_found_any(struct dt_node_iter* iter)
 struct dt_context*
 dt_main_context();
 
-/****
- * DT Main Functions: Node-binding
- ****/
-
-static inline void
-dt_bind_object(struct dt_node_base* base, void* obj)
+static inline u32_t
+dtp_u32(struct dtp_val* val)
 {
-    base->obj = obj;
+    return val->ref->u32_val;
 }
 
-static inline bool
-dt_has_binding(struct dt_node_base* base) 
+static inline u64_t
+dtp_u64(struct dtp_val* val)
 {
-    return base->obj != NULL;
+    return val->ref->u64_val;
 }
 
-#define dt_binding_of(node_base, type)  \
-    ((type)(node_base)->obj)
-
-
-/****
- * DT Main Functions: Prop decoders
- ****/
-
 static inline void
-dt_decode(struct dt_prop_iter* dtpi, struct dt_node_base* node, 
-                struct dt_prop_val* val, unsigned int ent_sz)
+dtp_speckey(struct dtspec_key* key, struct dtp_val* prop)
 {
-    *dtpi = (struct dt_prop_iter) {
-        .prop = val,
-        .node = node,
-        .prop_loc = val->encoded,
-        .prop_loc_next = val->encoded,
-        .ent_sz = ent_sz
+    key->size = prop->size / sizeof(u32_t);
+    key->val  = prop->encoded;
+}
+
+
+//////////////////////////////////////
+///     DT Prop Extractor
+//////////////////////////////////////
+
+enum dtprop_types
+{
+    DTP_END = 0,
+    DTP_U32,
+    DTP_U64,
+    DTP_PHANDLE,
+    DTP_COMPX,
+};
+
+struct dtprop_def
+{
+    unsigned int cell;
+    unsigned int acc_sz;
+    enum dtprop_types type;
+};
+
+typedef struct dtprop_def dt_proplet[];
+
+struct dtprop_xval
+{
+    union {
+        u32_t u32;
+        ptr_t u64;
+        struct dtn* phandle;
+        union {
+            dt_enc_t composite;
+            union dtp_baseval* cval;
+        };
     };
-}
+    struct dtprop_def* archetype;
+};
 
-#define dt_decode_reg(dtpi, node, field) \
-            dt_decode(dtpi, &(node)->base, &(node)->field, \
-                        dt_size_cells(&(node)->base) \
-                            + dt_addr_cells(&(node)->base))
+struct dtpropx
+{
+    const struct dtprop_def* proplet;
+    int proplet_len;
+    int proplet_sz;
 
-#define dt_decode_range(dtpi, node, field) \
-            dt_decode(dtpi, &(node)->base, &(node)->field, \
-                        dt_size_cells(&(node)->base) * 2 \
-                            + dt_addr_cells(&(node)->base))
+    struct dtp_val* raw;
+    off_t row_loc;
+};
 
-#define dt_decode_simple(dtpi, prop) \
-            dt_decode(dtpi, NULL, prop, 1);
+#define dtprop_u32              (struct dtprop_def){ 1, 0, DTP_U32 }
+#define dtprop_u64              (struct dtprop_def){ 2, 0, DTP_U64 }
+#define dtprop_handle           (struct dtprop_def){ 1, 0, DTP_PHANDLE }
+#define dtprop_compx(cell)      (struct dtprop_def){ cell, 0, DTP_COMPX }
+#define dtprop_end              (struct dtprop_def){ 0, 0, DTP_END }
+#define dtprop_(type, cell)     (struct dtprop_def){ cell, 0, type }
 
-#define dtprop_off(dtpi) \
-            (unsigned int)(\
-                __ptr(dtpi->prop_loc_next) - __ptr(dtpi->prop->encoded) \
-            )
+#define dtprop_reglike(base)                    \
+    ({                                          \
+        dt_proplet p = {                        \
+            dtprop_compx(base->addr_c),         \
+            dtprop_compx(base->sz_c),           \
+            dtprop_end                          \
+        };                                      \
+        dt_proplet;                             \
+    })
 
-#define dtprop_extract(dtpi, off) \
-            ( (dt_enc_t) (&(dtpi)->prop_loc[(off)]) )
+#define dtprop_rangelike(node)                  \
+    ({                                          \
+        dt_proplet p = {                        \
+            dtprop_compx(base->addr_c),         \
+            dtprop_compx(base->parent->addr_c), \
+            dtprop_compx(base->sz_c),           \
+            dtprop_end                          \
+        };                                      \
+        dt_proplet;                             \
+    })
 
 #define dtprop_strlst_foreach(pos, prop)    \
         for (pos = (prop)->str_lst; \
-             pos <= &(prop)->str_lst[(prop)->size]; \
+             pos <= &(prop)->str_lst[(prop)->size - 1]; \
              pos = &pos[strlen(pos) + 1])
 
-static inline bool
-dtprop_next_n(struct dt_prop_iter* dtpi, int n)
+void
+dtpx_compile_proplet(struct dtprop_def* proplet);
+
+void
+dtpx_prepare_with(struct dtpropx* propx, struct dtp_val* prop,
+                  struct dtprop_def* proplet);
+
+#define dtproplet_compile(proplet)   \
+        dtpx_compile_proplet(proplet, \
+                          sizeof(proplet) / sizeof(struct dtprop_def))
+
+bool
+dtpx_goto_row(struct dtpropx*, int row);
+
+bool
+dtpx_next_row(struct dtpropx*);
+
+bool
+dtpx_extract_at(struct dtpropx*, struct dtprop_xval*, int col);
+
+bool
+dtpx_extract_loc(struct dtpropx*, struct dtprop_xval*, 
+                 int row, int col);
+
+bool
+dtpx_extract_row(struct dtpropx*, struct dtprop_xval*, int len);
+
+static inline u32_t
+dtpx_xvalu32(struct dtprop_xval* val){
+    return val->archetype->type == DTP_COMPX ?
+            val->cval->u32_val : val->u32;
+}
+
+static inline u64_t
+dtpx_xvalu64(struct dtprop_xval* val){
+    return val->archetype->type == DTP_COMPX ?
+            val->cval->u64_val : val->u64;
+}
+
+
+//////////////////////////////////////
+///     DT Prop Iterator
+//////////////////////////////////////
+
+static inline void
+dtpi_init(struct dtpropi* dtpi, struct dtp_val* val)
 {
-    unsigned int off;
+    *dtpi = (struct dtpropi) {
+        .prop = *val,
+        .loc = 0
+    };
+}
 
-    dtpi->prop_loc = dtpi->prop_loc_next;
-    dtpi->prop_loc_next += n;
-
-    off = dtprop_off(dtpi);
-    return off >= dtpi->prop->size;
+static inline void
+dtpi_init_empty(struct dtpropi* dtpi)
+{
+    *dtpi = (struct dtpropi) {
+        .prop = { 0, 0 },
+        .loc = 0
+    };
 }
 
 static inline bool
-dtprop_prev_n(struct dt_prop_iter* dtpi, int n)
+dtpi_is_empty(struct dtpropi* dtpi)
 {
-    unsigned int off;
+    return !dtpi->prop.size;
+}
 
-    off = dtprop_off(dtpi);
-    if (!off || off > dtpi->prop->size) {
+static inline bool
+dtpi_has_next(struct dtpropi* dtpi)
+{
+    return dtpi->loc < dtpi->prop.size / sizeof(u32_t);
+}
+
+static inline u32_t
+dtpi_next_u32(struct dtpropi* dtpi) 
+{
+    union dtp_baseval* val;
+    val = (union dtp_baseval*)&dtpi->prop.encoded[dtpi->loc++];
+    return val->u32_val;
+}
+
+static inline u64_t
+dtpi_next_u64(struct dtpropi* dtpi) 
+{
+    union dtp_baseval* val;
+    off_t loc = dtpi->loc;
+    dtpi->loc += 2;
+    val = (union dtp_baseval*)&dtpi->prop.encoded[loc];
+    
+    return val->u64_val;
+}
+
+static inline struct dtn*
+dtpi_next_hnd(struct dtpropi* dtpi) 
+{
+    u32_t phandle;
+    phandle = dtpi_next_u32(dtpi);
+    return dt_resolve_phandle(phandle);
+}
+
+static inline bool
+dtpi_next_val(struct dtpropi* dtpi, struct dtp_val* val, int cells) 
+{
+    if (!dtpi_has_next(dtpi)) {
         return false;
     }
 
-    dtpi->prop_loc = dtpi->prop_loc_next;
-    dtpi->prop_loc_next -= n;
+    off_t loc = dtpi->loc;
+    dtp_val_set(val, &dtpi->prop.encoded[loc], cells);
 
+    dtpi->loc += cells;
     return true;
-}
-
-static inline bool
-dtprop_next(struct dt_prop_iter* dtpi)
-{
-    return dtprop_next_n(dtpi, dtpi->ent_sz);
-}
-
-static inline bool
-dtprop_prev(struct dt_prop_iter* dtpi)
-{
-    return dtprop_prev_n(dtpi, dtpi->ent_sz);
-}
-
-static inline unsigned int
-dtprop_to_u32(dt_enc_t enc_val)
-{
-    return le(*enc_val);
-}
-
-#define dtprop_to_phnd(enc_val) \
-            (dt_phnd_t)dtprop_to_u32(enc_val)
-
-static inline u64_t
-dtprop_to_u64(dt_enc_t enc_val)
-{
-    return le64(*(u64_t*)enc_val);
-}
-
-static inline u32_t
-dtprop_u32_at(struct dt_prop_iter* dtpi, int index)
-{
-    return dtprop_to_u32(dtprop_extract(dtpi, index));
-}
-
-static inline u32_t
-dtprop_u64_at(struct dt_prop_iter* dtpi, int index)
-{
-    return dtprop_to_u64(dtprop_extract(dtpi, index));
-}
-
-static inline dt_enc_t
-dtprop_reg_addr(struct dt_prop_iter* dtpi)
-{
-    return dtprop_extract(dtpi, 0);
-}
-
-static inline ptr_t
-dtprop_reg_nextaddr(struct dt_prop_iter* dtpi)
-{
-    ptr_t t;
-
-    t = (ptr_t)dtprop_to_u64(dtprop_reg_addr(dtpi));
-    dtprop_next_n(dtpi, dt_addr_cells(dtpi->node));
-
-    return t;
-}
-
-static inline dt_enc_t
-dtprop_reg_len(struct dt_prop_iter* dtpi)
-{
-    return dtprop_extract(dtpi, dtpi->node->addr_c);
-}
-
-static inline size_t
-dtprop_reg_nextlen(struct dt_prop_iter* dtpi)
-{
-    size_t t;
-
-    t = (size_t)dtprop_to_u64(dtprop_reg_len(dtpi));
-    dtprop_next_n(dtpi, dt_size_cells(dtpi->node));
-
-    return t;
-}
-
-static inline dt_enc_t
-dtprop_range_childbus(struct dt_prop_iter* dtpi)
-{
-    return dtprop_extract(dtpi, 0);
-}
-
-static inline dt_enc_t
-dtprop_range_parentbus(struct dt_prop_iter* dtpi)
-{
-    return dtprop_extract(dtpi, dt_addr_cells(dtpi->node));
-}
-
-static inline dt_enc_t
-dtprop_range_len(struct dt_prop_iter* dtpi)
-{
-    return dtprop_extract(dtpi, dt_addr_cells(dtpi->node) * 2);
 }
 
 #endif /* __LUNAIX_DEVTREE_H */

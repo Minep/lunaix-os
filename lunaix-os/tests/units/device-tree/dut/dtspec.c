@@ -1,0 +1,1 @@
+../../../../hal/devtree/dtspec.c
