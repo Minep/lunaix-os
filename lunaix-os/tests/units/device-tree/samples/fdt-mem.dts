@@ -20,20 +20,20 @@
 
     reserved-memory {
         #address-cells = <2>;
-		#size-cells = <1>;
-		ranges;
+        #size-cells = <1>;
+        ranges;
 
-		hwrom_reserved: hwrom@0 {
-			reg = <0x0 0x0 0x1000000>;
-			no-map;
-		};
+        hwrom_reserved: hwrom@0 {
+            reg = <0x0 0x0 0x1000000>;
+            no-map;
+        };
 
-		cma {
-			compatible = "shared-dma-pool";
-			reusable;
-			size = <0x10000000>;
-			alignment = <0x400000>;
-			alloc-ranges = <0x0 0x10000000 0x10000000>;
-		};
+        cma {
+            compatible = "shared-dma-pool";
+            reusable;
+            size = <0x10000000>;
+            alignment = <0x400000>;
+            alloc-ranges = <0x0 0x10000000 0x10000000>;
+        };
     };
 };
