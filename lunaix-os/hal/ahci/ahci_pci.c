@@ -11,7 +11,7 @@ ahci_pci_create(struct device_def* def, morph_t* morphed)
     struct device* dev;
     struct pci_base_addr* bar6;
     struct ahci_driver* ahci_drv;
-    msi_vector_t msiv;
+    irq_t irq;
 
     probe = changeling_try_reveal(morphed, pci_probe_morpher);
     if (!probe) {
@@ -29,12 +29,13 @@ ahci_pci_create(struct device_def* def, morph_t* morphed)
     
     assert(pci_capability_msi(probe));
 
-    msiv = pci_msi_setup_simple(probe, ahci_hba_isr);
+    irq = pci_declare_msi_irq(ahci_hba_isr, probe, NULL);
+    pci_assign_msi(probe, irq);
 
     struct ahci_driver_param param = {
         .mmio_base = bar6->start,
         .mmio_size = bar6->size,
-        .ahci_iv = msi_vect(msiv),
+        .irq = irq,
     };
 
     ahci_drv = ahci_driver_init(&param);

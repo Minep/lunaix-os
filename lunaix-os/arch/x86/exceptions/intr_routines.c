@@ -75,16 +75,14 @@ intr_routine_apic_spi(const struct hart_state* state)
 void
 intr_routine_apic_error(const struct hart_state* state)
 {
-    u32_t error_reg = apic_read_reg(APIC_ESR);
-    char buf[32];
-    ksprintf(buf, "APIC error, ESR=0x%x", error_reg);
-
+    ERROR("APIC error");
     failsafe_diagnostic();
 }
 
 void
 intr_routine_sched(const struct hart_state* state)
 {
+    isrm_notify_eoi(0, LUNAIX_SCHED);
     schedule();
 }
 

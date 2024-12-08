@@ -10,6 +10,8 @@
 
 #include <asm-generic/isrm.h>
 
+#include "irq.h"
+
 #define PCI_VENDOR_INVLD 0xffff
 
 #define PCI_REG_VENDOR_DEV 0
@@ -86,6 +88,7 @@ struct pci_probe
     struct pci_base_addr bar[6];
 
     struct device* bind;
+    struct irq_domain* irq_domain;
 };
 #define pci_probe_morpher   morphable_attrs(pci_probe, mobj)
 
@@ -115,6 +118,13 @@ pci_register_driver(struct device_def* def, pci_id_checker_t checker);
 size_t
 pci_bar_sizing(struct pci_probe* probe, u32_t* bar_out, u32_t bar_num);
 
+irq_t
+pci_declare_msi_irq(irq_servant callback, 
+                    struct pci_probe* probe, void *irq_extra);
+
+int
+pci_assign_msi(struct pci_probe* probe, irq_t irq);
+
 /**
  * @brief Bind an abstract device instance to the pci device
  *
@@ -126,32 +136,6 @@ pci_bind_instance(struct pci_probe* probe, struct device* dev)
 {
     probe->bind = dev;
 
-}
-
-msienv_t
-pci_msi_start(struct pci_probe* probe);
-
-msi_vector_t
-pci_msi_setup_at(msienv_t msienv, struct pci_probe* probe, 
-                 int i, isr_cb handler);
-
-static inline void
-pci_msi_done(msienv_t env)
-{
-    isrm_msi_done(env);
-}
-
-static inline msi_vector_t
-pci_msi_setup_simple(struct pci_probe* probe, isr_cb handler)
-{
-    msienv_t env;
-    msi_vector_t msiv;
-    
-    env = pci_msi_start(probe);
-    msiv = pci_msi_setup_at(env, probe, 0, handler);
-    pci_msi_done(env);
-
-    return msiv;
 }
 
 int

@@ -103,13 +103,13 @@ uart_general_exec_cmd(struct serial_dev* sdev, u32_t req, va_list args)
 }
 
 void
-uart_handle_irq_overlap(int iv, struct llist_header* ports)
+uart_handle_irq_overlap(irq_t irq, struct llist_header* ports)
 {
     struct uart16550 *pos, *n;
     llist_for_each(pos, n, ports, local_ports)
     {
         int is = uart_intr_identify(pos);
-        if (iv == pos->iv && (is == UART_CHR_TIMEOUT)) {
+        if (irq == pos->irq && (is == UART_CHR_TIMEOUT)) {
             goto done;
         }
     }
@@ -117,11 +117,11 @@ uart_handle_irq_overlap(int iv, struct llist_header* ports)
     return;
 
 done:
-    uart_handle_irq(iv, pos);
+    uart_handle_irq(irq, pos);
 }
 
 void
-uart_handle_irq(int iv, struct uart16550 *uart)
+uart_handle_irq(irq_t irq, struct uart16550 *uart)
 {
     char tmpbuf[32];
     char recv;

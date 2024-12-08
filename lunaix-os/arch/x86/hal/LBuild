@@ -4,7 +4,6 @@ sources([
     "cpu.c",
     "ps2kbd.c",
     "apic_timer.c",
-    "ioapic.c",
     "mc146818a.c",
     "pci.c"
 ])

@@ -3,6 +3,7 @@
 
 #include "hba.h"
 #include <asm-generic/isrm.h>
+#include <hal/irq.h>
 
 /*
  * Macro naming rule:
@@ -26,7 +27,7 @@ struct ahci_driver_param
 {
     ptr_t mmio_base;
     size_t mmio_size;
-    int ahci_iv;
+    irq_t irq;
 };
 
 void
@@ -59,6 +60,6 @@ struct ahci_driver*
 ahci_driver_init(struct ahci_driver_param* param);
 
 void
-ahci_hba_isr(const struct hart_state* hstate);
+ahci_hba_isr(irq_t irq, const struct hart_state* hstate);
 
 #endif /* __LUNAIX_AHCI_H */

@@ -15,23 +15,14 @@ static DEFINE_LLIST(pci_ports);
 
 
 static void
-uart_msi_irq_handler(const struct hart_state* hstate)
+uart_msi_irq_handler(irq_t irq, const struct hart_state* hstate)
 {
-    int vector;
     struct uart16550* uart;
     
-    vector = hart_vector_stamp(hstate);
-    uart = (struct uart16550*)isrm_get_payload(hstate);
+    uart = irq_payload(irq, struct uart16550);
 
     assert(uart);
-    uart_handle_irq(vector, uart);
-}
-
-static void
-uart_intx_irq_handler(const struct hart_state* hstate)
-{
-    int vector = hart_vector_stamp(hstate);
-    uart_handle_irq_overlap(vector, &pci_ports);
+    uart_handle_irq(irq, uart);
 }
 
 static bool
@@ -56,7 +47,7 @@ pci16x50_pci_create(struct device_def* def, morph_t* obj)
     struct pci_probe* probe;
     struct uart16550* uart;
     struct serial_dev* sdev;
-    msi_vector_t msiv;
+    irq_t irq;
     
     probe = changeling_reveal(obj, pci_probe_morpher);
 
@@ -102,16 +93,16 @@ pci16x50_pci_create(struct device_def* def, morph_t* obj)
 
         sdev = uart_create_serial(uart, &def->class, &pci_ports, "PCI");
 
-        msiv = pci_msi_setup_simple(probe, uart_msi_irq_handler);
-        isrm_set_payload(msi_vect(msiv), __ptr(uart));
+        irq = pci_declare_msi_irq(uart_msi_irq_handler, probe, NULL);
+        irq_set_payload(irq, uart);
+        pci_assign_msi(probe, irq);
 
-        INFO("base: 0x%x (%s), irq=%d (%s)", 
+        INFO("base: 0x%x (%s), %s", 
                 bar->start, 
                 pci_bar_mmio_space(bar) ? "mmio" : "pmio",
-                msi_vect(msiv), 
                 pci_capability_msi(probe) ? "msi" : "intx, re-routed");
         
-        uart->iv = msi_vect(msiv);
+        uart->irq = irq;
 
         pci_bind_instance(probe, sdev->dev);
     }
