@@ -7,12 +7,13 @@
 LOG_MODULE("io_evt")
 
 void
-ahci_hba_isr(const struct hart_state* hstate)
+ahci_hba_isr(irq_t irq, const struct hart_state* hstate)
 {
     struct ahci_hba* hba;
     struct ahci_driver *pos, *n;
-    struct llist_header* ahcis = (struct llist_header*)isrm_get_payload(hstate);
+    struct llist_header* ahcis;
 
+    ahcis = irq_payload(irq, struct llist_header);
     llist_for_each(pos, n, ahcis, ahci_drvs)
     {
         if (pos->id == hart_vector_stamp(hstate)) {

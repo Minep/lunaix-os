@@ -6,6 +6,8 @@
 #include <lunaix/timer.h>
 #include <lunaix/hart_state.h>
 
+#include <hal/irq.h>
+
 #include "asm/x86.h"
 
 #include <klibc/string.h>
@@ -189,7 +191,7 @@ static struct input_device* kbd_idev;
 // #define KBD_DBGLOG
 
 static void
-intr_ps2_kbd_handler(const struct hart_state* hstate);
+intr_ps2_kbd_handler(irq_t irq, const struct hart_state* hstate);
 
 static u8_t
 ps2_issue_cmd_wretry(char cmd, u16_t arg);
@@ -309,7 +311,9 @@ ps2_kbd_create(struct device_def* devdef, morph_t* obj)
      *
      *  所以，保险的方法是：在初始化后才去设置ioapic，这样一来我们就能有一个稳定的IRQ#1以放心使用。
      */
-    isrm_bindirq(PC_AT_IRQ_KBD, intr_ps2_kbd_handler);
+    
+    irq_t irq = irq_declare_line(intr_ps2_kbd_handler, PC_AT_IRQ_KBD, NULL);    
+    irq_assign(irq_owning_domain(kbd_idev->dev_if), irq);
 
     return 0;
 
@@ -401,7 +405,7 @@ kbd_buffer_key_event(kbd_keycode_t key, u8_t scancode, kbd_kstate_t state)
 }
 
 static void
-intr_ps2_kbd_handler(const struct hart_state* hstate)
+intr_ps2_kbd_handler(irq_t irq, const struct hart_state* hstate)
 {
 
     // This is important! Don't believe me? try comment it out and run on Bochs!

@@ -4,14 +4,6 @@
 #include <asm-generic/isrm.h>
 
 /**
- * @brief Bind a given irq and associated handler to an iv
- *
- * @param iv iv allocated by system
- */
-int
-isrm_bindirq(int irq, isr_cb irq_handler);
-
-/**
  * @brief Bind given iv with it's associated handler
  *
  * @param iv
@@ -38,5 +30,29 @@ isrm_ivosalloc(isr_cb handler);
  */
 int
 isrm_ivexalloc(isr_cb handler);
+
+/**
+ * @brief Release a iv resource
+ *
+ * @param iv
+ */
+void
+isrm_ivfree(int iv);
+
+/**
+ * @brief Get the handler associated with the given iv
+ *
+ * @param iv
+ * @return isr_cb
+ */
+isr_cb
+isrm_get(int iv);
+
+ptr_t
+isrm_get_payload(const struct hart_state*);
+
+void
+isrm_set_payload(int iv, ptr_t);
+
 
 #endif /* __LUNAIX_X86_ISRM_H */

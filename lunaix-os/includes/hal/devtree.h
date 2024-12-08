@@ -1,6 +1,7 @@
 #ifndef __LUNAIX_DEVTREE_H
 #define __LUNAIX_DEVTREE_H
 
+#ifdef CONFIG_USE_DEVICETREE
 #include <lunaix/types.h>
 #include <lunaix/ds/llist.h>
 #include <lunaix/ds/hstr.h>
@@ -727,4 +728,5 @@ dtpi_next_val(struct dtpropi* dtpi, struct dtp_val* val, int cells)
     return true;
 }
 
+#endif
 #endif /* __LUNAIX_DEVTREE_H */
