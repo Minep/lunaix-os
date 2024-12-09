@@ -2,7 +2,6 @@
 #include <lunaix/syslog.h>
 
 #include <asm/x86_pmio.h>
-#include <asm/x86_isrm.h>
 
 #include "16x50.h"
 

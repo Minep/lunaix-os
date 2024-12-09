@@ -14,7 +14,6 @@
 #include "asm/soc/apic.h"
 
 #include <asm/hart.h>
-#include <asm/x86_isrm.h>
 
 #include <lunaix/mm/mmio.h>
 #include <lunaix/spike.h>
@@ -70,13 +69,9 @@ apic_write_reg(unsigned int reg, unsigned int val)
 }
 
 void
-isrm_notify_eoi(cpu_t id, int iv)
+apic_ack_interrupt(irq_t irq)
 {
-    // for all external interrupts except the spurious interrupt
-    //  this is required by Intel Manual Vol.3A, section 10.8.1 & 10.8.5
-    if (iv >= IV_EX_BEGIN && iv != APIC_SPIV_IV) {
-        *(unsigned int*)(_apic_base + APIC_EOI) = 0;
-    }
+    *(unsigned int*)(_apic_base + APIC_EOI) = 0;
 }
 
 unsigned int
@@ -205,21 +200,15 @@ __ioapic_translate_irq(struct irq_domain *domain, irq_t irq, void *irq_extra)
     return 0;
 }
 
-static void
-__external_irq_dispatch(const struct hart_state* state)
-{
-    irq_t irq;
-
-    irq = irq_find(irq_get_default_domain(), hart_vector_stamp(state));
-
-    assert(irq);
-    irq_serve(irq, state);
-}
-
 static int
 __ioapic_install_irq(struct irq_domain *domain, irq_t irq)
 {
-    irq->vector = isrm_ivexalloc(__external_irq_dispatch);
+    if (irq->vector == IRQ_VECTOR_UNSET) {
+        irq->vector = btrie_map(&domain->irq_map, IV_EX_BEGIN, IV_EX_END, irq);
+    }
+    else {
+        irq_record(domain, irq);
+    }
 
     if (irq->type == IRQ_MESSAGE) {
         irq->msi->wr_addr = __APIC_BASE_PADDR;
@@ -228,8 +217,6 @@ __ioapic_install_irq(struct irq_domain *domain, irq_t irq)
         __ioapic_install_line(domain, irq);
     }
 
-    irq_record(domain, irq);
-    
     return 0;
 }
 

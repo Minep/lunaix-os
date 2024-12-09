@@ -3,8 +3,6 @@ use("hal")
 sources([
     "exceptions/interrupts.c",
     "exceptions/isrdef.c",
-    "exceptions/intr_routines.c",
-    "exceptions/isrm.c",
     "exceptions/intrhnds.S",
 ])
 

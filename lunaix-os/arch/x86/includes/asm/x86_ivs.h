@@ -33,11 +33,11 @@
 #define LUNAIX_SYS_CALL                 33
 
 // begin allocatable iv resources
-#define IV_EX_BEGIN                     50
 #define LUNAIX_SCHED                    50
+#define IV_EX_BEGIN                     51
 
 // end allocatable iv resources
-#define IV_EX_END             249
+#define IV_EX_END                       249
 
 // 来自APIC的中断有着最高的优先级。
 // APIC related

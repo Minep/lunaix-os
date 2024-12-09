@@ -13,7 +13,6 @@
 #include <klibc/string.h>
 
 #include "asm/x86_cpu.h"
-#include <asm/x86_isrm.h>
 #include <asm/x86_pmio.h>
 
 #define PS2_PORT_ENC_DATA 0x60

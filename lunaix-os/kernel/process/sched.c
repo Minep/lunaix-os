@@ -20,8 +20,6 @@
 #include <lunaix/hart_state.h>
 #include <lunaix/kpreempt.h>
 
-#include <asm-generic/isrm.h>
-
 #include <klibc/string.h>
 
 struct thread empty_thread_obj;

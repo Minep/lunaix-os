@@ -6,6 +6,8 @@
 #include <lunaix/ds/btrie.h>
 #include <asm/hart.h>
 
+#define IRQ_VECTOR_UNSET    ((unsigned)-1)
+
 struct irq_domain;
 typedef struct irq_object* irq_t;
 typedef void (*irq_servant)(irq_t, const struct hart_state*);
@@ -36,6 +38,7 @@ struct irq_domain
 
 enum irq_type
 {
+    IRQ_DIRECT,
     IRQ_LINE,
     IRQ_MESSAGE
 };
@@ -70,8 +73,6 @@ struct irq_object
     void* irq_extra;
     int ref;
 };
-
-#define SZ sizeof(struct irq_object)
 
 struct irq_domain*
 irq_create_domain(struct device* intc_dev, const struct irq_domain_ops* ops);
@@ -113,6 +114,18 @@ irq_serve(irq_t irq, struct hart_state* state)
 }
 
 static inline void
+irq_set_servant(irq_t irq, irq_servant callback)
+{
+    irq->serve = callback;
+}
+
+static inline void
+irq_bind_vector(irq_t irq, int vector)
+{
+    irq->vector = vector;
+}
+
+static inline void
 irq_set_payload(irq_t irq, void* payload)
 {
     irq->payload = payload;
@@ -142,6 +155,12 @@ irq_declare_msg(irq_servant callback,
     irq->msi->sideband = sideband;
 
     return irq;
+}
+
+static inline irq_t
+irq_declare_direct(irq_servant callback)
+{
+    return irq_declare(IRQ_DIRECT, callback, 0, NULL);
 }
 
 static inline struct irq_domain*

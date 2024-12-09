@@ -1,12 +1,12 @@
 #include "apic_timer.h"
 #include <hal/hwtimer.h>
+#include <hal/irq.h>
 
 #include <lunaix/clock.h>
 #include <lunaix/compiler.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
 
-#include <asm/x86_isrm.h>
 #include "asm/soc/apic.h"
 
 LOG_MODULE("timer(apic)")
@@ -15,20 +15,20 @@ LOG_MODULE("timer(apic)")
 #define APIC_BASETICKS 0x100000
 
 static void
-temp_intr_routine_apic_timer(const struct hart_state* state)
+apic_timer_count_stop(irq_t irq, const struct hart_state* state)
 {
     struct hwtimer_pot* pot;
 
-    pot = (struct hwtimer_pot*)isrm_get_payload(state);
+    pot = irq_payload(irq, struct hwtimer_pot);
     pot->systick_raw = (ticks_t)-1;
 }
 
 static void
-apic_timer_tick_isr(const struct hart_state* state)
+apic_timer_tick_isr(irq_t irq, const struct hart_state* state)
 {
     struct hwtimer_pot* pot;
 
-    pot = (struct hwtimer_pot*)isrm_get_payload(state);
+    pot = irq_payload(irq, struct hwtimer_pot);
     pot->systick_raw++;
 
     if (likely(__ptr(pot->callback))) {
@@ -39,20 +39,19 @@ apic_timer_tick_isr(const struct hart_state* state)
 static void
 __apic_timer_calibrate(struct hwtimer_pot* pot, u32_t hertz)
 {
+    irq_t irq;
     ticks_t base_freq = 0;
 
     cpu_disable_interrupt();
 
-    // Setup APIC timer
-
-    // grab ourselves these irq numbers
-    u32_t iv_timer = isrm_ivexalloc(temp_intr_routine_apic_timer);
-    isrm_set_payload(iv_timer, __ptr(pot));
+    irq = irq_declare_direct(apic_timer_count_stop);
+    irq_set_payload(irq, pot);
+    irq_assign(irq_get_default_domain(), irq);
 
     // Setup a one-shot timer, we will use this to measure the bus speed. So we
     // can then calibrate apic timer to work at *nearly* accurate hz
     apic_write_reg(APIC_TIMER_LVT,
-                   LVT_ENTRY_TIMER(iv_timer, LVT_TIMER_ONESHOT));
+                   LVT_ENTRY_TIMER(irq->vector, LVT_TIMER_ONESHOT));
 
     // Set divider to 64
     apic_write_reg(APIC_TIMER_DCR, APIC_TIMER_DIV64);
@@ -89,7 +88,6 @@ __apic_timer_calibrate(struct hwtimer_pot* pot, u32_t hertz)
     wait_until(!(pot->systick_raw + 1));
 
     cpu_disable_interrupt();
-    isrm_ivfree(iv_timer);
 
     sysrtc->ops->set_proactive(sysrtc, false);
     
@@ -101,14 +99,12 @@ __apic_timer_calibrate(struct hwtimer_pot* pot, u32_t hertz)
     assert_msg(base_freq, "Fail to initialize timer (NOFREQ)");
     INFO("hw: %u Hz; os: %u Hz", base_freq, hertz);
 
+    irq_set_servant(irq, apic_timer_tick_isr);
+
     apic_write_reg(APIC_TIMER_ICR, base_freq / hertz);
-    
-    iv_timer = isrm_ivexalloc(apic_timer_tick_isr);
-    isrm_set_payload(iv_timer, __ptr(pot));
-    
     apic_write_reg(
         APIC_TIMER_LVT,
-        LVT_ENTRY_TIMER(iv_timer, LVT_TIMER_PERIODIC));
+        LVT_ENTRY_TIMER(irq->vector, LVT_TIMER_PERIODIC));
 }
 
 static struct hwtimer_pot_ops potops = {

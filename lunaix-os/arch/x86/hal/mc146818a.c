@@ -19,7 +19,6 @@
 
 #include <klibc/string.h>
 
-#include <asm/x86_isrm.h>
 #include <asm/x86_pmio.h>
 
 #define RTC_INDEX_PORT 0x70

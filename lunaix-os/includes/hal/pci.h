@@ -8,8 +8,6 @@
 #include <lunaix/types.h>
 #include <lunaix/changeling.h>
 
-#include <asm-generic/isrm.h>
-
 #include "irq.h"
 
 #define PCI_VENDOR_INVLD 0xffff

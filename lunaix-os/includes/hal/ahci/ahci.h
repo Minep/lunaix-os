@@ -2,7 +2,6 @@
 #define __LUNAIX_AHCI_H
 
 #include "hba.h"
-#include <asm-generic/isrm.h>
 #include <hal/irq.h>
 
 /*

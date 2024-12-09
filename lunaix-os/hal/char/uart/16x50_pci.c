@@ -1,5 +1,4 @@
 #include <lunaix/device.h>
-#include <asm-generic/isrm.h>
 #include <lunaix/syslog.h>
 #include <lunaix/mm/mmio.h>
 

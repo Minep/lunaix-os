@@ -93,7 +93,8 @@ irq_declare(enum irq_type type, irq_servant callback,
     *irq = (struct irq_object) {
         .type = type,
         .serve = callback ?: __default_servant,
-        .irq_extra = irq_extra
+        .irq_extra = irq_extra,
+        .vector = IRQ_VECTOR_UNSET
     };
 
     if (type == IRQ_LINE) {
