@@ -9,3 +9,7 @@ use("bus")
 
 if config("use_devicetree"):
     use("devtree")
+
+sources([
+    "irq.c"
+])

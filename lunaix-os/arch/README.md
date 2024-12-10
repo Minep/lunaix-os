@@ -60,7 +60,6 @@ Lunaix provide bunch of headers that **MUST** be implemented in order to behave 
 
 ```
 includes/asm/cpu.h
-includes/asm-generic/isrm.h
 includes/asm/muldiv64.h
 includes/asm/hart.h
 includes/asm/mempart.h

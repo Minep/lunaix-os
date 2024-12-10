@@ -2,6 +2,7 @@
 #define __LUNAIX_16550_H
 
 #include <hal/serial.h>
+#include <hal/irq.h>
 #include <lunaix/types.h>
 
 #define UART_rRxTX 0
@@ -70,7 +71,7 @@ struct uart16550
     struct serial_dev* sdev;
     ptr_t base_addr;
     unsigned int base_clk;
-    int iv;
+    irq_t irq;
 
     struct
     {
@@ -227,10 +228,10 @@ int
 uart_general_tx(struct serial_dev* sdev, u8_t* data, size_t len);
 
 void
-uart_handle_irq_overlap(int iv, struct llist_header* ports);
+uart_handle_irq_overlap(irq_t irq, struct llist_header* ports);
 
 void
-uart_handle_irq(int iv, struct uart16550 *uart);
+uart_handle_irq(irq_t irq, struct uart16550 *uart);
 
 static inline struct serial_dev*
 uart_create_serial(struct uart16550* uart, struct devclass* class, 

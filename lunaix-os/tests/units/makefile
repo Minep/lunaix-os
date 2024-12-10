@@ -1,8 +1,12 @@
 LUNAIX_ROOT ?= $(shell realpath ../../)
 
-include test_build.mkinc
+include $(LUNAIX_ROOT)/tests/shared/makefile
+include $(LUNAIX_ROOT)/tests/shared/mkobj.mkinc
 
-__test-dir := device-tree
+MAKEFLAGS += --no-print-directory
+CFLAGS += -isystem $(unit-test-root)/stubs/includes
+
+__test-dir := device-tree btrie
 test-dir := $(addprefix test-,$(__test-dir))
 
 obj-stubs := 
@@ -11,7 +15,9 @@ obj-tmp :=
 include stubs/makefile
 obj-stubs += $(addprefix $(unit-test-root)/stubs/,$(obj-tmp))
 
-export obj-stubs LUNAIX_ROOT
+BIN_DEPS := $(obj-stubs) $(obj-shared)
+
+export BIN_DEPS CFLAGS LUNAIX_ROOT
 test-%:
 	$(call status,MK,$*)
 	@$(MAKE) $(MKFLAGS) -C $* $(_ACT) -I $(CURDIR)

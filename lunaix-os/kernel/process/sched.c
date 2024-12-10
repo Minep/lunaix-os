@@ -20,8 +20,6 @@
 #include <lunaix/hart_state.h>
 #include <lunaix/kpreempt.h>
 
-#include <asm-generic/isrm.h>
-
 #include <klibc/string.h>
 
 struct thread empty_thread_obj;
@@ -221,7 +219,6 @@ schedule()
     sched_ctx.procs_index = to_check->process->pid;
 
 done:
-    isrm_notify_eos(0);
     run(to_check);
 
     fail("unexpected return from scheduler");

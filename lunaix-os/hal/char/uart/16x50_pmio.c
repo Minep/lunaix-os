@@ -9,7 +9,6 @@
  *
  */
 #include <lunaix/device.h>
-#include <asm-generic/isrm.h>
 
 #include <asm/x86_pmio.h>
 

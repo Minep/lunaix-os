@@ -3,8 +3,6 @@
 #include <lunaix/spike.h>
 #include <lunaix/process.h>
 
-#include <asm/x86_isrm.h>
-
 #include "asm/x86.h"
 #include "asm/hart.h"
 
@@ -14,19 +12,12 @@ void
 exception_init()
 {
     exception_install_handler();
-    isrm_init();
-    intr_routine_init();
 }
-
-extern void
-syscall_hndlr(const struct hart_state* hstate);
 
 void
 arch_preinit()
 {
     exception_init();
-
-    isrm_bindiv(LUNAIX_SYS_CALL, syscall_hndlr);
 }
 
 void

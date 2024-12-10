@@ -1,0 +1,3 @@
+%.o: %.c
+	$(call status,CC,$(@F))
+	@$(CC) $(CFLAGS) -c $< -o $@

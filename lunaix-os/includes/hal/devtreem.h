@@ -13,7 +13,7 @@ struct device;
 
 typedef struct dtn* devtree_link_t;
 
-#define dt_node_morpher     morphable_attrs(dt_node, mobj)
+#define dt_node_morpher     morphable_attrs(dtn, mobj)
 
 struct dtm_driver_info
 {

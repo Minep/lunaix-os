@@ -18,7 +18,6 @@
 
 #include <klibc/string.h>
 #include <lunaix/block.h>
-#include <asm-generic/isrm.h>
 #include <lunaix/mm/mmio.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/page.h>
@@ -35,7 +34,7 @@
 
 LOG_MODULE("AHCI")
 
-DEFINE_LLIST(ahcis);
+static DEFINE_LLIST(ahcis);
 
 static char sata_ifs[][20] = { "Not detected",
                                "SATA I (1.5Gbps)",
@@ -80,10 +79,9 @@ ahci_driver_init(struct ahci_driver_param* param)
 {
     struct ahci_driver* ahci_drv = vzalloc(sizeof(*ahci_drv));
     struct ahci_hba* hba = &ahci_drv->hba;
-    ahci_drv->id = param->ahci_iv;
+    ahci_drv->id = param->irq->vector;
 
-    isrm_set_payload(param->ahci_iv, (ptr_t)&ahcis);
-
+    irq_set_payload(param->irq, &ahcis);
     llist_append(&ahcis, &ahci_drv->ahci_drvs);
 
     hba->base = (hba_reg_t*)ioremap(param->mmio_base, param->mmio_size);

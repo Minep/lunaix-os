@@ -72,10 +72,4 @@ apic_read_reg(unsigned int reg);
 void
 apic_write_reg(unsigned int reg, unsigned int val);
 
-void
-apic_init();
-
-void
-apic_on_eoi(struct x86_intc* intc_ctx, cpu_t cpu, int iv);
-
 #endif /* __LUNAIX_APIC_H */
