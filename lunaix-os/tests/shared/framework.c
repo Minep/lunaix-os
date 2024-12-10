@@ -1,4 +1,5 @@
 #include <testing/basic.h>
+#include <testing/memchk.h>
 #include <stdlib.h>
 
 struct test_context* __test_ctx;
@@ -13,11 +14,14 @@ main(int argc, const char* argv[])
     run_test(argc, argv);
 
     printf(
-        "All test done: %d passed, %d failed\n",
+        "All test done: %d passed, %d failed\n\n",
         __test_ctx->stats.total_passed,
         __test_ctx->stats.total_failed
     );
-    printf("************\n\n");
+
+    memchk_print_stats();
+
+    printf("\n************\n\n");
 
     exit(__test_ctx->stats.total_failed > 0);
 }

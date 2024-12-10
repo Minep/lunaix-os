@@ -1,0 +1,24 @@
+include $(LUNAIX_ROOT)/tests/shared/mkobj.mkinc
+include $(LUNAIX_ROOT)/makeinc/utils.mkinc
+
+tests := $(addsuffix .test,$(shell cat tests.txt))
+run_tests := $(addprefix run.,$(tests))
+
+BIN_DEPS += $(obj-dut)
+
+.PHONY: all run clean
+
+%.test: $(BIN_DEPS) test-%.o
+	$(call status,LD,$@)
+	@$(CC) $^ -o $@
+
+run.%.test: %.test
+	$(call status,RUN,$^)
+	@./$^
+
+all: $(tests)
+
+run: $(tests) $(run_tests)
+
+clean:
+	@rm -f *.o $(tests) $(obj-dut) $(TO_CLEAN)
