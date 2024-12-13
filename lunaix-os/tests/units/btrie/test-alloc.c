@@ -12,10 +12,10 @@ __alloc_simple()
     struct btrie_node *root;
     btrie_init(&tree, ilog2(WIDTH));
 
-    expect_ulong(btrie_map(&tree, 0, 100, (void*)1), 0);
-    expect_ulong(btrie_map(&tree, 0, 100, (void*)2), 1);
-    expect_ulong(btrie_map(&tree, 0, 100, (void*)3), 2);
-    expect_ulong(btrie_map(&tree, 0, 100, (void*)4), 3);
+    expect_long(btrie_map(&tree, 0, 100, (void*)1), 0);
+    expect_long(btrie_map(&tree, 0, 100, (void*)2), 1);
+    expect_long(btrie_map(&tree, 0, 100, (void*)3), 2);
+    expect_long(btrie_map(&tree, 0, 100, (void*)4), 3);
 
     root = tree.btrie_root;
     expect_notnull(root->children);
@@ -43,10 +43,10 @@ __alloc_edge()
     struct btrie_node *root;
     btrie_init(&tree, ilog2(WIDTH));
 
-    expect_ulong(btrie_map(&tree, 7, 100, (void*)1), 7);
-    expect_ulong(btrie_map(&tree, 7, 100, (void*)2), 8);
-    expect_ulong(btrie_map(&tree, 7, 100, (void*)3), 9);
-    expect_ulong(btrie_map(&tree, 7, 100, (void*)4), 10);
+    expect_long(btrie_map(&tree, 7, 100, (void*)1), 7);
+    expect_long(btrie_map(&tree, 7, 100, (void*)2), 8);
+    expect_long(btrie_map(&tree, 7, 100, (void*)3), 9);
+    expect_long(btrie_map(&tree, 7, 100, (void*)4), 10);
 
     root = tree.btrie_root;
     expect_notnull(root->children);
@@ -76,10 +76,10 @@ __alloc_narrow()
     struct btrie_node *root;
     btrie_init(&tree, ilog2(WIDTH));
 
-    expect_ulong(btrie_map(&tree, 4, 7, (void*)1), 4);
-    expect_ulong(btrie_map(&tree, 4, 7, (void*)2), 5);
-    expect_ulong(btrie_map(&tree, 4, 7, (void*)3), 6);
-    expect_ulong(btrie_map(&tree, 4, 7, (void*)4), -1);
+    expect_long(btrie_map(&tree, 4, 7, (void*)1), 4);
+    expect_long(btrie_map(&tree, 4, 7, (void*)2), 5);
+    expect_long(btrie_map(&tree, 4, 7, (void*)3), 6);
+    expect_long(btrie_map(&tree, 4, 7, (void*)4), -1);
 
     root = tree.btrie_root;
     expect_notnull(root->children);
@@ -107,9 +107,9 @@ __alloc_narrow_partial()
     struct btrie_node *root;
     btrie_init(&tree, ilog2(WIDTH));
 
-    expect_ulong(btrie_map(&tree, 15, 17, (void*)1), 15);
-    expect_ulong(btrie_map(&tree, 15, 17, (void*)2), 16);
-    expect_ulong(btrie_map(&tree, 15, 17, (void*)3), -1);
+    expect_long(btrie_map(&tree, 15, 17, (void*)1), 15);
+    expect_long(btrie_map(&tree, 15, 17, (void*)2), 16);
+    expect_long(btrie_map(&tree, 15, 17, (void*)3), -1);
 
     root = tree.btrie_root;
     expect_notnull(root->children);
@@ -178,9 +178,9 @@ __alloc_retrive()
     struct btrie_node *root;
     btrie_init(&tree, ilog2(WIDTH));
 
-    expect_ulong(btrie_map(&tree, 4, 7, (void*)1), 4);
-    expect_ulong(btrie_map(&tree, 4, 7, (void*)2), 5);
-    expect_ulong(btrie_map(&tree, 4, 7, (void*)3), 6);
+    expect_long(btrie_map(&tree, 4, 7, (void*)1), 4);
+    expect_long(btrie_map(&tree, 4, 7, (void*)2), 5);
+    expect_long(btrie_map(&tree, 4, 7, (void*)3), 6);
 
     expect_ulong(__ptr(btrie_get(&tree, 6)), 3);
     expect_ulong(__ptr(btrie_get(&tree, 5)), 2);

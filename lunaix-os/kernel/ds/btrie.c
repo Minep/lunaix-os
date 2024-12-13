@@ -151,7 +151,7 @@ __get_immediate_node(struct btrie* tree, struct btrie_node *root,
 
     mask  = (1UL << tree->order) - 1;
     index = loc & mask;
-    for (int i = 0; i <= mask; ++i, index = (index + 1) & mask) 
+    for (unsigned long i = 0; i <= mask; ++i, index = (index + 1) & mask) 
     {    
         loc = (loc & ~mask) + index;
         node = __btrie_get_child(root, index);
