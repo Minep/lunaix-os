@@ -5,104 +5,85 @@
 #include <klibc/string.h>
 
 static bool
-__gic_predicate(struct dt_node_iter* iter, struct dt_node_base* pos)
-{
-    if (likely(!pos->intr_controll)) {
-        return false;
-    }
-
-    return strneq(pos->compat.str_val, "arm,gic-", 8);
-}
-
-static bool
-__its_predicate(struct dt_node_iter* iter, struct dt_node_base* pos)
+__its_predicate(struct dt_node_iter* iter, struct dtn_base* pos)
 {
     return strneq(pos->compat.str_val, "arm,gic-v3-its", 14);
 }
 
-static void
-__setup_pe_rdist(struct arm_gic* gic, struct dt_prop_iter* prop, int cpu)
+static inline void*
+__do_remap_mmio(struct dtpropx* dtpx, int row)
 {
-    ptr_t base;
-    size_t len;
+    struct dtprop_xval base, size;
 
-    base = dtprop_reg_nextaddr(prop);
-    len  = dtprop_reg_nextlen(prop);
+    dtpx_extract_loc(&dtpx, &base, row, 0);
+    dtpx_extract_loc(&dtpx, &size, row, 1);
 
-    gic->pes[cpu]._rd = (struct gic_rd*)ioremap(base, len);
+    return ioremap(base.u64, size.u64);
+}
+
+static inline void*
+__remap_mmio_dtn(struct dtn* node)
+{
+    struct dtprop_xval base, size;
+    struct dtpropx dtpx;
+    dt_proplet gic_mmio =  dtprop_reglike(&node->base);
+
+    dtpx_compile_proplet(gic_mmio);
+    dtpx_prepare_with(&dtpx, &node->reg, &gic_mmio);
+
+    return __do_remap_mmio(&dtpx, 0);
 }
 
 static void
-__create_its(struct arm_gic* gic, struct dt_node* gic_node)
+__create_its(struct arm_gic* gic, struct dtn* gic_node)
 {
     struct dt_node* its_node;
-    struct dt_node_iter iter;
-    struct dt_prop_iter prop;
-    struct gic_its* its;
-    ptr_t its_base;
-    size_t its_size;
+    struct dtn_iter iter;
 
     dt_begin_find(&iter, gic_node, __its_predicate, NULL);
 
     while (dt_find_next(&iter, (struct dt_node_base**)&its_node))
     {
-        dt_decode_reg(&prop, its_node, reg);
-
-        its_base = dtprop_reg_nextaddr(&prop);
-        its_size = dtprop_reg_nextlen(&prop);
-
-        its = gic_its_create(gic, ioremap(its_base, its_size));
-        dt_bind_object(&its_node->base, its);    
+        gic_its_create(gic, __remap_mmio_dtn(its_node));
     }
     
     dt_end_find(&iter);
 }
 
 void
-gic_create_from_dt(struct arm_gic* gic)
+gic_create_from_dt(struct arm_gic* gic, struct dtn* node)
 {
-    struct dt_node* gic_node;
-    struct dt_node_iter iter;
-    struct dt_prop_iter prop;
-    ptr_t ptr;
-    size_t sz;
+    struct dtpropx dtpx;
+    struct gic_rd* rd;
+    dt_proplet gic_mmio =  dtprop_reglike(&node->base);
 
-    dt_begin_find(&iter, NULL, __gic_predicate, NULL);
+    dtpx_compile_proplet(gic_mmio);
+    dtpx_prepare_with(&dtpx, &node->reg, &gic_mmio);
 
-    if (!dt_find_next(&iter, (struct dt_node_base**)&gic_node)) {
-        fail("expected 'arm,gic-*' compatible node, but found none");
-    }
-
-    dt_end_find(&iter);
-
-    dt_decode_reg(&prop, gic_node, reg);
-
-    ptr = dtprop_reg_nextaddr(&prop);
-    sz  = dtprop_reg_nextlen(&prop);
-    gic->mmrs.dist_base = (gicreg_t*)ioremap(ptr, sz);
+    gic->mmrs.dist_base = (gicreg_t*)__do_remap_mmio(&dtpx, 0);
 
     for (int i = 0; i < NR_CPU; i++) {
-        __setup_pe_rdist(gic, &prop, i);
+        rd = (struct gic_rd*)__do_remap_mmio(&dtpx, i + 1);
+        gic->pes[i]._rd = rd;
     }
     
     // ignore cpu_if, as we use sysreg to access them    
     // ignore vcpu_if, as we dont do any EL2 stuff
 
-    __create_its(gic, gic_node);
-
-    dt_bind_object(&gic_node->base, gic);
+    __create_its(gic, node);
 }
 
 unsigned int;
-gic_dtprop_interpret(struct gic_int_param* param, 
-                     struct dt_prop_val* val, int width)
+gic_decode_specifier(struct gic_int_param* param, 
+                     struct dtp_val* val, int nr_cells)
 {
-    struct dt_prop_iter iter;
+    struct dtpropi dtpi;
     unsigned int v;
 
-    dt_decode_simple(&iter, val);
+    assert(nr_cells >= 3);
+    dtpi_init(&dtpi, val);
 
-    v = dtprop_u32_at(&iter, 0);
+    v = dtpi_next_u32(&dtpi);
     switch (v)
     {
     case 0:
@@ -120,11 +101,13 @@ gic_dtprop_interpret(struct gic_int_param* param,
         break;
     }
 
-    v = dtprop_u32_at(&iter, 2);
+    param->group = GIC_G1NS;
+    param->rel_intid = dtpi_next_u32(&dtpi);
+    
+    v = dtpi_next_u32(&dtpi);
     param->trigger = v == 1 ? GIC_TRIG_EDGE : GIC_TRIG_LEVEL;
 
-    param->group = GIC_G1NS;
-    param->rel_intid = dtprop_u32_at(&iter, 1);
+    // 4th cell only applicable to PPI, ignore for now
 
     return param->rel_intid;
 }

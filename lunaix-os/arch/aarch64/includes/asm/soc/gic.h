@@ -266,11 +266,11 @@ struct arm_gic
 };
 
 void
-gic_create_from_dt(struct arm_gic* gic);
+gic_create_from_dt(struct arm_gic* gic, struct dtn* node);
 
 unsigned int;
-gic_dtprop_interpret(struct gic_int_param* param, 
-                     struct dt_prop_val* val, int width);
+gic_decode_specifier(struct gic_int_param* param, 
+                     struct dtp_val* val, int nr_cells);
 
 struct gic_its*
 gic_its_create(struct arm_gic* gic, ptr_t regs);

@@ -259,7 +259,7 @@ struct dtn_base
 
     struct dtp_table        *props;
 
-    morph_t                 *binded_dev;
+    morph_t                 *binded_obj;
 };
 
 struct dtspec_key
@@ -442,6 +442,12 @@ dtp_val_set(struct dtp_val* val, dt_enc_t raw, unsigned cells)
     val->size = cells * sizeof(u32_t);
 }
 
+static inline void
+dtn_bind_object(struct dtn* node, morph_t* mobj)
+{
+    node->base.binded_obj = changeling_ref(mobj);
+}
+
 
 //////////////////////////////////////
 ///     DT Methods: Specifier Map
@@ -589,11 +595,11 @@ struct dtpropx
 #define dtprop_reglike(base)                    \
     ({                                          \
         dt_proplet p = {                        \
-            dtprop_compx(base->addr_c),         \
-            dtprop_compx(base->sz_c),           \
+            dtprop_compx((base)->addr_c),       \
+            dtprop_compx((base)->sz_c),         \
             dtprop_end                          \
         };                                      \
-        dt_proplet;                             \
+        p;                             \
     })
 
 #define dtprop_rangelike(node)                  \
@@ -604,7 +610,7 @@ struct dtpropx
             dtprop_compx(base->sz_c),           \
             dtprop_end                          \
         };                                      \
-        dt_proplet;                             \
+        p;                             \
     })
 
 #define dtprop_strlst_foreach(pos, prop)    \

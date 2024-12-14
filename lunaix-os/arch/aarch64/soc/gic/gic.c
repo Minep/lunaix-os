@@ -7,8 +7,8 @@
 #include <lunaix/syslog.h>
 
 #include <hal/devtree.h>
+#include <hal/devtreem.h>
 
-#include <asm/aa64_isrm.h>
 #include <asm/soc/gic.h>
 
 static struct arm_gic gic;
@@ -529,178 +529,38 @@ gic_signal_eoi()
     set_sysreg(ICC_EOIR1_EL1, pe->iar_val);
 }
 
-/* ****** Lunaix ISRM Interfacing ****** */
-
-void
-isrm_init()
+struct arm_gic*
+gic_instance()
 {
-    // nothing to do
-}
-
-void
-isrm_ivfree(int iv)
-{
-    struct gic_interrupt* ent;
-    struct gic_distributor* dist;
-    
-    ent  = __find_interrupt_record(iv);
-    if (!ent) {
-        return;
-    }
-
-    dist = __attached_distributor(0, ent);
-    __undone_interrupt(&gic, dist, ent);
-
-    hlist_delete(&ent->node);
-    vfree(ent);
-}
-
-int
-isrm_ivosalloc(isr_cb handler)
-{
-    return isrm_ivexalloc(handler);
-}
-
-int
-isrm_ivexalloc(isr_cb handler)
-{
-    struct gic_int_param param;
-    struct gic_interrupt* intr;
-
-    param = (struct gic_int_param) {
-        .class = GIC_SPI,
-        .group = GIC_G1NS,
-        .trigger = GIC_TRIG_EDGE,
-    };
-
-    intr = gic_install_int(&param, handler, true);
-    
-    return intr->intid;
-}
-
-isr_cb
-isrm_get(int iv)
-{
-    struct gic_interrupt* intr;
-
-    intr = __find_interrupt_record(iv);
-    if (!intr) {
-        return NULL;
-    }
-
-    return intr->handler;
-}
-
-ptr_t
-isrm_get_payload(const struct hart_state* state)
-{
-    struct gic_interrupt* active;
-
-    active = gic.pes[0].active;
-    assert(active);
-
-    return active->handler;
-}
-
-void
-isrm_set_payload(int iv, ptr_t payload)
-{
-    struct gic_interrupt* intr;
-
-    intr = __find_interrupt_record(iv);
-    if (!intr) {
-        return NULL;
-    }
-
-    intr->payload = payload;
-}
-
-void
-isrm_notify_eoi(cpu_t id, int iv)
-{
-    gic_signal_eoi();
-}
-
-void
-isrm_notify_eos(cpu_t id)
-{
-    isrm_notify_eoi(id, 0);
-}
-
-msi_vector_t
-isrm_msialloc(isr_cb handler)
-{
-    int intid;
-    msi_vector_t msiv;
-    struct gic_int_param param;
-
-    param = (struct gic_int_param) {
-        .group = GIC_G1NS,
-        .trigger = GIC_TRIG_EDGE
-    };
-
-    if (gic.msi_via_spi) {
-        param.class = GIC_SPI;
-
-        intid = gic_install_int(&param, handler, true);
-        msiv.msi_addr  = gic_regptr(gic.mmrs.dist_base, GICD_SETSPI_NSR);
-        goto done;
-    }
-    
-    if (unlikely(!gic.lpi_ready)) {
-        return invalid_msi_vector;
-    }
-
-    if (unlikely(llist_empty(&gic.its))) {
-        // FIXME The MSI interface need rework
-        WARN("ITS-base MSI is yet unsupported.");
-        return invalid_msi_vector;
-    }
-
-    param.class = GIC_LPI;
-    intid = gic_install_int(&param, handler, true);
-    msiv.msi_addr = gic_regptr(gic.pes[0]._rd->base, GICR_SETLPIR);
-
-done:
-    msiv.mapped_iv = intid;
-    msiv.msi_data  = intid;
-
-    return msiv;
-}
-
-int
-isrm_bind_dtnode(struct dt_intr_node* node, isr_cb handler)
-{
-    struct dt_prop_val* val;
-    struct gic_int_param param;
-    struct gic_interrupt* installed;
-
-    val = dt_resolve_interrupt(INTR_TO_DTNODE(node));
-    if (!val) {
-        return EINVAL;
-    }
-
-    if (node->intr.extended) {
-        WARN("binding of multi interrupt is yet to supported");
-        return EINVAL;
-    }
-
-    gic_dtprop_interpret(&param, val, 3);
-    param.cpu_id = 0;
-
-    installed = gic_install_int(&param, handler, false);
-
-    return installed->intid;
+    return &gic;
 }
 
 /* ****** Device Definition & Export ****** */
 
 static void
-gic_init()
+gic_register(struct device_def* def)
 {
-    memset(&gic, 0, sizeof(gic));
+    dtm_register_entry(def, "arm,gic-v3");
 
-    gic_create_from_dt(&gic);
+    // TODO need to re-exam the programming model for gic v1,v2
+    // dtm_register_entry(def, "arm,cortex-a*-gic");
+    // dtm_register_entry(def, "arm,gic-400");
+
+    memset(&gic, 0, sizeof(gic));
+}
+
+static void
+gic_init(struct device_def* def, morph_t* mobj)
+{
+    struct dtn* node;
+    struct device* gic_dev;
+
+    node = changeling_try_reveal(mobj, dt_morpher);
+    if (!node) {
+        return;
+    }
+
+    gic_create_from_dt(&gic, node);
 
     // configure the system interfaces
     gic_configure_icc();
@@ -714,12 +574,17 @@ gic_init()
         gic_configure_pe(&gic, &gic.pes[i]);
     }
 
+    gic_dev = device_allocsys(NULL, &gic);
+    register_device_var(gic_dev, &def->class, "gic");
+    
     gic_configure_its(&gic);
 }
 
 static struct device_def dev_arm_gic = {
-    .name = "ARM Generic Interrupt Controller",
-    .class = DEVCLASS(DEVIF_SOC, DEVFN_CFG, DEV_INTC),
-    .init = gic_init
+    def_device_name("ARM Generic Interrupt Controller"),
+    def_device_class(ARM, CFG, INTC),
+
+    def_on_register(gic_register),
+    def_on_create(gic_init)
 };
 EXPORT_DEVICE(arm_gic, &dev_arm_gic, load_sysconf);
