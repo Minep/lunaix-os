@@ -1,38 +1,18 @@
-include test_build.mkinc
+obj-dut := dut/dt_interrupt.o \
+			dut/dt.o \
+			dut/dtspec.o \
+			dut/changeling.o
 
-tests := $(shell cat tests.txt)
+BIN_DEPS += load.%.o
+CFLAGS   += -DCONFIG_USE_DEVICETREE -Wp,-w
 
-obj = dut/dt_interrupt.o \
-	  dut/dt.o \
-	  dut/dtspec.o \
-	  dut/changeling.o \
-
-dtbs := $(addprefix samples/,$(addsuffix .dtb,$(tests)))
-
-tests := $(addsuffix .test,$(tests))
-run_tests := $(addprefix run.,$(tests))
-
+.PRECIOUS: %.dtb
 %.dtb: %.dts
 	$(call status,DTC,$^)
 	@dtc -q -I dts -O dtb $^ -o $@
 
-.PHONY: all run clean
-
-load.%.o:: load.c
+load.%.o: load.c samples/%.dtb
 	$(call status,CC,$@)
-	@$(CC) $(CFLAGS) -DTEST_DTBFILE=\"samples/$*.dtb\" -c $^ -o $@
+	@$(CC) $(CFLAGS) -DTEST_DTBFILE=\"samples/$*.dtb\" -c $< -o $@
 
-%.test: $(obj-shared) $(obj-stubs) $(obj) test-%.o load.%.o
-	$(call status,LD,$@)
-	@$(CC) $^ -o $@
-
-run.%.test: %.test
-	$(call status,RUN,$^)
-	@./$^
-
-all: $(dtbs) $(tests)
-
-run: $(dtbs) $(tests) $(run_tests)
-
-clean:
-	@rm -f *.o $(obj) $(test) $(dtbs)
+include units_build.mkinc

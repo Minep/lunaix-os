@@ -1,4 +1,5 @@
 #include <testing/basic.h>
+#include <testing/memchk.h>
 #include <stdlib.h>
 
 struct test_context* __test_ctx;
@@ -13,11 +14,15 @@ main(int argc, const char* argv[])
     run_test(argc, argv);
 
     printf(
-        "All test done: %d passed, %d failed\n",
+        "All test done: %d passed, %d failed, %d skipped\n\n",
         __test_ctx->stats.total_passed,
-        __test_ctx->stats.total_failed
+        __test_ctx->stats.total_failed,
+        __test_ctx->stats.total_skipped
     );
-    printf("************\n\n");
+
+    memchk_print_stats();
+
+    printf("\n************\n\n");
 
     exit(__test_ctx->stats.total_failed > 0);
 }
@@ -33,6 +38,7 @@ begin_testcase(const char* name)
     __test_ctx->name = name;
     __test_ctx->stats.countings[0] = 0;
     __test_ctx->stats.countings[1] = 0;
+    __test_ctx->stats.countings[2] = 0;
 
     printf("%s\n", name);
 }
@@ -40,11 +46,14 @@ begin_testcase(const char* name)
 void
 end_testcase()
 {
-    printf("..... passed: %d, failed: %d\n\n", 
-            __test_ctx->stats.passed, __test_ctx->stats.failed);
+    printf("..... passed: %d, failed: %d, %d skipped\n\n", 
+            __test_ctx->stats.passed, 
+            __test_ctx->stats.failed,
+            __test_ctx->stats.skipped);
 
     __test_ctx->stats.total_passed += __test_ctx->stats.passed;
     __test_ctx->stats.total_failed += __test_ctx->stats.failed;
+    __test_ctx->stats.total_skipped += __test_ctx->stats.skipped;
     __test_ctx->name = NULL;
 
 }

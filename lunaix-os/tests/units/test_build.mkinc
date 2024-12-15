@@ -1,5 +1,0 @@
-MAKEFLAGS += --no-print-directory
-
-include $(LUNAIX_ROOT)/tests/shared/makefile
-
-CFLAGS += -isystem $(unit-test-root)/stubs/includes

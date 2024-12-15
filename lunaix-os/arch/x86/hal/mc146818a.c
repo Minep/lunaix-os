@@ -15,10 +15,10 @@
 #include <lunaix/hart_state.h>
 
 #include <hal/hwrtc.h>
+#include <hal/irq.h>
 
 #include <klibc/string.h>
 
-#include <asm/x86_isrm.h>
 #include <asm/x86_pmio.h>
 
 #define RTC_INDEX_PORT 0x70
@@ -57,7 +57,7 @@
 struct mc146818
 {
     struct hwrtc_potens* rtc_context;
-    u32_t rtc_iv;
+    irq_t irq;
 };
 
 #define rtc_state(data) ((struct mc146818*)(data))
@@ -132,10 +132,11 @@ rtc_setwalltime(struct hwrtc_potens* rtc, datetime_t* datetime)
 }
 
 static void
-__rtc_tick(const struct hart_state* hstate)
+__rtc_tick(irq_t irq, const struct hart_state* hstate)
 {
-    struct mc146818* state = (struct mc146818*)isrm_get_payload(hstate);
+    struct mc146818* state;
 
+    state = irq_payload(irq, struct mc146818);
     state->rtc_context->live++;
 
     (void)rtc_read_reg(RTC_REG_C);
@@ -164,8 +165,12 @@ static int
 __rtc_calibrate(struct hwrtc_potens* pot)
 {
     struct mc146818* state;
+    struct device* rtc_dev;
+    u8_t reg;
 
-    u8_t reg = rtc_read_reg(RTC_REG_A);
+    rtc_dev = potens_dev(pot);
+
+    reg = rtc_read_reg(RTC_REG_A);
     reg = (reg & ~0x7f) | RTC_FREQUENCY_1024HZ | RTC_DIVIDER_33KHZ;
     rtc_write_reg(RTC_REG_A, reg);
 
@@ -177,9 +182,12 @@ __rtc_calibrate(struct hwrtc_potens* pot)
 
     pot->base_freq = RTC_TIMER_BASE_FREQUENCY;
 
-    state = (struct mc146818*)potens_dev(pot)->underlay;
-    state->rtc_iv = isrm_bindirq(PC_AT_IRQ_RTC, __rtc_tick);
-    isrm_set_payload(state->rtc_iv, __ptr(state));
+    state = (struct mc146818*)rtc_dev->underlay;
+
+    state->irq = irq_declare_line(__rtc_tick, PC_AT_IRQ_RTC);
+    irq_set_payload(state->irq, state);
+
+    irq_assign(irq_owning_domain(rtc_dev), state->irq, NULL);
 
     return 0;
 }

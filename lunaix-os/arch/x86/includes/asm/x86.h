@@ -95,8 +95,5 @@ typedef struct x86_sysdesc x86_segdesc_t;
 void
 exception_install_handler();
 
-void
-intr_routine_init();
-
 #endif
 #endif /* __LUNAIX_I386_ASM_H */
