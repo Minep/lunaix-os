@@ -121,7 +121,7 @@ fdt_find_prop(const struct fdt_blob* fdt, fdt_loc_t loc,
         }
         
         if (likely(val)) {
-            val->encoded = (dt_enc_t)loc.prop->val;
+            val->encoded = (dt_enc_t)__prop_val_ptr(loc.prop);
             val->size    = loc.prop->len;
         }
         return true;
@@ -152,6 +152,8 @@ fdt_memscan_begin(struct fdt_memscan* mscan, const struct fdt_blob* fdt)
 
     mscan->loc = loc;
     mscan->node_type = FDT_MEM_FREE;
+
+    return true;
 }
 
 #define get_size(mscan, val)    \

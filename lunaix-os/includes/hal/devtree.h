@@ -1,6 +1,7 @@
 #ifndef __LUNAIX_DEVTREE_H
 #define __LUNAIX_DEVTREE_H
 
+#ifdef CONFIG_USE_DEVICETREE
 #include <lunaix/types.h>
 #include <lunaix/ds/llist.h>
 #include <lunaix/ds/hstr.h>
@@ -46,14 +47,14 @@ struct dtp_val
 {
     union
     {
-        union {
-            const char*  str_val;
-            const char*  str_lst;
-        };
         ptr_t        ptr_val;
         dt_enc_t     encoded;
         
         union dtp_baseval* ref;
+        union {
+            const char*  str_val;
+            const char*  str_lst;
+        };
     };
     unsigned int size;
 };
@@ -675,7 +676,7 @@ static inline void
 dtpi_init_empty(struct dtpropi* dtpi)
 {
     *dtpi = (struct dtpropi) {
-        .prop = { 0, 0 },
+        .prop = { {0}, 0 },
         .loc = 0
     };
 }
@@ -733,4 +734,5 @@ dtpi_next_val(struct dtpropi* dtpi, struct dtp_val* val, int cells)
     return true;
 }
 
+#endif
 #endif /* __LUNAIX_DEVTREE_H */

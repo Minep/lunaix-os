@@ -9,12 +9,9 @@ CFLAGS += -idirafter $(lunaix-root)/includes	\
 		  -I $(test-root)/includes \
 		  -Wno-discarded-qualifiers \
 		  -Wno-scalar-storage-order \
-		  -g
+		  -Werror \
+		  -g \
+		  -D__off_t_defined
 
-
-%.o: %.c
-	$(call status,CC,$(@F))
-	@$(CC) $(CFLAGS) -c $< -o $@
-
-
-obj-shared := $(test-shared-root)/framework.o
+obj-shared := $(test-shared-root)/framework.o	\
+				$(test-shared-root)/memchk.o

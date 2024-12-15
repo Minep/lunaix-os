@@ -353,11 +353,13 @@ device_create(struct device* dev,
 struct device*
 device_alloc(struct device_meta* parent, u32_t type, void* underlay);
 
+#ifdef CONFIG_USE_DEVICETREE
 static inline void
 device_set_devtree_node(struct device* dev, devtree_link_t node)
 {
     dev->devtree_node = node;
 }
+#endif
 
 static inline struct device* must_inline
 device_allocsys(struct device_meta* parent, void* underlay)

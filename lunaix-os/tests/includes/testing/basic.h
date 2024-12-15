@@ -13,35 +13,44 @@ struct test_context
             struct {
                 int passed;
                 int failed;
+                int skipped;
             };
-            int countings[2];
+            int countings[3];
         };
 
         union {
             struct {
                 int total_passed;
                 int total_failed;
+                int total_skipped;
             };
-            int total_countings[2];
+            int total_countings[3];
         };
     } stats;
 };
 
 #define fmt_passed  "[\x1b[32;49mPASS\x1b[0m]"
 #define fmt_failed  "[\x1b[31;49mFAIL\x1b[0m]"
+#define fmt_skiped  "[\x1b[33;49mSKIP\x1b[0m]"
 
 #define active_context      \
     ({ extern struct test_context* __test_ctx; __test_ctx; })
 
 #define _expect(expr, act, exp, type_fmt)                                   \
     do {                                                                    \
+        if(should_skip_test()) {                                            \
+            printf("  @%s:%03d ....... ", __FILE__, __LINE__);              \
+            printf(fmt_skiped "\n");                                        \
+            active_context->stats.skipped++;                                \
+            break;                                                          \
+        }                                                                   \
+                                                                            \
         int failed = !(expr);                                               \
-        printf("  @%s:%03d ....... ", __FILE__, __LINE__);                    \
-        if (failed)                                                         \
+        if (failed) {                                                       \
+            printf("  @%s:%03d ....... ", __FILE__, __LINE__);              \
             printf(fmt_failed " (expect: " type_fmt ", got: " type_fmt ")\n",\
                     exp, act);                                              \
-        else                                                                \
-            printf(fmt_passed "\n");                                       \
+        }                                                                   \
         active_context->stats.countings[failed]++;                          \
     } while(0)
 
@@ -87,5 +96,11 @@ end_testcase();
 
 void 
 run_test(int argc, const char* argv[]);
+
+static inline int
+should_skip_test()
+{
+    return active_context->stats.failed;
+}
 
 #endif /* __COMMON_TEST_BASIC_H */

@@ -107,6 +107,7 @@ __pci_add_prober(pciaddr_t loc, ptr_t pci_base, int devinfo)
     prober->cspace_base = pci_base;
     prober->intr_info = intr;
     prober->loc = loc;
+    prober->irq_domain = irq_get_domain(pci_bridge);
 
     changeling_morph_anon(pci_probers, prober->mobj, pci_probe_morpher);
 
@@ -271,12 +272,12 @@ pci_scan()
 }
 
 static void
-__pci_config_msi(struct pci_probe* probe, msi_vector_t msiv)
+__pci_config_msi(struct pci_probe* probe, irq_t irq)
 {
     // PCI LB Spec. (Rev 3) Section 6.8 & 6.8.1
 
-    ptr_t msi_addr = msi_addr(msiv);
-    u32_t msi_data = msi_data(msiv);
+    ptr_t msi_addr = irq->msi->wr_addr;
+    u32_t msi_data = irq->msi->message;
 
     pci_reg_t reg1 = pci_read_cspace(probe->cspace_base, probe->msi_loc);
     pci_reg_t msg_ctl = reg1 >> 16;
@@ -306,39 +307,26 @@ __pci_config_msi(struct pci_probe* probe, msi_vector_t msiv)
     pci_write_cspace(probe->cspace_base, probe->msi_loc, reg1);
 }
 
-msienv_t
-pci_msi_start(struct pci_probe* probe)
+irq_t
+pci_declare_msi_irq(irq_servant callback, struct pci_probe* probe)
 {
-    /*
-        As a PCI bridge/root complex can be initialised from device tree node,
-        in that case, general information such as routing, rid remapping, 
-        are vital to all msi setup of all peripherals under it.
-
-        Therefore, a wrapper around isrm_msi_* is needed in order to
-        improve overall readability and usability, where the bridge
-        device instance that contain these information will be 
-        automatically passed to the underlay as credential to perform
-        configuration.
-    */
-
-    msienv_t env;
-    
-    env = isrm_msi_start(pci_bridge);
-    isrm_msi_set_sideband(env, pci_requester_id(probe));
-
-    return env;
+    return irq_declare_msg(callback, probe->loc, probe->loc);
 }
 
-msi_vector_t
-pci_msi_setup_at(msienv_t msienv, struct pci_probe* probe, 
-                 int i, isr_cb handler)
+int
+pci_assign_msi(struct pci_probe* probe, irq_t irq, void* irq_spec)
 {
-    msi_vector_t msiv;
+    int err = 0;
 
-    msiv = isrm_msi_alloc(msienv, 0, i, handler);
-    __pci_config_msi(probe, msiv);
+    assert(irq->type == IRQ_MESSAGE);
 
-    return msiv;
+    err = irq_assign(probe->irq_domain, irq, irq_spec);
+    if (err) {
+        return err;
+    }
+
+    __pci_config_msi(probe, irq);
+    return 0;
 }
 
 size_t
@@ -533,6 +521,29 @@ EXPORT_TWIFS_PLUGIN(pci_devs, pci_build_fsmapping);
 /*---------- PCI 3.0 HBA device definition ----------*/
 
 static int
+__pci_irq_install(struct irq_domain* domain, irq_t irq)
+{
+    struct irq_domain* parent;
+    int err;
+
+    parent = domain->parent;
+    err = parent->ops->install_irq(parent, irq);
+    if (err) {
+        return err;
+    }
+
+    if (irq->type == IRQ_MESSAGE) {
+        irq->msi->message = irq->vector;
+    }
+
+    return 0;
+}
+
+static struct irq_domain_ops pci_irq_ops = {
+    .install_irq = __pci_irq_install
+};
+
+static int
 pci_register(struct device_def* def)
 {
     pci_probers = changeling_spawn(NULL, "pci_realm");
@@ -543,15 +554,19 @@ pci_register(struct device_def* def)
 static int
 pci_create(struct device_def* def, morph_t* obj)
 {
-    devtree_link_t devtree_node;
-
-    devtree_node = changeling_try_reveal(obj, dt_morpher);
-
+    struct irq_domain *pci_domain;
     pci_bridge = device_allocsys(NULL, NULL);
+
+#ifdef CONFIG_USE_DEVICETREE
+    devtree_link_t devtree_node;
+    devtree_node = changeling_try_reveal(obj, dt_morpher);
     device_set_devtree_node(pci_bridge, devtree_node);
+#endif
+
+    pci_domain = irq_create_domain(pci_bridge, &pci_irq_ops);
+    irq_attach_domain(irq_get_default_domain(), pci_domain);
 
     register_device(pci_bridge, &def->class, "pci_bridge");
-
     pci_scan();
 
     return 0;
@@ -564,4 +579,4 @@ static struct device_def pci_def = {
     def_on_register(pci_register),
     def_on_create(pci_create)
 };
-EXPORT_DEVICE(pci3hba, &pci_def, load_sysconf);
+EXPORT_DEVICE(pci3hba, &pci_def, load_onboot);

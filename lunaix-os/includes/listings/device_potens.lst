@@ -18,3 +18,9 @@ potens(HWTIMER),
  * 
  */
 potens(HWRTC),
+
+/**
+ * @brief Interrupt controller (domain) capability
+ * 
+ */
+potens(INT_DOMAIN),
