@@ -44,8 +44,8 @@ isa16x50_create_once(struct device_def* def)
              *  Since these irqs are overlapped, this particular setup is needed
              * to avoid double-bind
              */
-            uart->irq = irq_declare_line(com_irq_handler, irq, NULL);
-            irq_assign(irq_owning_domain(sdev->dev), uart->irq);
+            uart->irq = irq_declare_line(com_irq_handler, irq);
+            irq_assign(irq_owning_domain(sdev->dev), uart->irq, NULL);
             *((volatile int*)irqs[i]) = 0;
         }
         

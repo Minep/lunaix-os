@@ -308,20 +308,19 @@ __pci_config_msi(struct pci_probe* probe, irq_t irq)
 }
 
 irq_t
-pci_declare_msi_irq(irq_servant callback, 
-                    struct pci_probe* probe, void *irq_extra)
+pci_declare_msi_irq(irq_servant callback, struct pci_probe* probe)
 {
-    return irq_declare_msg(callback, probe->loc, probe->loc, irq_extra);
+    return irq_declare_msg(callback, probe->loc, probe->loc);
 }
 
 int
-pci_assign_msi(struct pci_probe* probe, irq_t irq)
+pci_assign_msi(struct pci_probe* probe, irq_t irq, void* irq_spec)
 {
     int err = 0;
 
     assert(irq->type == IRQ_MESSAGE);
 
-    err = irq_assign(probe->irq_domain, irq);
+    err = irq_assign(probe->irq_domain, irq, irq_spec);
     if (err) {
         return err;
     }

@@ -84,8 +84,7 @@ __irq_create_msi(irq_t irq, ptr_t message)
 }
 
 irq_t
-irq_declare(enum irq_type type, irq_servant callback, 
-            ptr_t data, void* irq_extra)
+irq_declare(enum irq_type type, irq_servant callback, ptr_t data)
 {
     irq_t irq;
 
@@ -93,7 +92,6 @@ irq_declare(enum irq_type type, irq_servant callback,
     *irq = (struct irq_object) {
         .type = type,
         .serve = callback ?: __default_servant,
-        .irq_extra = irq_extra,
         .vector = IRQ_VECTOR_UNSET
     };
 
@@ -118,11 +116,11 @@ irq_revoke(irq_t irq)
 }
 
 int
-irq_assign(struct irq_domain* domain, irq_t irq)
+irq_assign(struct irq_domain* domain, irq_t irq, void* irq_spec)
 {
     int err = 0;    
     if (domain->ops->map_irq) {
-        err = domain->ops->map_irq(domain, irq, irq->irq_extra);
+        err = domain->ops->map_irq(domain, irq, irq_spec);
         if (err) {
             return err;
         }

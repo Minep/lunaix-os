@@ -92,9 +92,9 @@ pci16x50_pci_create(struct device_def* def, morph_t* obj)
 
         sdev = uart_create_serial(uart, &def->class, &pci_ports, "PCI");
 
-        irq = pci_declare_msi_irq(uart_msi_irq_handler, probe, NULL);
+        irq = pci_declare_msi_irq(uart_msi_irq_handler, probe);
         irq_set_payload(irq, uart);
-        pci_assign_msi(probe, irq);
+        pci_assign_msi(probe, irq, NULL);
 
         INFO("base: 0x%x (%s), %s", 
                 bar->start, 

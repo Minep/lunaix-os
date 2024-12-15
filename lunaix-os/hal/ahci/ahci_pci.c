@@ -29,8 +29,8 @@ ahci_pci_create(struct device_def* def, morph_t* morphed)
     
     assert(pci_capability_msi(probe));
 
-    irq = pci_declare_msi_irq(ahci_hba_isr, probe, NULL);
-    pci_assign_msi(probe, irq);
+    irq = pci_declare_msi_irq(ahci_hba_isr, probe);
+    pci_assign_msi(probe, irq, NULL);
 
     struct ahci_driver_param param = {
         .mmio_base = bar6->start,

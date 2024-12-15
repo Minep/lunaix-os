@@ -311,8 +311,8 @@ ps2_kbd_create(struct device_def* devdef, morph_t* obj)
      *  所以，保险的方法是：在初始化后才去设置ioapic，这样一来我们就能有一个稳定的IRQ#1以放心使用。
      */
     
-    irq_t irq = irq_declare_line(intr_ps2_kbd_handler, PC_AT_IRQ_KBD, NULL);    
-    irq_assign(irq_owning_domain(kbd_idev->dev_if), irq);
+    irq_t irq = irq_declare_line(intr_ps2_kbd_handler, PC_AT_IRQ_KBD);    
+    irq_assign(irq_owning_domain(kbd_idev->dev_if), irq, NULL);
 
     return 0;
 

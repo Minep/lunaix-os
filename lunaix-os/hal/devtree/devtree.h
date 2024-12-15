@@ -11,10 +11,16 @@ propeq(struct fdt_blob* fdt, fdt_loc_t loc, const char* key)
     return streq(fdt_prop_key(fdt, loc), key);
 }
 
+static inline ptr_t
+__prop_val_ptr(struct fdt_prop* prop)
+{
+    return __ptr(prop) + sizeof(struct fdt_prop);
+}
+
 static inline void
 __mkprop_ptr(fdt_loc_t loc, struct dtp_val* val)
 {
-    val->ptr_val = __ptr(loc.prop->val);
+    val->ptr_val = __prop_val_ptr(loc.prop);
     val->size = loc.prop->len;
 }
 

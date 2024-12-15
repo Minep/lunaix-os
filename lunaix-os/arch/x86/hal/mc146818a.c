@@ -184,10 +184,10 @@ __rtc_calibrate(struct hwrtc_potens* pot)
 
     state = (struct mc146818*)rtc_dev->underlay;
 
-    state->irq = irq_declare_line(__rtc_tick, PC_AT_IRQ_RTC, NULL);
+    state->irq = irq_declare_line(__rtc_tick, PC_AT_IRQ_RTC);
     irq_set_payload(state->irq, state);
 
-    irq_assign(irq_owning_domain(rtc_dev), state->irq);
+    irq_assign(irq_owning_domain(rtc_dev), state->irq, NULL);
 
     return 0;
 }

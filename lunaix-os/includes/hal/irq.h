@@ -70,7 +70,6 @@ struct irq_object
     void* payload;
 
     struct irq_domain* domain;
-    void* irq_extra;
     int ref;
 };
 
@@ -84,13 +83,13 @@ int
 irq_attach_domain(struct irq_domain* parent, struct irq_domain* child);
 
 irq_t
-irq_declare(enum irq_type, irq_servant, ptr_t, void*);
+irq_declare(enum irq_type, irq_servant, ptr_t);
 
 void
 irq_revoke(irq_t);
 
 int
-irq_assign(struct irq_domain* domain, irq_t);
+irq_assign(struct irq_domain* domain, irq_t, void*);
 
 irq_t
 irq_find(struct irq_domain* domain, int local_irq);
@@ -141,17 +140,17 @@ irq_set_domain_object(struct irq_domain* domain, void* obj)
 #define irq_domain_obj(domain, type)        ((type*)(domain)->object)
 
 static inline irq_t
-irq_declare_line(irq_servant callback, int local_irq, void* irq_extra)
+irq_declare_line(irq_servant callback, int local_irq)
 {
-    return irq_declare(IRQ_LINE, callback, (int)local_irq, irq_extra);
+    return irq_declare(IRQ_LINE, callback, (int)local_irq);
 }
 
 static inline irq_t
 irq_declare_msg(irq_servant callback, 
-                ptr_t message, ptr_t sideband, void* irq_extra)
+                ptr_t message, ptr_t sideband)
 {
     irq_t irq;
-    irq = irq_declare(IRQ_MESSAGE, callback, message, irq_extra);
+    irq = irq_declare(IRQ_MESSAGE, callback, message);
     irq->msi->sideband = sideband;
 
     return irq;
@@ -160,7 +159,7 @@ irq_declare_msg(irq_servant callback,
 static inline irq_t
 irq_declare_direct(irq_servant callback)
 {
-    return irq_declare(IRQ_DIRECT, callback, 0, NULL);
+    return irq_declare(IRQ_DIRECT, callback, 0);
 }
 
 static inline struct irq_domain*

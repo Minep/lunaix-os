@@ -47,14 +47,14 @@ struct dtp_val
 {
     union
     {
-        union {
-            const char*  str_val;
-            const char*  str_lst;
-        };
         ptr_t        ptr_val;
         dt_enc_t     encoded;
         
         union dtp_baseval* ref;
+        union {
+            const char*  str_val;
+            const char*  str_lst;
+        };
     };
     unsigned int size;
 };
@@ -670,7 +670,7 @@ static inline void
 dtpi_init_empty(struct dtpropi* dtpi)
 {
     *dtpi = (struct dtpropi) {
-        .prop = { 0, 0 },
+        .prop = { {0}, 0 },
         .loc = 0
     };
 }

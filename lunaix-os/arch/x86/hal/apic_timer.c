@@ -46,7 +46,7 @@ __apic_timer_calibrate(struct hwtimer_pot* pot, u32_t hertz)
 
     irq = irq_declare_direct(apic_timer_count_stop);
     irq_set_payload(irq, pot);
-    irq_assign(irq_get_default_domain(), irq);
+    irq_assign(irq_get_default_domain(), irq, NULL);
 
     // Setup a one-shot timer, we will use this to measure the bus speed. So we
     // can then calibrate apic timer to work at *nearly* accurate hz

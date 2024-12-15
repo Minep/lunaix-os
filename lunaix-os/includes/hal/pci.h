@@ -117,11 +117,10 @@ size_t
 pci_bar_sizing(struct pci_probe* probe, u32_t* bar_out, u32_t bar_num);
 
 irq_t
-pci_declare_msi_irq(irq_servant callback, 
-                    struct pci_probe* probe, void *irq_extra);
+pci_declare_msi_irq(irq_servant callback, struct pci_probe* probe);
 
 int
-pci_assign_msi(struct pci_probe* probe, irq_t irq);
+pci_assign_msi(struct pci_probe* probe, irq_t irq, void* irq_spec);
 
 /**
  * @brief Bind an abstract device instance to the pci device

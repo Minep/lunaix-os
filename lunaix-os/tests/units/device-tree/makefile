@@ -4,7 +4,7 @@ obj-dut := dut/dt_interrupt.o \
 			dut/changeling.o
 
 BIN_DEPS += load.%.o
-CFLAGS   += -DCONFIG_USE_DEVICETREE
+CFLAGS   += -DCONFIG_USE_DEVICETREE -Wp,-w
 
 .PRECIOUS: %.dtb
 %.dtb: %.dts
