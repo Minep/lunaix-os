@@ -11,11 +11,17 @@
 #define CurrentEL       __sr_encode(3, 0,  4,  2, 2)
 #define ELR_E1          __sr_encode(3, 0,  4,  0, 1)
 #define SPSel           __sr_encode(3, 0,  4,  2, 0)
+
 #define SPSR_EL1        __sr_encode(3, 0,  4,  0, 0)
+#define SPSR_EL2        __sr_encode(3, 4,  4,  0, 0)
+#define SPSR_EL3        __sr_encode(3, 6,  4,  0, 0)
+
 #define DAIF_EL1        __sr_encode(3, 3,  4,  2, 1)
 #define ALLINT_EL1      __sr_encode(3, 0,  4,  3, 0)
 #define SP_EL0          __sr_encode(3, 0,  4,  1, 0)
 #define SP_EL1          __sr_encode(3, 4,  4,  1, 0)
+
+#define ID_AA64PFR0_EL1          __sr_encode(3, 0,  0,  4, 0)
 
 #ifndef __ASM__
 #define read_sysreg(reg)                                    \

@@ -1,5 +1,6 @@
 #include <lunaix/boot_generic.h>
 #include <asm/aa64.h>
+#include <asm/aa64_spsr.h>
 
 #include "init.h"
 
@@ -82,6 +83,71 @@ extract_dtb_bootinfo(ptr_t dtb, struct boot_handoff* handoff)
     handoff->kexec.dtb_pa = dtb;
     
     // TODO extract /memory, /reserved-memories from dtb
+}
+
+static inline void
+setup_gic_sysreg()
+{
+    int el;
+    bool has_el2;
+    u64_t pfr;
+
+    pfr = read_sysreg(ID_AA64PFR0_EL1);
+    el = read_sysreg(CurrentEL) >> 2;
+
+    // Arm A-Profile: D19.2.69, check for GIC sysreg avaliability
+
+    if (!BITS_GET(pfr, BITFIELD(27, 24))) {
+        return;
+    }
+
+    has_el2 = !!BITS_GET(pfr, BITFIELD(11, 8));
+
+    // GIC spec (v3,v4): 12.1.7, table 12-2
+    // GIC spec (v3,v4): ICC_SRE_ELx accessing
+    // Arm A-Profile: R_PCDTX, PSTATE.EL reset value
+
+    if (el == 3) {
+        sysreg_flagging(ICC_SRE_EL3, ICC_SRE_SRE, 0);
+    }
+    
+    if (has_el2) {
+        // el must be >= 2
+        sysreg_flagging(ICC_SRE_EL2, ICC_SRE_SRE, 0);
+    }
+
+    sysreg_flagging(ICC_SRE_EL1, ICC_SRE_SRE, 0);
+}
+
+void
+aarch64_pre_el1_init()
+{
+    setup_gic_sysreg();
+}
+
+bool
+aarch64_prepare_el1_transfer()
+{
+    ptr_t spsr;
+    int el;
+
+    el = read_sysreg(CurrentEL) >> 2;
+
+    if (el == 1) {
+        return false;
+    }
+
+    spsr = SPSR_AllInt | SPSR_I | SPSR_F | SPSR_SP;
+    spsr = BITS_SET(spsr, SPSR_EL, 1);
+
+    if (el == 2) {
+        set_sysreg(SPSR_EL2, spsr);
+    }
+    else {
+        set_sysreg(SPSR_EL3, spsr);
+    }
+
+    return true;
 }
 
 struct boot_handoff*

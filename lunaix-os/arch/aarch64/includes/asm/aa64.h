@@ -5,5 +5,6 @@
 #include "aa64_mmu.h"
 #include "aa64_msrs.h"
 #include "aa64_sysinst.h"
+#include "aa64_gic.h"
 
 #endif /* __LUNAIX_AA64_H */

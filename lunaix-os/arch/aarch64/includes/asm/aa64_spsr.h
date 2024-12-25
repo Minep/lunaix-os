@@ -5,7 +5,12 @@
 #include <lunaix/bits.h>
 
 #define SPSR_EL          BITFIELD(3, 2)
-#define SPSR_SP          BIT(0)
+
+#define SPSR_SP          BITFLAG(0)
+#define SPSR_I           BITFLAG(7)
+#define SPSR_F           BITFLAG(6)
+#define SPSR_I           BITFLAG(7)
+#define SPSR_AllInt      BITFLAG(13)
 
 static inline bool
 spsr_from_el0(reg_t spsr)
