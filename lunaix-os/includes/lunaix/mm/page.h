@@ -145,6 +145,15 @@ pin_leaflet(struct leaflet* leaflet)
     change_page_type(get_ppage(leaflet), PP_FGLOCKED);
 }
 
+static inline int
+to_napot_order(int nr_pages)
+{
+    int order;
+    
+    order = ilog2(nr_pages);
+    return is_pot(nr_pages) ? order : order + 1;
+}
+
 /**
  * @brief Map a leaflet
  * 

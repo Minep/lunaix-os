@@ -1,0 +1,5 @@
+sources([
+    "gic_v3.c",
+    "common.c",
+    "default_ops.c",
+])

@@ -4,6 +4,7 @@
 #include <lunaix/changeling.h>
 #include <lunaix/device.h>
 #include <lunaix/ds/btrie.h>
+#include <lunaix/status.h>
 #include <asm/hart.h>
 
 #define IRQ_VECTOR_UNSET    ((unsigned)-1)
@@ -43,6 +44,12 @@ enum irq_type
     IRQ_MESSAGE
 };
 
+enum irq_trigger
+{
+    IRQ_EDGE = 0,
+    IRQ_LEVEL
+};
+
 struct irq_line_wire
 {
     ptr_t domain_local;
@@ -59,6 +66,7 @@ struct irq_msi_wire
 struct irq_object
 {    
     enum irq_type type;
+    enum irq_trigger trig;
     unsigned int vector;
     
     union {
@@ -105,6 +113,24 @@ irq_get_default_domain();
 
 int
 irq_forward_install(struct irq_domain* current, irq_t irq);
+
+static inline int
+irq_alloc_id(struct irq_domain* domain, irq_t irq, int start, int end)
+{
+    unsigned int irq_id;
+
+    if (irq->vector != IRQ_VECTOR_UNSET) {
+        return EEXIST;
+    }
+    
+    irq_id = (unsigned int)btrie_map(&domain->irq_map, start, end, irq);
+    if (irq_id == -1U) {
+        return E2BIG;
+    }
+
+    irq->vector = irq;
+    return 0;
+}
 
 static inline void
 irq_serve(irq_t irq, struct hart_state* state)

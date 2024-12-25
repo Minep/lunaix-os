@@ -693,23 +693,27 @@ dtpi_has_next(struct dtpropi* dtpi)
     return dtpi->loc < dtpi->prop.size / sizeof(u32_t);
 }
 
-static inline u32_t
-dtpi_next_u32(struct dtpropi* dtpi) 
+static inline u64_t
+dtpi_next_integer(struct dtpropi* dtpi, int int_cells) 
 {
     union dtp_baseval* val;
-    val = (union dtp_baseval*)&dtpi->prop.encoded[dtpi->loc++];
-    return val->u32_val;
+    off_t loc = dtpi->loc;
+    dtpi->loc += int_cells;
+    val = (union dtp_baseval*)&dtpi->prop.encoded[loc];
+    
+    return int_cells == 1 ? val->u32_val : val->u64_val;
 }
 
 static inline u64_t
 dtpi_next_u64(struct dtpropi* dtpi) 
 {
-    union dtp_baseval* val;
-    off_t loc = dtpi->loc;
-    dtpi->loc += 2;
-    val = (union dtp_baseval*)&dtpi->prop.encoded[loc];
-    
-    return val->u64_val;
+    return dtpi_next_integer(dtpi, 2);
+}
+
+static inline u32_t
+dtpi_next_u32(struct dtpropi* dtpi) 
+{
+    return (u32_t)dtpi_next_integer(dtpi, 1);
 }
 
 static inline struct dtn*

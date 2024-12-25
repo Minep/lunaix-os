@@ -12,12 +12,20 @@ typedef unsigned long gicreg64_t;
 #define REG_INDEX(addr)     ((addr) / sizeof(gicreg_t))
 
 #define ICC_CTLR_EL1        __sr_encode(3, 0, 12, 12, 4)
+#define ICC_BPR0_EL1        __sr_encode(3, 0, 12,  8, 3)
+#define ICC_PMR_EL1         __sr_encode(3, 0,  4,  6, 0)
+
 #define ICC_SRE_EL1         __sr_encode(3, 0, 12, 12, 5)
+#define ICC_SRE_EL2         __sr_encode(3, 4, 12,  9, 5)
+#define ICC_SRE_EL3         __sr_encode(3, 6, 12, 12, 5)
+
 #define ICC_IGRPEN0_EL1     __sr_encode(3, 0, 12, 12, 6)
 #define ICC_IGRPEN1_EL1     __sr_encode(3, 0, 12, 12, 7)
 
 #define ICC_IAR1_EL1        __sr_encode(3, 0, 12, 12, 0)
+#define ICC_NMIAR1_EL1      __sr_encode(3, 0, 12,  9, 5)
 #define ICC_EOIR1_EL1       __sr_encode(3, 0, 12, 12, 1)
+#define ICC_DIR_EL1         __sr_encode(3, 0, 12, 11, 1)
 
 #define INTID_ACKED_S        1020
 #define INTID_ACKED_NS       1021
@@ -66,6 +74,9 @@ typedef unsigned long gicreg64_t;
 #define GITS_CBASER          REG_INDEX(0x0080)
 #define GITS_BASER           REG_INDEX(0x0100)
 
+#define GICD_CTLR_DS         BITFLAG(6)
+#define GICD_CTLR_ARE_NS     BITFLAG(5)
+#define GICD_CTLR_ARE_S      BITFLAG(4)
 #define GICD_CTLR_G1SEN      BITFLAG(2)
 #define GICD_CTLR_G1NSEN     BITFLAG(1)
 #define GICD_CTLR_G0EN       BITFLAG(0)
@@ -82,6 +93,8 @@ typedef unsigned long gicreg64_t;
 
 #define GICR_TYPER_AffVal    BITFIELD(63, 32)
 #define GICR_TYPER_PPInum    BITFIELD(31, 27)
+
+#define GICR_TYPER_DirectLPI    BITFLAG(3)
 
 #define GICR_BASER_PAddr     BITFIELD(51, 12)
 #define GICR_BASER_Share     BITFIELD(11, 10)
@@ -104,6 +117,7 @@ typedef unsigned long gicreg64_t;
 #define GITS_TYPER_ITTe_sz   BITFIELD(7, 4)
 
 #define GITS_BASER_VALID     BITFLAG(63)
+#define GITS_BASER_Ind       BITFLAG(62)
 #define GITS_BASER_ICACHE    BITFIELD(61, 59)
 #define GITS_BASER_OCACHE    BITFIELD(55, 53)
 #define GITS_BASER_PA        BITFIELD(47, 12)
