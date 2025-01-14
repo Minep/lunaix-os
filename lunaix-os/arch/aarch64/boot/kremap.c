@@ -8,7 +8,7 @@
 
 static pte_t kpt[LEVEL_SIZE][32];
 
-ptr_t
+ptr_t boot_text
 kremap()
 {
     struct pt_alloc alloc;

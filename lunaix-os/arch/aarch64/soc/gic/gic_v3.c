@@ -734,6 +734,7 @@ v3_init_its_domain(struct gic* gic,
 
         if (type == 0b001) {
             nr_ents = BITS_GET(gits->typer, GITS_TYPER_Devbits);
+            nr_ents = 1 << (nr_ents + 1);
         }
         else if (type) {
             nr_ents = gic->nr_cpus;
@@ -815,6 +816,11 @@ v3_map_redistributors(struct gic* gic,
     val = dt_getprop(dtn, "redistributor-stride");
     red_stride = val ? val->ref->u32_val : 0;
 
+    /*
+        We assume only a max 16 cores in all scenarios,
+        no doubt a bad assumption, but the kernel is uniprocessor,
+        just show some respects to the gic.
+    */
     struct gic_pe *pe, *pes[16];
     for (int i = 0; i < nr_red_regions; i++)
     {

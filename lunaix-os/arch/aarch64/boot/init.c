@@ -1,6 +1,7 @@
 #include <lunaix/boot_generic.h>
 #include <asm/aa64.h>
 #include <asm/aa64_spsr.h>
+#include <hal/devtree.h>
 
 #include "init.h"
 
@@ -77,12 +78,62 @@ setup_ttbr()
     set_sysreg(TCR_EL1, tcr);
 }
 
+#define MMAP_ENTS_CHUNK_SIZE    16
+
 static inline void
 extract_dtb_bootinfo(ptr_t dtb, struct boot_handoff* handoff)
 {
+    struct fdt_blob fdt;
+    struct fdt_memscan mscan;
+    struct dt_memory_node mnode;
+
+    int mmap_len = 0, mmap_max_len = 16;
+    size_t pmem_size = 0;
+    struct boot_mmapent* mmap;
+
+    mmap = bootmem_alloc(sizeof(*mmap) * MMAP_ENTS_CHUNK_SIZE);
     handoff->kexec.dtb_pa = dtb;
     
     // TODO extract /memory, /reserved-memories from dtb
+
+    fdt_load(&fdt, dtb);
+    fdt_memscan_begin(&mscan, &fdt);
+
+    struct boot_mmapent* mmap_ent;
+
+    while(fdt_memscan_nextnode(&mscan, &fdt))
+    {
+        while (fdt_memscan_nextrange(&mscan, &mnode)) 
+        {
+            mmap_ent = &mmap[mmap_len++];
+            *mmap_ent = (struct boot_mmapent) {
+                .size = mnode.size,
+                .start = mnode.base
+            };
+
+            if (mnode.type == FDT_MEM_FREE) {
+                mmap_ent->type = BOOT_MMAP_FREE;
+                pmem_size += mnode.size;
+            }
+            else {
+                mmap_ent->type = BOOT_MMAP_RSVD;
+            }
+
+
+            if (mmap_len < mmap_max_len) {
+                continue;
+            }
+
+            mmap_max_len += MMAP_ENTS_CHUNK_SIZE;
+
+            // another allocation is just expanding the previous allocation.
+            bootmem_alloc(sizeof(*mmap) * MMAP_ENTS_CHUNK_SIZE);
+        }
+    }
+
+    handoff->mem.mmap = mmap;
+    handoff->mem.mmap_len = mmap_len;
+    handoff->mem.size = pmem_size;
 }
 
 static inline void
@@ -119,13 +170,13 @@ setup_gic_sysreg()
     sysreg_flagging(ICC_SRE_EL1, ICC_SRE_SRE, 0);
 }
 
-void
+void boot_text
 aarch64_pre_el1_init()
 {
     setup_gic_sysreg();
 }
 
-bool
+bool boot_text
 aarch64_prepare_el1_transfer()
 {
     ptr_t spsr;
@@ -134,11 +185,12 @@ aarch64_prepare_el1_transfer()
     el = read_sysreg(CurrentEL) >> 2;
 
     if (el == 1) {
+        // no transfer required
         return false;
     }
 
-    spsr = SPSR_AllInt | SPSR_I | SPSR_F | SPSR_SP;
-    spsr = BITS_SET(spsr, SPSR_EL, 1);
+    spsr  = SPSR_EL1_preset;
+    spsr |= SPSR_AllInt | SPSR_I | SPSR_F | SPSR_A;
 
     if (el == 2) {
         set_sysreg(SPSR_EL2, spsr);
@@ -150,7 +202,7 @@ aarch64_prepare_el1_transfer()
     return true;
 }
 
-struct boot_handoff*
+struct boot_handoff* boot_text
 aarch64_init(ptr_t dtb)
 {
     setup_evbar();

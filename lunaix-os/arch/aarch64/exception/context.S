@@ -1,6 +1,12 @@
 #define __ASM__
 #include <asm/aa64_msrs.h>
+#include <asm/bits.h>
 #include "hart_fields.inc"
+
+.section .data
+    .align 4
+    .skip 256
+    _aa64_csw_temp_stack:
 
 .section .text
     
@@ -85,4 +91,22 @@
 
     _aa64_switch_task:
         // TODO
+        adr  sp, _aa64_csw_temp_stack
+        
+        bl   aa64_switch_ttbr
+        
+        bl   switch_signposting
+        cbnz x0, _aa64_handle_signal
+
         b     do_eret
+
+    _aa64_handle_signal:
+        mov  x1, #SPSR_EL0_preset
+        msr  SPSR_EL1, x1
+
+        ldr  x1, [x0, #sigact]
+        msr  ELR_E1, x1
+
+        msr  SP_EL0, x0
+
+        eret

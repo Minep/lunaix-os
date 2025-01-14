@@ -2,6 +2,11 @@
 #include <asm/hart.h>
 #include <asm/aa64_exception.h>
 
+extern void 
+handle_mm_abort(struct hart_state* state);
+
+extern void
+aa64_syscall(struct hart_state* hstate);
 
 static inline void
 update_thread_context(struct hart_state* state)
@@ -21,10 +26,7 @@ update_thread_context(struct hart_state* state)
     }
 }
 
-extern void 
-handle_mm_abort(struct hart_state* state);
-
-static void
+static inline void
 handle_sync_exception(struct hart_state* hstate)
 {
     unsigned int ec;
@@ -40,16 +42,27 @@ handle_sync_exception(struct hart_state* hstate)
         handle_mm_abort(hstate);
         break;
     
+    case EC_SVC:
+        aa64_syscall(hstate);
+        break;
+    
     default:
         fail("unhandled exception (synced)");
         break;
     }
 }
 
-static void
+static inline void
 handle_async_exception(struct hart_state* hstate)
 {
+    int err = 0;
+    
+    err = gic_handle_irq(hstate);
+    if (!err) {
+        return;
+    }
 
+    // TODO do we have other cases of async exception?
 }
 
 struct hart_state*

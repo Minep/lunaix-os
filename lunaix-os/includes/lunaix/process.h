@@ -379,6 +379,9 @@ exit_thread(void* val);
 void
 thread_release_mem(struct thread* thread);
 
+ptr_t 
+proc_vmroot();
+
 /* 
     ========= Signal =========
 */

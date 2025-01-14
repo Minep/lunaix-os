@@ -5,6 +5,7 @@
 #include <lunaix/compiler.h>
 
 #include "aa64_mmu.h"
+#include <lunaix/bits.h>
 
 /* ******** Page Table Manipulation ******** */
 
@@ -62,11 +63,11 @@ struct __pte {
 
 // upper attributes
 
-#define _PTE_UXN                (1UL << 54)
-#define _PTE_PXN                (1UL << 53)
+#define _PTE_UXN                BITFLAG(54)
+#define _PTE_PXN                BITFLAG(53)
 #define _PTE_XN                 (_PTE_UXN | _PTE_PXN)
-#define _PTE_Contig             (1UL << 52)
-#define _PTE_DBM                (1UL << 51)
+#define _PTE_Contig             BITFLAG(52)
+#define _PTE_DBM                BITFLAG(51)
 
 #ifdef _MMU_USE_OA52
 #if  CONFIG_AA64_PAGE_GRAN_64K
@@ -88,17 +89,24 @@ struct __pte {
 
 // lower attributes
 
-#define _PTE_nG                 (1UL << 11)
-#define _PTE_AF                 (1UL << 10)
+#define _PTE_nG                 BITFLAG(11)
+#define _PTE_AF                 BITFLAG(10)
 
 // AP bits: R_RNGJG
 
 #define _PTE_AP(p, u)           ((((p) & 1) << 1 | ((u) & 1)) << 6)
-#define _PTE_PRW                _PTE_AP(0 , 0)      // priv rw, unpriv none
-#define _PTE_PRWURW             _PTE_AP(0 , 1)      // priv rw, unpriv rw
-#define _PTE_U                  _PTE_AP(0 , 1)      // generic unpriv flag
-#define _PTE_PRO                _PTE_AP(1 , 0)      // priv ro, unpriv none
-#define _PTE_PROURO             _PTE_AP(1 , 1)      // priv ro, unpriv ro
+
+// el1 rw, el0 deny all
+#define _PTE_PRW                _PTE_AP(0 , 0)
+// el1 rw, el0 rw
+#define _PTE_PRWURW             _PTE_AP(0 , 1)
+// el0 allow
+#define _PTE_U                  _PTE_AP(0 , 1)
+#define _PTE_nDIRTY             _PTE_AP(1 , 0)
+// el1 ro, el0 deny all
+#define _PTE_PRO                _PTE_AP(1 , 0) | _PTE_DBM
+// el1 ro, el0 ro
+#define _PTE_PROURO             _PTE_AP(1 , 1) | _PTE_DBM
 
 #define _PTE_BLKDESC            (0b01)
 #define _PTE_TABDESC            (0b11)
@@ -381,13 +389,13 @@ pte_istouched(pte_t pte)
 static inline pte_t
 pte_mkclean(pte_t pte) 
 {
-    return __mkpte_from(pte.val & ~_PTE_DBM);
+    return __mkpte_from(pte.val | _PTE_nDIRTY);
 }
 
 static inline bool
 pte_dirty(pte_t pte) 
 {
-    return !!(pte.val & _PTE_DBM);
+    return (pte.val & _PTE_DBM) && (pte.val & ~_PTE_nDIRTY);
 }
 
 static inline void

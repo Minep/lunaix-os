@@ -245,8 +245,40 @@ gic_create_context(struct device* gicdev)
     gic = valloc(sizeof(*gic));
     domain = irq_create_domain(gicdev, &gic_domain_ops);
 
+    irq_set_default_domain(domain);
     irq_set_domain_object(gic, domain);
     gic->domain = domain;
 
     return gic;
+}
+
+int
+gic_handle_irq(struct hart_state* hs)
+{
+    int err = 0;
+    struct gic* gic;
+    struct gic_pe* pe;
+    struct irq_domain* domain;
+    irq_t irq;
+
+    domain = irq_get_default_domain();
+    gic = irq_domain_obj(domain, struct gic);
+
+    pe = gic->cores[current_cpu];
+    if (!pe->ops->ack_int(pe)) {
+        return ENOENT;
+    }
+
+    err = gic_get_interrupt(gic, pe->active_id, &pe->active_int);
+    if (err) {
+        return err;
+    }
+
+    irq = pe->active_int.irq;
+    assert(irq);
+
+    irq->serve(irq, hs);
+
+    pe->has_active_int = false;
+    return pe->ops->notify_eoi(pe);
 }

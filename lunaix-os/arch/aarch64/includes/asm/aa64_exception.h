@@ -23,6 +23,7 @@
 #define EC_BTI              0b001101
 #define EC_EXEC_STATE       0b001110
 #define EC_SYS_INST         0b011000
+#define EC_SVC              0b010101
 
 #define EC_I_ABORT          0b100000
 #define EC_I_ABORT_EL       0b100001

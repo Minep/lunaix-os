@@ -28,6 +28,7 @@ static inline void must_inline
 __tlb_invalidate(ptr_t va) 
 {
     sys_a1(tlbi_vaae1, pack_va(0, 0, va));
+    data_barrier;
 }
 
 /**
@@ -40,6 +41,7 @@ static inline void must_inline
 __tlb_flush_asid(unsigned int asid, ptr_t va) 
 {
     sys_a1(tlbi_vae1, pack_va(asid, 0, va));
+    data_barrier;
 }
 
 /**
@@ -62,6 +64,7 @@ static inline void must_inline
 __tlb_flush_all() 
 {
     sys_a0(tlbi_alle1);
+    data_barrier;
 }
 
 /**
@@ -73,6 +76,7 @@ static inline void must_inline
 __tlb_flush_asid_all(unsigned int asid) 
 {
     sys_a1(tlbi_aside1, pack_va(asid, 0, 0));
+    data_barrier;
 }
 
 
@@ -93,6 +97,7 @@ tlb_flush_range(ptr_t addr, unsigned int npages)
     }
 #else
     sys_a1(tlbi_rvaae1, pack_rva(0, 0, addr, npages, 0));
+    data_barrier;
 #endif
 }
 
@@ -114,6 +119,7 @@ tlb_flush_asid_range(unsigned int asid, ptr_t addr, unsigned int npages)
     }
 #else
     sys_a1(tlbi_rvae1, pack_rva(asid, 0, addr, npages, 0));
+    data_barrier;
 #endif
 }
 

@@ -21,6 +21,8 @@
 #define SP_EL0          __sr_encode(3, 0,  4,  1, 0)
 #define SP_EL1          __sr_encode(3, 4,  4,  1, 0)
 
+#define FAR_EL1         __sr_encode(3, 0,  6,  0, 0)
+
 #define ID_AA64PFR0_EL1          __sr_encode(3, 0,  0,  4, 0)
 
 #ifndef __ASM__

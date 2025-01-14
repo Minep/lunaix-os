@@ -43,12 +43,14 @@ struct hart_state
 } compact align(16);
 
 static inline int
-hart_vector_stamp(struct hart_state* hstate) {
+hart_vector_stamp(struct hart_state* hstate) 
+{
     return BITS_GET(hstate->execp.syndrome, SYNDROME_ETYPE);
 }
 
 static inline unsigned int
-hart_ecause(struct hart_state* hstate) {
+hart_ecause(struct hart_state* hstate) 
+{
     return hstate->execp.syndrome;
 }
 
@@ -79,8 +81,10 @@ hart_sp(struct hart_state* hstate)
 static inline bool
 kernel_context(struct hart_state* hstate)
 {
-    // TODO
-    return false;
+    reg_t spsr;
+
+    spsr = hstate->execp.spsr;
+    return !spsr_from_el0(spsr);
 }
 
 static inline ptr_t

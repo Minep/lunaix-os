@@ -3,6 +3,7 @@
 
 #include <asm-generic/bits.h>
 
+#ifndef __ASM__
 #undef _BITS_EXTRACT
 #undef _BITS_INSERT
 
@@ -27,5 +28,5 @@
             _r;                         \
         })
 
-
+#endif
 #endif /* __LUNAIX_ARCH_BITS_H */

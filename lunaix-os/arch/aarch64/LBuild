@@ -1,20 +1,13 @@
+use("boot")
+use("exception")
+use("klibc")
+
 use("soc/gic")
 
 sources([
-    "boot/init.c",
-    "boot/kremap.c",
-    "boot/start.S"
-])
-
-sources([
-    "exception/entries.S",
-    "exception/context.S",
-    "exception/handler.c"
-])
-
-sources([
     "fault.c",
-    "trace.c"
+    "trace.c",
+    "vmutils.c"
 ])
 
 headers([

@@ -38,8 +38,8 @@
     1:
         mov x0, x19
         adr x4, aarch64_init
-        bl x4
+        blr x4
          
         // x0: ptr to boot_handoff
         adr x4, kernel_bootstrap
-        bl x4
+        blr x4

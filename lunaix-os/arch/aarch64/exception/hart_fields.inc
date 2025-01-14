@@ -30,3 +30,14 @@ hart_regs:
 hart_execp:
     .struct hart_execp + execp_end
 hart_end:
+
+    .struct 0
+sig_num:
+    .struct sig_pend + 4
+sigact:
+    .struct sigact + 8
+sighand:
+    .struct sighand + 8
+saved_hstate:
+    .struct saved_hstate + 8
+sig_end:

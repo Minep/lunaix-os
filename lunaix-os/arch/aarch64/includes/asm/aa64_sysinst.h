@@ -22,4 +22,6 @@
         _x;                                             \
     })
 
+#define data_barrier        asm ("dsb sy")
+
 #endif /* __LUNAIX_AA64_SYSINST_H */

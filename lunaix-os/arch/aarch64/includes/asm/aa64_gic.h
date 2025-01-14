@@ -3,6 +3,7 @@
 
 #include <lunaix/bits.h>
 #include "aa64_msrs.h"
+#include "hart.h"
 
 #define FRAME_SIZE  0x10000
 
@@ -129,5 +130,8 @@ typedef unsigned long gicreg64_t;
 #define GITS_BASERn_PGSZ     BITFIELD(9, 8)
 
 #define GITS_CWRRD_OFF       BITFIELD(19, 5)
+
+int
+gic_handle_irq(struct hart_state* hs);
 
 #endif /* __LUNAIX_AA64_GIC_H */

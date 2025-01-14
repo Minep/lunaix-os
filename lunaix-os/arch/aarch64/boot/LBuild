@@ -1,0 +1,5 @@
+sources([
+    "init.c",
+    "kremap.c",
+    "start.S"
+])

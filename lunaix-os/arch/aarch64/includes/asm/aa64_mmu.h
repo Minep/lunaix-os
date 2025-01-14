@@ -2,6 +2,7 @@
 #define __LUNAIX_AA64_MMU_H
 
 #include "aa64_asm.h"
+#include <lunaix/bits.h>
 
 #if    defined(CONFIG_AA64_PAGE_GRAN_4K)
 #define _MMU_TG    0b01
@@ -46,5 +47,9 @@
 #define TCR_EPD1            (1UL << 23)
 #define TCR_EPD0            (1UL << 7)
 #define TCR_A1              (1UL << 22)
+
+#define TTBR_ASID           BITFIELD(63, 48)
+#define TTBR_BADDR          BITFIELD(47, 1)
+#define TTBR_CnP            BITFLAG(0)
 
 #endif /* __LUNAIX_AA64_MMU_H */
