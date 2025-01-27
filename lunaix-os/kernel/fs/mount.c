@@ -11,8 +11,16 @@ LOG_MODULE("fs")
 
 struct llist_header all_mnts = { .next = &all_mnts, .prev = &all_mnts };
 
-struct v_mount*
-vfs_create_mount(struct v_mount* parent, struct v_dnode* mnt_point)
+static void
+__vfs_attach_vmnt(struct v_dnode* mnt_point, struct v_mount* vmnt)
+{
+    vmnt->mnt_point = mnt_point;
+    vfs_d_assign_vmnt(mnt_point, vmnt);
+    vfs_ref_dnode(mnt_point);
+}
+
+static struct v_mount*
+__vfs_create_mount(struct v_mount* parent, struct v_superblock* mnt_sb)
 {
     struct v_mount* mnt = vzalloc(sizeof(struct v_mount));
     if (!mnt) {
@@ -25,8 +33,7 @@ vfs_create_mount(struct v_mount* parent, struct v_dnode* mnt_point)
     mutex_init(&mnt->lock);
 
     mnt->parent = parent;
-    mnt->mnt_point = mnt_point;
-    vfs_vmnt_assign_sb(mnt, mnt_point->super_block);
+    vfs_vmnt_assign_sb(mnt, mnt_sb);
 
     if (parent) {
         mnt_mkbusy(parent);
@@ -34,28 +41,40 @@ vfs_create_mount(struct v_mount* parent, struct v_dnode* mnt_point)
         llist_append(&parent->submnts, &mnt->sibmnts);
         mutex_unlock(&mnt->parent->lock);
     }
-    
-    atomic_fetch_add(&mnt_point->ref_count, 1);
 
     return mnt;
 }
 
-void
-__vfs_release_vmnt(struct v_mount* mnt)
+static void
+__vfs_detach_vmnt(struct v_mount* mnt)
 {
     assert(llist_empty(&mnt->submnts));
+
+    vfs_unref_dnode(mnt->mnt_point);
+    assert(!mnt->busy_counter);
 
     if (mnt->parent) {
         mnt_chillax(mnt->parent);
     }
 
+    mnt->mnt_point->mnt = NULL;
+
     llist_delete(&mnt->sibmnts);
     llist_delete(&mnt->list);
-    atomic_fetch_sub(&mnt->mnt_point->ref_count, 1);
     vfree(mnt);
 }
 
-int
+static inline void
+__detach_node_cache_ref(struct hbucket* bucket)
+{
+    if (!bucket->head) {
+        return;
+    }
+
+    bucket->head->pprev = 0;
+}
+
+static int
 __vfs_do_unmount(struct v_mount* mnt)
 {
     int errno = 0;
@@ -67,17 +86,18 @@ __vfs_do_unmount(struct v_mount* mnt)
 
     // detached the inodes from cache, and let lru policy to recycle them
     for (size_t i = 0; i < VFS_HASHTABLE_SIZE; i++) {
-        struct hbucket* bucket = &sb->i_cache[i];
-        if (!bucket->head) {
-            continue;
-        }
-        bucket->head->pprev = 0;
+        __detach_node_cache_ref(&sb->i_cache[i]);
+        __detach_node_cache_ref(&sb->d_cache[i]);
     }
 
-    mnt->mnt_point->mnt = mnt->parent;
+    struct v_dnode *pos, *next;
+    llist_for_each(pos, next, &mnt->mnt_point->children, siblings)
+    {
+        vfs_d_free(pos);
+    }
 
-    vfs_sb_free(sb);
-    __vfs_release_vmnt(mnt);
+    __vfs_detach_vmnt(mnt);
+    vfs_d_assign_vmnt(mnt->mnt_point, mnt->parent);
 
     return errno;
 }
@@ -163,27 +183,30 @@ vfs_mount_fsat(struct filesystem* fs,
     }
 
     int errno = 0;
-    char* dev_name = "sys";
-    char* fsname = HSTR_VAL(fs->fs_name);
+    char* dev_name;
+    char* fsname;
+    struct v_mount *parent_mnt, *vmnt;
+    struct v_superblock *sb;
 
-    struct v_mount* parent_mnt = mnt_point->mnt;
-    struct v_superblock *sb = vfs_sb_alloc(), 
-                        *old_sb = mnt_point->super_block;
+    fsname = HSTR_VAL(fs->fs_name);
+    parent_mnt = mnt_point->mnt;
+    sb = vfs_sb_alloc();
 
-    if (device) {
-        dev_name = device->name_val;
-    }
+    dev_name = device ? device->name_val : "sys";
 
     // prepare v_superblock for fs::mount invoke
     sb->dev = device;
     sb->fs = fs;
     sb->root = mnt_point;
-    vfs_d_assign_sb(mnt_point, sb);
+    
+    vmnt = __vfs_create_mount(parent_mnt, sb);
 
-    if (!(mnt_point->mnt = vfs_create_mount(parent_mnt, mnt_point))) {
+    if (!vmnt) {
         errno = ENOMEM;
         goto cleanup;
     }
+
+    __vfs_attach_vmnt(mnt_point, vmnt);
 
     mnt_point->mnt->flags = options;
     if (!(errno = fs->mount(sb, mnt_point))) {
@@ -193,16 +216,14 @@ vfs_mount_fsat(struct filesystem* fs,
         goto cleanup;
     }
 
-    vfs_sb_free(old_sb);
     return errno;
 
 cleanup:
     ERROR("failed mount: dev=%s, fs=%s, mode=%d, err=%d",
             dev_name, fsname, options, errno);
 
-    vfs_d_assign_sb(mnt_point, old_sb);
-    vfs_sb_free(sb);
-    __vfs_release_vmnt(mnt_point->mnt);
+    __vfs_detach_vmnt(mnt_point->mnt);
+    vfs_d_assign_vmnt(mnt_point, parent_mnt);
 
     mnt_point->mnt = parent_mnt;
 
@@ -248,7 +269,9 @@ int
 vfs_unmount_at(struct v_dnode* mnt_point)
 {
     int errno = 0;
-    struct v_superblock* sb = mnt_point->super_block;
+    struct v_superblock* sb;
+
+    sb = mnt_point->super_block;
     if (!sb) {
         return EINVAL;
     }
@@ -257,15 +280,11 @@ vfs_unmount_at(struct v_dnode* mnt_point)
         return EINVAL;
     }
 
-    if (mnt_point->mnt->busy_counter) {
+    if (mnt_check_busy(mnt_point->mnt)) {
         return EBUSY;
     }
 
-    if (!(errno = __vfs_do_unmount(mnt_point->mnt))) {
-        atomic_fetch_sub(&mnt_point->ref_count, 1);
-    }
-
-    return errno;
+    return __vfs_do_unmount(mnt_point->mnt);
 }
 
 int

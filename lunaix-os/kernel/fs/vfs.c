@@ -64,7 +64,6 @@ static struct cake_pile* superblock_pile;
 static struct cake_pile* fd_pile;
 
 struct v_dnode* vfs_sysroot;
-static struct hbucket* dnode_cache;
 
 struct lru_zone *dnode_lru, *inode_lru;
 
@@ -89,8 +88,6 @@ vfs_init()
     superblock_pile =
       cake_new_pile("sb_cache", sizeof(struct v_superblock), 1, 0);
 
-    dnode_cache = vzalloc(VFS_HASHTABLE_SIZE * sizeof(struct hbucket));
-
     dnode_lru = lru_new_zone("vfs_dnode", __vfs_try_evict_dnode);
     inode_lru = lru_new_zone("vfs_inode", __vfs_try_evict_inode);
 
@@ -100,19 +97,23 @@ vfs_init()
     // 创建一个根dnode。
     vfs_sysroot = vfs_d_alloc(NULL, &vfs_empty);
     vfs_sysroot->parent = vfs_sysroot;
-    atomic_fetch_add(&vfs_sysroot->ref_count, 1);
+    
+    vfs_ref_dnode(vfs_sysroot);
 }
 
 static inline struct hbucket*
 __dcache_hash(struct v_dnode* parent, u32_t* hash)
 {
-    u32_t _hash = *hash;
-    // 确保低位更加随机
+    struct hbucket* d_cache;
+    u32_t _hash;
+    
+    d_cache = parent->super_block->d_cache;
+    _hash = *hash;
     _hash = _hash ^ (_hash >> VFS_HASHBITS);
-    // 与parent的指针值做加法，来减小碰撞的可能性。
     _hash += (u32_t)__ptr(parent);
+
     *hash = _hash;
-    return &dnode_cache[_hash & VFS_HASH_MASK];
+    return &d_cache[_hash & VFS_HASH_MASK];
 }
 
 static inline int
@@ -156,7 +157,7 @@ vfs_dcache_add(struct v_dnode* parent, struct v_dnode* dnode)
 {
     assert(parent);
 
-    atomic_fetch_add(&dnode->ref_count, 1);
+    dnode->ref_count = 1;
     dnode->parent = parent;
     llist_append(&parent->children, &dnode->siblings);
 
@@ -175,7 +176,7 @@ vfs_dcache_remove(struct v_dnode* dnode)
     hlist_delete(&dnode->hash_list);
 
     dnode->parent = NULL;
-    atomic_fetch_sub(&dnode->ref_count, 1);
+    dnode->ref_count = 0;
 }
 
 void
@@ -204,10 +205,10 @@ vfs_open(struct v_dnode* dnode, struct v_file** file)
 
     vfile->dnode = dnode;
     vfile->inode = inode;
-    vfile->ref_count = ATOMIC_VAR_INIT(1);
+    vfile->ref_count = 1;
     vfile->ops = inode->default_fops;
 
-    if (check_file_node(inode) && !inode->pg_cache) {
+    if (check_regfile_node(inode) && !inode->pg_cache) {
         struct pcache* pcache = vzalloc(sizeof(struct pcache));
         pcache_init(pcache);
         pcache->master = inode;
@@ -218,9 +219,8 @@ vfs_open(struct v_dnode* dnode, struct v_file** file)
     if (errno) {
         cake_release(file_pile, vfile);
     } else {
-        atomic_fetch_add(&dnode->ref_count, 1);
+        vfs_ref_dnode(dnode);
         inode->open_count++;
-        mnt_mkbusy(dnode->mnt);
 
         *file = vfile;
     }
@@ -293,8 +293,8 @@ vfs_pclose(struct v_file* file, pid_t pid)
 
     mutex_unlock_for(&inode->lock, pid);
     
-    if (file->ref_count > 1) {
-        atomic_fetch_sub(&file->ref_count, 1);
+    if (vfs_check_duped_file(file)) {
+        vfs_unref_file(file);
         return 0;
     }
 
@@ -302,8 +302,7 @@ vfs_pclose(struct v_file* file, pid_t pid)
         goto done;
     }
 
-    atomic_fetch_sub(&file->dnode->ref_count, 1);
-    mnt_chillax(file->dnode->mnt);
+    vfs_unref_dnode(file->dnode);
     cake_release(file_pile, file);
 
     /*
@@ -383,7 +382,10 @@ vfs_sb_alloc()
     struct v_superblock* sb = cake_grab(superblock_pile);
     memset(sb, 0, sizeof(*sb));
     llist_init_head(&sb->sb_list);
+    
     sb->i_cache = vzalloc(VFS_HASHTABLE_SIZE * sizeof(struct hbucket));
+    sb->d_cache = vzalloc(VFS_HASHTABLE_SIZE * sizeof(struct hbucket));
+
     sb->ref_count = 1;
     return sb;
 }
@@ -395,12 +397,12 @@ vfs_sb_ref(struct v_superblock* sb)
 }
 
 void
-vfs_sb_free(struct v_superblock* sb)
+vfs_sb_unref(struct v_superblock* sb)
 {
     assert(sb->ref_count);
 
     sb->ref_count--;
-    if (sb->ref_count) {
+    if (likely(sb->ref_count)) {
         return;
     }
 
@@ -409,6 +411,8 @@ vfs_sb_free(struct v_superblock* sb)
     }
 
     vfree(sb->i_cache);
+    vfree(sb->d_cache);
+    
     cake_release(superblock_pile, sb);
 }
 
@@ -454,7 +458,6 @@ vfs_d_alloc(struct v_dnode* parent, struct hstr* name)
     llist_init_head(&dnode->aka_list);
     mutex_init(&dnode->lock);
 
-    dnode->ref_count = ATOMIC_VAR_INIT(0);
     dnode->name = HHSTR(vzalloc(VFS_NAME_MAXLEN), 0, 0);
 
     hstrcpy(&dnode->name, name);
@@ -493,7 +496,7 @@ vfs_d_free(struct v_dnode* dnode)
         dnode->destruct(dnode);
     }
 
-    vfs_sb_free(dnode->super_block);
+    vfs_sb_unref(dnode->super_block);
     vfree((void*)dnode->name.value);
     cake_release(dnode_pile, dnode);
 }
@@ -566,7 +569,7 @@ vfs_i_free(struct v_inode* inode)
         inode->destruct(inode);
     }
 
-    vfs_sb_free(inode->sb);
+    vfs_sb_unref(inode->sb);
     hlist_delete(&inode->hash_list);
     cake_release(inode_pile, inode);
 }
@@ -1324,7 +1327,7 @@ vfs_dup_fd(struct v_fd* old, struct v_fd** new)
 
     memcpy(copied, old, sizeof(struct v_fd));
 
-    atomic_fetch_add(&old->file->ref_count, 1);
+    vfs_ref_file(old->file);
 
     *new = copied;
 
@@ -1429,31 +1432,6 @@ __DEFINE_LXSYSCALL2(
 done:
     __floc_try_unlock(&floc);
     return DO_STATUS(errno);
-}
-
-void
-vfs_ref_file(struct v_file* file)
-{
-    atomic_fetch_add(&file->ref_count, 1);
-}
-
-void
-vfs_ref_dnode(struct v_dnode* dnode)
-{
-    atomic_fetch_add(&dnode->ref_count, 1);
-    
-    if (dnode->mnt) {
-        mnt_mkbusy(dnode->mnt);
-    }
-}
-
-void
-vfs_unref_dnode(struct v_dnode* dnode)
-{
-    atomic_fetch_sub(&dnode->ref_count, 1);
-    if (dnode->mnt) {
-        mnt_chillax(dnode->mnt);
-    }
 }
 
 int

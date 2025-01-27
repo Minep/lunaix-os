@@ -14,8 +14,6 @@
 #include <lunaix/spike.h>
 #include <lunaix/bcache.h>
 
-#include <stdatomic.h>
-
 #include <usr/lunaix/fstypes.h>
 
 #define VFS_NAME_MAXLEN 128
@@ -126,6 +124,8 @@ struct v_superblock
     struct filesystem* fs;
     struct blkbuf_cache* blks;
     struct hbucket* i_cache;
+    struct hbucket* d_cache;
+    
     void* data;
     unsigned int ref_count;
     size_t blksize;
@@ -211,7 +211,7 @@ struct v_file
     struct v_dnode* dnode;
     struct llist_header* f_list;
     u32_t f_pos;
-    atomic_ulong ref_count;
+    unsigned long ref_count;
     void* data;
     struct v_file_ops* ops; // for caching
 };
@@ -285,9 +285,11 @@ struct v_dnode
     struct llist_header aka_list;
     struct llist_header children;
     struct llist_header siblings;
+    
     struct v_superblock* super_block;
     struct v_mount* mnt;
-    atomic_ulong ref_count;
+    
+    unsigned long ref_count;
 
     void* data;
 
@@ -430,15 +432,15 @@ struct v_superblock*
 vfs_sb_alloc();
 
 void
-vfs_sb_free(struct v_superblock* sb);
+vfs_sb_unref(struct v_superblock* sb);
 
 void
 vfs_sb_ref(struct v_superblock* sb);
 
 #define vfs_assign_sb(sb_accessor, sb)      \
     ({                                      \
-        if (sb_accessor) {                \
-            vfs_sb_free(sb_accessor);       \
+        if (likely(sb_accessor)) {          \
+            vfs_sb_unref(sb_accessor);       \
         }                                   \
         vfs_sb_ref(((sb_accessor) = (sb))); \
     })
@@ -456,13 +458,27 @@ vfs_d_assign_sb(struct v_dnode* dnode, struct v_superblock* sb)
 }
 
 static inline void
+vfs_d_assign_vmnt(struct v_dnode* dnode, struct v_mount* vmnt)
+{
+    if (dnode->mnt) {
+        assert_msg(dnode->mnt->mnt_point != dnode, 
+                    "vmnt must be detached first");
+    }
+
+    dnode->mnt = vmnt;
+
+    if (likely(vmnt))
+        vfs_d_assign_sb(dnode, vmnt->super_block);
+}
+
+static inline void
 vfs_vmnt_assign_sb(struct v_mount* vmnt, struct v_superblock* sb)
 {
     vfs_assign_sb(vmnt->super_block, sb);
 }
 
 struct v_dnode*
-vfs_d_alloc();
+vfs_d_alloc(struct v_dnode* parent, struct hstr* name);
 
 void
 vfs_d_free(struct v_dnode* dnode);
@@ -487,15 +503,6 @@ vfs_getfd(int fd, struct v_fd** fd_s);
 
 int
 vfs_get_dtype(int itype);
-
-void
-vfs_ref_dnode(struct v_dnode* dnode);
-
-void
-vfs_ref_file(struct v_file* file);
-
-void
-vfs_unref_dnode(struct v_dnode* dnode);
 
 int
 vfs_get_path(struct v_dnode* dnode, char* buf, size_t size, int depth);
@@ -540,8 +547,49 @@ mnt_chillax(struct v_mount* mnt);
 int
 vfs_mount_root(const char* fs_name, struct device* device);
 
-struct v_mount*
-vfs_create_mount(struct v_mount* parent, struct v_dnode* mnt_point);
+static inline bool
+mnt_check_busy(struct v_mount* mnt)
+{
+    return mnt->busy_counter > 1;
+}
+
+static inline void
+vfs_ref_dnode(struct v_dnode* dnode)
+{
+    dnode->ref_count++;
+    
+    if (likely(dnode->mnt)) {
+        mnt_mkbusy(dnode->mnt);
+    }
+}
+
+static inline void
+vfs_unref_dnode(struct v_dnode* dnode)
+{
+    dnode->ref_count--;
+
+    if (likely(dnode->mnt)) {
+        mnt_chillax(dnode->mnt);
+    }
+}
+
+static inline void
+vfs_ref_file(struct v_file* file)
+{
+    file->ref_count++;
+}
+
+static inline void
+vfs_unref_file(struct v_file* file)
+{
+    file->ref_count--;
+}
+
+static inline bool
+vfs_check_duped_file(struct v_file* file)
+{
+    return file->ref_count > 1;
+}
 
 int
 vfs_check_writable(struct v_dnode* dnode);
