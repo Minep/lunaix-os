@@ -15,8 +15,8 @@ static void
 __vfs_attach_vmnt(struct v_dnode* mnt_point, struct v_mount* vmnt)
 {
     vmnt->mnt_point = mnt_point;
-    atomic_fetch_add(&mnt_point->ref_count, 1);
     vfs_d_assign_vmnt(mnt_point, vmnt);
+    vfs_ref_dnode(mnt_point);
 }
 
 static struct v_mount*
@@ -50,6 +50,9 @@ __vfs_detach_vmnt(struct v_mount* mnt)
 {
     assert(llist_empty(&mnt->submnts));
 
+    vfs_unref_dnode(mnt->mnt_point);
+    assert(!mnt->busy_counter);
+
     if (mnt->parent) {
         mnt_chillax(mnt->parent);
     }
@@ -58,7 +61,6 @@ __vfs_detach_vmnt(struct v_mount* mnt)
 
     llist_delete(&mnt->sibmnts);
     llist_delete(&mnt->list);
-    atomic_fetch_sub(&mnt->mnt_point->ref_count, 1);
     vfree(mnt);
 }
 
@@ -86,6 +88,12 @@ __vfs_do_unmount(struct v_mount* mnt)
     for (size_t i = 0; i < VFS_HASHTABLE_SIZE; i++) {
         __detach_node_cache_ref(&sb->i_cache[i]);
         __detach_node_cache_ref(&sb->d_cache[i]);
+    }
+
+    struct v_dnode *pos, *next;
+    llist_for_each(pos, next, &mnt->mnt_point->children, siblings)
+    {
+        vfs_d_free(pos);
     }
 
     __vfs_detach_vmnt(mnt);
@@ -261,7 +269,9 @@ int
 vfs_unmount_at(struct v_dnode* mnt_point)
 {
     int errno = 0;
-    struct v_superblock* sb = mnt_point->super_block;
+    struct v_superblock* sb;
+
+    sb = mnt_point->super_block;
     if (!sb) {
         return EINVAL;
     }
@@ -270,15 +280,11 @@ vfs_unmount_at(struct v_dnode* mnt_point)
         return EINVAL;
     }
 
-    if (mnt_point->mnt->busy_counter) {
+    if (mnt_check_busy(mnt_point->mnt)) {
         return EBUSY;
     }
 
-    if (!(errno = __vfs_do_unmount(mnt_point->mnt))) {
-        atomic_fetch_sub(&mnt_point->ref_count, 1);
-    }
-
-    return errno;
+    return __vfs_do_unmount(mnt_point->mnt);
 }
 
 int

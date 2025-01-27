@@ -97,7 +97,8 @@ vfs_init()
     // 创建一个根dnode。
     vfs_sysroot = vfs_d_alloc(NULL, &vfs_empty);
     vfs_sysroot->parent = vfs_sysroot;
-    atomic_fetch_add(&vfs_sysroot->ref_count, 1);
+    
+    vfs_ref_dnode(vfs_sysroot);
 }
 
 static inline struct hbucket*
@@ -156,7 +157,7 @@ vfs_dcache_add(struct v_dnode* parent, struct v_dnode* dnode)
 {
     assert(parent);
 
-    atomic_fetch_add(&dnode->ref_count, 1);
+    dnode->ref_count = 1;
     dnode->parent = parent;
     llist_append(&parent->children, &dnode->siblings);
 
@@ -175,7 +176,7 @@ vfs_dcache_remove(struct v_dnode* dnode)
     hlist_delete(&dnode->hash_list);
 
     dnode->parent = NULL;
-    atomic_fetch_sub(&dnode->ref_count, 1);
+    dnode->ref_count = 0;
 }
 
 void
@@ -204,7 +205,7 @@ vfs_open(struct v_dnode* dnode, struct v_file** file)
 
     vfile->dnode = dnode;
     vfile->inode = inode;
-    vfile->ref_count = ATOMIC_VAR_INIT(1);
+    vfile->ref_count = 1;
     vfile->ops = inode->default_fops;
 
     if (check_regfile_node(inode) && !inode->pg_cache) {
@@ -218,9 +219,8 @@ vfs_open(struct v_dnode* dnode, struct v_file** file)
     if (errno) {
         cake_release(file_pile, vfile);
     } else {
-        atomic_fetch_add(&dnode->ref_count, 1);
+        vfs_ref_dnode(dnode);
         inode->open_count++;
-        mnt_mkbusy(dnode->mnt);
 
         *file = vfile;
     }
@@ -293,8 +293,8 @@ vfs_pclose(struct v_file* file, pid_t pid)
 
     mutex_unlock_for(&inode->lock, pid);
     
-    if (file->ref_count > 1) {
-        atomic_fetch_sub(&file->ref_count, 1);
+    if (vfs_check_duped_file(file)) {
+        vfs_unref_file(file);
         return 0;
     }
 
@@ -302,8 +302,7 @@ vfs_pclose(struct v_file* file, pid_t pid)
         goto done;
     }
 
-    atomic_fetch_sub(&file->dnode->ref_count, 1);
-    mnt_chillax(file->dnode->mnt);
+    vfs_unref_dnode(file->dnode);
     cake_release(file_pile, file);
 
     /*
@@ -459,7 +458,6 @@ vfs_d_alloc(struct v_dnode* parent, struct hstr* name)
     llist_init_head(&dnode->aka_list);
     mutex_init(&dnode->lock);
 
-    dnode->ref_count = ATOMIC_VAR_INIT(0);
     dnode->name = HHSTR(vzalloc(VFS_NAME_MAXLEN), 0, 0);
 
     hstrcpy(&dnode->name, name);
@@ -1329,7 +1327,7 @@ vfs_dup_fd(struct v_fd* old, struct v_fd** new)
 
     memcpy(copied, old, sizeof(struct v_fd));
 
-    atomic_fetch_add(&old->file->ref_count, 1);
+    vfs_ref_file(old->file);
 
     *new = copied;
 
@@ -1434,31 +1432,6 @@ __DEFINE_LXSYSCALL2(
 done:
     __floc_try_unlock(&floc);
     return DO_STATUS(errno);
-}
-
-void
-vfs_ref_file(struct v_file* file)
-{
-    atomic_fetch_add(&file->ref_count, 1);
-}
-
-void
-vfs_ref_dnode(struct v_dnode* dnode)
-{
-    atomic_fetch_add(&dnode->ref_count, 1);
-    
-    if (dnode->mnt) {
-        mnt_mkbusy(dnode->mnt);
-    }
-}
-
-void
-vfs_unref_dnode(struct v_dnode* dnode)
-{
-    atomic_fetch_sub(&dnode->ref_count, 1);
-    if (dnode->mnt) {
-        mnt_chillax(dnode->mnt);
-    }
 }
 
 int

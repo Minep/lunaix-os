@@ -14,8 +14,6 @@
 #include <lunaix/spike.h>
 #include <lunaix/bcache.h>
 
-#include <stdatomic.h>
-
 #include <usr/lunaix/fstypes.h>
 
 #define VFS_NAME_MAXLEN 128
@@ -213,7 +211,7 @@ struct v_file
     struct v_dnode* dnode;
     struct llist_header* f_list;
     u32_t f_pos;
-    atomic_ulong ref_count;
+    unsigned long ref_count;
     void* data;
     struct v_file_ops* ops; // for caching
 };
@@ -291,7 +289,7 @@ struct v_dnode
     struct v_superblock* super_block;
     struct v_mount* mnt;
     
-    atomic_ulong ref_count;
+    unsigned long ref_count;
 
     void* data;
 
@@ -468,7 +466,7 @@ vfs_d_assign_vmnt(struct v_dnode* dnode, struct v_mount* vmnt)
     }
 
     dnode->mnt = vmnt;
-    
+
     if (likely(vmnt))
         vfs_d_assign_sb(dnode, vmnt->super_block);
 }
@@ -505,15 +503,6 @@ vfs_getfd(int fd, struct v_fd** fd_s);
 
 int
 vfs_get_dtype(int itype);
-
-void
-vfs_ref_dnode(struct v_dnode* dnode);
-
-void
-vfs_ref_file(struct v_file* file);
-
-void
-vfs_unref_dnode(struct v_dnode* dnode);
 
 int
 vfs_get_path(struct v_dnode* dnode, char* buf, size_t size, int depth);
@@ -557,6 +546,50 @@ mnt_chillax(struct v_mount* mnt);
 
 int
 vfs_mount_root(const char* fs_name, struct device* device);
+
+static inline bool
+mnt_check_busy(struct v_mount* mnt)
+{
+    return mnt->busy_counter > 1;
+}
+
+static inline void
+vfs_ref_dnode(struct v_dnode* dnode)
+{
+    dnode->ref_count++;
+    
+    if (likely(dnode->mnt)) {
+        mnt_mkbusy(dnode->mnt);
+    }
+}
+
+static inline void
+vfs_unref_dnode(struct v_dnode* dnode)
+{
+    dnode->ref_count--;
+
+    if (likely(dnode->mnt)) {
+        mnt_chillax(dnode->mnt);
+    }
+}
+
+static inline void
+vfs_ref_file(struct v_file* file)
+{
+    file->ref_count++;
+}
+
+static inline void
+vfs_unref_file(struct v_file* file)
+{
+    file->ref_count--;
+}
+
+static inline bool
+vfs_check_duped_file(struct v_file* file)
+{
+    return file->ref_count > 1;
+}
 
 int
 vfs_check_writable(struct v_dnode* dnode);
