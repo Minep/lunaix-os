@@ -446,7 +446,7 @@ commit_process(struct proc_info* process)
         assert(!proc_terminated(process->parent));
     }
 
-    if (sched_ctx.proc_list) {
+    if (likely(sched_ctx.proc_list)) {
         llist_append(sched_ctx.proc_list, &process->tasks);
     } else {
         sched_ctx.proc_list = &process->tasks;

@@ -8,16 +8,36 @@
 
 extern struct v_file_ops twimap_file_ops;
 
+struct twimap;
+struct twimap_ops
+{
+    void (*read)(struct twimap* mapping);
+    int (*go_next)(struct twimap* mapping);
+    void (*reset)(struct twimap* mapping);
+};
+
 struct twimap
 {
     void* index;
     void* buffer;
     void* data;
     size_t size_acc;
-    void (*read)(struct twimap* mapping);
-    int (*go_next)(struct twimap* mapping);
-    void (*reset)(struct twimap* mapping);
+
+    union {
+        struct {
+            void (*read)(struct twimap* mapping);
+            int (*go_next)(struct twimap* mapping);
+            void (*reset)(struct twimap* mapping);
+        };
+        struct twimap_ops ops;
+    };
 };
+
+void
+__twimap_default_reset(struct twimap* map);
+
+int
+__twimap_default_gonext(struct twimap* map);
 
 int
 twimap_read(struct twimap* map, void* buffer, size_t len, size_t fpos);

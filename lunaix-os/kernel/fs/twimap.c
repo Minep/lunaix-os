@@ -68,12 +68,16 @@ twimap_read(struct twimap* map, void* buffer, size_t len, size_t fpos)
     size_t acc_size = MIN(len, map->size_acc - (pos - fpos)), rdlen = acc_size;
     memcpy(buffer, map->buffer + (pos - fpos), acc_size);
 
-    while (acc_size < len && map->go_next(map)) {
+    while (acc_size < len) {
         map->size_acc = 0;
         map->read(map);
         rdlen = MIN(len - acc_size, map->size_acc);
         memcpy(buffer + acc_size, map->buffer, rdlen);
         acc_size += rdlen;
+
+        if (!map->go_next(map)) {
+            break;
+        }
     }
 
     if (acc_size <= len - 1) {

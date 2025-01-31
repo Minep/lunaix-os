@@ -298,4 +298,16 @@ fsapi_fs_finalise(struct filesystem* fs)
     fsm_register(fs);
 }
 
+static inline bool
+fsapi_check_readdir_pos_pseduo(struct v_file* file)
+{
+    return file->f_pos < 2;
+}
+
+static inline bool
+fsapi_readdir_pos_entries_at(struct v_file* file, unsigned int pos)
+{
+    return file->f_pos == pos + 2;
+}
+
 #endif /* __LUNAIX_FSAPI_H */

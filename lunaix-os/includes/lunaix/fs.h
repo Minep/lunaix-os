@@ -358,6 +358,12 @@ fsm_itend(struct fs_iter* iterator)
     iterator->fs = NULL;
 }
 
+static inline bool
+fsm_check_pseudo_fs(struct filesystem* fs)
+{
+    return !!(fs->types & FSTYPE_PSEUDO);
+}
+
 void
 vfs_init();
 

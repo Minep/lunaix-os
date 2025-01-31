@@ -558,6 +558,8 @@ vfs_i_alloc(struct v_superblock* sb)
 void
 vfs_i_free(struct v_inode* inode)
 {
+    assert(inode->link_count == 0);
+    
     if (inode->pg_cache) {
         pcache_release(inode->pg_cache);
         vfree(inode->pg_cache);
@@ -791,8 +793,12 @@ __vfs_readdir_callback(struct dir_context* dctx,
                        const int dtype)
 {
     struct lx_dirent* dent = (struct lx_dirent*)dctx->cb_data;
-    strncpy(dent->d_name, name, MIN(len, DIRENT_NAME_MAX_LEN));
-    dent->d_nlen = len;
+    int len_ = MIN(len, DIRENT_NAME_MAX_LEN - 1);
+
+    strncpy(dent->d_name, name, len_);
+    dent->d_name[len_] = 0;
+
+    dent->d_nlen = len_;
     dent->d_type = dtype;
 }
 
@@ -832,6 +838,17 @@ done:
     return DO_STATUS_OR_RETURN(errno);
 }
 
+static inline bool
+check_pcache_eligibility(struct v_fd* fd_s)
+{
+    struct v_inode* inode;
+
+    inode = fd_s->file->inode;
+    return !check_seqdev_node(inode) \
+        && !fsm_check_pseudo_fs(inode->sb->fs) \
+        && !(fd_s->flags & FO_DIRECT);
+}
+
 __DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
 {
     int errno = 0;
@@ -850,7 +867,7 @@ __DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
 
     file->inode->atime = clock_unixtime();
 
-    if (check_seqdev_node(file->inode) || (fd_s->flags & FO_DIRECT)) {
+    if (!check_pcache_eligibility(fd_s)) {
         errno = file->ops->read(file->inode, buf, count, file->f_pos);
     } else {
         errno = pcache_read(file->inode, buf, count, file->f_pos);
@@ -896,7 +913,7 @@ __DEFINE_LXSYSCALL3(int, write, int, fd, void*, buf, size_t, count)
         file->f_pos = inode->fsize;
     }
 
-    if (check_seqdev_node(inode) || (fd_s->flags & FO_DIRECT)) {
+    if (!check_pcache_eligibility(fd_s)) {
         errno = file->ops->write(inode, buf, count, file->f_pos);
     } else {
         errno = pcache_write(inode, buf, count, file->f_pos);
@@ -993,6 +1010,8 @@ vfs_get_path(struct v_dnode* dnode, char* buf, size_t size, int depth)
 
     size_t cpy_size = MIN(dnode->name.len, size - len);
     strncpy(buf + len, dnode->name.value, cpy_size);
+    buf[len + cpy_size] = 0;
+
     len += cpy_size;
 
     return len;
@@ -1453,9 +1472,9 @@ vfs_do_chdir(struct proc_info* proc, struct v_dnode* dnode)
     vfs_ref_dnode(dnode);
     proc->cwd = dnode;
 
+done:
     unlock_dnode(dnode);
 
-done:
     return errno;
 }
 

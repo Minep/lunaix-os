@@ -27,18 +27,13 @@ strcpy(char* dest, const char* src)
 char* _weak
 strncpy(char* dest, const char* src, unsigned long n)
 {
-    char c;
+    char c = '\0';
     unsigned int i = 0;
-    while (i <= n && (c = src[i]))
+    while (i < n && (c = src[i]))
         dest[i++] = c;
 
-    if (!(n < i && src[i - 1])) {
-        while (i <= n)
-            dest[i++] = 0;
-    }
-    else {
-        dest[i - 1] = 0;
-    }
+    while (i < n)
+        dest[i++] = 0;
     
     return dest;
 }

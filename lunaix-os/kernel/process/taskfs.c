@@ -13,16 +13,24 @@
 #define COUNTER_MASK ((1 << 16) - 1)
 
 static struct hbucket* attr_export_table;
-static DEFINE_LLIST(attributes);
+static DEFINE_LIST(attributes);
 static volatile int ino_cnt = 1;
 
-int
+extern struct scheduler sched_ctx;
+
+static void
+__destruct_inode(struct v_inode* inode)
+{
+    vfree_safe(inode->data);
+}
+
+static int
 taskfs_next_counter()
 {
     return (ino_cnt = ((ino_cnt + 1) & COUNTER_MASK) + 1);
 }
 
-inode_t
+static inode_t
 taskfs_inode_id(pid_t pid, int sub_counter)
 {
     return ((pid & (MAX_PROCESS - 1)) << 16) | (sub_counter & COUNTER_MASK);
@@ -39,12 +47,55 @@ taskfs_mknod(struct v_dnode* dnode, pid_t pid, int sub_counter, int itype)
         if (!(inode = vfs_i_alloc(vsb))) {
             return ENOMEM;
         }
+
         inode->id = ino;
         inode->itype = itype;
+        inode->destruct = __destruct_inode;
         vfs_i_addhash(inode);
     }
 
     vfs_assign_inode(dnode, inode);
+    return 0;
+}
+
+static inline int
+__report_task_entries(struct v_file* file, struct dir_context* dctx)
+{
+    unsigned int counter = 0;
+    char name[VFS_NAME_MAXLEN];
+    struct proc_info *pos, *n;
+
+    llist_for_each(pos, n, sched_ctx.proc_list, tasks)
+    {
+        if (!fsapi_readdir_pos_entries_at(file, counter)) {
+            counter++;
+            continue;
+        }
+
+        ksnprintf(name, VFS_NAME_MAXLEN, "%d", pos->pid);
+        dctx->read_complete_callback(dctx, name, VFS_NAME_MAXLEN, DT_DIR);
+        return 1;
+    }
+
+    return 0;
+}
+
+static inline int
+__report_task_attributes(struct v_file* file, struct dir_context* dctx)
+{
+    unsigned int counter = 0;
+    struct task_attribute *pos, *n;
+
+    list_for_each(pos, n, attributes.first, siblings)
+    {
+        if (fsapi_readdir_pos_entries_at(file, counter)) {
+            dctx->read_complete_callback(
+                dctx, HSTR_VAL(pos->key), VFS_NAME_MAXLEN, DT_FILE);
+            return 1;
+        }
+        counter++;
+    }
+
     return 0;
 }
 
@@ -64,35 +115,14 @@ taskfs_readdir(struct v_file* file, struct dir_context* dctx)
     }
 
     if (pid) {
-        struct task_attribute *pos, *n;
-        llist_for_each(pos, n, &attributes, siblings)
-        {
-            if (counter == file->f_pos) {
-                dctx->read_complete_callback(
-                  dctx, pos->key_val, VFS_NAME_MAXLEN, DT_FILE);
-                return 1;
-            }
-            counter++;
-        }
-        return 0;
+        return __report_task_attributes(file, dctx);
     }
 
-    char name[VFS_NAME_MAXLEN];
-    struct proc_info *root = get_process(pid), *pos, *n;
-    llist_for_each(pos, n, &root->tasks, tasks)
-    {
-        if (counter == file->f_pos) {
-            ksnprintf(name, VFS_NAME_MAXLEN, "%d", pos->pid);
-            dctx->read_complete_callback(dctx, name, VFS_NAME_MAXLEN, DT_DIR);
-            return 1;
-        }
-        counter++;
-    }
-    return 0;
+    return __report_task_entries(file, dctx);
 }
 
 // ascii to pid
-pid_t
+static inline pid_t
 taskfs_atop(const char* str)
 {
     pid_t t = 0;
@@ -107,50 +137,76 @@ taskfs_atop(const char* str)
     return t;
 }
 
+static inline int
+__init_task_inode(pid_t pid, struct v_dnode* dnode)
+{
+    struct twimap* map;
+    struct proc_info* proc;
+    struct task_attribute* tattr;
+    
+    tattr = taskfs_get_attr(&dnode->name);
+    if (!tattr || !(proc = get_process(pid)))
+        return ENOENT;
+
+    map = twimap_create(proc);
+    map->ops = tattr->ops;
+
+    dnode->inode->data = map;
+    dnode->inode->default_fops = &twimap_file_ops;
+    
+    return 0;
+}
+
+static int
+__lookup_attribute(pid_t pid, struct v_dnode* dnode)
+{
+    int errno;    
+
+    errno = taskfs_mknod(dnode, pid, taskfs_next_counter(), VFS_IFFILE);
+    if (errno) {
+        return errno;
+    }
+
+    return __init_task_inode(pid, dnode);
+}
+
 int
 taskfs_dirlookup(struct v_inode* this, struct v_dnode* dnode)
 {
     pid_t pid = this->id >> 16;
-    struct proc_info* proc;
 
     if (pid) {
-        struct task_attribute* tattr = taskfs_get_attr(&dnode->name);
-        if (!tattr || !(proc = get_process(pid)))
-            return ENOENT;
-
-        int errno =
-          taskfs_mknod(dnode, pid, taskfs_next_counter(), VFS_IFSEQDEV);
-        if (!errno) {
-            tattr->map_file->data = proc;
-            dnode->inode->data = tattr->map_file;
-            dnode->inode->default_fops = &twimap_file_ops;
-        }
-        return errno;
+        return __lookup_attribute(pid, dnode);
     }
 
     pid = taskfs_atop(dnode->name.value);
 
-    if (pid <= 0 || !(proc = get_process(pid))) {
+    if (pid <= 0) {
         return ENOENT;
     }
 
-    return taskfs_mknod(dnode, pid, 0, F_DIR);
+    return taskfs_mknod(dnode, pid, 0, VFS_IFDIR);
 }
 
-static struct v_file_ops taskfs_file_ops = { .close = default_file_close,
-                                             .read = default_file_read,
-                                             .read_page =
-                                               default_file_read_page,
-                                             .write = default_file_write,
-                                             .write_page =
-                                               default_file_write_page,
-                                             .readdir = taskfs_readdir,
-                                             .seek = default_file_seek };
-static struct v_inode_ops taskfs_inode_ops = { .dir_lookup = taskfs_dirlookup,
-                                               .open = default_inode_open,
-                                               .mkdir = default_inode_mkdir,
-                                               .rmdir = default_inode_rmdir,
-                                               .rename = default_inode_rename };
+static struct v_file_ops taskfs_file_ops = { 
+    .close =        default_file_close,
+    .read =         default_file_read,
+    .read_page =    default_file_read_page,
+    .write =        default_file_write,
+    .write_page =   default_file_write_page,
+    .readdir =      taskfs_readdir,
+    .seek =         default_file_seek 
+};
+
+static struct v_inode_ops taskfs_inode_ops = { 
+    .dir_lookup =   taskfs_dirlookup,
+    .open =         default_inode_open,
+    .mkdir =        default_inode_mkdir,
+    .rmdir =        default_inode_rmdir,
+    .rename =       default_inode_rename 
+};
+
+static volatile struct v_superblock* taskfs_sb;
 
 void
 taskfs_init_inode(struct v_superblock* vsb, struct v_inode* inode)
@@ -158,8 +214,6 @@ taskfs_init_inode(struct v_superblock* vsb, struct v_inode* inode)
     inode->default_fops = &taskfs_file_ops;
     inode->ops = &taskfs_inode_ops;
 }
-
-static volatile struct v_superblock* taskfs_sb;
 
 int
 taskfs_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
@@ -180,8 +234,9 @@ void
 taskfs_invalidate(pid_t pid)
 {
     struct v_dnode *pos, *n;
-    struct v_inode* inode = vfs_i_find(taskfs_sb, taskfs_inode_id(pid, 0));
+    struct v_inode* inode;
 
+    inode = vfs_i_find(taskfs_sb, taskfs_inode_id(pid, 0));
     if (!inode)
         return;
 
@@ -192,23 +247,33 @@ taskfs_invalidate(pid_t pid)
         }
         vfs_d_free(pos);
     }
+
+    if (!inode->link_count) {
+        vfs_i_free(inode);
+    }
 }
 
 #define ATTR_TABLE_LEN 16
+#define ATTR_KEY_LEN 32
 
 void
-taskfs_export_attr(const char* key, struct twimap* attr_map_file)
+taskfs_export_attr_mapping(const char* key, struct twimap_ops ops)
 {
-    struct task_attribute* tattr = valloc(sizeof(*tattr));
+    char* key_val;
+    struct hbucket* slot;
+    struct task_attribute* tattr;
+    
+    tattr = valloc(sizeof(*tattr));
+    key_val = valloc(ATTR_KEY_LEN);
 
-    tattr->map_file = attr_map_file;
-    tattr->key = HSTR(tattr->key_val, 0);
-    strncpy(tattr->key_val, key, 32);
+    tattr->ops = ops;
+    tattr->key = HSTR(key_val, 0);
+    strncpy(key_val, key, ATTR_KEY_LEN);
     hstr_rehash(&tattr->key, HSTR_FULL_HASH);
 
-    struct hbucket* slot = &attr_export_table[tattr->key.hash % ATTR_TABLE_LEN];
+    slot = &attr_export_table[tattr->key.hash % ATTR_TABLE_LEN];
     hlist_add(&slot->head, &tattr->attrs);
-    llist_append(&attributes, &tattr->siblings);
+    list_add(&attributes, &tattr->siblings);
 }
 
 struct task_attribute*
