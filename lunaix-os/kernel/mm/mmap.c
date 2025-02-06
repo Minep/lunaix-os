@@ -349,9 +349,7 @@ mem_unmap_region(ptr_t mnt, struct mm_region* region)
     pfn_t pglen = leaf_count(region->end - region->start);
     mem_sync_pages(mnt, region, region->start, pglen * PAGE_SIZE, 0);
 
-    pte_t* ptep = mkptep_va(mnt, region->start);
-    __remove_ranged_mappings(ptep, pglen);
-
+    procvm_prune_vmr(mnt, region);
     tlb_flush_vmr_all(region);
     
     llist_delete(&region->head);

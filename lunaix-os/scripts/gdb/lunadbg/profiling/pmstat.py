@@ -4,6 +4,9 @@ from ..structs.pmem import PMem
 from ..pp import MyPrettyPrinter
 import math
 
+ENTER_CONTIG = 0
+LEAVE_CONTIG = 1
+
 class PhysicalMemProfile:
     def __init__(self) -> None:
         super().__init__()
@@ -22,18 +25,29 @@ class PhysicalMemProfile:
         remainder = self.max_mem_pg % self.__mem_distr_granule
         bucket = 0
         non_contig = 0
-        last_contig = False
+        contig_state = LEAVE_CONTIG
+        new_state = LEAVE_CONTIG
 
-        for i in range(self.max_mem_pg):
+        i = 0
+        while i < self.max_mem_pg:
             element = PageStruct(pplist[i].address)
-            bucket += int(element.busy())
-            if last_contig:
-                last_contig = element.busy()
-                non_contig += int(not last_contig)
-            else:
-                last_contig = element.busy()
 
-            if (i + 1) % page_per_granule == 0:
+            nr_pgs = 1
+            if element.lead_page():
+                nr_pgs = 1 << element.order
+                if element.busy():
+                    bucket += nr_pgs
+                    new_state = ENTER_CONTIG
+                else:
+                    new_state = LEAVE_CONTIG
+            
+            i += nr_pgs
+
+            if contig_state != new_state:
+                non_contig += int(new_state == LEAVE_CONTIG)
+                contig_state = new_state
+
+            if i % page_per_granule == 0:
                 self.mem_distr.append(bucket)
                 bucket = 0
         

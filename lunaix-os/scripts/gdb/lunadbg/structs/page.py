@@ -9,6 +9,7 @@ class PageStruct(KernelStruct):
         self.flags = self._kstruct["flags"]
         self.order = self._kstruct["order"]
         self.pool = self._kstruct["pool"]
+        self.companion = self._kstruct["companion"]
 
     def uninitialized(self):
         return not (self.flags & 0b10)
@@ -20,7 +21,11 @@ class PageStruct(KernelStruct):
     
     def busy(self):
         return (not self.uninitialized()
+                and self.type != 0b1000
                 and self.ref > 0)
+
+    def lead_page(self):
+        return self.companion == 0 and not self.uninitialized()
 
     @staticmethod
     def get_type() -> Type:

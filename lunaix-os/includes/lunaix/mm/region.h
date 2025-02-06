@@ -41,6 +41,16 @@ writable_region(struct mm_region* mm) {
 }
 
 static inline bool
+readable_region(struct mm_region* mm) {
+    return !!(mm->attr & (REGION_RSHARED | REGION_READ));
+}
+
+static inline bool
+executable_region(struct mm_region* mm) {
+    return !!(mm->attr & REGION_EXEC);
+}
+
+static inline bool
 shared_writable_region(struct mm_region* mm) {
     return !!(mm->attr & REGION_WSHARED);
 }

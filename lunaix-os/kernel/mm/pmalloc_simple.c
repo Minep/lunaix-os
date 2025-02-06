@@ -127,6 +127,7 @@ pmm_looknext(struct pmem_pool* pool, size_t order)
         page->order = order;
         page->companion = i;
         page->pool = pool->type;
+        page->refs = 0;
         llist_init_head(&page->sibs);
         __set_page_initialized(page);
     }

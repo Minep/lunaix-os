@@ -4,10 +4,24 @@
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/mmap.h>
 #include <lunaix/process.h>
+#include <lunaix/syslog.h>
 
 #include <asm/mm_defs.h>
 
 #include <klibc/string.h>
+
+#define alloc_pagetable_trace(ptep, pte, ord, level)                        \
+    ({                                                                      \
+        alloc_kpage_at(ptep, pte, ord);                                     \
+    })
+
+#define free_pagetable_trace(ptep, pte, level)                              \
+    ({                                                                      \
+        struct leaflet* leaflet = pte_leaflet_aligned(pte);                 \
+        assert(leaflet_order(leaflet) == 0);                                \
+        leaflet_return(leaflet);                                            \
+        set_pte(ptep, null_pte);                                            \
+    })
 
 struct proc_mm*
 procvm_create(struct proc_info* proc) {
@@ -46,13 +60,41 @@ __descend(ptr_t dest_mnt, ptr_t src_mnt, ptr_t va, bool alloc)
         }
 
         if (alloc && pte_isnull(pte_at(dest))) {
-            alloc_kpage_at(dest, pte, 0);
+            alloc_pagetable_trace(dest, pte, 0, i);
         }
 
         i++;
     }
 
     return i;
+}
+
+static void
+__free_hierarchy(ptr_t mnt, ptr_t va, int level)
+{
+    pte_t pte, *ptep, *ptep_next;
+
+    if (pt_last_level(level)) {
+        return;
+    }
+
+    __free_hierarchy(mnt, va, level + 1);
+
+    ptep = mklntep_va(level, mnt, va);
+    pte = pte_at(ptep);
+    if (pte_isnull(pte)) {
+        return;
+    }
+
+    ptep_next = ptep_step_into(ptep);
+    for (unsigned i = 0; i < LEVEL_SIZE; i++, ptep_next++)
+    {
+        if (!pte_isnull(pte_at(ptep_next))) {
+            return;
+        }
+    }
+    
+    free_pagetable_trace(ptep, pte, level);
 }
 
 static inline void
@@ -77,7 +119,7 @@ copy_leaf(pte_t* dest, pte_t* src, pte_t pte, int level)
 static inline void
 copy_root(pte_t* dest, pte_t* src, pte_t pte, int level)
 {
-    alloc_kpage_at(dest, pte, 0);
+    alloc_pagetable_trace(dest, pte, 0, level);
 }
 
 static void
@@ -131,6 +173,12 @@ vmrcpy(ptr_t dest_mnt, ptr_t src_mnt, struct mm_region* region)
     }
 }
 
+static inline void
+vmrfree_hierachy(ptr_t vm_mnt, struct mm_region* region)
+{
+    __free_hierarchy(vm_mnt, region->start, 0);
+}
+
 static void
 vmrfree(ptr_t vm_mnt, struct mm_region* region)
 {
@@ -143,7 +191,7 @@ vmrfree(ptr_t vm_mnt, struct mm_region* region)
     src  = mkptep_va(vm_mnt, region->start);
     end  = mkptep_va(vm_mnt, region->end);
 
-    level = __descend(0, vm_mnt, loc, false);
+    level = __descend(vm_mnt, vm_mnt, loc, false);
 
     while (src < end)
     {
@@ -161,6 +209,8 @@ vmrfree(ptr_t vm_mnt, struct mm_region* region)
             continue;
         }
 
+        set_pte(src, null_pte);
+        
         if (pte_isloaded(pte)) {
             leaflet = pte_leaflet_aligned(pte);
             leaflet_return(leaflet);
@@ -171,10 +221,7 @@ vmrfree(ptr_t vm_mnt, struct mm_region* region)
     cont:
         while (ptep_vfn(src) == MAX_PTEN - 1) {
             src = ptep_step_out(src);
-            leaflet = pte_leaflet_aligned(pte_at(src));
-            
-            assert(leaflet_order(leaflet) == 0);
-            leaflet_return(leaflet);
+            free_pagetable_trace(src, pte_at(src), level);
             
             level--;
         }
@@ -232,7 +279,7 @@ vmscpy(struct proc_mm* dest_mm, struct proc_mm* src_mm)
     pte_t* ptep_smx     = mkl1tep_va(VMS_SELF, dest_mnt);
     pte_t  pte_sms      = mkpte_prot(KERNEL_PGTAB);
 
-    pte_sms = alloc_kpage_at(ptep_ssm, pte_sms, 0);
+    pte_sms = alloc_pagetable_trace(ptep_ssm, pte_sms, 0, 0);
     set_pte(&ptep_smx[VMS_SELF_L0TI], pte_sms);
     
     tlb_flush_kernel((ptr_t)dest_mnt);
@@ -259,22 +306,28 @@ static void
 vmsfree(struct proc_mm* mm)
 {
     struct leaflet* leaflet;
+    struct mm_region *pos, *n;
     ptr_t vm_mnt;
     pte_t* ptep_self;
     
     vm_mnt    = mm->vm_mnt;
     ptep_self = mkl0tep(mkptep_va(vm_mnt, VMS_SELF));
 
-    struct mm_region *pos, *n;
+    // first pass: free region mappings
     llist_for_each(pos, n, &mm->regions, head)
     {
         vmrfree(vm_mnt, pos);
     }
 
+    // second pass: free the hierarchical 
+    llist_for_each(pos, n, &mm->regions, head)
+    {
+        vmrfree_hierachy(vm_mnt, pos);
+    }
+
     procvm_unlink_kernel();
 
-    leaflet = pte_leaflet_aligned(pte_at(ptep_self));
-    leaflet_return(leaflet);
+    free_pagetable_trace(ptep_self, pte_at(ptep_self), 0);
 }
 
 static inline void
@@ -297,6 +350,12 @@ __detach_from_current_vms(struct proc_mm* guest_mm)
     }
 }
 
+void
+procvm_prune_vmr(ptr_t vm_mnt, struct mm_region* region)
+{
+    vmrfree(vm_mnt, region);
+    vmrfree_hierachy(vm_mnt, region);
+}
 
 void
 procvm_dupvms_mount(struct proc_mm* mm) {
@@ -366,13 +425,19 @@ void
 procvm_unmount_release(struct proc_mm* mm) {
     ptr_t vm_mnt = mm->vm_mnt;
     struct mm_region *pos, *n;
+
     llist_for_each(pos, n, &mm->regions, head)
     {
         mem_sync_pages(vm_mnt, pos, pos->start, pos->end - pos->start, 0);
-        region_release(pos);
     }
 
     vmsfree(mm);
+
+    llist_for_each(pos, n, &mm->regions, head)
+    {
+        region_release(pos);
+    }
+
     vms_unmount(vm_mnt);
     vfree(mm);
 

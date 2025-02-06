@@ -91,6 +91,8 @@ __vfree(void* ptr, struct cake_pile** segregate_list, size_t len)
             return;
         }
     }
+
+    fail("this is really not a piece of cake");
 }
 
 void*

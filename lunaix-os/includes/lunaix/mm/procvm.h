@@ -49,6 +49,9 @@ struct proc_mm
 struct proc_mm*
 procvm_create(struct proc_info* proc);
 
+void
+procvm_prune_vmr(ptr_t vm_mnt, struct mm_region* region);
+
 /**
  * @brief Initialize and mount the vm of `proc` to duplication of current process
  * 
