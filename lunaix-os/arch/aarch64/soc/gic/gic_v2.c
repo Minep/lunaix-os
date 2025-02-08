@@ -70,7 +70,7 @@ __spi_set_enabled(struct gic_int_class* class, intid_t intid, bool en)
     if (en) {
         __gic_bitmap_setf(distr->gicd->isenabler, intid, true);
     } else {
-        __gic_bitmap_setf(distr->gicd->icenabler, intid, false);
+        __gic_bitmap_setf(distr->gicd->icenabler, intid, true);
     }
 
     return 0;
