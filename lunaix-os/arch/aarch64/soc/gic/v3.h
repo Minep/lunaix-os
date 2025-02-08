@@ -12,7 +12,7 @@ union v3_rdbase_map
 {
     FIELD_AT(u32_t, ctlr,           0x0000);
     FIELD_AT(u32_t, iidr,           0x0004);
-    FIELD_AT(u32_t, typer,          0x0008);
+    FIELD_AT(u64_t, typer,          0x0008);
 
     // LPI
     FIELD_AT(u64_t, setlpir,        0x0040);
