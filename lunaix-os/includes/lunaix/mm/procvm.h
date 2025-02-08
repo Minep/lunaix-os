@@ -119,6 +119,6 @@ void
 procvm_link_kernel(ptr_t dest_mnt);
 
 void
-procvm_unlink_kernel();
+procvm_unlink_kernel(ptr_t dest_mnt);
 
 #endif /* __LUNAIX_PROCVM_H */

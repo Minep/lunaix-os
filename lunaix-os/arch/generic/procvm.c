@@ -30,7 +30,22 @@ procvm_link_kernel(ptr_t dest_mnt)
 }
 
 _default void
-procvm_unlink_kernel()
+procvm_unlink_kernel(ptr_t dest_mnt)
 {
-    // nothing to do here.
+    pte_t *ptep_smx, *src_smx;
+    unsigned int i;
+    
+    i = va_level_index(KERNEL_RESIDENT, L0T_SIZE);
+    ptep_smx = mkl1tep_va(VMS_SELF, dest_mnt);
+    src_smx  = mkl0tep_va(VMS_SELF, 0);
+
+    for (; i < LEVEL_SIZE; i++)
+    {
+        pte_t* ptep = &ptep_smx[i];
+        if (lntep_implie_vmnts(ptep, L0T_SIZE)) {
+            continue;
+        }
+
+        set_pte(ptep, null_pte);
+    }
 }

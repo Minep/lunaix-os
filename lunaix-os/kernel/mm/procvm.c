@@ -69,34 +69,6 @@ __descend(ptr_t dest_mnt, ptr_t src_mnt, ptr_t va, bool alloc)
     return i;
 }
 
-static void
-__free_hierarchy(ptr_t mnt, ptr_t va, int level)
-{
-    pte_t pte, *ptep, *ptep_next;
-
-    if (pt_last_level(level)) {
-        return;
-    }
-
-    __free_hierarchy(mnt, va, level + 1);
-
-    ptep = mklntep_va(level, mnt, va);
-    pte = pte_at(ptep);
-    if (pte_isnull(pte)) {
-        return;
-    }
-
-    ptep_next = ptep_step_into(ptep);
-    for (unsigned i = 0; i < LEVEL_SIZE; i++, ptep_next++)
-    {
-        if (!pte_isnull(pte_at(ptep_next))) {
-            return;
-        }
-    }
-    
-    free_pagetable_trace(ptep, pte, level);
-}
-
 static inline void
 copy_leaf(pte_t* dest, pte_t* src, pte_t pte, int level)
 {
@@ -171,12 +143,6 @@ vmrcpy(ptr_t dest_mnt, ptr_t src_mnt, struct mm_region* region)
         src++;
         dest++;
     }
-}
-
-static inline void
-vmrfree_hierachy(ptr_t vm_mnt, struct mm_region* region)
-{
-    __free_hierarchy(vm_mnt, region->start, 0);
 }
 
 static void
@@ -303,6 +269,37 @@ done:;
 }
 
 static void
+__purge_vms_residual(struct proc_mm* mm, int level, ptr_t va)
+{
+    pte_t *ptep, pte;
+    ptr_t _va;
+
+    if (level >= MAX_LEVEL) {
+        return;
+    }
+
+    ptep = mklntep_va(level, mm->vm_mnt, va);
+
+    for (unsigned i = 0; i < LEVEL_SIZE; i++, ptep++) 
+    {
+        pte = pte_at(ptep);
+        if (pte_isnull(pte) || !pte_isloaded(pte)) {
+            continue;
+        }
+
+        if (lntep_implie_vmnts(ptep, lnt_page_size(level))) {
+            continue;
+        }
+
+        _va = va + (i * lnt_page_size(level));
+        __purge_vms_residual(mm, level + 1, _va);
+        
+        set_pte(ptep, null_pte);
+        leaflet_return(pte_leaflet_aligned(pte));
+    }
+}
+
+static void
 vmsfree(struct proc_mm* mm)
 {
     struct leaflet* leaflet;
@@ -311,7 +308,7 @@ vmsfree(struct proc_mm* mm)
     pte_t* ptep_self;
     
     vm_mnt    = mm->vm_mnt;
-    ptep_self = mkl0tep(mkptep_va(vm_mnt, VMS_SELF));
+    ptep_self = mkl0tep_va(vm_mnt, VMS_SELF);
 
     // first pass: free region mappings
     llist_for_each(pos, n, &mm->regions, head)
@@ -319,13 +316,10 @@ vmsfree(struct proc_mm* mm)
         vmrfree(vm_mnt, pos);
     }
 
-    // second pass: free the hierarchical 
-    llist_for_each(pos, n, &mm->regions, head)
-    {
-        vmrfree_hierachy(vm_mnt, pos);
-    }
+    procvm_unlink_kernel(vm_mnt);
 
-    procvm_unlink_kernel();
+    // free up all allocated tables on intermediate levels
+    __purge_vms_residual(mm, 0, 0);
 
     free_pagetable_trace(ptep_self, pte_at(ptep_self), 0);
 }
@@ -354,7 +348,6 @@ void
 procvm_prune_vmr(ptr_t vm_mnt, struct mm_region* region)
 {
     vmrfree(vm_mnt, region);
-    vmrfree_hierachy(vm_mnt, region);
 }
 
 void
