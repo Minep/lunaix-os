@@ -3,6 +3,7 @@
 
 #include <lunaix/compiler.h>
 #include <asm/physical.h>
+#include <lunaix/ds/list.h>
 
 /**
  * @brief 长久页：不会被缓存，但允许释放
@@ -45,7 +46,7 @@ struct ppage
     };
     unsigned short companion;
     
-    struct llist_header sibs;
+    struct list_node sibs;
 
     struct ppage_arch arch;
 } align(16);

@@ -33,7 +33,7 @@ list_head_init(struct list_head *list)
 static inline void 
 list_node_init(struct list_node *node)
 {
-	node->next = node;
+	node->next = NULL;
 }
 
 #define slist_entry(ptr, type, member)		\
@@ -58,10 +58,31 @@ __llist_add_batch(struct list_node *new_first,
 	return new_last->next == NULL;
 }
 
+static inline bool
+list_empty(struct list_head* head)
+{
+	return !head->first;
+}
+
 static inline void
 list_add(struct list_head* head, struct list_node* node)
 {
 	__llist_add_batch(node, node, head);
+}
+
+static inline struct list_node*
+list_pop_head(struct list_head* head) {
+	struct list_node* node;
+
+	if (list_empty(head)) {
+		return NULL;
+	}
+
+	node = head->first;
+	head->first = node->next;
+
+	list_node_init(node);
+	return node;
 }
 
 #endif /* __LUNAIX_LIST_H */

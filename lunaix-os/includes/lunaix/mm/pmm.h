@@ -36,7 +36,7 @@ struct pmem_pool
     
 #elif defined(CONFIG_PMALLOC_METHOD_SIMPLE)
 
-    struct llist_header idle_order[MAX_PAGE_ORDERS];
+    struct list_head idle_order[MAX_PAGE_ORDERS];
     int count[MAX_PAGE_ORDERS];
 
 #endif

@@ -27,13 +27,13 @@ __uninitialized_page(struct ppage* page)
 }
 
 static inline void
-__set_page_initialized(struct ppage* page)
+__init_page(struct ppage* page)
 {
     page->flags |= INIT_FLAG;
 }
 
 static inline void
-__set_pages_uninitialized(struct ppage* lead)
+__deinit_page(struct ppage* lead)
 {
     for (size_t i = 0; i < (1UL << lead->order); i++)
     {
@@ -51,7 +51,7 @@ void
 pmm_allocator_init_pool(struct pmem_pool* pool)
 {
     for (int i = 0; i < MAX_PAGE_ORDERS; i++) {
-        llist_init_head(&pool->idle_order[i]);
+        list_head_init(&pool->idle_order[i]);
         pool->count[i] = 0;
     }
 
@@ -78,15 +78,15 @@ pmm_free_one(struct ppage* page, int type_mask)
     assert(order <= MAX_PAGE_ORDERS);
 
     struct pmem_pool* pool = pmm_pool_lookup(page);
-    struct llist_header* bucket = &pool->idle_order[order];
+    struct list_head* bucket = &pool->idle_order[order];
 
     if (pool->count[order] < po_limit[order]) {
-        llist_append(bucket, &page->sibs);
-        pool->count[order]++;
+        list_add(bucket, &page->sibs);
+        pool->count[order] += 1;
         return;
     }
 
-    __set_pages_uninitialized(page);
+    __deinit_page(page);
 }
 
 static pfn_t index = 0;
@@ -128,11 +128,25 @@ pmm_looknext(struct pmem_pool* pool, size_t order)
         page->companion = i;
         page->pool = pool->type;
         page->refs = 0;
-        llist_init_head(&page->sibs);
-        __set_page_initialized(page);
+        list_node_init(&page->sibs);
+        __init_page(page);
     }
 
     return lead;
+}
+
+static struct ppage*
+__select_free_page_from(struct list_head* bucket)
+{
+    struct list_node* sib;
+    struct ppage* page;
+
+    do {
+        sib = list_pop_head(bucket);
+        page = sib ? slist_entry(sib, struct ppage, sibs) : NULL;
+    } while (page && __uninitialized_page(page));
+
+    return page;
 }
 
 struct ppage*
@@ -141,15 +155,15 @@ pmm_alloc_napot_type(int pool, size_t order, ppage_type_t type)
     assert(order <= MAX_PAGE_ORDERS);
 
     struct pmem_pool* _pool = pmm_pool_get(pool);
-    struct llist_header* bucket = &_pool->idle_order[order];
-
+    struct list_head* bucket = &_pool->idle_order[order];
     struct ppage* good_page = NULL;
-    if (!llist_empty(bucket)) {
-        (_pool->count[order])--;
-        good_page = list_entry(bucket->next, struct ppage, sibs);
-        llist_delete(&good_page->sibs);
+
+    if (!list_empty(bucket)) {
+        _pool->count[order] -= 1;
+        good_page = __select_free_page_from(bucket);
     }
-    else {
+    
+    if (!good_page) {
         good_page = pmm_looknext(_pool, order);
     }
 
@@ -169,14 +183,10 @@ pmm_allocator_trymark_onhold(struct pmem_pool* pool,
     while (start <= end) {
         if (__uninitialized_page(start)) {
             set_reserved(start);
-            __set_page_initialized(start);
+            __init_page(start);
         }
         else if (!start->refs) {
-            struct ppage* lead = leading_page(start);
-            llist_delete(&lead->sibs);
-
-            __set_pages_uninitialized(lead);
-            
+            __deinit_page(leading_page(start));
             continue;
         }
         else if (!reserved_page(start)) {
@@ -195,7 +205,7 @@ pmm_allocator_trymark_unhold(struct pmem_pool* pool,
 {
     while (start <= end) {
         if (!__uninitialized_page(start) && reserved_page(start)) {
-            __set_pages_uninitialized(start);
+            __deinit_page(start);
         }
 
         start++;
