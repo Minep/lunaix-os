@@ -12,7 +12,7 @@ union v3_rdbase_map
 {
     FIELD_AT(u32_t, ctlr,           0x0000);
     FIELD_AT(u32_t, iidr,           0x0004);
-    FIELD_AT(u64_t, typer,          0x0008);
+    FIELD_AT(u32_t, typer,          0x0008);
 
     // LPI
     FIELD_AT(u64_t, setlpir,        0x0040);
@@ -111,7 +111,7 @@ union v3_gicc_regs
     FIELD_AT(u32_t, bpr,          0x0008        );
     FIELD_AT(u32_t, iar,          0x000c        );
     FIELD_AT(u32_t, eoir,         0x0010        );
-    FIELD_AT(u32_t, ppr,          0x0014        );
+    FIELD_AT(u32_t, rpr,          0x0014        );
 
     FIELD_AT(u32_t, iidr,         0x00fc        );
     FIELD_AT(u32_t, dir,          0x1000        );
