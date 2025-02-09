@@ -273,7 +273,7 @@ __pe_ack_interrupt(struct gic_pe* pe)
     switch (id)
     {
     case INTID_IAR1_NMI:
-        id == read_sysreg(ICC_NMIAR1_EL1);
+        id = read_sysreg(ICC_NMIAR1_EL1);
         break;
     
     case INTID_NOTHING:
