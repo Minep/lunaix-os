@@ -1,6 +1,5 @@
 #define __ASM__
-#include <lunaix/syscall.h>
-#include "syscall_nr.inc"
+#include <asm-generic/syscall_nr.inc>
 
 .section .text
     .type syscall_hndlr, @function

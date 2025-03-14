@@ -27,6 +27,9 @@
 #define reclaimable_start   __section_mark(bssreclaim, start)
 #define reclaimable_end     __section_mark(bssreclaim, end)
 
+#define bootsec_start       __section_mark(kboot, start)
+#define bootsec_end         __section_mark(kboot, end)
+
 #define kernel_start        __section_mark(kexec, start)
 #define kernel_load_end     __section_mark(kexec, end)
 #define kernel_end          __section_mark(kimg, end)

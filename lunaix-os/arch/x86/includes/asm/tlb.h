@@ -2,8 +2,7 @@
 #define __LUNAIX_ARCH_TLB_H
 
 #include <lunaix/compiler.h>
-#include <lunaix/mm/procvm.h>
-#include <lunaix/mm/physical.h>
+#include <asm/mm_defs.h>
 
 /**
  * @brief Invalidate an entry of all address space
@@ -131,54 +130,6 @@ tlb_flush_kernel_ranged(ptr_t addr, unsigned int npages)
     }
 }
 
-/**
- * @brief Invalidate an entry within a process memory space
- * 
- * @param asid 
- * @param addr 
- * @param npages 
- */
-void
-tlb_flush_mm(struct proc_mm* mm, ptr_t addr);
-
-/**
- * @brief Invalidate entries within a process memory space
- * 
- * @param asid 
- * @param addr 
- * @param npages 
- */
-void
-tlb_flush_mm_range(struct proc_mm* mm, ptr_t addr, unsigned int npages);
-
-/**
- * @brief Invalidate an entry within a vm region
- * 
- * @param asid 
- * @param addr 
- * @param npages 
- */
-void
-tlb_flush_vmr(struct mm_region* vmr, ptr_t va);
-
-/**
- * @brief Invalidate all entries within a vm region
- * 
- * @param asid 
- * @param addr 
- * @param npages 
- */
-void
-tlb_flush_vmr_all(struct mm_region* vmr);
-
-/**
- * @brief Invalidate entries within a vm region
- * 
- * @param asid 
- * @param addr 
- * @param npages 
- */
-void
-tlb_flush_vmr_range(struct mm_region* vmr, ptr_t addr, unsigned int npages);
+#include <asm-generic/tlb-shared.h>
 
 #endif /* __LUNAIX_VMTLB_H */

@@ -1,3 +1,4 @@
+
 dev_id(VTERM),
 dev_id(RNG),
 
@@ -18,3 +19,7 @@ dev_id(KBD),
 dev_id(GFXA),
 dev_id(VGA),
 dev_id(INTC),
+
+#include <arch-listings/devnum.lst>
+
+dev_id(END)

@@ -20,7 +20,10 @@ def hal():
         """
 
         type(bool)
-        default(not v(arch).startswith("x86"))
+        default(False)
+
+        if v(arch) == "aarch64":
+            set_value(True)
 
     @ReadOnly
     @Term("Maximum size of device tree blob (in KiB)")

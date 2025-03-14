@@ -559,7 +559,7 @@ pci_create(struct device_def* def, morph_t* obj)
 
 #ifdef CONFIG_USE_DEVICETREE
     devtree_link_t devtree_node;
-    devtree_node = changeling_try_reveal(obj, dt_node_morpher);
+    devtree_node = changeling_try_reveal(obj, dt_morpher);
     device_set_devtree_node(pci_bridge, devtree_node);
 #endif
 

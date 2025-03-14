@@ -118,12 +118,12 @@ __try_create_categorical(struct dtn_base *p)
         return parent;
     }
 
-    if (p->binded_dev) {
-        cat = changeling_reveal(p->binded_dev, devcat_morpher);
+    if (p->binded_obj) {
+        cat = changeling_reveal(p->binded_obj, devcat_morpher);
     }
     else {
         cat = device_addcat(parent, HSTR_VAL(dt_mobj(p)->name));
-        p->binded_dev = dev_mobj(cat);
+        p->binded_obj = dev_mobj(cat);
     }
 
     return dev_meta(cat);

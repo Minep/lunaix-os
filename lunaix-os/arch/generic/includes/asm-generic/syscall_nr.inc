@@ -1,4 +1,6 @@
-#ifdef CONFIG_ARCH_X86_64
+#include <lunaix/syscall.h>
+
+#ifdef CONFIG_ARCH_BITS_64
 #   define PTR     .8byte
 #   define SIZE    8
 #else

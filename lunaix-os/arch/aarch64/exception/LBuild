@@ -1,0 +1,8 @@
+sources([
+    "entries.S",
+    "context.S",
+    "syscall_nr.S",
+    "handler.c",
+    "syscall.c",
+    "vmswitch.c"
+])

@@ -272,11 +272,14 @@ class LCTermNode(LCFuncNode):
             rctx.add_field(self._display_name, self)
 
     def serialise(self, dict):
+        if not self.enabled():
+            return
+        
         s_val = self._type.serialise(self._value)
         dict[self._name] = s_val
 
     def deserialise(self, dict):
-        if self._name not in dict:
+        if self._name not in dict or not self.enabled():
             return
         
         s_val = dict[self._name]
@@ -353,10 +356,13 @@ class LCGroupNode(LCFuncNode):
                 child.evaluate()
         
     def render(self, rctx):
+        if not self.enabled():
+            return
+        
         for child in self._children.values():
             child.render(rctx)
 
-    def serialise(self, dict):
+    def serialise(self, dict): 
         sub_dict = {}
         for child in self._children.values():
             child.serialise(sub_dict)
@@ -388,10 +394,11 @@ class LCCollectionNode(LCGroupNode):
         return "Collection"
     
     def render(self, rctx):
-        _super = super()
-        rctx.add_expandable(
-            self._display_name,
-            self, 
-            lambda _ctx: 
-                _super.render(_ctx)
-        )
+        if not self.enabled():
+            return
+        
+        label = self._display_name
+        rctx.add_expandable(label, self, self.__expand)
+
+    def __expand(self, _ctx):
+        super().render(_ctx)

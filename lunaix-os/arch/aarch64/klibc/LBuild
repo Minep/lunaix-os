@@ -1,0 +1,4 @@
+sources([
+    "crc.c",
+    "string.c"
+])

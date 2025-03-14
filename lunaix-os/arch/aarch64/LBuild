@@ -1,0 +1,22 @@
+use("boot")
+use("exception")
+use("klibc")
+
+use("soc/gic")
+
+sources([
+    "fault.c",
+    "trace.c",
+    "vmutils.c"
+])
+
+headers([
+    "includes"
+])
+
+compile_opts([
+    "-mlittle-endian",
+    "-mgeneral-regs-only",
+    "-mabi=lp64",
+    "-mno-omit-leaf-frame-pointer"
+])

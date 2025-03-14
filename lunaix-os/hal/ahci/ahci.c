@@ -14,8 +14,6 @@
 #include <hal/ahci/scsi.h>
 #include <hal/pci.h>
 
-#include <asm/x86_pmio.h>
-
 #include <klibc/string.h>
 #include <lunaix/block.h>
 #include <lunaix/mm/mmio.h>
@@ -70,7 +68,7 @@ __hba_reset_port(hba_reg_t* port_reg)
     }
     // 如果port未响应，则继续执行重置
     port_reg[HBA_RPxSCTL] = (port_reg[HBA_RPxSCTL] & ~0xf) | 1;
-    port_delay(100000); // 等待至少一毫秒，差不多就行了
+
     port_reg[HBA_RPxSCTL] &= ~0xf;
 }
 

@@ -6,4 +6,8 @@ dev_fn(TIME),
 dev_fn(BUSIF),
 dev_fn(TTY),
 dev_fn(DISP),
-dev_fn(CFG)
+dev_fn(CFG),
+
+#include <arch-listings/devnum_fn.lst>
+
+dev_fn(END)

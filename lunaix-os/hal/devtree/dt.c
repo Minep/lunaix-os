@@ -761,11 +761,21 @@ dtpx_compile_proplet(struct dtprop_def* proplet)
 {
     int i;
     unsigned int acc = 0;
+    struct dtprop_def* pl;
     
     for (i = 0; proplet[i].type && i < 10; ++i)
     {
-        proplet[i].acc_sz = acc;
-        acc += proplet[i].cell;
+        pl = &proplet[i];
+
+        if (pl->type == DTP_COMPX) {
+            if (pl->cell == 1) 
+                pl->type = DTP_U32;
+            else if (pl->cell == 2)
+                pl->type = DTP_U64;
+        }
+
+        pl->acc_sz = acc;
+        acc += pl->cell;
     }
 
     if (proplet[i - 1].type && i == 10) {
@@ -858,7 +868,9 @@ dtpx_extract_at(struct dtpropx* propx,
         } break;
 
         case DTP_COMPX:
-            val->composite = enc;
+            {
+                val->composite = enc;
+            }
             break;
         
         default:

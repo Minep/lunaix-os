@@ -5,9 +5,9 @@
 
 #ifndef __ASM__
 
-#define SYSCALL_ESTATUS(errno) -((errno) != 0)
+#include <lunaix/compiler.h>
 
-#define asmlinkage __attribute__((regparm(0)))
+#define SYSCALL_ESTATUS(errno) -((errno) != 0)
 
 #define __PARAM_MAP1(t1, p1) t1 p1
 #define __PARAM_MAP2(t1, p1, ...) t1 p1, __PARAM_MAP1(__VA_ARGS__)
