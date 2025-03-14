@@ -8,9 +8,11 @@
 
 # The Lunaix Project
 
-The Lunaix, LunaixOS, or Lunaix kernel to be exact, is a multi-architectural general purpose kernel written from scratch by the author *independently*. And it is the author's years-long personal endeavor and also a challenge to oneself for writing a functioning kernel **without** any external reference such as existing implementation, tutorial and books (with code) on kernel design. 
+The Lunaix, LunaixOS, or Lunaix kernel to be exact, is a multi-architectural general purpose kernel written from scratch by the author *independently*. It is the author's years-long personal endeavor and also a challenge to oneself for writing a functioning kernel **without** any external reference such as existing implementations, tutorials and books (with code) on kernel design. As a result, this project is a manifestation of the author's own research and understanding on the board topic of operating system design and implementation.
 
-The overall design is aimed to be modern and POSIX-compliance. In a nutshell, Lunaix is:
+## Introduction
+
+The overall design of lunaix is aimed to be modern and POSIX-compliance. In a nutshell, Lunaix is:
 
 + fully-preemptive
 + modular design with configurable components at compile-time and extendable subsystems
@@ -18,18 +20,20 @@ The overall design is aimed to be modern and POSIX-compliance. In a nutshell, Lu
 + fault-tolerance with sophisticated builtin error handling and tracing techniques.
 + robust in nature with techniques such as proactive deadlock detection and driver isolation mechanism.
 
-To give a better understanding (and appreciation) of the works, the following list has been compiled with all feature that lunaix currently supported:
+The author has put a significant amount of time on devising better abstractions, advance kernel features and various optimisation techniques. To give a better understanding (and appreciation) of the works being done, the following non-exhaust list has been compiled with features that are currently supported in lunaix:
 
 + Multi-ISA
   + x86_32
   + x86_64
   + Aarch64 (W.I.P)
-+ Boot protocol abstraction
++ Boot protocol
+  + abstraction for different protocol
+  + configurable kernel boot-time parameters
 + Platform resource management and definition
   + ACPI
   + Devicetree
 + Memory management
-  + multi-architecture abstraction
+  + architecture-neutral abstraction
   + on-demand paging
   + copy-on-write and page sharing
   + compound page support
@@ -37,25 +41,27 @@ To give a better understanding (and appreciation) of the works, the following li
   + reverse mapping indexing (rmap)
   + memory compaction (W.I.P)
   + slab-alike object allocator
-+ Multi-threadingg and multi-tasking
-  + Protection level and memory space isolation
+  + highmem support
+  + remote address space accessing
++ Multi-tasking
+  + Protection level and process image isolation
   + Native threading support (no more lightweight process nonsense)
-  + Signal handling
-  + Kernel-level multi-tasking (i.e. kernel threads)
+  + Signal mechanism
+  + Kernel level multi-tasking (i.e. kernel threads)
   + Round-robin scheduling (for now)
-  + Fully-preemptive kernel design
+  + Preemptive kernel design
   + taskfs: file system interface to process and threads
 + File system
   + virtual file system framework
-  + ...with POSIX compliant file system interface
-  + mountable file system
+  + ...with POSIX compliant interfaces
+  + file system mounting mechanism
   + page cache for file IO
   + node cache for vfs structure representation.
   + ext2 (rev.0, rev.1)
   + iso9660 (rock-ridge)
   + twifs: file system interface to kernel states.
 + Device management and interrupt handling
-  + architectural decoupled design
+  + architecture-neutral design
   + generalised driver framework
   + generalised irq framework
   + driver modularisation design
@@ -63,22 +69,22 @@ To give a better understanding (and appreciation) of the works, the following li
   + devfs: file system interface to device subsystem
 + Block I/O (blkio)
   + generalised block IO interface and encapsulation
-  + blkio request caching
+  + blkio packets caching
   + asynchronous blkio operation in nature
 + Serial I/O
   + POSIX-compliant serial port model
   + serial device driver framework (part of driver framework)
 + Caching Infrastructure
-  + primtive: generic sparse associative array
+  + primitive: generic sparse associative array (spatial data)
   + LRU replacement policy and pooling
-  + kernel daemon for periodical cache eviction
+  + kernel daemon for scheduled cache eviction
 + Error handling and detection
   + stack back-tracing with symbol resolution
   + nested exception unfolding
   + CPU state dumping
   + Deadlock/hung-up detection
 
-For the device driver that is currently support see below:
+For the device drivers that are currently support see below:
 
 + Arhcitecture Neutral
   + UART 16650-compatible driver
@@ -99,7 +105,7 @@ By the way, do you know there is an online video course  by the author on the de
 
 ## Project Structure
 
-| | |
+| Path | Description |
 |-----|------|
 | [lunaix-os](../lunaix-os/) | LunaixOS source code |
 | [slides](../slides/) | Slides used in my videos |
@@ -107,16 +113,18 @@ By the way, do you know there is an online video course  by the author on the de
 
 ## Compile and Build
 
-You will need following dependencies in order to build Lunaix
+Building lunaix is simple, no more bloated dependencies to install, basic `build-essentials` installation plus a python are sufficient.
 
 + gcc (recommend v12+)
 + binutils
 + make
 + python (recommend v3.11+)
 
-And also one should have environment variable `ARCH=<arch>` exported, where `<arch>` is one of the supported arhcitecture (`x86_32`, `x86_64`, `arm64`)
+And also one should have environment variable `ARCH=<arch>` exported, where `<arch>` is one of the supported arhcitecture (`x86_32`, `x86_64`, `aarch64`).
 
-The following `make` actions are available to use.
+For cross compilation, also export `CX_PREFIX` to the gcc prefix for the corresponding `<arch>`.
+
+The following `make` actions are then available to use.
 
 | Make command | Usage |
 | ---- | ---- |
@@ -131,7 +139,7 @@ A successful build will give `build/bin/kernel.bin`.
 
 ## Booting the kernel
 
-Since lunaix is a kernel, much like linux. It require additional setup to make the magic. And, as it is "much like linux", methods to make linux kernel boot can also apply to lunaix without or with little translation, as we will discuss below.
+Since lunaix is a kernel, much like linux. It requires additional setup to do the magic. And, as in "much like linux", methods to make linux kernel boot can also apply to lunaix without or with little translation, as we will discuss below.
 
 The bootloader part is generic, any bootloader, for example GRUB will work (not tested for UEFI, but I expect this would be an exception), or booting up in QEMU using `-kernel` option
 
@@ -148,17 +156,17 @@ Currently, lunaix support the following options
 
 ### A quick 'Get Started'
 
-One can use the `live_debug.sh` provided in the lunaix root directory to quickly bring up the system with default parameter (which is used by the author for debugging).
+One can use the `live_debug.sh` provided in the lunaix root directory to quickly bring up the system with default parameters (also used by the author for debugging).
 
 Following the steps:
 
-1. Select a architecture `<arch>`
+1. Select an architecture `<arch>`
 2. Check the compilation prerequisites and presence of `qemu-system-<arch>`
 3. Run `make ARCH=<arch> user` to build the stock user program
 4. Run `make ARCH=<arch> rootfs` to build stock rootfs image, require support of `dd`，`mkfs.ext2`, `mount -o loop`, `mktemp`.
 5. Run `ARCH=<arch> live_debug.sh` to boot in QEMU with gdb hooked (one should see a gdb session)
 6. telenet to `localhost:12345`, this is QEMU emulated serial port
-7. type `c` in the active gdb session and commence emualtion.
+7. type `c` in the active gdb session and commence emulation.
 8. Congrats, enjoy your lunaix!
 (or submit an issue)
 
@@ -181,11 +189,11 @@ If one ran into bug, one can submit an issue by filling up the following templat
 
 ## Limitations
 
-The development process is still in motion, any limitation can be categorised as yet to be finished feature. However, some feature that the author considered to be the most urgent and wish the matters to be discussed.
+The development process is still in motion, any limitation can be categorised as a feature yet to be. However, some features that the author considered to be the most urgent and wish the matters to be discussed.
 
-Lunaix is under assumption of uniprocessor and not capable of running in SMP environment. This is major held back of being a modern operating system. It has the highest priority among all other tasks
+Lunaix is under impression of uniprocessor and not capable of running in SMP environment. This is major held back of being a modern operating system. It has the highest priority among all other tasks
 
-Lunaix is do not have a mature user space ecosystem, mainly because the lack of a proper and sophisticated libc. Efforts need to be done for porting one to the target. However, given the author's tight schedule, this task is unfortunately still beyond the horizon.
+Lunaix do not have a mature (or even, an infant) user space ecosystem, mainly because the lack of a proper and sophisticated libc. Efforts need to be done for porting one to the target. However, given the author's tight schedule, this task is unfortunately still beyond the horizon.
 
 ## Acknowledgement
 
@@ -193,11 +201,11 @@ Albeit one must realise that the author has mentioned it in the very beginning, 
 
 As a personal challenge, this project is independently developed by the author single-handly, which means:
 
-+ No reference to existing tutorial, books, online course or any open source project that might provide example, hint or working prototype on the design and implementation of kernel, it's various subsystems or anythings that can be contributed towards a working prototype.
++ No reference to existing tutorials, books, online courses or any open source project that might provide any example, hint or working prototype on the design and implementation of kernel, subsystems or anythings that can be contributed towards a working prototype.
 + The author has no prior knowledge on Linux kernel through out 90% of the project time.
-+ All knowledge on the kernel design is comming from the basic textbook on operating system theory, that is, *Modern Operating System* by Tanenbaum.
-+ All knowledge on the system programming is commingg from the basic textbook, that is, *Computer System - A Programmer's Perspective Third Edition*
-+ All knowledge on the generic framework design and driver development are ingested from various technical specifications gathered across internet.
++ All knowledge on the kernel design is coming from the basic textbook on operating system theory, that is, *Modern Operating System* by Tanenbaum.
++ All knowledge on the system programming is coming from the basic textbook, that is, *Computer System - A Programmer's Perspective Third Edition*
++ All knowledge on the generic framework design and driver development are ingested from various technical specifications gathered across the Internet.
 
 ## References
 
