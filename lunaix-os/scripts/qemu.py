@@ -346,13 +346,14 @@ class QEMUExec:
             cmds += dev.get_qemu_opts()
 
         cmds += extras
-        print(" ".join(cmds), "\n")
+        logger.info(" ".join(cmds))
 
         if dryrun:
             logger.info("[DRY RUN] QEMU not invoked")
             return
         
         handle = subprocess.Popen(cmds)
+        logger.info(f"QEMU launched (pid={handle.pid})")
         
         while True:
             ret_code = handle.poll()
