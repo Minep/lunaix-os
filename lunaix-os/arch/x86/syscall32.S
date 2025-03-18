@@ -1,6 +1,5 @@
 #define __ASM__
 #include <lunaix/syscall.h>
-#include "syscall_nr.inc"
 
 .section .text
     .type syscall_hndlr, @function
@@ -16,7 +15,7 @@
         jae     2f
 
         shll    $2, %eax
-        addl    $syscall_table, %eax
+        addl    $__syscall_table, %eax
         cmpl    $0, (%eax)
         jne     1f
     2:    

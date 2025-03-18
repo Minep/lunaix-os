@@ -13,6 +13,8 @@
 #include <lunaix/types.h>
 #include <lunaix/spike.h>
 #include <lunaix/hart_state.h>
+#include <lunaix/usrscope.h>
+
 #include <stdint.h>
 
 
@@ -113,7 +115,7 @@ struct thread
 {
     /*
         Any change to *critical section*, including layout, size
-        must be reflected in arch/x86/interrupt.S.inc to avoid
+        must be reflected in arch/<arch>/interrupt.S.inc to avoid
         disaster!
      */
     struct
@@ -166,6 +168,13 @@ struct proc_info
         pid_t pid;
         pid_t pgid;
         time_t created;
+
+        uid_t euid;
+        uid_t suid;
+        gid_t egid;
+        gid_t sgid;
+
+        struct user_scope uscope;
 
         int state;
         int exit_code;
@@ -463,5 +472,22 @@ thread_stats_user_elapse(struct thread* thread)
     return stats->last_entry - stats->last_leave;
 }
 
+static inline struct user_scope*
+current_user_scope()
+{
+    return &__current->uscope;
+}
+
+static inline uid_t must_inline
+current_euid()
+{
+    return __current->euid;
+}
+
+static inline gid_t must_inline
+current_egid()
+{
+    return __current->egid;
+}
 
 #endif /* __LUNAIX_PROCESS_H */

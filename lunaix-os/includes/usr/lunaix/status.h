@@ -36,5 +36,6 @@
 #define EAGAIN -30
 #define EDEADLK -31
 #define EDQUOT -32
+#define EPERM -33
 
 #endif /* __LUNAIX_STATUS_H */

@@ -1,6 +1,5 @@
 #define __ASM__
 #include <lunaix/syscall.h>
-#include "syscall_nr.inc"
 #include "asm/variants/interrupt64.S.inc"
 
 .section .text
@@ -18,7 +17,7 @@
         jae     2f
 
         shlq    $3, %rax               // %rax * 8
-        movabsq $syscall_table, %r8
+        movabsq $__syscall_table, %r8
         addq    %r8, %rax
         cmpq    $0, (%rax)
         jne     1f
