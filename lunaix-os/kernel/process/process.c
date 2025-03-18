@@ -17,46 +17,6 @@
 
 LOG_MODULE("PROC")
 
-__DEFINE_LXSYSCALL(pid_t, getpid)
-{
-    return __current->pid;
-}
-
-__DEFINE_LXSYSCALL(pid_t, getppid)
-{
-    return __current->parent->pid;
-}
-
-__DEFINE_LXSYSCALL(pid_t, getpgid)
-{
-    return __current->pgid;
-}
-
-__DEFINE_LXSYSCALL2(int, setpgid, pid_t, pid, pid_t, pgid)
-{
-    struct proc_info* proc = pid ? get_process(pid) : __current;
-
-    if (!proc) {
-        syscall_result(EINVAL);
-        return -1;
-    }
-
-    pgid = pgid ? pgid : proc->pid;
-
-    struct proc_info* gruppenfuhrer = get_process(pgid);
-
-    if (!gruppenfuhrer || proc->pgid == gruppenfuhrer->pid) {
-        syscall_result(EINVAL);
-        return -1;
-    }
-
-    llist_delete(&proc->grp_member);
-    llist_append(&gruppenfuhrer->grp_member, &proc->grp_member);
-
-    proc->pgid = pgid;
-    return 0;
-}
-
 int
 spawn_process(struct thread** created, ptr_t entry, bool with_ustack) 
 {
@@ -130,4 +90,163 @@ fail:
 
 ptr_t proc_vmroot() {
     return __current->mm->vmroot;
+}
+
+__DEFINE_LXSYSCALL(pid_t, getpid)
+{
+    return __current->pid;
+}
+
+__DEFINE_LXSYSCALL(pid_t, getppid)
+{
+    return __current->parent->pid;
+}
+
+__DEFINE_LXSYSCALL(pid_t, getpgid)
+{
+    return __current->pgid;
+}
+
+__DEFINE_LXSYSCALL2(int, setpgid, pid_t, pid, pid_t, pgid)
+{
+    struct proc_info* proc = pid ? get_process(pid) : __current;
+
+    if (!proc) {
+        syscall_result(EINVAL);
+        return -1;
+    }
+
+    pgid = pgid ? pgid : proc->pid;
+
+    struct proc_info* gruppenfuhrer = get_process(pgid);
+
+    if (!gruppenfuhrer || proc->pgid == gruppenfuhrer->pid) {
+        syscall_result(EINVAL);
+        return -1;
+    }
+
+    llist_delete(&proc->grp_member);
+    llist_append(&gruppenfuhrer->grp_member, &proc->grp_member);
+
+    proc->pgid = pgid;
+    return 0;
+}
+
+static inline bool
+__can_change_real_id(const struct user_scope* procu, caps_t id_cap) {
+    if (uscope_with_capability(procu, id_cap)) {
+        return true;
+    }
+
+    if (check_current_acl(0, 0) != ACL_NO_MATCH) {
+        return true;
+    }
+
+    return false;
+}
+
+__DEFINE_LXSYSCALL1(int, setuid, uid_t, uid)
+{
+    struct user_scope* procu;
+
+    procu = current_user_scope();
+
+    if (__can_change_real_id(procu, CAP_SETUID)) 
+    {
+        procu->ruid = uid;
+    }
+
+    __current->suid = uid;
+    __current->euid = uid;
+
+    return 0;
+}
+
+__DEFINE_LXSYSCALL1(int, setgid, gid_t, gid)
+{
+    struct user_scope* procu;
+
+    procu = current_user_scope();
+
+    if (__can_change_real_id(procu, CAP_SETGID)) 
+    {
+        procu->rgid = gid;
+    }
+
+    __current->sgid = gid;
+    __current->egid = gid;
+
+    return 0;
+}
+
+__DEFINE_LXSYSCALL1(int, seteuid, uid_t, euid)
+{
+    __current->euid = euid;
+
+    return 0;
+}
+
+__DEFINE_LXSYSCALL1(int, setegid, gid_t, egid)
+{
+    __current->egid = egid;
+
+    return 0;
+}
+
+__DEFINE_LXSYSCALL2(int, setgroups, const gid_t*, gids, unsigned int, len)
+{
+    struct user_scope* procu;
+
+    procu = current_user_scope();
+
+    if (check_current_acl(0, 0) == ACL_NO_MATCH) {
+        return EPERM;
+    }
+
+    if (uscope_with_capability(procu, CAP_SETGID)) {
+        return EPERM;
+    }
+
+    return uscope_setgroups(procu, gids, len);
+}
+
+
+__DEFINE_LXSYSCALL(uid_t, getuid)
+{
+    return current_user_scope()->ruid;
+}
+
+__DEFINE_LXSYSCALL(gid_t, getgid)
+{
+    return current_user_scope()->rgid;
+}
+
+__DEFINE_LXSYSCALL(uid_t, geteuid)
+{
+    return __current->euid;
+}
+
+__DEFINE_LXSYSCALL(gid_t, getegid)
+{
+    return __current->egid;
+}
+
+__DEFINE_LXSYSCALL2(int, getgroups, gid_t*, out_buf, unsigned int, len)
+{
+    struct user_scope* procu;
+    struct ugroup_obj* gobj;
+
+    procu = current_user_scope();
+    gobj  = user_groups(procu);
+
+    assert(gobj);
+    len = MIN(gobj->maxcap, len);
+
+    unsigned i = 0;
+    for (; i < len && gobj->list[i] != grp_list_end; i++)
+    {
+        out_buf[i] = gobj->list[i];
+    }
+    
+    return i + 1;
 }
