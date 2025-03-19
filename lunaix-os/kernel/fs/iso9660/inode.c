@@ -1,5 +1,5 @@
 #include <klibc/string.h>
-#include <lunaix/fs.h>
+#include <lunaix/fs/api.h>
 #include "iso9660.h"
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/valloc.h>
@@ -87,9 +87,16 @@ iso9660_fill_inode(struct v_inode* inode, struct iso_drecache* dir, int ino)
         inode->ctime = iso9660_dt2unix(&xattr->ctime);
         inode->mtime = iso9660_dt2unix(&xattr->mtime);
 
+        fsapi_inode_setaccess(inode, xattr->perm);
+        fsapi_inode_setowner(inode, xattr->owner.le, xattr->group.le);
+
         inode->lb_addr += dir->xattr_len * dir->fu_size;
 
         vfree(xattr);
+    }
+    else {
+        fsapi_inode_setaccess(inode, FSACL_u(R, W, _) | FSACL_g(R, W, _));
+        fsapi_inode_setowner(inode,  0, 0);
     }
 
     inode->ctime = dir->ctime ? dir->ctime : inode->ctime;

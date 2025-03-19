@@ -13,6 +13,7 @@
 #include <lunaix/status.h>
 #include <lunaix/spike.h>
 #include <lunaix/bcache.h>
+#include <lunaix/fs_acl.h>
 
 #include <usr/lunaix/fstypes.h>
 
@@ -248,6 +249,11 @@ struct v_inode
     u32_t link_count;
     u32_t lb_usage;
     u32_t fsize;
+
+    u32_t acl;
+    uid_t uid;
+    gid_t gid;
+
     void* data; // 允许底层FS绑定他的一些专有数据
     struct llist_header aka_dnodes;
     struct llist_header xattrs;
@@ -705,6 +711,30 @@ static inline bool
 check_symlink_node(struct v_inode* inode)
 {
     return check_itype(inode->itype, VFS_IFSYMLINK);
+}
+
+static inline bool
+check_allow_ops(struct v_inode* inode, unsigned int perm)
+{
+    return fsacl_allow_ops(perm, inode->acl, inode->uid, inode->gid);
+}
+
+static inline bool
+check_allow_read(struct v_inode* inode)
+{
+    return check_allow_ops(inode, FSACL_aR);
+}
+
+static inline bool
+check_allow_write(struct v_inode* inode)
+{
+    return check_allow_ops(inode, FSACL_aW);
+}
+
+static inline bool
+check_allow_execute(struct v_inode* inode)
+{
+    return check_allow_ops(inode, FSACL_aX);
 }
 
 #endif /* __LUNAIX_VFS_H */

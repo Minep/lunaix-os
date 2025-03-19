@@ -30,6 +30,7 @@
 #define IMODE_ORD             0x0004
 #define IMODE_OWR             0x0002
 #define IMODE_OEX             0x0001
+#define IMODE_ACL_MASK        0x01ff
 
 #define ext2_aligned                    compact align(4)
 #define to_ext2ino_id(fsblock_id)       ((fsblock_id) + 1)

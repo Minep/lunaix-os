@@ -161,6 +161,19 @@ fsapi_inode_settime(struct v_inode* inode,
 }
 
 static inline void
+fsapi_inode_setaccess(struct v_inode* inode, unsigned int acl)
+{
+    inode->acl = acl;
+}
+
+static inline void
+fsapi_inode_setowner(struct v_inode* inode, uid_t uid, gid_t gid)
+{
+    inode->uid = uid;
+    inode->gid = gid;
+}
+
+static inline void
 fsapi_dnode_setdector(struct v_dnode* dnode, 
                       dnode_free free_cb)
 {

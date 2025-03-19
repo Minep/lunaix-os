@@ -223,12 +223,17 @@ exec_load_byname(struct exec_host* container, const char* filename)
         goto done;
     }
 
-    if ((errno = vfs_open(dnode, &file))) {
+    if (!check_allow_execute(dnode->inode)) {
+        errno = EPERM;
         goto done;
     }
 
     if (!check_itype_any(dnode->inode, F_FILE)) {
         errno = EISDIR;
+        goto done;
+    }
+    
+    if ((errno = vfs_open(dnode, &file))) {
         goto done;
     }
 
