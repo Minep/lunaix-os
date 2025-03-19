@@ -295,6 +295,10 @@ ext2ino_fill(struct v_inode* inode, ino_t ino_id)
                                b_ino->i_mtime, 
                                b_ino->i_atime);
     
+    fsapi_inode_setaccess(inode, b_ino->i_mode & IMODE_ACL_MASK);
+    fsapi_inode_setowner(inode, b_ino->i_uid,
+                                b_ino->i_gid);
+    
     __ext2ino_fill_common(inode, ino_id);
 
     if (check_itype(b_ino->i_mode, IMODE_IFLNK)) {

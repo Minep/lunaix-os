@@ -192,11 +192,11 @@ vfs_dcache_rehash(struct v_dnode* new_parent, struct v_dnode* dnode)
 int
 vfs_open(struct v_dnode* dnode, struct v_file** file)
 {
-    if (!dnode->inode || !dnode->inode->ops->open) {
+    struct v_inode* inode = dnode->inode;
+    
+    if (!inode || !inode->ops->open) {
         return ENOTSUP;
     }
-
-    struct v_inode* inode = dnode->inode;
 
     lock_inode(inode);
 
@@ -846,6 +846,11 @@ __DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
         goto done;
     }
 
+    if (!check_allow_read(file->inode)) {
+        errno = EPERM;
+        goto done;
+    }
+
     lock_inode(file->inode);
 
     file->inode->atime = clock_unixtime();
@@ -932,6 +937,11 @@ __DEFINE_LXSYSCALL3(int, lseek, int, fd, int, offset, int, options)
         goto done;
     }
 
+    if (!check_allow_read(inode)) {
+        errno = EPERM;
+        goto done;
+    }
+
     lock_inode(inode);
 
     int overflow = 0;
@@ -1010,6 +1020,10 @@ vfs_readlink(struct v_dnode* dnode, char* buf, size_t size)
 
     if (!inode->ops->read_symlink) {
         return ENOTSUP;
+    }
+
+    if (!check_allow_read(inode)) {
+        return EPERM;
     }
 
     lock_inode(inode);

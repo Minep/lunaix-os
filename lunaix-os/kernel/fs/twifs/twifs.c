@@ -58,6 +58,13 @@ __twifs_init_inode(struct v_superblock* vsb, struct v_inode* inode)
 {
     inode->ops = (struct v_inode_ops*)&twifs_inode_ops;
     inode->default_fops = (struct v_file_ops*)&twifs_file_ops;
+
+
+    // we set default access right to be 0660.
+    // TODO need a way to allow this to be changed
+    
+    fsapi_inode_setaccess(inode, FSACL_u(R, W, _) | FSACL_g(R, W, _));
+    fsapi_inode_setowner(inode, 0, 0);
 }
 
 int

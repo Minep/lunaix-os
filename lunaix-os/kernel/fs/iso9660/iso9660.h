@@ -289,6 +289,7 @@ struct iso_drecache
     time_t ctime;
     time_t atime;
     time_t mtime;
+
     struct hstr name;
     char name_val[ISO9660_IDLEN];
 };

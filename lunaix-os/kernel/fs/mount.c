@@ -293,6 +293,11 @@ vfs_check_writable(struct v_dnode* dnode)
     if ((dnode->mnt->flags & MNT_RO)) {
         return EROFS;
     }
+
+    if (!check_allow_write(dnode->inode)) {
+        return EPERM;
+    }
+
     return 0;
 }
 

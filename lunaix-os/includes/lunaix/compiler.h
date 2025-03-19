@@ -39,8 +39,9 @@
 #define prefetch_rd(ptr, ll)    __builtin_prefetch((ptr), 0, ll)
 #define prefetch_wr(ptr, ll)    __builtin_prefetch((ptr), 1, ll)
 
-#define stringify(v) #v
-#define stringify__(v) stringify(v)
+#define v__(v)                  (v)
+#define stringify(v)            #v
+#define stringify__(v)          stringify(v)
 
 #define compact                 __attribute__((packed))
 #define align(v)                __attribute__((aligned (v)))

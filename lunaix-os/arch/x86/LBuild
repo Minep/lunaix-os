@@ -29,7 +29,8 @@ sources([
     "gdbstub.c",
     "trace.c",
     "hart.c",
-    "failsafe.S"
+    "failsafe.S",
+    "syscall_lut.S"
 ])
 
 sources({
