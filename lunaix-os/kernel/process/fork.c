@@ -173,6 +173,7 @@ dup_proc()
     }
 
     __dup_fdtable(pcb);
+    uscope_copy(&pcb->uscope, current_user_scope());
 
     struct proc_mm* mm = vmspace(pcb);
     procvm_dupvms_mount(mm);

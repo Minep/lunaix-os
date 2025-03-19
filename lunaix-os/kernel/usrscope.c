@@ -30,6 +30,10 @@ __alloc_groups_obj(unsigned int len)
 static inline void
 __ref_groups_obj(struct ugroup_obj* ugo)
 {
+    if (unlikely(!ugo)) {
+        return;
+    }
+
     ugo->refs++;
 }
 
