@@ -3,6 +3,8 @@
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
 
+#include <usr/lunaix/fcntl_defs.h>
+
 #include <klibc/string.h>
 
 #define VFS_SYMLINK_DEPTH 16
@@ -29,11 +31,16 @@ __vfs_walk(struct v_dnode* start,
     if (path[0] == VFS_PATH_DELIM || !start) {
         if ((walk_options & VFS_WALK_FSRELATIVE) && start) {
             start = start->super_block->root;
-        } else {
+        } 
+        else if (unlikely(!__current)) {
             start = vfs_sysroot;
-            if (!vfs_sysroot->mnt) {
-                fail("vfs: no root");
-            }
+        }
+        else {
+            start = __current->root ?: vfs_sysroot;
+        }
+
+        if (unlikely(!start || !start->mnt)) {
+            fail("vfs: no root");
         }
 
         if (path[0] == VFS_PATH_DELIM) {
@@ -50,9 +57,12 @@ __vfs_walk(struct v_dnode* start,
     struct hstr name = HSTR(fname_buffer, 0);
 
     char current = path[i++], lookahead;
-    while (current) {
+    while (current) 
+    {
         lookahead = path[i++];
-        if (current != VFS_PATH_DELIM) {
+
+        if (current != VFS_PATH_DELIM) 
+        {
             if (j >= VFS_NAME_MAXLEN - 1) {
                 return ENAMETOOLONG;
             }
@@ -83,9 +93,15 @@ __vfs_walk(struct v_dnode* start,
 
         lock_dnode(current_level);
 
+        if (!check_allow_execute(current_inode)) {
+            errno = EACCESS;
+            goto error;
+        }
+
         dnode = vfs_dcache_lookup(current_level, &name);
 
-        if (!dnode) {
+        if (!dnode) 
+        {
             dnode = vfs_d_alloc(current_level, &name);
 
             if (!dnode) {
@@ -123,7 +139,8 @@ __vfs_walk(struct v_dnode* start,
         assert(current_inode);
         
         if (check_symlink_node(current_inode) &&
-            !(walk_options & VFS_WALK_NOFOLLOW)) {
+            !(walk_options & VFS_WALK_NOFOLLOW)) 
+        {
             const char* link;
             struct v_inode_ops* iops;
 
@@ -169,6 +186,7 @@ __vfs_walk(struct v_dnode* start,
 
 cleanup:
     vfs_d_free(dnode);
+
 error:
     *dentry = NULL;
     return errno;
@@ -204,4 +222,36 @@ vfs_walk_proc(const char* path,
               int options)
 {
     return vfs_walk(__current->cwd, path, dentry, component, options);
+}
+
+int
+vfs_walkat(int fd, const char* path, int at_opts, struct v_dnode** dnode_out)
+{
+    int errno, options = 0;
+    struct v_dnode *root_dnode;
+    struct v_fd* _fd;
+
+    if ((at_opts & AT_FDCWD)) {
+        root_dnode = __current->cwd;
+    }
+    else 
+    {
+        errno = vfs_getfd(fd, &_fd);
+        if (errno) {
+            return errno;
+        }
+
+        root_dnode = _fd->file->dnode;
+    }
+
+    if ((at_opts & AT_SYMLINK_NOFOLLOW)) {
+        options |= VFS_WALK_NOFOLLOW;
+    }
+
+    errno = vfs_walk(root_dnode, path, dnode_out, NULL, options);
+    if (errno) {
+        return errno;
+    }
+
+    return 0;
 }

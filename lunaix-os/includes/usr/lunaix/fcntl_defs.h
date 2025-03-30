@@ -26,6 +26,16 @@
 #define O_RDWR FO_RDWR
 #define O_TRUNC FO_TRUNC
 
+#define AT_SYMLINK_FOLLOW       0b0000
+#define AT_SYMLINK_NOFOLLOW     0b0001
+#define AT_FDCWD                0b0010
+#define AT_EACCESS              0b0100
+
+#define R_OK                    0b100100100
+#define W_OK                    0b010010010
+#define X_OK                    0b001001001
+#define F_OK                    0b111111111
+
 /* Mount with read-only flag */
 #define MNT_RO (1 << 0)
 

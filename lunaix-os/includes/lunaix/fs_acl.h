@@ -8,6 +8,7 @@
 #define FSACL_WRITE    2
 #define FSACL_EXEC     1
 
+#define FSACL_RWXMASK  0777
 #define FSACL_U(x)    (((x) & 0b111) << 6)
 #define FSACL_G(x)    (((x) & 0b111) << 3)
 #define FSACL_O(x)    ((x) & 0b111)
@@ -23,6 +24,10 @@
 #define FSACL_oR      FSACL_O(FSACL_READ)
 #define FSACL_oW      FSACL_O(FSACL_WRITE)
 #define FSACL_oX      FSACL_O(FSACL_EXEC)
+
+#define FSACL_suid    04000
+#define FSACL_sgid    02000
+#define FSACL_svtx    01000
 
 // permitted read (any usr or group matched)
 #define FSACL_RD      (FSACL_uRD | FSACL_gRD)
@@ -51,6 +56,8 @@
 
 #define FSACL_o(r, w, x)            \
         (v__(__fsacl_sel(o, r)) | v__(__fsacl_sel(o, w)) | v__(__fsacl_sel(o, x)))
+
+#define fsacl_test(acl, type)   ((acl) & (FSACL_##type))
 
 static inline bool must_inline
 fsacl_allow_ops(unsigned int ops, unsigned int acl, uid_t uid, gid_t gid)

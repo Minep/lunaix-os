@@ -202,6 +202,7 @@ exec_load(struct exec_host* container, struct v_file* executable)
     }
 
     save_process_cmd(proc, argv);
+    container->inode = executable->inode;
     
     errno = load_executable(&container->exe, executable);
     if (errno) {
@@ -285,6 +286,7 @@ __DEFINE_LXSYSCALL3(int,
                     envp[])
 {
     int errno = 0;
+    int acl;
     struct exec_host container;
 
     if (!argv || !envp) {
@@ -307,6 +309,15 @@ __DEFINE_LXSYSCALL3(int,
     current_thread->ustack_top = 0;
     signal_reset_context(&current_thread->sigctx);
     signal_reset_registry(__current->sigreg);
+
+    acl = container.inode->acl;
+    if (fsacl_test(acl, suid)) {
+        current_set_euid(container.inode->uid);
+    }
+
+    if (fsacl_test(acl, sgid)) {
+        current_set_egid(container.inode->gid);
+    }
 
 done:
     // set return value

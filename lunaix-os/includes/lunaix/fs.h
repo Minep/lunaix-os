@@ -396,6 +396,10 @@ vfs_walk_proc(const char* path,
               int options);
 
 int
+vfs_walkat(int fd, const char* path, int at_opts, 
+           struct v_dnode** dnode_out);
+
+int
 vfs_mount(const char* target,
           const char* fs_name,
           struct device* device,

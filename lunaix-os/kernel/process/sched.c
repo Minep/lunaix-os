@@ -24,7 +24,7 @@
 
 struct thread empty_thread_obj;
 
-volatile struct proc_info* __current;
+volatile struct proc_info* __current = NULL;
 volatile struct thread* current_thread = &empty_thread_obj;
 
 struct scheduler sched_ctx;
@@ -392,6 +392,8 @@ alloc_process()
     proc->pid = i;
     proc->created = clock_systime();
     proc->pgid = proc->pid;
+
+    proc->root = vfs_sysroot;
 
     proc->sigreg = vzalloc(sizeof(struct sigregistry));
     proc->fdtable = vzalloc(sizeof(struct v_fdtable));

@@ -175,6 +175,7 @@ struct proc_info
         gid_t sgid;
 
         struct user_scope uscope;
+        struct v_dnode* root;
 
         int state;
         int exit_code;
@@ -484,10 +485,28 @@ current_euid()
     return __current->euid;
 }
 
+static inline bool must_inline
+current_is_root()
+{
+    return current_euid() == 0;
+}
+
 static inline gid_t must_inline
 current_egid()
 {
     return __current->egid;
+}
+
+static inline void must_inline
+current_set_egid(gid_t gid)
+{
+    __current->egid = gid;
+}
+
+static inline void must_inline
+current_set_euid(uid_t uid)
+{
+    __current->euid = uid;
 }
 
 #endif /* __LUNAIX_PROCESS_H */

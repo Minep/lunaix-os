@@ -115,19 +115,36 @@ uscope_copy(struct user_scope* to, struct user_scope* from)
     memcpy(to, from, sizeof(*to));
 }
 
+enum acl_match
+check_acl_between(uid_t u1, gid_t g1, uid_t u2, gid_t g2)
+{
+    struct user_scope* uscope;
+
+    if (!u1 || u1 == u2)
+        return ACL_MATCH_U;
+
+    if (g1 == g2)
+        return ACL_MATCH_G;
+
+    return ACL_NO_MATCH;
+}
+
 
 enum acl_match
 check_current_acl(uid_t desired_u, gid_t desired_g)
 {
+    enum acl_match match;
     struct user_scope* uscope;
 
-    if (!__current->euid || __current->euid == desired_u) 
-    {
-        return ACL_MATCH_U;
+    if (unlikely(!__current)) {
+        return ACL_NO_MATCH;
     }
 
-    if (__current->egid == desired_g) {
-        return ACL_MATCH_G;
+    match = check_acl_between(__current->euid, __current->egid,
+                              desired_u, desired_g);
+    
+    if (match != ACL_NO_MATCH) {
+        return match;
     }
 
     uscope = current_user_scope();

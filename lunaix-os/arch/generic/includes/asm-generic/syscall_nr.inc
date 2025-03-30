@@ -76,3 +76,7 @@ SYSCALL __lxsys_setgid
 SYSCALL __lxsys_seteuid
 SYSCALL __lxsys_setegid
 SYSCALL __lxsys_setgroups
+SYSCALL __lxsys_chroot
+SYSCALL __lxsys_fchmodat
+SYSCALL __lxsys_fchownat
+SYSCALL __lxsys_faccessat

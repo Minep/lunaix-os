@@ -48,6 +48,9 @@ uscope_membership(struct user_scope* proc_usr, gid_t gid);
 enum acl_match
 check_current_acl(uid_t desired_u, gid_t desired_g);
 
+enum acl_match
+check_acl_between(uid_t u1, gid_t g1, uid_t u2, gid_t g2);
+
 static inline bool
 uscope_with_capability(const struct user_scope* proc_usr, caps_t cap)
 {
