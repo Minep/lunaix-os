@@ -42,16 +42,27 @@
 /* Mount with block-cache-disabled flag */
 #define MNT_NC (1 << 1)
 
+typedef unsigned int mode_t;
+typedef unsigned int nlink_t;
+
 struct file_stat
 {
-    dev_t st_dev;
-    ino_t st_ino;
-    unsigned int mode;
-    dev_t st_rdev;
-    off_t st_size;
-    size_t st_blksize;
-    size_t st_ioblksize;
-    size_t st_blocks;
+    dev_t   st_dev;
+    ino_t   st_ino;
+    mode_t  st_mode;
+    nlink_t st_nlink;
+    uid_t   st_uid;
+    gid_t   st_gid;
+    dev_t   st_rdev;
+    off_t   st_size;
+    size_t  st_blksize;
+    size_t  st_blocks;
+
+    unsigned long st_atim;
+    unsigned long st_ctim;
+    unsigned long st_mtim;
+
+    size_t  st_ioblksize;
 };
 
 #endif /* __LUNAIX_FNCTL_DEFS_H */

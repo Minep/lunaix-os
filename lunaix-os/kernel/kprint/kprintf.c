@@ -112,7 +112,7 @@ __twimap_kprintf_read(struct twimap* map)
     {
         time_t s = pos->time / 1000;
         time_t ms = pos->time % 1000;
-        twimap_printf(map, "[%05d.%03d] %s\n", s, ms, pos->content);
+        twimap_printf(map, "[%05d.%03d] %s", s, ms, pos->content);
     }
 }
 

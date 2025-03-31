@@ -1733,12 +1733,21 @@ __DEFINE_LXSYSCALL2(int, fstat, int, fd, struct file_stat*, stat)
     struct v_inode* vino = fds->file->inode;
     struct device* fdev = vino->sb->dev;
 
-    *stat = (struct file_stat){.st_ino = vino->id,
-                               .st_blocks = vino->lb_usage,
-                               .st_size = vino->fsize,
-                               .mode = vino->itype,
-                               .st_ioblksize = PAGE_SIZE,
-                               .st_blksize = vino->sb->blksize};
+    stat->st_ino     = vino->id;
+    stat->st_blocks  = vino->lb_usage;
+    stat->st_size    = vino->fsize;
+    stat->st_blksize = vino->sb->blksize;
+    stat->st_nlink   = vino->link_count;
+    stat->st_uid     = vino->uid;
+    stat->st_gid     = vino->gid;
+
+    stat->st_ctim    = vino->ctime;
+    stat->st_atim    = vino->atime;
+    stat->st_mtim    = vino->mtime;
+
+    stat->st_mode    = (vino->itype << 16) | vino->acl;
+
+    stat->st_ioblksize = PAGE_SIZE;
 
     if (check_device_node(vino)) {
         struct device* rdev = resolve_device(vino->data);

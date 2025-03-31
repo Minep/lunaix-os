@@ -39,7 +39,7 @@ init_termios(int fd) {
 
     check(tcgetattr(fd, &term));
 
-    term.c_lflag = ICANON | IEXTEN | ISIG | ECHO | ECHOE | ECHONL;
+    term.c_lflag = ICANON | IEXTEN | ISIG | ECHO | ECHOE;
     term.c_iflag = ICRNL | IGNBRK;
     term.c_oflag = ONLCR | OPOST;
     term.c_cflag = CREAD | CLOCAL | CS8 | CPARENB;

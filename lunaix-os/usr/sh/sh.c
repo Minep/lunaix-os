@@ -182,7 +182,7 @@ sh_loop()
 
     while (1) {
         getcwd(pwd, 512);
-        printf("[%s]$ ", pwd);
+        printf("%s # ", pwd);
         int sz = read(stdin, buf, 511);
 
         if (sz < 0) {
@@ -195,8 +195,7 @@ sh_loop()
 
         // currently, this shell only support single argument
         if (!parse_cmdline(buf, argv)) {
-            printf("\n");
-            goto cont;
+             continue;
         }
 
         // cmd=="exit"
@@ -204,9 +203,7 @@ sh_loop()
             break;
         }
 
-        sh_exec((const char**)argv);
-    cont:
-        printf("\n");
+        sh_exec((const char**)argv);       
     }
 }
 

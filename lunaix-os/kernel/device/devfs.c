@@ -180,10 +180,10 @@ devfs_init_inode(struct v_superblock* vsb, struct v_inode* inode)
     inode->ops = &devfs_inode_ops;
     inode->default_fops = &devfs_file_ops;
 
-    // we set default access right to be 0660.
+    // we set default access right to be 0775.
     // TODO need a way to allow this to be changed
     
-    fsapi_inode_setaccess(inode, FSACL_u(R, W, X) | FSACL_g(R, W, X) | FSACL_oX);
+    fsapi_inode_setaccess(inode, FSACL_DEFAULT);
     fsapi_inode_setowner(inode, 0, 0);
 }
 

@@ -29,7 +29,7 @@ main(int argc, const char* argv[])
 
     close(fd);
 
-    if ((stat.mode & F_DIR)) {
+    if (((stat.st_mode >> 16) & F_DIR)) {
         err = rmdir(path);
     }
     else {

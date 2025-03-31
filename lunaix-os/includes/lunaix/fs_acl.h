@@ -8,6 +8,7 @@
 #define FSACL_WRITE    2
 #define FSACL_EXEC     1
 
+#define FSACL_MASK     03777
 #define FSACL_RWXMASK  0777
 #define FSACL_U(x)    (((x) & 0b111) << 6)
 #define FSACL_G(x)    (((x) & 0b111) << 3)
@@ -56,6 +57,9 @@
 
 #define FSACL_o(r, w, x)            \
         (v__(__fsacl_sel(o, r)) | v__(__fsacl_sel(o, w)) | v__(__fsacl_sel(o, x)))
+
+#define FSACL_DEFAULT               \
+        (FSACL_u(R, W, X) | FSACL_g(R, W, X) | FSACL_o(R, _, X))
 
 #define fsacl_test(acl, type)   ((acl) & (FSACL_##type))
 

@@ -16,9 +16,6 @@ typedef unsigned int u32_t;
 typedef unsigned long ptr_t;
 typedef unsigned long reg_t;
 
-typedef unsigned int uid_t;
-typedef unsigned int gid_t;
-
 #ifndef CONFIG_ARCH_BITS_64
 typedef unsigned long long u64_t;
 #else

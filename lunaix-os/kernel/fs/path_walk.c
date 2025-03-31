@@ -95,6 +95,7 @@ __vfs_walk(struct v_dnode* start,
 
         if (!check_allow_execute(current_inode)) {
             errno = EACCESS;
+            unlock_dnode(current_level);
             goto error;
         }
 
@@ -106,6 +107,7 @@ __vfs_walk(struct v_dnode* start,
 
             if (!dnode) {
                 errno = ENOMEM;
+                unlock_dnode(current_level);
                 goto error;
             }
 

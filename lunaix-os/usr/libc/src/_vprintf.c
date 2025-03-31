@@ -112,6 +112,9 @@ __vprintf_internal(char* buffer, const char* fmt, size_t max_len, va_list vargs)
                 flags = flags | FLAG_CAPS;
                 base = 16;
                 goto format_unsigned;
+            case 'o':
+                base = 8;
+                goto format_unsigned;
             case 'p':
                 num = (uintptr_t)va_arg(vargs, void*);
                 base = 16;

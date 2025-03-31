@@ -28,7 +28,7 @@ main(int argc, char* argv[])
     printf("File: %s ", argv[1]);
 
     char* ftype = "directory";
-    int mode = stat.mode;
+    int mode = stat.st_mode >> 16;
     if ((mode & F_DEV)) {
         ftype = "mappable (sequential) device";
 
@@ -53,16 +53,25 @@ main(int argc, char* argv[])
            stat.st_blocks,
            stat.st_blksize,
            stat.st_ioblksize);
-    printf("Inode: %d;  ", stat.st_ino);
 
     dev_t* dev;
-    if (!(stat.mode & F_DEV)) {
+    if (!(mode & F_DEV)) {
         dev = &stat.st_dev;
     } else {
         dev = &stat.st_rdev;
     }
+    printf("Device: %xh:%xh@%d;  Inode: %d;  Links: %d\n", 
+           dev->meta, dev->unique, dev->index,
+           stat.st_ino, stat.st_nlink);
 
-    printf("Device: %xh:%xh@%d;\n", dev->meta, dev->unique, dev->index);
+    printf("Access: 0%o;  Uid: %d;  Gid: %d\n",
+           stat.st_mode & 0xffff,
+           stat.st_uid,
+           stat.st_gid);
+
+    printf("Access: %lu\n", stat.st_atim);
+    printf("Modify: %lu\n", stat.st_mtim);
+    printf("Create: %lu\n", stat.st_ctim);
 
     close(fd);
     return 0;
