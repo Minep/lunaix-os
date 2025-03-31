@@ -13,9 +13,13 @@ The Lunaix kernel (or soon-to-be LunaixOS) is a hobby kernel, written entirely f
 This project is based solely on first principles. Meaning that it does neither copy-pasting nor recycling other os projects/tutorials. However, this doesn't necessarily imply superiority; In fact, Lunaix starts out as a mean to challenge my understanding in OS theory and also a platform for experimenting some advanced (and cool) kernel features. If you are a kernel hobbyist who want some new perspectives or just simply get fatigued on those recycled content, then you have came to the right place!
 
 
-| ![showcase_lunaix-over-serial.png](docs/img/showcase_lunaix-over-serial.png) | ![showcase_lunaix-over-serial.png](docs/img/showcase_lunaix-over-vga-text.png) |
-|:--:| :--:| 
-| *Lunaix over serial* | *Lunaix over VGA text mode* |
+| ![showcase_lunaix-over-serial.png](docs/img/showcase_lunaix-over-serial.png) |
+|:--:|
+| *Lunaix over serial* (`console=/dev/ttyS0`) |
+
+| ![showcase_lunaix-over-serial.png](docs/img/showcase_lunaix-over-vga-text.png) |
+|:--:|
+| *Lunaix over VGA text mode* (`console=/dev/ttyVCON0`) |
 
 > By the way, do you know there is an online video course  by the author on the design of lunaix? [Check it out](https://space.bilibili.com/12995787/channel/collectiondetail?sid=196337) (although it is in Chinese!)
 
@@ -144,6 +148,23 @@ A successful build will give `build/bin/kernel.bin`.
 
 **Please note: this is the kernel, not a bootable image, it require a bootloader to boot and specify the rootfs.**
 
+## Get Started
+
+If you are impatient, or just want something to run and don't want to went through tedious process of configuring rootfs and tweak kernel parameters. You can use the `live_debug.sh` provided in the lunaix root directory to quickly bring up the system with default parameters (also used by the author for debugging).
+
+Following the steps:
+
+1. Select an architecture `<arch>`
+2. Check the compilation prerequisites and presence of `qemu-system-<arch>`
+3. Optionally export `CX_PREFIX` if you are building for another architecture.
+4. Run `make ARCH=<arch> rootfs` to build stock rootfs image, require support of `dd`，`mkfs.ext2`, `mount -o loop`, `mktemp`.
+5. Run `ARCH=<arch> live_debug.sh` to boot in QEMU with gdb hooked (one should see a gdb session)
+6. telnet to `localhost:12345`, this is QEMU emulated serial port
+7. type `c` in the active gdb session and commence emulation.
+8. Congrats, enjoy your lunaix!
+(or submit an issue)
+
+
 ## Booting the kernel
 
 Since lunaix is a kernel, much like linux. It requires additional setup to do the magic. And, as in "much like linux", methods to make linux kernel boot can also apply to lunaix without or with little translation, as we will discuss below.
@@ -160,22 +181,6 @@ Currently, lunaix support the following options
 | console | `/dev/ttyS0`   | No | Specify the system console device, path within lunaix's devfs |
 | rootfs | `/dev/block/sda` | No | Specify the device contain rootfs image, path within lunaix's devfs |
 | init | `/init` | Yes | Path within rootfs of the `init` |
-
-### A quick 'Get Started'
-
-One can use the `live_debug.sh` provided in the lunaix root directory to quickly bring up the system with default parameters (also used by the author for debugging).
-
-Following the steps:
-
-1. Select an architecture `<arch>`
-2. Check the compilation prerequisites and presence of `qemu-system-<arch>`
-3. Run `make ARCH=<arch> user` to build the stock user program
-4. Run `make ARCH=<arch> rootfs` to build stock rootfs image, require support of `dd`，`mkfs.ext2`, `mount -o loop`, `mktemp`.
-5. Run `ARCH=<arch> live_debug.sh` to boot in QEMU with gdb hooked (one should see a gdb session)
-6. telenet to `localhost:12345`, this is QEMU emulated serial port
-7. type `c` in the active gdb session and commence emulation.
-8. Congrats, enjoy your lunaix!
-(or submit an issue)
 
 
 ## Submit an Issue
@@ -325,7 +330,7 @@ As a personal challenge, this project is independently developed by the author s
 
 ## Appendix 2: Debugging with GDB remotely via UART
 
-**(((( Not working yet, need rework ))))**
+**(((( Broken after a refactoring years ago, need rework ))))**
 
 The LunaixOS kernel comes with a built-in GDB debugging server, which runs on COM1@9600Bd. However, LunaixOS must be in debug mode before involving GDB.
 
