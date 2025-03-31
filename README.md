@@ -8,11 +8,20 @@
 
 # The Lunaix Project
 
-The Lunaix, LunaixOS, or Lunaix kernel to be exact, is a multi-architectural general purpose kernel written from scratch by the author *independently*. It is the author's years-long personal endeavor and also a challenge to oneself for writing a functioning kernel **without** any external reference such as existing implementations, tutorials and books (with code) on kernel design. As a result, this project is a manifestation of the author's own research and understanding on the board topic of operating system design and implementation.
+The Lunaix kernel (or soon-to-be LunaixOS) is a hobby kernel, written entirely from scratch. Designed to be POSIX-compliance, performance critical and modern, with some independent thoughts being applied in architectural design.
 
-## Introduction
+This project is based solely on first principles. Meaning that it does neither copy-pasting nor recycling other os projects/tutorials. However, this doesn't necessarily imply superiority; In fact, Lunaix starts out as a mean to challenge my understanding in OS theory and also a platform for experimenting some advanced (and cool) kernel features. If you are a kernel hobbyist who want some new perspectives or just simply get fatigued on those recycled content, then you have came to the right place!
 
-The overall design of lunaix is aimed to be modern and POSIX-compliance. In a nutshell, Lunaix is:
+
+| ![showcase_lunaix-over-serial.png](docs/img/showcase_lunaix-over-serial.png) | ![showcase_lunaix-over-serial.png](docs/img/showcase_lunaix-over-vga-text.png) |
+|:--:| :--:| 
+| *Lunaix over serial* | *Lunaix over VGA text mode* |
+
+> By the way, do you know there is an online video course  by the author on the design of lunaix? [Check it out](https://space.bilibili.com/12995787/channel/collectiondetail?sid=196337) (although it is in Chinese!)
+
+## Features
+
+In a nutshell, Lunaix is a multi-architectural general purpose kernel, and she is:
 
 + fully-preemptive
 + modular design with configurable components at compile-time and extendable subsystems
@@ -101,8 +110,6 @@ For the device drivers that are currently support see below:
   + GICv3
   + PL011 (W.I.P)
 
-By the way, do you know there is an online video course  by the author on the design of lunaix? [Check it out](https://space.bilibili.com/12995787/channel/collectiondetail?sid=196337) (although it is in Chinese!) 
-
 ## Project Structure
 
 | Path | Description |
@@ -178,11 +185,15 @@ If one ran into bug, one can submit an issue by filling up the following templat
 ```
 1. Describe the problem
     "How does it look like, anything descriptive: visual, sonic, emotional experience"
+
 2. Steps to reproduce
     "How you ran into this mess?"
+
 3. Expected behaviour
     "What do you intended/expected to achieve/to be"
+
 4. Lunaix's panic trace (if applicable)
+
 5. Other clues that you think might be helpful
 ```
 
