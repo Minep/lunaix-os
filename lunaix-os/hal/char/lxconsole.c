@@ -27,7 +27,7 @@
 
 struct console
 {
-    struct potens_meta* tp_cap;
+    struct termport_potens* tp_cap;
     struct lx_timer* flush_timer;
     struct fifo_buf output;
     struct fifo_buf input;
@@ -92,9 +92,7 @@ __lxconsole_listener(struct input_device* dev)
 
     fifo_putone(&lx_console.input, ttychr);
 
-    struct termport_potens* tpcap;
-    tpcap = get_potens(lx_console.tp_cap, typeof(*tpcap));
-    term_notify_data_avaliable(tpcap);
+    term_notify_data_avaliable(lx_console.tp_cap);
     
     pwake_all(&lx_reader);
 done:
@@ -300,7 +298,7 @@ lxconsole_spawn_ttydev(struct device_def* devdef)
 
     register_device(tty_dev, &devdef->class, "vcon");
 
-    term_attach_potens(tty_dev, NULL, "VCON");
+    lx_console.tp_cap = term_attach_potens(tty_dev, NULL, "VCON");
 
     return 0;
 }

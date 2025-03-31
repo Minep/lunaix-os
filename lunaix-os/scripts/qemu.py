@@ -337,6 +337,7 @@ class QEMUExec:
         qemu_path = os.path.join(qemu_dir_override, qemu_path)
         cmds = [
             qemu_path,
+            *extras,
             *self.get_qemu_general_opts(),
             *self.get_qemu_arch_opts(),
             *self.get_qemu_debug_opts()
@@ -345,7 +346,6 @@ class QEMUExec:
         for dev in self._devices:
             cmds += dev.get_qemu_opts()
 
-        cmds += extras
         logger.info(" ".join(cmds))
 
         if dryrun:

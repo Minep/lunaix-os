@@ -51,7 +51,7 @@ function cleanup() {
 dd if=/dev/zero of="${rootfs}" count=${size_mb} bs=1M \
     || cleanup tmpmnt
 
-mkfs.${fs} -L lunaix-rootfs -r 0 "${rootfs}" \
+${prefix} mkfs.${fs} -L lunaix-rootfs -r 0 "${rootfs}" \
     || cleanup tmpmnt img
 
 ${prefix} mount -o loop "${rootfs}" "${tmp_mnt}" \
