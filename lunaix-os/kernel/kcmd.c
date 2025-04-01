@@ -74,7 +74,12 @@ kcmd_parse_cmdline(char* cmd_line)
 {
     struct extractor ctx = { .cmdline = cmd_line, .pos = 0 };
     
-    while(extract_next_option(&ctx)) {
+    INFO("active kcmds");
+
+    // first option is always kernel itself
+    extract_next_option(&ctx);
+
+    while (extract_next_option(&ctx)) {
         if (!ctx.key.len) {
             continue;
         }
@@ -96,6 +101,9 @@ kcmd_parse_cmdline(char* cmd_line)
         
         memcpy(kopt->buf, &cmd_line[ctx.key.pos], ctx.key.len);
         
+        kopt->hashkey = HSTR(kopt->buf, ctx.key.len);
+        hstr_rehash(&kopt->hashkey, HSTR_FULL_HASH);
+
         if (ctx.val.len) {
             kopt->value = &kopt->buf[ctx.key.len + 1];
             size_t max_val_len = maxlen - ctx.key.len;
@@ -106,11 +114,12 @@ kcmd_parse_cmdline(char* cmd_line)
             }
 
             memcpy(kopt->value, &cmd_line[ctx.val.pos], ctx.val.len);
+            INFO("   %-10s =%s", kopt->hashkey.value, kopt->value);
+        }
+        else {
+            INFO("   %s", kopt->hashkey.value);
         }
         
-        kopt->hashkey = HSTR(kopt->buf, ctx.key.len);
-        hstr_rehash(&kopt->hashkey, HSTR_FULL_HASH);
-
         hashtable_hash_in(options, &kopt->node, kopt->hashkey.hash);
     }
 }

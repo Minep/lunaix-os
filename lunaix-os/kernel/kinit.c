@@ -111,6 +111,16 @@ __remap_and_load_dtb(struct boot_handoff* bhctx)
     return;
 }
 
+static void
+log_bootup_time()
+{
+    datetime_t dt;
+
+    clock_walltime(&dt);
+    INFO("kernel boot at: %d/%d/%d %d:%d:%d", 
+            dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
+}
+
 void
 kernel_bootstrap(struct boot_handoff* bhctx)
 {
@@ -123,6 +133,8 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     /* Setup kernel memory layout and services */
     kmem_init(bhctx);
 
+    INFO();
+    INFO("Lunaix " CONFIG_LUNAIX_VER " (c) Lunaixsky 2022-2025");
 
     boot_parse_cmdline(bhctx);
 
@@ -141,6 +153,7 @@ kernel_bootstrap(struct boot_handoff* bhctx)
 
     clock_init();
     timer_init();
+    log_bootup_time();
 
     initfn_invoke_earlyboot();
 

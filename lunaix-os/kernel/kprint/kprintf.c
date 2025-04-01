@@ -5,6 +5,7 @@
 #include <lunaix/syslog.h>
 #include <lunaix/device.h>
 #include <lunaix/owloysius.h>
+#include <lunaix/ds/flipbuf.h>
 
 #include <hal/term.h>
 
@@ -12,11 +13,11 @@
 
 #include "kp_records.h"
 
-#define MAX_BUFSZ 512
 #define MAX_BUFSZ_HLF 256
 #define MAX_KPENT_NUM 1024
 
-static char tmp_buf[MAX_BUFSZ];
+static char tmp_buf[MAX_BUFSZ_HLF * 2];
+static DEFINE_FLIPBUF(fmtbuf, MAX_BUFSZ_HLF, tmp_buf);
 
 static struct kp_records kprecs = {
     .kp_ents = { .ents = { .next = &kprecs.kp_ents.ents,
@@ -40,23 +41,43 @@ shift_level(const char* str, int* level)
 }
 
 static inline void
+__put_console(const struct kp_entry* ent)
+{
+    char* buf;
+    time_t s, ms;
+    size_t sz;
+
+    if (unlikely(!sysconsole)) {
+        return;
+    }
+
+    s   = ent->time / 1000;
+    ms  = ent->time % 1000;
+    buf = flipbuf_flip(&fmtbuf);
+    sz  = ksnprintf(buf, MAX_BUFSZ_HLF, 
+                    "[%04d.%03d] %s", s, ms, ent->content);
+    
+    sysconsole->ops.write(sysconsole, buf, 0, sz);
+}
+
+static inline void
 kprintf_put(int level, const char* buf, size_t sz)
 {
-    kprec_put(&kprecs, level, buf, sz);
-
-    if (likely(sysconsole)) {
-        sysconsole->ops.write(sysconsole, buf, 0, sz);
-    }
+    __put_console(kprec_put(&kprecs, level, buf, sz));
 }
 
 static inline void
 kprintf_ml(const char* component, int level, const char* fmt, va_list args)
 {
-    char* buf = &tmp_buf[MAX_BUFSZ_HLF];
+    char* buf;
+    size_t sz;
+
+    buf = flipbuf_top(&fmtbuf);
     ksnprintf(buf, MAX_BUFSZ_HLF, "%s: %s\n", component, fmt);
 
-    size_t sz = ksnprintfv(tmp_buf, buf, MAX_BUFSZ_HLF, args);
-    kprintf_put(level, tmp_buf, sz);
+    sz = ksnprintfv(flipbuf_flip(&fmtbuf), buf, MAX_BUFSZ_HLF, args);
+    
+    kprintf_put(level, flipbuf_top(&fmtbuf), sz);
 }
 
 void
@@ -112,7 +133,7 @@ kprintf_dump_logs() {
     struct kp_entry *pos, *n;
     llist_for_each(pos, n, kprecs.kp_ent_wp, ents)
     {
-        sysconsole->ops.write(sysconsole, pos->content, 0, pos->len);
+        __put_console(pos);
     }
 }
 

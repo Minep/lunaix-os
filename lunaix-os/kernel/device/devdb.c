@@ -59,6 +59,8 @@ device_scan_drivers()
 
         llist_append(&dev_registry_flat, &devdef->dev_list);
     }
+
+    INFO("%d drivers registered", idx + 1);
 }
 
 static int

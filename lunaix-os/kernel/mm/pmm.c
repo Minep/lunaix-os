@@ -1,8 +1,12 @@
 #include <lunaix/status.h>
 #include <lunaix/mm/pagetable.h>
 #include <lunaix/spike.h>
+#include <lunaix/owloysius.h>
+#include <lunaix/syslog.h>
 
 #include "pmm_internal.h"
+
+LOG_MODULE("pmm")
 
 static inline bool
 __check_typemask(struct ppage* page, ppage_type_t typemask)
@@ -109,3 +113,23 @@ pmm_declare_pool(int pool, pfn_t start, pfn_t size)
 
     return _pool;
 }
+
+static void
+pmm_log_summary()
+{
+    pfn_t len;
+    struct pmem_pool* _pool;
+
+    INFO("init: nr_pages=%ld, gran=0x%lx", memory.list_len, 1 << PAGE_SHIFT);
+
+    for (int i = 0; i < POOL_COUNT; i++)
+    {
+        _pool = &memory.pool[i];
+        len   = ppfn(_pool->pool_end) - ppfn(_pool->pool_start) + 1;
+        
+        INFO("pool #%d (%d), %ld-%ld(0x%lx)", 
+                i , _pool->type, 
+                ppfn(_pool->pool_start), ppfn(_pool->pool_end), len);
+    }
+}
+owloysius_fetch_init(pmm_log_summary, on_sysconf);

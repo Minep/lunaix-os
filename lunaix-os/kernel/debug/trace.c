@@ -13,7 +13,7 @@
 
 #define NB_TRACEBACK 16
 
-LOG_MODULE("TRACE")
+LOG_MODULE("lkdbg")
 
 extern_autogen(ksymtable);
 
@@ -34,6 +34,9 @@ void
 trace_modksyms_init(struct boot_handoff* bhctx)
 {
     trace_ctx.ksym_table = autogen(struct ksyms, ksymtable);
+
+    INFO("symbols loaded: %d @0x%lx", 
+            trace_ctx.ksym_table->ksym_count, trace_ctx.ksym_table->syms);
 }
 
 struct ksym_entry*
