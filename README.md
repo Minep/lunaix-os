@@ -282,22 +282,22 @@ As a personal challenge, this project is independently developed by the author s
 2. `mkdir(2)`
 2. `lseek(2)`
 2. `readdir(2)`
-2. `readlink(2)`※
-2. `readlinkat(2)`※
-2. `rmdir(2)`※
-2. `unlink(2)`※
-2. `unlinkat(2)`※
-2. `link(2)`※
-2. `fsync(2)`※
+2. `readlink(2)`
+2. `readlinkat(2)`
+2. `rmdir(2)`
+2. `unlink(2)`
+2. `unlinkat(2)`
+2. `link(2)`
+2. `fsync(2)`
 2. `dup(2)`
 2. `dup2(2)`
-2. `symlink(2)`※
+2. `symlink(2)`
 2. `chdir(2)`
 2. `fchdir(2)`
 2. `getcwd(2)`
 2. `rename(2)`※
 2. `mount(2)`
-2. `unmount` (a.k.a `umount(2)`)※
+2. `unmount` (a.k.a `umount(2)`)
 2. `getxattr(2)`※
 2. `setxattr(2)`※
 2. `fgetxattr(2)`※
@@ -319,6 +319,20 @@ As a personal challenge, this project is independently developed by the author s
 4. `pthread_kill`
 4. `pthread_detach`
 4. `pthread_sigmask`
+4. `getuid`
+4. `getgid`
+4. `geteuid`
+4. `getegid`
+4. `getgroups`
+4. `setuid`
+4. `setgid`
+4. `seteuid`
+4. `setegid`
+4. `setgroups`
+4. `chroot`
+4. `fchmodat`
+4. `fchownat`
+4. `faccessat`
 
 **LunaixOS**
 

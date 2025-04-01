@@ -14,6 +14,7 @@
 struct load_context
 {
     struct exec_host* container;
+
     ptr_t base;
     ptr_t end;
     ptr_t mem_sz;
@@ -36,6 +37,7 @@ struct exec_host
     ptr_t vms_mnt;
 
     struct load_context exe;
+    struct v_inode* inode;
 
     struct exec_arrptr argv;
     struct exec_arrptr envp;

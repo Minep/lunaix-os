@@ -2,6 +2,7 @@
 #define __LUNAIX_TYPES_H
 
 #include <lunaix/compiler.h>
+#include <lunaix/limits.h>
 #include <stdarg.h>
 #include <usr/lunaix/types.h>
 

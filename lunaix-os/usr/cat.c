@@ -26,7 +26,7 @@ main(int argc, const char* argv[])
             return 1;
         }
 
-        if ((stat.mode & F_DIR)) {
+        if (((stat.st_mode >> 16) & F_DIR)) {
             printf("%s is a directory", argv[i]);
             return 1;
         }

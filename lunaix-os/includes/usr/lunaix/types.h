@@ -24,6 +24,8 @@ typedef signed long ssize_t;
 
 typedef int pid_t;
 typedef int tid_t;
+typedef int uid_t;
+typedef int gid_t;
 
 typedef __SIZE_TYPE__ size_t;
 

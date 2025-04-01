@@ -132,7 +132,13 @@ ramfs_mount(struct v_superblock* vsb, struct v_dnode* mount_point)
 {
     vsb->ops.init_inode = ramfs_inode_init;
 
-    return __ramfs_mknod(mount_point, NULL, RAMF_DIR);
+    int errno = __ramfs_mknod(mount_point, NULL, RAMF_DIR);
+
+    if (!errno) {
+        fsapi_inode_setaccess(mount_point->inode, FSACL_DEFAULT);
+    }
+
+    return errno;
 }
 
 int

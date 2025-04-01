@@ -202,6 +202,7 @@ exec_load(struct exec_host* container, struct v_file* executable)
     }
 
     save_process_cmd(proc, argv);
+    container->inode = executable->inode;
     
     errno = load_executable(&container->exe, executable);
     if (errno) {
@@ -223,12 +224,17 @@ exec_load_byname(struct exec_host* container, const char* filename)
         goto done;
     }
 
-    if ((errno = vfs_open(dnode, &file))) {
+    if (!check_allow_execute(dnode->inode)) {
+        errno = EPERM;
         goto done;
     }
 
     if (!check_itype_any(dnode->inode, F_FILE)) {
         errno = EISDIR;
+        goto done;
+    }
+    
+    if ((errno = vfs_open(dnode, &file))) {
         goto done;
     }
 
@@ -270,16 +276,11 @@ exec_kexecve(const char* filename, const char* argv[], const char* envp[])
     return errno;
 }
 
-__DEFINE_LXSYSCALL3(int,
-                    execve,
-                    const char*,
-                    filename,
-                    const char*,
-                    argv[],
-                    const char*,
-                    envp[])
+__DEFINE_LXSYSCALL3(int, execve, const char*, filename,
+                    const char*, argv[], const char*, envp[])
 {
     int errno = 0;
+    int acl;
     struct exec_host container;
 
     if (!argv || !envp) {
@@ -303,6 +304,15 @@ __DEFINE_LXSYSCALL3(int,
     signal_reset_context(&current_thread->sigctx);
     signal_reset_registry(__current->sigreg);
 
+    acl = container.inode->acl;
+    if (fsacl_test(acl, suid)) {
+        current_set_euid(container.inode->uid);
+    }
+
+    if (fsacl_test(acl, sgid)) {
+        current_set_egid(container.inode->gid);
+    }
+
 done:
     // set return value
     store_retval(DO_STATUS(errno));
@@ -310,6 +320,5 @@ done:
     // Always yield the process that want execve!
     schedule();
 
-    // this will never get executed!
-    return -1;
+    unreachable;
 }

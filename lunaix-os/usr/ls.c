@@ -13,27 +13,43 @@ main(int argc, const char* argv[])
     DIR* dir = opendir(path);
 
     if (!dir) {
-        return errno;
+        goto done;
     }
 
     struct dirent* dent;
+    int i = 0, sz;
+    char bf[100];
 
     while ((dent = readdir(dir))) {
         if (dent->d_type == DT_DIR) {
-            printf(" %s/\n", dent->d_name);
+            sz = snprintf(bf, 100, "%s/", dent->d_name);
         } else if (dent->d_type == DT_SYMLINK) {
-            printf(" %s@\n", dent->d_name);
+            sz = snprintf(bf, 100, "%s@", dent->d_name);
         } else {
-            printf(" %s\n", dent->d_name);
+            sz = snprintf(bf, 100, "%s", dent->d_name);
+        }
+
+        bf[sz] = 0;
+        printf("%-15s ", bf);
+
+        i++;
+        if ((i % 4) == 0) {
+            printf("\n");
         }
     }
 
+    if ((i % 4) != 0) {
+        printf("\n");
+    }
+
+done:
     int err = errno;
     if (err) {
         printf("failed: %d\n",err);
     }
 
-    closedir(dir);
+    if (dir)
+        closedir(dir);
 
     return err;
 }

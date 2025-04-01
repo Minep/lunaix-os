@@ -12,7 +12,7 @@ __try_wait(bool check_stall)
     if (waitq_empty(current_wq)) {
         return;
     }
-    
+
     block_current_thread();
 
     if (!check_stall) {
@@ -54,7 +54,7 @@ pwait_check_stall(waitq_t* queue)
 void
 pwake_one(waitq_t* queue)
 {
-    if (llist_empty(&queue->waiters)) {
+    if (waitq_empty(queue)) {
         return;
     }
 
@@ -69,7 +69,7 @@ pwake_one(waitq_t* queue)
 void
 pwake_all(waitq_t* queue)
 {
-    if (llist_empty(&queue->waiters)) {
+    if (waitq_empty(queue)) {
         return;
     }
 

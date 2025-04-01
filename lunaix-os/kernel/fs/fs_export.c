@@ -4,8 +4,8 @@
 
 extern struct llist_header all_mnts;
 
-void
-__mount_read(struct twimap* map)
+static void
+__twimap_read_mounts(struct twimap* map)
 {
     char path[512];
     struct v_mount* mnt = twimap_index(map, struct v_mount*);
@@ -20,8 +20,8 @@ __mount_read(struct twimap* map)
     twimap_printf(map, "\n");
 }
 
-int
-__mount_next(struct twimap* map)
+static int
+__twimap_gonext_mounts(struct twimap* map)
 {
     struct v_mount* mnt = twimap_index(map, struct v_mount*);
     if (mnt->list.next == &all_mnts) {
@@ -31,14 +31,14 @@ __mount_next(struct twimap* map)
     return 1;
 }
 
-void
-__mount_reset(struct twimap* map)
+static void
+__twimap_reset_mounts(struct twimap* map)
 {
     map->index = container_of(all_mnts.next, struct v_mount, list);
 }
 
 void
-__version_rd(struct twimap* map)
+__twimap_read_version(struct twimap* map)
 {
     twimap_printf(map,
                   "Lunaix "
@@ -49,12 +49,7 @@ __version_rd(struct twimap* map)
 void
 vfs_export_attributes()
 {
-    struct twimap* map = twifs_mapping(NULL, NULL, "mounts");
-    map->read = __mount_read;
-    map->go_next = __mount_next;
-    map->reset = __mount_reset;
-
-    map = twifs_mapping(NULL, NULL, "version");
-    map->read = __version_rd;
+    twimap_export_list (NULL, mounts,  FSACL_ugR, NULL);
+    twimap_export_value(NULL, version, FSACL_ugR, NULL);
 }
 EXPORT_TWIFS_PLUGIN(vfs_general, vfs_export_attributes);

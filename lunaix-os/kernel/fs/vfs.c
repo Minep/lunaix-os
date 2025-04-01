@@ -57,13 +57,16 @@
 
 #include <usr/lunaix/dirent_defs.h>
 
+#define INODE_ACCESSED  0
+#define INODE_MODIFY    1
+
 static struct cake_pile* dnode_pile;
 static struct cake_pile* inode_pile;
 static struct cake_pile* file_pile;
 static struct cake_pile* superblock_pile;
 static struct cake_pile* fd_pile;
 
-struct v_dnode* vfs_sysroot;
+struct v_dnode* vfs_sysroot = NULL;
 
 struct lru_zone *dnode_lru, *inode_lru;
 
@@ -152,6 +155,20 @@ vfs_dcache_lookup(struct v_dnode* parent, struct hstr* str)
     return NULL;
 }
 
+static void
+__vfs_touch_inode(struct v_inode* inode, const int type)
+{
+    if (type == INODE_MODIFY) {
+        inode->mtime = clock_unixtime();
+    }
+
+    else if (type == INODE_ACCESSED) {
+        inode->atime = clock_unixtime();
+    }
+
+    lru_use_one(inode_lru, &inode->lru);
+}
+
 void
 vfs_dcache_add(struct v_dnode* parent, struct v_dnode* dnode)
 {
@@ -192,11 +209,11 @@ vfs_dcache_rehash(struct v_dnode* new_parent, struct v_dnode* dnode)
 int
 vfs_open(struct v_dnode* dnode, struct v_file** file)
 {
-    if (!dnode->inode || !dnode->inode->ops->open) {
+    struct v_inode* inode = dnode->inode;
+    
+    if (!inode || !inode->ops->open) {
         return ENOTSUP;
     }
-
-    struct v_inode* inode = dnode->inode;
 
     lock_inode(inode);
 
@@ -696,6 +713,31 @@ done:
     return errno;
 }
 
+
+static bool
+__check_unlinkable(struct v_dnode* dnode)
+{
+    int acl;
+    bool wr_self, wr_parent;
+    struct v_dnode* parent;
+
+    parent = dnode->parent;
+    acl = dnode->inode->acl;
+
+    wr_self = check_allow_write(dnode->inode);
+    wr_parent = check_allow_write(parent->inode);
+
+    if (!fsacl_test(acl, svtx)) {
+        return wr_self;
+    }
+
+    if (current_euid() == dnode->inode->uid) {
+        return true;
+    }
+
+    return wr_self && wr_parent;
+}
+
 int
 vfs_do_open(const char* path, int options)
 {
@@ -814,6 +856,11 @@ __DEFINE_LXSYSCALL2(int, sys_readdir, int, fd, struct lx_dirent*, dent)
         goto unlock;
     }
 
+    if (!check_allow_read(inode)) {
+        errno = EPERM;
+        goto unlock;
+    }
+
     struct dir_context dctx = (struct dir_context) {
         .cb_data = dent,
         .read_complete_callback = __vfs_readdir_callback
@@ -836,6 +883,8 @@ __DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
 {
     int errno = 0;
     struct v_fd* fd_s;
+    struct v_inode* inode;
+
     if ((errno = vfs_getfd(fd, &fd_s))) {
         goto done;
     }
@@ -846,23 +895,29 @@ __DEFINE_LXSYSCALL3(int, read, int, fd, void*, buf, size_t, count)
         goto done;
     }
 
-    lock_inode(file->inode);
+    if (!check_allow_read(file->inode)) {
+        errno = EPERM;
+        goto done;
+    }
 
-    file->inode->atime = clock_unixtime();
+    inode = file->inode;
+    lock_inode(inode);
 
-    if (check_seqdev_node(file->inode) || (fd_s->flags & FO_DIRECT)) {
-        errno = file->ops->read(file->inode, buf, count, file->f_pos);
+    __vfs_touch_inode(inode, INODE_ACCESSED);
+
+    if (check_seqdev_node(inode) || (fd_s->flags & FO_DIRECT)) {
+        errno = file->ops->read(inode, buf, count, file->f_pos);
     } else {
-        errno = pcache_read(file->inode, buf, count, file->f_pos);
+        errno = pcache_read(inode, buf, count, file->f_pos);
     }
 
     if (errno > 0) {
         file->f_pos += errno;
-        unlock_inode(file->inode);
+        unlock_inode(inode);
         return errno;
     }
 
-    unlock_inode(file->inode);
+    unlock_inode(inode);
 
 done:
     return DO_STATUS(errno);
@@ -891,7 +946,7 @@ __DEFINE_LXSYSCALL3(int, write, int, fd, void*, buf, size_t, count)
     inode = file->inode;
     lock_inode(inode);
 
-    inode->mtime = clock_unixtime();
+    __vfs_touch_inode(inode, INODE_MODIFY);
     if ((fd_s->flags & O_APPEND)) {
         file->f_pos = inode->fsize;
     }
@@ -929,6 +984,11 @@ __DEFINE_LXSYSCALL3(int, lseek, int, fd, int, offset, int, options)
 
     if (!file->ops->seek) {
         errno = ENOTSUP;
+        goto done;
+    }
+
+    if (!check_allow_read(inode)) {
+        errno = EPERM;
         goto done;
     }
 
@@ -1010,6 +1070,10 @@ vfs_readlink(struct v_dnode* dnode, char* buf, size_t size)
 
     if (!inode->ops->read_symlink) {
         return ENOTSUP;
+    }
+
+    if (!check_allow_read(inode)) {
+        return EPERM;
     }
 
     lock_inode(inode);
@@ -1118,6 +1182,11 @@ __DEFINE_LXSYSCALL1(int, rmdir, const char*, pathname)
 
     lock_dnode(dnode);
 
+    if (!__check_unlinkable(dnode)) {
+        errno = EPERM;
+        goto done;
+    } 
+
     if ((errno = vfs_check_writable(dnode))) {
         goto done;
     }
@@ -1214,7 +1283,7 @@ done:
     return DO_STATUS(errno);
 }
 
-int
+static int
 __vfs_do_unlink(struct v_dnode* dnode)
 {
     int errno;
@@ -1223,6 +1292,10 @@ __vfs_do_unlink(struct v_dnode* dnode)
     if (dnode->ref_count > 1) {
         return EBUSY;
     }
+
+    if (!__check_unlinkable(dnode)) {
+        return EPERM;
+    } 
 
     if ((errno = vfs_check_writable(dnode))) {
         return errno;
@@ -1434,16 +1507,11 @@ done:
     return DO_STATUS(errno);
 }
 
-int
-vfs_do_chdir(struct proc_info* proc, struct v_dnode* dnode)
+static int
+vfs_do_chdir_nolock(struct proc_info* proc, struct v_dnode* dnode)
 {
-    int errno = 0;
-
-    lock_dnode(dnode);
-
     if (!check_directory_node(dnode->inode)) {
-        errno = ENOTDIR;
-        goto done;
+        return ENOTDIR;
     }
 
     if (proc->cwd) {
@@ -1453,9 +1521,20 @@ vfs_do_chdir(struct proc_info* proc, struct v_dnode* dnode)
     vfs_ref_dnode(dnode);
     proc->cwd = dnode;
 
+    return 0;
+}
+
+static int
+vfs_do_chdir(struct proc_info* proc, struct v_dnode* dnode)
+{
+    int errno = 0;
+
+    lock_dnode(dnode);
+
+    errno = vfs_do_chdir_nolock(proc, dnode);
+
     unlock_dnode(dnode);
 
-done:
     return errno;
 }
 
@@ -1484,6 +1563,31 @@ __DEFINE_LXSYSCALL1(int, fchdir, int, fd)
     }
 
     errno = vfs_do_chdir((struct proc_info*)__current, fd_s->file->dnode);
+
+done:
+    return DO_STATUS(errno);
+}
+
+
+__DEFINE_LXSYSCALL1(int, chroot, const char*, path)
+{
+    int errno;
+    struct v_dnode* dnode;
+    if ((errno = vfs_walk_proc(path, &dnode, NULL, 0))) {
+        return errno;
+    }
+
+    lock_dnode(dnode);
+
+    errno = vfs_do_chdir_nolock(__current, dnode);
+    if (errno) {
+        unlock_dnode(dnode);
+        goto done;
+    }
+
+    __current->root = dnode;
+    
+    unlock_dnode(dnode);
 
 done:
     return DO_STATUS(errno);
@@ -1629,12 +1733,21 @@ __DEFINE_LXSYSCALL2(int, fstat, int, fd, struct file_stat*, stat)
     struct v_inode* vino = fds->file->inode;
     struct device* fdev = vino->sb->dev;
 
-    *stat = (struct file_stat){.st_ino = vino->id,
-                               .st_blocks = vino->lb_usage,
-                               .st_size = vino->fsize,
-                               .mode = vino->itype,
-                               .st_ioblksize = PAGE_SIZE,
-                               .st_blksize = vino->sb->blksize};
+    stat->st_ino     = vino->id;
+    stat->st_blocks  = vino->lb_usage;
+    stat->st_size    = vino->fsize;
+    stat->st_blksize = vino->sb->blksize;
+    stat->st_nlink   = vino->link_count;
+    stat->st_uid     = vino->uid;
+    stat->st_gid     = vino->gid;
+
+    stat->st_ctim    = vino->ctime;
+    stat->st_atim    = vino->atime;
+    stat->st_mtim    = vino->mtime;
+
+    stat->st_mode    = (vino->itype << 16) | vino->acl;
+
+    stat->st_ioblksize = PAGE_SIZE;
 
     if (check_device_node(vino)) {
         struct device* rdev = resolve_device(vino->data);
@@ -1652,6 +1765,108 @@ __DEFINE_LXSYSCALL2(int, fstat, int, fd, struct file_stat*, stat)
         stat->st_dev = (dev_t){.meta = fdev->ident.fn_grp,
                                .unique = fdev->ident.unique,
                                .index = dev_uid(fdev) };
+    }
+
+done:
+    return DO_STATUS(errno);
+}
+
+__DEFINE_LXSYSCALL4(int, fchmodat, int, fd, 
+                    const char*, path, int, mode, int, flags)
+{
+    int errno;
+    struct v_dnode *dnode;
+    struct v_inode* inode;
+
+    errno = vfs_walkat(fd, path, flags, &dnode);
+    if (errno) {
+        goto done;
+    }
+
+    errno = vfs_check_writable(dnode);
+    if (errno) {
+        return errno;
+    }
+
+    inode = dnode->inode;
+    lock_inode(inode);
+
+    if (!current_is_root()) {
+        mode = mode & FSACL_RWXMASK;
+    }
+
+    inode->acl = mode;
+    __vfs_touch_inode(inode, INODE_MODIFY);
+
+    unlock_inode(inode);
+
+done:
+    return DO_STATUS(errno);
+}
+
+__DEFINE_LXSYSCALL5(int, fchownat, int, fd, 
+                    const char*, path, uid_t, uid, gid_t, gid, int, flags)
+{
+    int errno;
+    struct v_dnode *dnode;
+    struct v_inode *inode;
+
+    errno = vfs_walkat(fd, path, flags, &dnode);
+    if (errno) {
+        goto done;
+    }
+
+    errno = vfs_check_writable(dnode);
+    if (errno) {
+        return errno;
+    }
+
+    inode = dnode->inode;
+    lock_inode(inode);
+
+    inode->uid = uid;
+    inode->gid = gid;
+    __vfs_touch_inode(inode, INODE_MODIFY);
+
+    unlock_inode(inode);
+
+done:
+    return DO_STATUS(errno);
+}
+
+__DEFINE_LXSYSCALL4(int, faccessat, int, fd, 
+                    const char*, path, int, amode, int, flags)
+{
+    int errno, acl;
+    struct v_dnode *dnode;
+    struct v_inode *inode;
+    struct user_scope* uscope;
+
+    uid_t tuid;
+    gid_t tgid;
+
+    errno = vfs_walkat(fd, path, flags, &dnode);
+    if (errno) {
+        goto done;
+    }
+
+    if ((flags & AT_EACCESS)) {
+        tuid = current_euid();
+        tgid = current_egid();
+    }
+    else {
+        uscope = current_user_scope();
+        tuid = uscope->ruid;
+        tgid = uscope->rgid;
+    }
+
+    inode = dnode->inode;
+
+    acl  = inode->acl;
+    acl &= amode;
+    acl &= check_acl_between(inode->uid, inode->gid, tuid, tgid);
+    if (!acl) {
+        errno = EACCESS;
     }
 
 done:
