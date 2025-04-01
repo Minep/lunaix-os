@@ -99,7 +99,7 @@ kprintf_v(const char* component, const char* fmt, ...)
 }
 
 static void
-__twimap_kprintf_read(struct twimap* map)
+__twimap_read_kmsg(struct twimap* map)
 {
     struct kp_records* __kprecs = twimap_data(map, struct kp_records*);
 
@@ -119,7 +119,7 @@ __twimap_kprintf_read(struct twimap* map)
 static void
 kprintf_mapping_init()
 {
-    twimap_entry_simple(NULL, "kmsg", &kprecs, __twimap_kprintf_read);
+    twimap_export_value(NULL, kmsg, FSACL_ugR, &kprecs);
 }
 EXPORT_TWIFS_PLUGIN(kprintf, kprintf_mapping_init);
 

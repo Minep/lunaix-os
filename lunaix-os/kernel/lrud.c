@@ -159,7 +159,7 @@ lru_remove(struct lru_zone* zone, struct lru_node* node)
 }
 
 static void
-read_lrulist_entry(struct twimap* map)
+__twimap_read_lru_pool(struct twimap* map)
 {
     struct lru_zone* zone;
 
@@ -181,14 +181,14 @@ read_lrulist_entry(struct twimap* map)
 }
 
 static void
-read_lrulist_reset(struct twimap* map)
+__twimap_reset_lru_pool(struct twimap* map)
 {
     map->index = container_of(&zone_lead, struct lru_zone, zones);
     twimap_printf(map, "name, n_objs, hot, n_evt, n_half, n_full, status\n");
 }
 
 static int
-read_lrulist_next(struct twimap* map)
+__twimap_gonext_lru_pool(struct twimap* map)
 {
     struct lru_zone* zone;
     struct llist_header* next;
@@ -206,11 +206,6 @@ read_lrulist_next(struct twimap* map)
 static void
 lru_pool_twimappable()
 {
-    struct twimap* map;
-
-    map = twifs_mapping(NULL, NULL, "lru_pool");
-    map->read = read_lrulist_entry;
-    map->reset = read_lrulist_reset;
-    map->go_next = read_lrulist_next;
+    twimap_export_list(NULL, lru_pool, FSACL_aR, NULL);
 }
 EXPORT_TWIFS_PLUGIN(__lru_twimap, lru_pool_twimappable);

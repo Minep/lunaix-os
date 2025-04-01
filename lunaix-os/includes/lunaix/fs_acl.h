@@ -41,12 +41,16 @@
 #define FSACL_g_      0
 #define FSACL_o_      0
 
-// any read
+// any
 #define FSACL_aR      (FSACL_uR | FSACL_gR | FSACL_oR)
-// any write
 #define FSACL_aW      (FSACL_uW | FSACL_gW | FSACL_oW)
-// any execute
 #define FSACL_aX      (FSACL_uX | FSACL_gX | FSACL_oX)
+
+// user/group
+#define FSACL_ugR      (FSACL_uR | FSACL_gR)
+#define FSACL_ugW      (FSACL_uW | FSACL_gW)
+#define FSACL_ugX      (FSACL_uX | FSACL_gX)
+
 
 #define __fsacl_sel(scope, type)    (FSACL_##scope##type)
 #define FSACL_u(r, w, x)            \

@@ -276,14 +276,8 @@ exec_kexecve(const char* filename, const char* argv[], const char* envp[])
     return errno;
 }
 
-__DEFINE_LXSYSCALL3(int,
-                    execve,
-                    const char*,
-                    filename,
-                    const char*,
-                    argv[],
-                    const char*,
-                    envp[])
+__DEFINE_LXSYSCALL3(int, execve, const char*, filename,
+                    const char*, argv[], const char*, envp[])
 {
     int errno = 0;
     int acl;
@@ -326,6 +320,5 @@ done:
     // Always yield the process that want execve!
     schedule();
 
-    // this will never get executed!
-    return -1;
+    unreachable;
 }

@@ -303,7 +303,7 @@ cake_grab(struct cake_pile* pile)
 
     if (!pos)
         return NULL;
-    
+
     void* piece;
     piece_t found_index, *fl_slot;
     
@@ -337,7 +337,9 @@ int
 cake_release(struct cake_pile* pile, void* area)
 {
     piece_t piece_index;
-    size_t dsize = 0;
+    size_t dsize = 0, maybe_index;
+
+    piece_t *fl_slot;
     struct cake_s *pos, *n;
     struct llist_header* hdrs[2] = { &pile->full, &pile->partial };
 
@@ -347,9 +349,12 @@ cake_release(struct cake_pile* pile, void* area)
             if (pos->first_piece > area) {
                 continue;
             }
-            dsize = (ptr_t)(area - pos->first_piece);
-            piece_index = dsize / pile->piece_size;
-            if (piece_index < pile->pieces_per_cake) {
+            
+            dsize = __ptr(area - pos->first_piece);
+            maybe_index = dsize / pile->piece_size;
+
+            if (maybe_index < pile->pieces_per_cake) {
+                piece_index = (piece_t)maybe_index;
                 goto found;
             }
         }
@@ -360,13 +365,11 @@ cake_release(struct cake_pile* pile, void* area)
 found:
     assert(!(dsize % pile->piece_size));
 
-    piece_t *fl_slot;
+    assert_msg(piece_index != pos->next_free, "double free");
 
     fl_slot = __fl_slot(pos, piece_index);
     *fl_slot = pos->next_free;
     pos->next_free = piece_index;
-
-    assert_msg(*fl_slot != pos->next_free, "double free");
 
     pos->used_pieces--;
     pile->alloced_pieces--;

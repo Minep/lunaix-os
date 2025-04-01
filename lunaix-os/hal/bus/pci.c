@@ -371,7 +371,7 @@ pci_apply_command(struct pci_probe* probe, pci_reg_t cmd)
 }
 
 static void
-__pci_read_cspace(struct twimap* map)
+__twimap_read_config(struct twimap* map)
 {
     struct pci_probe* probe;
 
@@ -388,7 +388,7 @@ __pci_read_cspace(struct twimap* map)
 /*---------- TwiFS interface definition ----------*/
 
 static void
-__pci_read_revid(struct twimap* map)
+__twimap_read_revision(struct twimap* map)
 {
     struct pci_probe* probe;
 
@@ -397,7 +397,7 @@ __pci_read_revid(struct twimap* map)
 }
 
 static void
-__pci_read_class(struct twimap* map)
+__twimap_read_class(struct twimap* map)
 {
     struct pci_probe* probe;
 
@@ -406,7 +406,7 @@ __pci_read_class(struct twimap* map)
 }
 
 static void
-__pci_read_devinfo(struct twimap* map)
+__twimap_read_pci_devinfo(struct twimap* map)
 {
     struct pci_probe* probe;
 
@@ -417,7 +417,7 @@ __pci_read_devinfo(struct twimap* map)
 }
 
 static void
-__pci_bar_read(struct twimap* map)
+__twimap_read_io_bases(struct twimap* map)
 {
     struct pci_probe* probe;
     int bar_index;
@@ -448,7 +448,7 @@ __pci_bar_read(struct twimap* map)
 }
 
 static int
-__pci_bar_gonext(struct twimap* map)
+__twimap_gonext_io_bases(struct twimap* map)
 {
     if (twimap_index(map, int) >= 5) {
         return 0;
@@ -458,7 +458,13 @@ __pci_bar_gonext(struct twimap* map)
 }
 
 static void
-__pci_read_binding(struct twimap* map)
+__twimap_reset_io_bases(struct twimap* map)
+{
+    map->index = 0;
+}
+
+static void
+__twimap_read_binding(struct twimap* map)
 {
     struct pci_probe* probe;
     struct devident* devid;
@@ -499,21 +505,11 @@ pci_build_fsmapping()
         probe = changeling_reveal(pos, pci_probe_morpher);
         pci_dev = twifs_dir_node(pci_class, "%x", probe->loc);
 
-        map = twifs_mapping(pci_dev, probe, "config");
-        map->read = __pci_read_cspace;
-
-        map = twifs_mapping(pci_dev, probe, "revision");
-        map->read = __pci_read_revid;
-
-        map = twifs_mapping(pci_dev, probe, "class");
-        map->read = __pci_read_class;
-
-        map = twifs_mapping(pci_dev, probe, "binding");
-        map->read = __pci_read_binding;
-
-        map = twifs_mapping(pci_dev, probe, "io_bases");
-        map->read = __pci_bar_read;
-        map->go_next = __pci_bar_gonext;
+        twimap_export_value(pci_dev, config,    FSACL_aR, probe);
+        twimap_export_value(pci_dev, revision,  FSACL_aR, probe);
+        twimap_export_value(pci_dev, class,     FSACL_aR, probe);
+        twimap_export_value(pci_dev, binding,   FSACL_aR, probe);
+        twimap_export_list (pci_dev, io_bases,  FSACL_aR, probe);
     }
 }
 EXPORT_TWIFS_PLUGIN(pci_devs, pci_build_fsmapping);

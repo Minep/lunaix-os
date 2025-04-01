@@ -80,7 +80,7 @@ fsm_itnext(struct fs_iter* iterator)
 }
 
 static void
-read_fslist(struct twimap *mapping)
+__twimap_read_fstab(struct twimap *mapping)
 {
     struct filesystem *pos, *n;
     llist_for_each(pos, n, &fs_flatlist, fs_flat)
@@ -92,7 +92,6 @@ read_fslist(struct twimap *mapping)
 static void
 fstab_twifs_plugin()
 {
-    struct twimap* map = twifs_mapping(NULL, NULL, "fstab");
-    map->read = read_fslist;
+    twimap_export_value(NULL, fstab, FSACL_ugR, NULL);
 }
 EXPORT_TWIFS_PLUGIN(fstab, fstab_twifs_plugin);

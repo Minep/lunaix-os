@@ -166,7 +166,9 @@ static void
 hwrtc_twifs_export(struct hwrtc_potens* pot)
 {
     const char* name = pot->rtc_proxy->name_val;
-    struct twimap* rtc_mapping = twifs_mapping(NULL, pot, name);
+    struct twimap* rtc_mapping;
+    
+    rtc_mapping = twifs_mapping(NULL, pot, FSACL_aR, name);
     rtc_mapping->read = __hwrtc_readinfo;
 }
 

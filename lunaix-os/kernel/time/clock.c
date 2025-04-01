@@ -5,15 +5,15 @@
 
 #include <klibc/string.h>
 
-void
-__clock_read_systime(struct twimap* map)
+static void
+__twimap_read_systime(struct twimap* map)
 {
     ticks_t sys_time = clock_systime();
     twimap_printf(map, "%u", sys_time);
 }
 
-void
-__clock_read_datetime(struct twimap* map)
+static void
+__twimap_read_datetime(struct twimap* map)
 {
     datetime_t dt;
     clock_walltime(&dt);
@@ -23,28 +23,11 @@ __clock_read_datetime(struct twimap* map)
                   dt.hour, dt.minute, dt.second);
 }
 
-void
-__clock_read_unix(struct twimap* map)
+static void
+__twimap_read_unixtime(struct twimap* map)
 {
     twimap_printf(map, "%u", clock_unixtime());
 }
-
-void
-clock_build_mapping()
-{
-    struct twifs_node* root = twifs_dir_node(NULL, "clock");
-    struct twimap* map;
-
-    map = twifs_mapping(root, NULL, "systime");
-    map->read = __clock_read_systime;
-
-    map = twifs_mapping(root, NULL, "unix");
-    map->read = __clock_read_unix;
-
-    map = twifs_mapping(root, NULL, "datetime");
-    map->read = __clock_read_datetime;
-}
-EXPORT_TWIFS_PLUGIN(sys_clock, clock_build_mapping);
 
 time_t
 clock_unixtime()
@@ -76,3 +59,17 @@ clock_walltime(datetime_t* datetime)
 {
     sysrtc->ops->get_walltime(sysrtc, datetime);
 }
+
+static void
+clock_build_mapping()
+{
+    struct twifs_node* root;
+    struct twimap* map;
+
+    root = twifs_dir_node(NULL, "clock");
+    
+    twimap_export_value(root, systime, FSACL_ugR, NULL);
+    twimap_export_value(root, unixtime, FSACL_ugR, NULL);
+    twimap_export_value(root, datetime, FSACL_ugR, NULL);
+}
+EXPORT_TWIFS_PLUGIN(sys_clock, clock_build_mapping);

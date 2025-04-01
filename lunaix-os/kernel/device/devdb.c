@@ -133,7 +133,7 @@ device_sysconf_load()
 }
 
 static int
-__devdb_db_gonext(struct twimap* mapping)
+__twimap_gonext_devtab(struct twimap* mapping)
 {
     struct device_def* current = twimap_index(mapping, struct device_def*);
     if (current->dev_list.next == &dev_registry_flat) {
@@ -145,7 +145,7 @@ __devdb_db_gonext(struct twimap* mapping)
 }
 
 static void
-__devdb_twifs_lsdb(struct twimap* mapping)
+__twimap_read_devtab(struct twimap* mapping)
 {
     char flags[64];
     struct device_def* def = twimap_index(mapping, struct device_def*);
@@ -161,8 +161,8 @@ __devdb_twifs_lsdb(struct twimap* mapping)
                   flags);
 }
 
-void
-__devdb_reset(struct twimap* map)
+static void
+__twimap_reset_devtab(struct twimap* map)
 {
     map->index =
       container_of(dev_registry_flat.next, struct device_def, dev_list);
@@ -171,9 +171,6 @@ __devdb_reset(struct twimap* map)
 static void
 devdb_twifs_plugin()
 {
-    struct twimap* map = twifs_mapping(NULL, NULL, "devtab");
-    map->reset = __devdb_reset;
-    map->read = __devdb_twifs_lsdb;
-    map->go_next = __devdb_db_gonext;
+    twimap_export_list(NULL, devtab, FSACL_aR, NULL);
 }
 EXPORT_TWIFS_PLUGIN(devdb, devdb_twifs_plugin);
