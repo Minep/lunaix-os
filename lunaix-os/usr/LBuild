@@ -9,6 +9,7 @@ sources([
     "maze",
     "mkdir",
     "rm",
+    "fuzzer",
 ])
 
 compile_opts([
