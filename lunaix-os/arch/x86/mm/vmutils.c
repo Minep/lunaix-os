@@ -10,8 +10,9 @@ dup_leaflet(struct leaflet* leaflet)
     
     new_leaflet = alloc_leaflet(leaflet_order(leaflet));
 
-    src_va = leaflet_mount(leaflet);
+    // TODO need a proper long term fix for the contention of page mount point
     dest_va = vmap(new_leaflet, KERNEL_DATA);
+    src_va = leaflet_mount(leaflet);
 
     size_t cnt_wordsz = leaflet_size(new_leaflet) / sizeof(ptr_t);
 
