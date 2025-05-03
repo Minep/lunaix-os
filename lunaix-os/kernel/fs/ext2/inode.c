@@ -391,7 +391,7 @@ __get_group_desc(struct v_superblock* vsb, int ino,
     sb = EXT2_SB(vsb);
 
     blkgrp_id = to_fsblock_id(ino) / sb->raw->s_ino_per_grp;
-    return ext2gd_take(vsb, blkgrp_id, gd_out);
+    return ext2gd_take_at(vsb, blkgrp_id, gd_out);
 }
 
 static struct ext2b_inode*
@@ -443,7 +443,7 @@ __create_inode(struct v_superblock* vsb, struct ext2_gdesc* gd, int ino_index)
     inode->btlb      = vzalloc(sizeof(struct ext2_btlb));
     inode->buf       = ino_tab;
     inode->ino       = b_inode;
-    inode->blk_grp   = gd;
+    inode->blk_grp   = ext2gd_take(gd);
     inode->isize     = b_inode->i_size;
 
     if (ext2_feature(vsb, FEAT_LARGE_FILE)) {
@@ -592,7 +592,7 @@ __free_block_at(struct v_superblock *vsb, unsigned int block_pos)
     sb = EXT2_SB(vsb);
     gd_index = block_pos / sb->raw->s_blk_per_grp;
 
-    if ((errno = ext2gd_take(vsb, gd_index, &gd))) {
+    if ((errno = ext2gd_take_at(vsb, gd_index, &gd))) {
         return errno;
     }
 

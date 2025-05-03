@@ -12,7 +12,6 @@ ext2_open_inode(struct v_inode* inode, struct v_file* file)
     struct ext2_file* e_file;
 
     e_file = valloc(sizeof(*e_file));
-    e_file->b_ino = EXT2_INO(inode);
     
     file->data = e_file;
 

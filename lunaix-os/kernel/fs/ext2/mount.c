@@ -170,6 +170,8 @@ ext2_mount(struct v_superblock* vsb, struct v_dnode* mnt)
     ext2sb->raw = rawsb;
     ext2sb->all_feature = __translate_feature(rawsb);
 
+    mutex_init(&ext2sb->lock);
+
     fsapi_set_vsb_ops(vsb, &vsb_ops);
     fsapi_complete_vsb_setup(vsb, ext2sb);
 
@@ -187,6 +189,9 @@ ext2_mount(struct v_superblock* vsb, struct v_dnode* mnt)
     else {
         ext2sb->raw = offset(blkbuf_data(buf), EXT2_BASE_BLKSZ);
     }
+
+    ext2sb->raw->s_mnt_cnt++;
+    ext2sb->raw->s_mtime = clock_unixtime();
 
     ext2sb->buf = buf;
     vfree(rawsb);

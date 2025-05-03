@@ -57,10 +57,11 @@ done:
 _ret:
     fsblock_put(prev_buf);
     ext2dr_itend(&iter);
+    
     return itstate_sel(&iter, errno);
 }
 
-static size_t
+static inline size_t
 __dirent_realsize(struct ext2b_dirent* dirent)
 {
     return sizeof(*dirent) - sizeof(dirent->name) + dirent->name_len;
