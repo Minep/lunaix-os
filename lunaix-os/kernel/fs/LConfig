@@ -19,3 +19,5 @@ def file_system():
         type(bool)
         default(True)
 
+
+include("ext2")

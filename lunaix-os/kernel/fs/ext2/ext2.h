@@ -7,6 +7,13 @@
 #include <lunaix/ds/hashtable.h>
 #include <lunaix/ds/lru.h>
 
+#ifdef CONFIG_EXT2_DEBUG_MSG
+#   include <lunaix/syslog.h>
+#   define ext2_debug(fmt, ...)  kprintf_v("ext2", fmt, ##__VA_ARGS__)
+#else
+#   define ext2_debug(fmt, ...)
+#endif
+
 #define FEAT_COMPRESSION      0b00000001
 #define FEAT_RESIZE_INO       0b00000010
 #define FEAT_FILETYPE         0b00000100
@@ -269,7 +276,8 @@ struct ext2_inode
     bbuf_t buf;                  // partial inotab that holds this inode
     unsigned int inds_lgents;       // log2(# of block in an indirection level)
     unsigned int ino_id;
-    size_t indirect_blocks;
+    size_t nr_fsblks;
+    size_t nr_indblks;
     size_t isize;
 
     struct ext2b_inode* ino;        // raw ext2 inode
@@ -405,8 +413,11 @@ ext2ino_linkto(struct ext2_inode* e_ino, struct ext2b_dirent* dirent)
     fsblock_dirty(e_ino->buf);
 }
 
+#define DBIT_MODE_ISIZE 0
+#define DBIT_MODE_BLOCK 1
+
 void
-ext2db_itbegin(struct ext2_iterator* iter, struct v_inode* inode);
+ext2db_itbegin(struct ext2_iterator* iter, struct v_inode* inode, int mode);
 
 void
 ext2db_itend(struct ext2_iterator* iter);

@@ -96,7 +96,7 @@ ext2_inode_read(struct v_inode *inode,
     blksz = e_sb->block_size;
     end = fpos + len;
 
-    ext2db_itbegin(&iter, inode);
+    ext2db_itbegin(&iter, inode, DBIT_MODE_ISIZE);
     ext2db_itffw(&iter, fpos / blksz);
 
     while (fpos < end && ext2db_itnext(&iter)) {
@@ -134,7 +134,7 @@ ext2_inode_read_page(struct v_inode *inode, void *buffer, size_t fpos)
     n = PAGE_SIZE / e_sb->block_size;
     transfer_sz = MIN(PAGE_SIZE, e_sb->block_size);
 
-    ext2db_itbegin(&iter, inode);
+    ext2db_itbegin(&iter, inode, DBIT_MODE_ISIZE);
     ext2db_itffw(&iter, blk_start);
 
     while (n-- && ext2db_itnext(&iter)) 

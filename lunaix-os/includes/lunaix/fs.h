@@ -62,17 +62,17 @@
      ('0' <= (chr) && (chr) <= '9') || (chr) == '.' || (chr) == '_' ||         \
      (chr) == '-' || (chr) == ':')
 
-#define unlock_inode(inode) mutex_unlock(&inode->lock)
+#define unlock_inode(inode) mutex_unlock_nested(&inode->lock)
 #define lock_inode(inode)                                                      \
     ({                                                                         \
-        mutex_lock(&inode->lock);                                              \
+        mutex_lock_nested(&inode->lock);                                       \
         lru_use_one(inode_lru, &inode->lru);                                   \
     })
 
-#define unlock_dnode(dnode) mutex_unlock(&dnode->lock)
+#define unlock_dnode(dnode) mutex_unlock_nested(&dnode->lock)
 #define lock_dnode(dnode)                                                      \
     ({                                                                         \
-        mutex_lock(&dnode->lock);                                              \
+        mutex_lock_nested(&dnode->lock);                                       \
         lru_use_one(dnode_lru, &dnode->lru);                                   \
     })
 

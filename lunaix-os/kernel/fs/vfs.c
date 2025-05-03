@@ -290,6 +290,11 @@ vfs_pclose(struct v_file* file, pid_t pid)
 
     inode = file->inode;
 
+    if (vfs_check_duped_file(file)) {
+        vfs_unref_file(file);
+        return 0;
+    }
+
     /*
      * Prevent dead lock.
      * This happened when process is terminated while blocking on read.
@@ -307,13 +312,11 @@ vfs_pclose(struct v_file* file, pid_t pid)
      * than A. And this will cause a probable race condition on A if other
      * process is writing to this file later after B exit.
     */
-
     mutex_unlock_for(&inode->lock, pid);
-    
-    if (vfs_check_duped_file(file)) {
-        vfs_unref_file(file);
-        return 0;
-    }
+
+    // now regain lock for inode syncing
+
+    lock_inode(inode);
 
     if ((errno = file->ops->close(file))) {
         goto done;
@@ -322,17 +325,6 @@ vfs_pclose(struct v_file* file, pid_t pid)
     vfs_unref_dnode(file->dnode);
     cake_release(file_pile, file);
 
-    /*
-        if the current inode is not being locked by other 
-        threads that does not share same open context,
-        then we can try to do sync opportunistically
-    */
-    if (mutex_on_hold(&inode->lock)) {
-        goto done;
-    }
-    
-    lock_inode(inode);
-
     pcache_commit_all(inode);
     inode->open_count--;
 
@@ -340,9 +332,8 @@ vfs_pclose(struct v_file* file, pid_t pid)
         __sync_inode_nolock(inode);
     }
 
-    unlock_inode(inode);
-
 done:
+    unlock_inode(inode);
     return errno;
 }
 
@@ -671,27 +662,33 @@ __vfs_try_locate_file(const char* path,
         return errno;
     }
 
+    lock_dnode(fdir);
+
     errno = vfs_walk(fdir, name.value, &file, NULL, woption);
 
     if (errno && errno != ENOENT) {
-        goto done;
+        goto error;
+    }
+
+    if (!errno && (options & FLOC_MKNAME)) {
+        errno = EEXIST;
+        goto error;
     }
     
     if (!errno) {
-        if ((options & FLOC_MKNAME)) {
-            errno = EEXIST;
-        }
+        // the file present, no need to hold the directory lock
+        unlock_dnode(fdir);
         goto done;
     }
 
     // errno == ENOENT
     if (!options) {
-        goto done;
+        goto error;
     }
 
     errno = vfs_check_writable(fdir);
     if (errno) {
-        goto done;
+        goto error;
     }
 
     floc->fresh = true;
@@ -699,17 +696,20 @@ __vfs_try_locate_file(const char* path,
     file = vfs_d_alloc(fdir, &name);
 
     if (!file) {
-        return ENOMEM;
+        errno = ENOMEM;
+        goto error;
     }
-
-    lock_dnode(fdir);
 
     vfs_dcache_add(fdir, file);
 
 done:
     floc->dir   = fdir;
     floc->file  = file;
+    
+    return errno;
 
+error:
+    unlock_dnode(fdir);
     return errno;
 }
 

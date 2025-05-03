@@ -128,8 +128,65 @@ __btlb_flushall(struct ext2_inode* e_inode)
     }
 }
 
+/**
+ * Obtain the number of indirect blocks that contains 
+ * pointers to next level blocks.
+ * 
+ * Let N be the number of ids that a data block can hold,
+ * then the total number of data blocks assigned (reserved)
+ * to the inode:
+ * 
+ * i_blocks = 12 + (N + 1) + (N^2 + N + 1) + (N^3 + N^2 + N + 1)
+ */
+static int
+__get_nr_indblks(struct ext2_sbinfo* sb, size_t fsblks)
+{
+    ssize_t blks; 
+    int nr_ents;
+    int nr_inds, n, acc_nr;
+
+    blks    = (ssize_t)fsblks;
+    nr_ents = sb->block_size / sizeof(int);
+    acc_nr  = 1;
+
+    if (blks <= 12)
+        return 0;
+
+    blks -= 12;
+
+    if (blks > 0) // order-1 indirection
+    {
+        n = MIN(ICEIL(blks, nr_ents), acc_nr);
+        blks  -= n * nr_ents;
+        
+        nr_inds += 1;
+        acc_nr  *= nr_ents;
+    }
+
+    if (blks > 0) // order-2 indirection
+    {
+        n = MIN(ICEIL(blks, nr_ents), acc_nr);
+        blks  -= n * nr_ents;
+        
+        nr_inds += n + 1;
+        acc_nr  *= nr_ents;
+    }
+
+    if (blks > 0) // order-3 indirection
+    {
+        n = MAX(ICEIL(blks, nr_ents), acc_nr);
+        blks  -= n * nr_ents;
+
+        nr_inds += n + ICEIL(n, nr_ents) + 1;
+    }
+
+    assert_fs(blks <= 0);
+
+    return nr_inds;
+}
+
 void
-ext2db_itbegin(struct ext2_iterator* iter, struct v_inode* inode)
+ext2db_itbegin(struct ext2_iterator* iter, struct v_inode* inode, int mode)
 {
     struct ext2_inode* e_ino;
 
@@ -138,8 +195,12 @@ ext2db_itbegin(struct ext2_iterator* iter, struct v_inode* inode)
         .pos = 0,
         .inode = inode,
         .blksz = inode->sb->blksize,
-        .end_pos = ICEIL(e_ino->isize, inode->sb->blksize)
     };
+
+    if (mode == DBIT_MODE_ISIZE)
+        iter->end_pos = ICEIL(e_ino->isize, inode->sb->blksize);
+    else
+        iter->end_pos = e_ino->nr_fsblks - e_ino->nr_indblks;
 }
 
 void
@@ -186,14 +247,13 @@ ext2db_itnext(struct ext2_iterator* iter)
         fsblock_put(iter->sel_buf);
     }
 
-    buf = ext2db_get(iter->inode, iter->pos);
+    buf = ext2db_get(iter->inode, iter->pos++);
     iter->sel_buf = buf;
 
     if (!buf || !ext2_itcheckbuf(iter)) {
         return false;
     }
 
-    iter->pos++;
     iter->data = blkbuf_data(buf);
 
     return true;
@@ -371,7 +431,7 @@ __create_inode(struct v_superblock* vsb, struct ext2_gdesc* gd, int ino_index)
     struct ext2b_inode* b_inode;
     struct ext2_inode* inode;
     unsigned int ind_ents;
-    size_t inds_blks;
+    size_t nr_linked;
 
     sb = gd->sb;
     b_inode = __get_raw_inode(vsb, gd, &ino_tab, ino_index);
@@ -391,11 +451,11 @@ __create_inode(struct v_superblock* vsb, struct ext2_gdesc* gd, int ino_index)
     }
 
     if (b_inode->i_blocks) {
-        inds_blks  = (size_t)b_inode->i_blocks;
-        inds_blks -= ICEIL(inode->isize, 512);
-        inds_blks /= (sb->block_size / 512);
+        nr_linked  = (size_t)b_inode->i_blocks;
+        nr_linked /= (sb->block_size / 512);
 
-        inode->indirect_blocks = inds_blks;
+        inode->nr_fsblks = nr_linked;
+        inode->nr_indblks = __get_nr_indblks(sb, nr_linked);
     }
 
     ind_ents = sb->block_size / sizeof(int);
@@ -404,6 +464,8 @@ __create_inode(struct v_superblock* vsb, struct ext2_gdesc* gd, int ino_index)
     inode->inds_lgents = ilog2(ind_ents);
     inode->ino_id = gd->ino_base + to_ext2ino_id(ino_index);
 
+    ext2_debug("ino(%d): isize=%lu, nr_blk=%lu, nr_inds=%lu",
+                    inode->ino_id, inode->isize, inode->nr_fsblks, inode->nr_indblks);
     return inode;
 }
 
@@ -654,7 +716,9 @@ __update_inode_size(struct v_inode* inode, size_t size)
 {
     struct ext2b_inode* b_ino;
     struct ext2_inode*  e_ino;
+    struct ext2_sbinfo* sb;
 
+    sb    = EXT2_SB(inode->sb);
     e_ino = EXT2_INO(inode);
     b_ino = e_ino->ino;
 
@@ -668,8 +732,8 @@ __update_inode_size(struct v_inode* inode, size_t size)
         b_ino->i_size  = size;
     }
 
-    b_ino->i_blocks = ICEIL(size, 512);
-    b_ino->i_blocks += e_ino->indirect_blocks;
+    b_ino->i_blocks = e_ino->nr_fsblks * (sb->block_size / 512);
+    fsblock_dirty(e_ino->buf);
 }
 
 int
@@ -738,6 +802,9 @@ ext2_link(struct v_inode* this, struct v_dnode* new_name)
     new_name->data = e_dno;
     vfs_assign_inode(new_name, this);
 
+    // linking a dnode to parent could result new data block allocated
+    ext2_sync_inode(parent);
+
 done:
     return errno;
 }
@@ -760,6 +827,8 @@ ext2_unlink(struct v_inode* this, struct v_dnode* name)
         return errno;
     }
 
+    // unlink a dnode from parent will not free the allocated data blocks
+    //  rather, it leads to fragmentation
     return ext2ino_free(this);
 }
 
@@ -784,6 +853,9 @@ __walkstate_set_stack(struct walk_state* state, int depth,
     state->stack.indices[depth] = index;
 }
 
+#define WALKMODE_ALLOC  0b01
+#define WALKMODE_NOBTLB 0b10
+
 /**
  * @brief Walk the indrection chain given the position of data block
  *        relative to the inode. Upon completed, walk_state will be
@@ -794,20 +866,26 @@ __walkstate_set_stack(struct walk_state* state, int depth,
  *        (i.e., a leaf block), then the state is the indirect block that
  *        containing the ID of that leaf block.
  *        
- *        If `resolve` is set, it will resolve any absence encountered
- *        during the walk by allocating and chaining indirect block.
- *        It require the file system is mounted writable.
+ *        Two modes can be specified to alter the walk process:
+ * 
+ *        WALKMODE_ALLOC
+ *          resolve any absence encountered
+ *          during the walk by allocating and chaining indirect block
+ *        
+ *        WALKMODE_NOBTLB
+ *          Ignore the cached result, always perform a complete walk.
+ *          This does not by pass the cache entirely, lower level caches
+ *          like block buffer (blkio request cache) will be used transparently
  * 
  * @param inode     inode to walk
  * @param pos       flattened data block position to be located
  * @param state     contain the walk result
- * @param resolve   whether to auto allocate the indirection structure during 
- *                  walk if `pos` is not exist.
+ * @param mode      walk mode
  * @return int 
  */
 static int
 __walk_indirects(struct v_inode* inode, unsigned int pos,
-                 struct walk_state* state, bool resolve, bool full_walk)
+                 struct walk_state* state, int mode)
 {
     int errno;
     int inds, stride, shifts, level;
@@ -816,12 +894,13 @@ __walk_indirects(struct v_inode* inode, unsigned int pos,
     struct ext2b_inode* b_inode;
     struct v_superblock* vsb;
     bbuf_t table, next_table;
+    bool alloc;
 
     e_inode = EXT2_INO(inode);
     b_inode = e_inode->ino;
     vsb = inode->sb;
     level = 0;
-    resolve = resolve && !EXT2_SB(vsb)->read_only;
+    alloc = (mode & WALKMODE_ALLOC) && !EXT2_SB(vsb)->read_only;
 
     if (pos < 12) {
         index = pos;
@@ -847,7 +926,7 @@ __walk_indirects(struct v_inode* inode, unsigned int pos,
     }
 
     // bTLB cache the last level indirect block
-    if (!full_walk && (table = __btlb_hit(e_inode, pos))) {
+    if (!(mode & WALKMODE_NOBTLB) && (table = __btlb_hit(e_inode, pos))) {
         level = inds;
         index = pos & ((1 << stride) - 1);
         slotref = &block_buffer(table, u32_t)[index];
@@ -867,7 +946,7 @@ __walk_indirects(struct v_inode* inode, unsigned int pos,
 
         next = *slotref;
         if (!next) {
-            if (!resolve) {
+            if (!alloc) {
                 goto _return;
             }
 
@@ -876,7 +955,6 @@ __walk_indirects(struct v_inode* inode, unsigned int pos,
                 return errno;
             }
 
-            e_inode->indirect_blocks++;
             *slotref = fsblock_id(next_table);
             fsblock_dirty(table);
         }
@@ -894,7 +972,6 @@ __walk_indirects(struct v_inode* inode, unsigned int pos,
         assert(shifts >= 0);
 
         index = (pos & mask) >> shifts;
-
         slotref = &block_buffer(table, u32_t)[index];
 
         shifts -= stride;
@@ -927,7 +1004,7 @@ ext2db_get(struct v_inode* inode, unsigned int data_pos)
 
     ext2walk_init_state(&state);
 
-    errno = __walk_indirects(inode, data_pos, &state, false, false);
+    errno = __walk_indirects(inode, data_pos, &state, 0);
     if (errno) {
         return (bbuf_t)INVL_BUFFER;
     }
@@ -953,7 +1030,7 @@ ext2db_acquire(struct v_inode* inode, unsigned int data_pos, bbuf_t* out)
 
     ext2walk_init_state(&state);
 
-    errno = __walk_indirects(inode, data_pos, &state, true, false);
+    errno = __walk_indirects(inode, data_pos, &state, WALKMODE_ALLOC);
     if (errno) {
         return errno;
     }
@@ -987,36 +1064,36 @@ done:
 int
 ext2db_alloc(struct v_inode* inode, bbuf_t* out)
 {
-    int free_ino_idx;
+    int next_free;
     struct ext2_gdesc* gd;
     struct ext2_inode* e_inode;
     struct v_superblock* vsb;
 
-    free_ino_idx = ALLOC_FAIL;
+    next_free = ALLOC_FAIL;
     e_inode = EXT2_INO(inode);
     vsb = inode->sb;
 
     gd = e_inode->blk_grp;
-    free_ino_idx = ext2gd_alloc_block(gd);
+    next_free = ext2gd_alloc_block(gd);
 
     // locality alloc failed, try entire fs
-    if (!valid_bmp_slot(free_ino_idx)) {
-        free_ino_idx = ext2db_alloc_slot(vsb, &gd);
+    if (!valid_bmp_slot(next_free)) {
+        next_free = ext2db_alloc_slot(vsb, &gd);
     }
 
-    if (!valid_bmp_slot(free_ino_idx)) {
+    if (!valid_bmp_slot(next_free)) {
         return EDQUOT;
     }
 
-    free_ino_idx += gd->base;
-    free_ino_idx = ext2_datablock(vsb, free_ino_idx);
-    free_ino_idx = to_ext2ino_id(free_ino_idx);
+    next_free += gd->base;
+    next_free = ext2_datablock(vsb, next_free);
     
-    bbuf_t buf = fsblock_get(vsb, free_ino_idx);
+    bbuf_t buf = fsblock_get(vsb, next_free);
     if (blkbuf_errbuf(buf)) {
         return EIO;
     }
 
+    e_inode->nr_fsblks++;
     *out = buf;
     return 0;
 }
@@ -1067,7 +1144,6 @@ ext2ino_resizing(struct v_inode* inode, size_t new_size)
     }
 
     __update_inode_size(inode, new_size);
-    fsblock_dirty(e_ino->buf);
 
     if (check_symlink_node(inode)) {
         return 0;
@@ -1080,7 +1156,7 @@ ext2ino_resizing(struct v_inode* inode, size_t new_size)
     ext2walk_init_state(&state);
 
     pos   = new_size / fsapi_block_size(inode->sb);
-    errno = __walk_indirects(inode, pos, &state, false, true);
+    errno = __walk_indirects(inode, pos, &state, WALKMODE_NOBTLB);
     if (errno) {
         return errno;
     }

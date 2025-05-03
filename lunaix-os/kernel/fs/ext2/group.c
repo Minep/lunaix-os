@@ -89,8 +89,8 @@ __try_load_bitmap(struct v_superblock* vsb,
     struct ext2_sbinfo* ext2sb;
     struct ext2_bmp* bmp;
     struct llist_header* flist, *flist_entry;
+    unsigned int bmp_blk_id, bmp_size;
     bbuf_t buf;
-    unsigned int blk_id, bmp_blk_id, bmp_size;
 
     ext2sb = EXT2_SB(vsb);
 
@@ -111,8 +111,7 @@ __try_load_bitmap(struct v_superblock* vsb,
     flist = &ext2sb->free_list_sel[type];
     flist_entry = &gd->free_list_sel[type];
 
-    blk_id = ext2_datablock(vsb, bmp_blk_id);
-    buf    = fsblock_get(vsb, blk_id);
+    buf = fsblock_get(vsb, bmp_blk_id);
     if (blkbuf_errbuf(buf)) {
         return false;
     }

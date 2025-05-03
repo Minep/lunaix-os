@@ -66,89 +66,128 @@ __dirent_realsize(struct ext2b_dirent* dirent)
     return sizeof(*dirent) - sizeof(dirent->name) + dirent->name_len;
 }
 
-#define DIRENT_SLOT_MID     0
-#define DIRENT_SLOT_LAST    1
-#define DIRENT_SLOT_EMPTY   2
+#define DIRENT_INSERT     0
+#define DIRENT_APPEND     1
+
+#define DIRENT_ALIGNMENT    sizeof(int)
+
+struct dirent_locator
+{
+    size_t search_size;
+
+    int state;
+    struct ext2_dnode result;
+    size_t new_prev_reclen;
+    size_t db_pos;
+};
+
+
+static inline void must_inline
+__init_locator(struct dirent_locator* loc, size_t search_size)
+{
+    *loc = (struct dirent_locator) { .search_size = search_size };
+}
 
 static int
-__find_free_dirent_slot(struct v_inode* inode, size_t size, 
-                        struct ext2_dnode* e_dnode_out, size_t *reclen)
+__find_free_dirent_slot(struct v_inode* inode, struct dirent_locator* loc)
 {
-    struct ext2_iterator iter;
+    struct ext2_iterator dbit;
     struct ext2b_dirent *dir = NULL;
+    struct ext2_dnode* result;
+    
     bbuf_t prev_buf = bbuf_null;
     bool found = false;
 
-    ext2db_itbegin(&iter, inode);
-
-    size_t sz = 0;
+    size_t sz = 0, aligned = 0;
     unsigned int rec = 0, total_rec = 0;
+    unsigned int dir_size;
 
-    while (!found && ext2db_itnext(&iter))
+    aligned = ROUNDUP(loc->search_size, DIRENT_ALIGNMENT);
+    result  = &loc->result;
+
+    ext2db_itbegin(&dbit, inode, DBIT_MODE_BLOCK);
+
+    while (!found && ext2db_itnext(&dbit))
     {
         rec = 0;
         do {
-            dir = (struct ext2b_dirent*)offset(iter.data, rec);
+            dir = (struct ext2b_dirent*)offset(dbit.data, rec);
 
             sz = dir->rec_len - __dirent_realsize(dir);
-            sz = ROUNDDOWN(sz, 4);
-            if (sz >= size) {
+            sz = ROUNDDOWN(sz, DIRENT_ALIGNMENT);
+            if ((signed)sz >= (signed)aligned) {
                 found = true;
                 break;
             }
 
             rec += dir->rec_len;
             total_rec += dir->rec_len;
-        } while(rec < iter.blksz);
+        } while(rec < dbit.blksz);
 
         if (likely(prev_buf)) {
             fsblock_put(prev_buf);
         }
         
-        prev_buf = fsblock_take(iter.sel_buf);
+        prev_buf = fsblock_take(dbit.sel_buf);
     }
+
+    ext2_debug("dr_find_slot: found=%d, blk_off=%d, off=%d, gap=%d, blk=%d/%d", 
+                found, rec, total_rec, sz, dbit.pos - 1, dbit.end_pos);
+
+    loc->db_pos = dbit.pos - 1;
 
     if (blkbuf_nullbuf(prev_buf)) {
         // this dir is brand new
-        return DIRENT_SLOT_EMPTY;
+        loc->state = DIRENT_APPEND;
+        goto done;
     }
 
-    e_dnode_out->prev = (struct ext2_dnode_sub) {
+    dir_size = ROUNDUP(__dirent_realsize(dir), 4);
+    loc->new_prev_reclen = dir_size;
+
+    result->prev = (struct ext2_dnode_sub) {
         .buf = fsblock_take(prev_buf),
         .dirent = dir
     };
 
     if (!found) {
         // if prev is the last, and no more space left behind.
-        assert_fs(rec == iter.blksz);
+        assert_fs(rec == dbit.blksz);
         
-        e_dnode_out->self.buf = bbuf_null;
-        ext2db_itend(&iter);
-        return itstate_sel(&iter, DIRENT_SLOT_LAST);
+        result->self.buf = bbuf_null;
+        ext2db_itend(&dbit);
+
+        loc->state = DIRENT_APPEND;
+        goto done;
     }
 
-    unsigned int dir_size;
-
-    dir_size = ROUNDUP(__dirent_realsize(dir), 4);
-    *reclen = dir_size;
-
-    rec = total_rec + dir_size;
-    dir = (struct ext2b_dirent*)offset(iter.data, rec);
+    rec += dir_size;
+    dir = (struct ext2b_dirent*)offset(dbit.data, rec);
     
-    e_dnode_out->self = (struct ext2_dnode_sub) {
-        .buf = fsblock_take(iter.sel_buf),
+    result->self = (struct ext2_dnode_sub) {
+        .buf = fsblock_take(dbit.sel_buf),
         .dirent = dir
     };
 
-    ext2db_itend(&iter);
-    return DIRENT_SLOT_MID;
+    ext2db_itend(&dbit);
+
+    loc->state = DIRENT_INSERT;
+
+done:
+    return itstate_sel(&dbit, 0);
+}
+
+static inline void
+__release_dnode_blocks(struct ext2_dnode* e_dno)
+{
+    fsblock_put(e_dno->prev.buf);
+    fsblock_put(e_dno->self.buf);
 }
 
 static inline void
 __destruct_ext2_dnode(struct ext2_dnode* e_dno)
 {
-    fsblock_put(e_dno->prev.buf);
-    fsblock_put(e_dno->self.buf);
+    __release_dnode_blocks(e_dno);
     vfree(e_dno);
 }
 
@@ -452,54 +491,35 @@ ext2dr_insert(struct v_inode* this, struct ext2b_dirent* dirent,
 {
     int errno;
     size_t size, new_reclen, old_reclen;
-    struct ext2_inode* e_self;
     struct ext2_dnode*  e_dno;
     struct ext2b_dirent* prev_dirent;
+    struct dirent_locator locator;
     bbuf_t buf;
 
-    e_self = EXT2_INO(this);
-    e_dno  = vzalloc(sizeof(*e_dno));
-    
     size = __dirent_realsize(dirent);
-    errno = __find_free_dirent_slot(this, size, e_dno, &new_reclen);
+    __init_locator(&locator, size);
+    
+    errno = __find_free_dirent_slot(this, &locator);
     if (errno < 0) {
         goto failed;
     }
 
-    if (errno == DIRENT_SLOT_EMPTY) {
-        if ((errno = ext2db_acquire(this, 0, &buf))) {
+    e_dno = &locator.result;
+    new_reclen = locator.new_prev_reclen;
+    old_reclen = fsapi_block_size(this->sb);
+
+    if (locator.state != DIRENT_INSERT) 
+    {
+        if ((errno = ext2db_acquire(this, locator.db_pos, &buf)))
             goto failed;
-        }
 
         this->fsize += fsapi_block_size(this->sb);
         ext2ino_update(this);
         
-        old_reclen = fsapi_block_size(this->sb);
         e_dno->self.buf = buf;
-        e_dno->self.dirent = blkbuf_data(buf);
-
-        goto place_dir;
+        e_dno->self.dirent = block_buffer(buf, struct ext2b_dirent);
     }
 
-    prev_dirent = e_dno->prev.dirent;
-    old_reclen = prev_dirent->rec_len;
-
-    if (errno == DIRENT_SLOT_LAST) {
-        // prev is last record
-        if ((errno = ext2db_alloc(this, &buf))) {
-            goto failed;
-        }
-
-        this->fsize += fsapi_block_size(this->sb);
-        ext2ino_update(this);
-
-        new_reclen = __dirent_realsize(prev_dirent);
-        new_reclen = ROUNDUP(new_reclen, sizeof(int));
-        e_dno->self = (struct ext2_dnode_sub) {
-            .buf = buf,
-            .dirent = block_buffer(buf, struct ext2b_dirent)
-        };
-    }
 
     /*
                    --- +--------+ ---
@@ -519,17 +539,29 @@ ext2dr_insert(struct v_inode* this, struct ext2b_dirent* dirent,
                        +--------+
     */
 
-    old_reclen -= new_reclen;
-    prev_dirent->rec_len = new_reclen;
-    fsblock_dirty(e_dno->prev.buf);
+    else
+    {
+        prev_dirent = e_dno->prev.dirent;
+        old_reclen  = prev_dirent->rec_len;
+        old_reclen -= new_reclen;
 
-place_dir:
-    dirent->rec_len = ROUNDUP(old_reclen, sizeof(int));
+        prev_dirent->rec_len = new_reclen;
+        fsblock_dirty(e_dno->prev.buf);
+    }
+
+    ext2_debug("dr_insert: state=%d, blk=%d, prev_rlen=%d, new_rlen=%d", 
+                locator.state, locator.db_pos, new_reclen, old_reclen);
+
+    assert_fs(new_reclen > 0);
+    assert_fs(old_reclen > 0);
+
+    dirent->rec_len = old_reclen;
+    
     memcpy(e_dno->self.dirent, dirent, size);
     fsblock_dirty(e_dno->self.buf);
 
     if (!e_dno_out) {
-        __destruct_ext2_dnode(e_dno);
+        __release_dnode_blocks(e_dno);
     }
     else {
         *e_dno_out = e_dno;
@@ -538,7 +570,7 @@ place_dir:
     return errno;
 
 failed:
-    __destruct_ext2_dnode(e_dno);
+    __release_dnode_blocks(e_dno);
     return errno;
 }
 
