@@ -6,6 +6,14 @@
 #include <lunaix/ds/llist.h>
 #include <lunaix/ds/hashtable.h>
 #include <lunaix/ds/lru.h>
+#include <lunaix/ds/mutex.h>
+
+#ifdef CONFIG_EXT2_DEBUG_MSG
+#   include <lunaix/syslog.h>
+#   define ext2_debug(fmt, ...)  kprintf_v("ext2", fmt, ##__VA_ARGS__)
+#else
+#   define ext2_debug(fmt, ...)
+#endif
 
 #define FEAT_COMPRESSION      0b00000001
 #define FEAT_RESIZE_INO       0b00000010
@@ -202,6 +210,8 @@ struct ext2_sbinfo
         struct llist_header gds;
         GDESC_FREE_LISTS;
     };
+
+    mutex_t lock;
 };
 #define EXT2_SB(vsb) (fsapi_impl_data(vsb, struct ext2_sbinfo))
 
@@ -234,6 +244,8 @@ struct ext2_gdesc
     struct ext2_sbinfo* sb;
     bbuf_t buf;
     bcobj_t cache_ref;
+
+    mutex_t lock;
 };
 
 /*
@@ -269,7 +281,8 @@ struct ext2_inode
     bbuf_t buf;                  // partial inotab that holds this inode
     unsigned int inds_lgents;       // log2(# of block in an indirection level)
     unsigned int ino_id;
-    size_t indirect_blocks;
+    size_t nr_fsblks;
+    size_t nr_indblks;
     size_t isize;
 
     struct ext2b_inode* ino;        // raw ext2 inode
@@ -290,6 +303,8 @@ struct ext2_inode
     // prefetched block for 1st order of indirection
     bbuf_t ind_ord1;
     char* symlink;
+
+    // No lock required, it shares lock context with v_inode.
 };
 #define EXT2_INO(v_inode) (fsapi_impl_data(v_inode, struct ext2_inode))
 
@@ -303,6 +318,8 @@ struct ext2_dnode
 {
     struct ext2_dnode_sub self;
     struct ext2_dnode_sub prev;
+
+    // No lock required, it shares lock context with v_dnode.
 };
 #define EXT2_DNO(v_dnode) (fsapi_impl_data(v_dnode, struct ext2_dnode))
 
@@ -336,7 +353,6 @@ struct ext2_iterator
 struct ext2_file
 {
     struct ext2_iterator iter;
-    struct ext2_inode* b_ino;
 };
 #define EXT2_FILE(v_file) (fsapi_impl_data(v_file, struct ext2_file))
 
@@ -370,6 +386,27 @@ ext2_feature(struct v_superblock* vsb, unsigned int feat)
 {
     return !!(EXT2_SB(vsb)->all_feature & feat);
 }
+
+/* ************   Superblock   ************ */
+
+static inline void
+ext2sb_schedule_sync(struct ext2_sbinfo* sb)
+{
+    fsblock_dirty(sb->buf);
+}
+
+static inline void must_inline
+ext2sb_lock(struct ext2_sbinfo* sb)
+{
+    mutex_lock(&sb->lock);
+}
+
+static inline void must_inline
+ext2sb_unlock(struct ext2_sbinfo* sb)
+{
+    mutex_unlock(&sb->lock);
+}
+
 
 /* ************   Inodes   ************ */
 
@@ -405,8 +442,20 @@ ext2ino_linkto(struct ext2_inode* e_ino, struct ext2b_dirent* dirent)
     fsblock_dirty(e_ino->buf);
 }
 
+static inline void
+ext2ino_schedule_sync(struct ext2_inode* ino)
+{
+    fsblock_dirty(ino->buf);
+}
+
+
+/* ************* Data blocks ************* */
+
+#define DBIT_MODE_ISIZE 0
+#define DBIT_MODE_BLOCK 1
+
 void
-ext2db_itbegin(struct ext2_iterator* iter, struct v_inode* inode);
+ext2db_itbegin(struct ext2_iterator* iter, struct v_inode* inode, int mode);
 
 void
 ext2db_itend(struct ext2_iterator* iter);
@@ -486,12 +535,31 @@ void
 ext2gd_release_gdt(struct v_superblock* vsb);
 
 int
-ext2gd_take(struct v_superblock* vsb, 
+ext2gd_take_at(struct v_superblock* vsb, 
                unsigned int index, struct ext2_gdesc** out);
+
+static inline struct ext2_gdesc*
+ext2gd_take(struct ext2_gdesc* gd) {
+    bcache_refonce(gd->cache_ref);
+
+    return gd;
+}
 
 static inline void
 ext2gd_put(struct ext2_gdesc* gd) {
     bcache_return(gd->cache_ref);
+}
+
+static inline void must_inline
+ext2gd_lock(struct ext2_gdesc* gd)
+{
+    mutex_lock(&gd->lock);
+}
+
+static inline void must_inline
+ext2gd_unlock(struct ext2_gdesc* gd)
+{
+    mutex_unlock(&gd->lock);
 }
 
 
@@ -599,23 +667,6 @@ ext2_get_symlink(struct v_inode *this, const char **path_out);
 int
 ext2_set_symlink(struct v_inode *this, const char *target);
 
-/* ***********   Bitmap   *********** */
-
-void
-ext2bmp_init(struct ext2_bmp* e_bmp, bbuf_t bmp_buf, unsigned int nr_bits);
-
-bool
-ext2bmp_check_free(struct ext2_bmp* e_bmp);
-
-int
-ext2bmp_alloc_one(struct ext2_bmp* e_bmp);
-
-void
-ext2bmp_free_one(struct ext2_bmp* e_bmp, unsigned int pos);
-
-void
-ext2bmp_discard(struct ext2_bmp* e_bmp);
-
 /* ***********   Allocations   *********** */
 
 #define ALLOC_FAIL -1
@@ -656,6 +707,13 @@ ext2gd_free_block(struct ext2_gdesc* gd, int slot)
     ext2gd_free_slot(gd, GDESC_BLK_SEL, slot);
 }
 
+static inline void
+ext2gd_schedule_sync(struct ext2_gdesc* gd)
+{
+    fsblock_dirty(gd->buf);
+    fsblock_dirty(gd->ino_bmp.raw);
+    fsblock_dirty(gd->blk_bmp.raw);
+}
 
 /**
  * @brief Allocate a free inode
@@ -704,5 +762,27 @@ ext2ino_alloc_slot(struct v_superblock* vsb, struct ext2_gdesc** gd_out);
 int
 ext2db_alloc_slot(struct v_superblock* vsb, struct ext2_gdesc** gd_out);
 
+
+/* ***********   Bitmap   *********** */
+
+void
+ext2bmp_init(struct ext2_bmp* e_bmp, bbuf_t bmp_buf, unsigned int nr_bits);
+
+int
+ext2bmp_alloc_nolock(struct ext2_bmp* e_bmp);
+
+void
+ext2bmp_free_nolock(struct ext2_bmp* e_bmp, unsigned int pos);
+
+void
+ext2bmp_discard_nolock(struct ext2_bmp* e_bmp);
+
+static inline bool
+ext2bmp_check_free(struct ext2_bmp* e_bmp)
+{
+    assert(e_bmp->raw);
+
+    return valid_bmp_slot(e_bmp->next_free);
+}
 
 #endif /* __LUNAIX_EXT2_H */

@@ -6,7 +6,7 @@
 
 typedef struct mutex_s
 {
-    atomic_ulong lk;
+    atomic_uint lk;
     pid_t owner;
 } mutex_t;
 
@@ -36,5 +36,8 @@ mutex_unlock_nested(mutex_t* mutex);
 
 void
 mutex_unlock_for(mutex_t* mutex, pid_t pid);
+
+bool
+mutex_trylock(mutex_t* mutex);
 
 #endif /* __LUNAIX_MUTEX_H */

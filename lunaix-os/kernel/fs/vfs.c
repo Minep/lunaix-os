@@ -102,21 +102,54 @@ vfs_init()
     vfs_sysroot->parent = vfs_sysroot;
     
     vfs_ref_dnode(vfs_sysroot);
+    lru_remove(dnode_lru, &vfs_sysroot->lru);
+}
+
+void
+vfs_vncache_init(struct vncache* cache)
+{
+    cache->pool = vzalloc(VFS_HASHTABLE_SIZE * sizeof(struct hbucket));
+    rwlock_init(&cache->lock);
+}
+
+void
+vfs_vncache_free(struct vncache* cache)
+{
+    // clear all other reader/writer
+    rwlock_begin_write(&cache->lock);
+    vfree(cache->pool);
+    
+    // already freed, so as the lock
+}
+
+void
+vfs_vncache_add(struct vncache* cache, size_t key, struct hlist_node* node)
+{
+    struct hbucket* slot;
+
+    cache_atomic_write(cache, 
+    {
+        slot = &cache->pool[key & VFS_HASH_MASK];
+        hlist_delete(node);
+        hlist_add(&slot->head, node);
+    });
 }
 
 static inline struct hbucket*
-__dcache_hash(struct v_dnode* parent, u32_t* hash)
+__dcache_hash_nolock(struct v_dnode* parent, u32_t* hash)
 {
+    struct v_superblock* sb;
     struct hbucket* d_cache;
     u32_t _hash;
+
+    sb = parent->super_block;
     
-    d_cache = parent->super_block->d_cache;
     _hash = *hash;
     _hash = _hash ^ (_hash >> VFS_HASHBITS);
     _hash += (u32_t)__ptr(parent);
 
     *hash = _hash;
-    return &d_cache[_hash & VFS_HASH_MASK];
+    return &sb->d_cache.pool[_hash & VFS_HASH_MASK];
 }
 
 static inline int
@@ -135,6 +168,11 @@ __sync_inode_nolock(struct v_inode* inode)
 struct v_dnode*
 vfs_dcache_lookup(struct v_dnode* parent, struct hstr* str)
 {
+    u32_t hash;
+    struct hbucket* slot;
+    struct v_dnode *pos, *n;
+    struct vncache *dcache;
+ 
     if (!str->len || HSTR_EQ(str, &vfs_dot))
         return parent;
 
@@ -142,16 +180,23 @@ vfs_dcache_lookup(struct v_dnode* parent, struct hstr* str)
         return parent->parent;
     }
 
-    u32_t hash = str->hash;
-    struct hbucket* slot = __dcache_hash(parent, &hash);
+    hash = str->hash;
+    dcache = dnode_cache(parent);
+    
+    vncache_lock_read(dcache);
 
-    struct v_dnode *pos, *n;
+    slot = __dcache_hash_nolock(parent, &hash);
     hashtable_bucket_foreach(slot, pos, n, hash_list)
     {
-        if (pos->name.hash == hash && pos->parent == parent) {
-            return pos;
+        if (pos->name.hash != hash || pos->parent != parent) {
+            continue;
         }
+
+        vncache_unlock_read(dcache);
+        return pos;
     }
+
+    vncache_unlock_read(dcache);
     return NULL;
 }
 
@@ -172,14 +217,21 @@ __vfs_touch_inode(struct v_inode* inode, const int type)
 void
 vfs_dcache_add(struct v_dnode* parent, struct v_dnode* dnode)
 {
+    struct hbucket* bucket;
+    struct vncache* cache;
+
     assert(parent);
+    assert(locked_node(parent));
 
     dnode->ref_count = 1;
     dnode->parent = parent;
     llist_append(&parent->children, &dnode->siblings);
 
-    struct hbucket* bucket = __dcache_hash(parent, &dnode->name.hash);
-    hlist_add(&bucket->head, &dnode->hash_list);
+    cache_atomic_write(dnode_cache(parent), 
+    {
+        bucket = __dcache_hash_nolock(parent, &dnode->name.hash);
+        hlist_add(&bucket->head, &dnode->hash_list);
+    });
 }
 
 void
@@ -190,7 +242,12 @@ vfs_dcache_remove(struct v_dnode* dnode)
 
     llist_delete(&dnode->siblings);
     llist_delete(&dnode->aka_list);
-    hlist_delete(&dnode->hash_list);
+    lru_remove(dnode_lru, &dnode->lru);
+
+    cache_atomic_write(dnode_cache(dnode),
+    {
+        hlist_delete(&dnode->hash_list);
+    });
 
     dnode->parent = NULL;
     dnode->ref_count = 0;
@@ -200,10 +257,14 @@ void
 vfs_dcache_rehash(struct v_dnode* new_parent, struct v_dnode* dnode)
 {
     assert(new_parent);
+    assert(locked_node(new_parent));
 
-    hstr_rehash(&dnode->name, HSTR_FULL_HASH);
-    vfs_dcache_remove(dnode);
-    vfs_dcache_add(new_parent, dnode);
+    dnode_atomic(dnode, 
+    {
+        hstr_rehash(&dnode->name, HSTR_FULL_HASH);
+        vfs_dcache_remove(dnode);
+        vfs_dcache_add(new_parent, dnode);
+    });
 }
 
 int
@@ -250,6 +311,8 @@ vfs_open(struct v_dnode* dnode, struct v_file** file)
 void
 vfs_assign_inode(struct v_dnode* assign_to, struct v_inode* inode)
 {
+    lock_dnode(assign_to);
+
     if (assign_to->inode) {
         llist_delete(&assign_to->aka_list);
         assign_to->inode->link_count--;
@@ -258,26 +321,33 @@ vfs_assign_inode(struct v_dnode* assign_to, struct v_inode* inode)
     llist_append(&inode->aka_dnodes, &assign_to->aka_list);
     assign_to->inode = inode;
     inode->link_count++;
+
+    unlock_dnode(assign_to);
 }
 
 int
 vfs_link(struct v_dnode* to_link, struct v_dnode* name)
 {
     int errno;
+    struct v_inode* inode;
+
+    inode = to_link->inode;
 
     if ((errno = vfs_check_writable(to_link))) {
         return errno;
     }
 
-    lock_inode(to_link->inode);
+    lock_inode(inode);
+
     if (to_link->super_block->root != name->super_block->root) {
         errno = EXDEV;
-    } else if (!to_link->inode->ops->link) {
+    } else if (!inode->ops->link) {
         errno = ENOTSUP;
-    } else if (!(errno = to_link->inode->ops->link(to_link->inode, name))) {
-        vfs_assign_inode(name, to_link->inode);
+    } else if (!(errno = inode->ops->link(inode, name))) {
+        vfs_assign_inode(name, inode);
     }
-    unlock_inode(to_link->inode);
+
+    unlock_inode(inode);
 
     return errno;
 }
@@ -289,6 +359,11 @@ vfs_pclose(struct v_file* file, pid_t pid)
     int errno = 0;
 
     inode = file->inode;
+
+    if (vfs_check_duped_file(file)) {
+        vfs_unref_file(file);
+        return 0;
+    }
 
     /*
      * Prevent dead lock.
@@ -307,13 +382,11 @@ vfs_pclose(struct v_file* file, pid_t pid)
      * than A. And this will cause a probable race condition on A if other
      * process is writing to this file later after B exit.
     */
-
     mutex_unlock_for(&inode->lock, pid);
-    
-    if (vfs_check_duped_file(file)) {
-        vfs_unref_file(file);
-        return 0;
-    }
+
+    // now regain lock for inode syncing
+
+    lock_inode(inode);
 
     if ((errno = file->ops->close(file))) {
         goto done;
@@ -322,17 +395,6 @@ vfs_pclose(struct v_file* file, pid_t pid)
     vfs_unref_dnode(file->dnode);
     cake_release(file_pile, file);
 
-    /*
-        if the current inode is not being locked by other 
-        threads that does not share same open context,
-        then we can try to do sync opportunistically
-    */
-    if (mutex_on_hold(&inode->lock)) {
-        goto done;
-    }
-    
-    lock_inode(inode);
-
     pcache_commit_all(inode);
     inode->open_count--;
 
@@ -340,9 +402,8 @@ vfs_pclose(struct v_file* file, pid_t pid)
         __sync_inode_nolock(inode);
     }
 
-    unlock_inode(inode);
-
 done:
+    unlock_inode(inode);
     return errno;
 }
 
@@ -384,12 +445,22 @@ vfs_fsync(struct v_file* file)
 int
 vfs_alloc_fdslot(int* fd)
 {
+    struct v_fdtable* fdtab;
+
+    fdtab = __current->fdtable;
+    lock_fdtable(fdtab);
+
     for (size_t i = 0; i < VFS_MAX_FD; i++) {
-        if (!__current->fdtable->fds[i]) {
-            *fd = i;
-            return 0;
+        if (__current->fdtable->fds[i]) {
+            continue;
         }
+
+        *fd = i;
+        unlock_fdtable(fdtab);
+        return 0;
     }
+
+    unlock_fdtable(fdtab);
     return EMFILE;
 }
 
@@ -399,9 +470,9 @@ vfs_sb_alloc()
     struct v_superblock* sb = cake_grab(superblock_pile);
     memset(sb, 0, sizeof(*sb));
     llist_init_head(&sb->sb_list);
-    
-    sb->i_cache = vzalloc(VFS_HASHTABLE_SIZE * sizeof(struct hbucket));
-    sb->d_cache = vzalloc(VFS_HASHTABLE_SIZE * sizeof(struct hbucket));
+
+    vfs_vncache_init(&sb->i_cache);
+    vfs_vncache_init(&sb->d_cache);
 
     sb->ref_count = 1;
     return sb;
@@ -427,25 +498,36 @@ vfs_sb_unref(struct v_superblock* sb)
         sb->ops.release(sb);
     }
 
-    vfree(sb->i_cache);
-    vfree(sb->d_cache);
-    
+    vfs_vncache_free(&sb->i_cache);
+    vfs_vncache_free(&sb->d_cache);
+
     cake_release(superblock_pile, sb);
 }
 
-static int
+static inline bool
+__dnode_evictable(struct v_dnode* dnode)
+{
+    return dnode->ref_count == 1 
+        && llist_empty(&dnode->children);
+}
+
+static bool
 __vfs_try_evict_dnode(struct lru_node* obj)
 {
     struct v_dnode* dnode = container_of(obj, struct v_dnode, lru);
 
-    if (!dnode->ref_count) {
-        vfs_d_free(dnode);
-        return 1;
+    if (mutex_on_hold(&dnode->lock))
+        return false;
+
+    if (!__dnode_evictable(dnode)) {
+        return false;
     }
-    return 0;
+
+    vfs_d_free(dnode);
+    return true;
 }
 
-static int
+static bool
 __vfs_try_evict_inode(struct lru_node* obj)
 {
     struct v_inode* inode = container_of(obj, struct v_inode, lru);
@@ -493,13 +575,14 @@ void
 vfs_d_free(struct v_dnode* dnode)
 {
     assert(dnode->ref_count == 1);
-
+    
     if (dnode->inode) {
         assert(dnode->inode->link_count > 0);
         dnode->inode->link_count--;
     }
 
     vfs_dcache_remove(dnode);
+
     // Make sure the children de-referencing their parent.
     // With lru presented, the eviction will be propagated over the entire
     // detached subtree eventually
@@ -514,6 +597,7 @@ vfs_d_free(struct v_dnode* dnode)
     }
 
     vfs_sb_unref(dnode->super_block);
+    
     vfree((void*)dnode->name.value);
     cake_release(dnode_pile, dnode);
 }
@@ -521,26 +605,32 @@ vfs_d_free(struct v_dnode* dnode)
 struct v_inode*
 vfs_i_find(struct v_superblock* sb, u32_t i_id)
 {
-    struct hbucket* slot = &sb->i_cache[i_id & VFS_HASH_MASK];
-    struct v_inode *pos, *n;
-    hashtable_bucket_foreach(slot, pos, n, hash_list)
-    {
-        if (pos->id == i_id) {
-            lru_use_one(inode_lru, &pos->lru);
-            return pos;
-        }
-    }
+    struct hbucket* slot;
+    struct v_inode *pos, *n, *found = NULL;
 
-    return NULL;
+    cache_atomic_read(&sb->i_cache, 
+    {
+        slot = &sb->i_cache.pool[i_id & VFS_HASH_MASK];
+
+        hashtable_bucket_foreach(slot, pos, n, hash_list)
+        {
+            if (pos->id != i_id) {
+                continue;
+            }
+
+            lru_use_one(inode_lru, &pos->lru);
+            found = pos;
+            break;
+        }
+    });
+
+    return found;
 }
 
 void
 vfs_i_addhash(struct v_inode* inode)
 {
-    struct hbucket* slot = &inode->sb->i_cache[inode->id & VFS_HASH_MASK];
-
-    hlist_delete(&inode->hash_list);
-    hlist_add(&slot->head, &inode->hash_list);
+    vfs_vncache_add(inode_cache(inode), inode->id, &inode->hash_list);
 }
 
 struct v_inode*
@@ -569,6 +659,7 @@ vfs_i_alloc(struct v_superblock* sb)
 
     vfs_i_assign_sb(inode, sb);
     lru_use_one(inode_lru, &inode->lru);
+    
     return inode;
 }
 
@@ -579,6 +670,7 @@ vfs_i_free(struct v_inode* inode)
         pcache_release(inode->pg_cache);
         vfree(inode->pg_cache);
     }
+
     // we don't need to sync inode.
     // If an inode can be free, then it must be properly closed.
     // Hence it must be synced already!
@@ -587,7 +679,10 @@ vfs_i_free(struct v_inode* inode)
     }
 
     vfs_sb_unref(inode->sb);
+    
     hlist_delete(&inode->hash_list);
+    lru_remove(inode_lru, &inode->lru);
+
     cake_release(inode_pile, inode);
 }
 
@@ -605,10 +700,19 @@ vfs_i_free(struct v_inode* inode)
 int
 vfs_getfd(int fd, struct v_fd** fd_s)
 {
-    if (TEST_FD(fd) && (*fd_s = __current->fdtable->fds[fd])) {
-        return 0;
+    struct v_fdtable* fdtab;
+
+    if (!TEST_FD(fd)) {
+        return EBADF;
     }
-    return EBADF;
+
+    fdtab = __current->fdtable;
+
+    lock_fdtable(fdtab);
+    *fd_s = __current->fdtable->fds[fd];
+    unlock_fdtable(fdtab);
+
+    return !*fd_s ? EBADF : 0;
 }
 
 static int
@@ -671,27 +775,33 @@ __vfs_try_locate_file(const char* path,
         return errno;
     }
 
+    lock_dnode(fdir);
+
     errno = vfs_walk(fdir, name.value, &file, NULL, woption);
 
     if (errno && errno != ENOENT) {
-        goto done;
+        goto error;
+    }
+
+    if (!errno && (options & FLOC_MKNAME)) {
+        errno = EEXIST;
+        goto error;
     }
     
     if (!errno) {
-        if ((options & FLOC_MKNAME)) {
-            errno = EEXIST;
-        }
+        // the file present, no need to hold the directory lock
+        unlock_dnode(fdir);
         goto done;
     }
 
     // errno == ENOENT
     if (!options) {
-        goto done;
+        goto error;
     }
 
     errno = vfs_check_writable(fdir);
     if (errno) {
-        goto done;
+        goto error;
     }
 
     floc->fresh = true;
@@ -699,17 +809,20 @@ __vfs_try_locate_file(const char* path,
     file = vfs_d_alloc(fdir, &name);
 
     if (!file) {
-        return ENOMEM;
+        errno = ENOMEM;
+        goto error;
     }
-
-    lock_dnode(fdir);
 
     vfs_dcache_add(fdir, file);
 
 done:
     floc->dir   = fdir;
     floc->file  = file;
+    
+    return errno;
 
+error:
+    unlock_dnode(fdir);
     return errno;
 }
 
@@ -869,6 +982,7 @@ __DEFINE_LXSYSCALL2(int, sys_readdir, int, fd, struct lx_dirent*, dent)
     if ((errno = fd_s->file->ops->readdir(fd_s->file, &dctx)) != 1) {
         goto unlock;
     }
+
     dent->d_offset++;
     fd_s->file->f_pos++;
 
@@ -1105,6 +1219,42 @@ vfs_get_dtype(int itype)
     return dtype;
 }
 
+struct v_fdtable*
+fdtable_create()
+{
+    struct v_fdtable* fdtab;
+
+    fdtab = vzalloc(sizeof(struct v_fdtable));
+    mutex_init(&fdtab->lock);
+
+    return fdtab;
+}
+
+void
+fdtable_copy(struct v_fdtable* dest, struct v_fdtable* src)
+{
+    lock_fdtable(dest);
+    lock_fdtable(src);
+    
+    for (size_t i = 0; i < VFS_MAX_FD; i++) {
+        struct v_fd* fd = src->fds[i];
+        if (!fd)
+            continue;
+        vfs_dup_fd(fd, &dest->fds[i]);
+    }
+
+    unlock_fdtable(dest);
+    unlock_fdtable(src);
+}
+
+void
+fdtable_free(struct v_fdtable* table)
+{
+    assert(!mutex_on_hold(&table->lock));
+
+    vfree(table);
+}
+
 __DEFINE_LXSYSCALL3(int, realpathat, int, fd, char*, buf, size_t, size)
 {
     int errno;
@@ -1114,11 +1264,12 @@ __DEFINE_LXSYSCALL3(int, realpathat, int, fd, char*, buf, size_t, size)
     }
 
     struct v_dnode* dnode;
-    errno = vfs_get_path(fd_s->file->dnode, buf, size, 0);
 
-    if (errno >= 0) {
-        return errno;
-    }
+    dnode = fd_s->file->dnode;
+
+    lock_dnode(dnode);
+    errno = vfs_get_path(dnode, buf, size, 0);
+    unlock_dnode(dnode);
 
 done:
     return DO_STATUS(errno);
@@ -1235,10 +1386,13 @@ done:
 
 __DEFINE_LXSYSCALL1(int, mkdir, const char*, path)
 {
-    int errno = 0;
+    int errno;
+    struct hstr name;
+    struct v_inode* inode;
     struct v_dnode *parent, *dir;
     char name_value[VFS_NAME_MAXLEN];
-    struct hstr name = HHSTR(name_value, 0, 0);
+
+    name = HHSTR(name_value, 0, 0);
 
     if ((errno = vfs_walk_proc(path, &parent, &name, VFS_WALK_PARENT))) {
         goto done;
@@ -1258,7 +1412,7 @@ __DEFINE_LXSYSCALL1(int, mkdir, const char*, path)
         goto done;
     }
 
-    struct v_inode* inode = parent->inode;
+    inode = parent->inode;
 
     lock_dnode(parent);
     lock_inode(inode);
@@ -1410,12 +1564,14 @@ vfs_dup_fd(struct v_fd* old, struct v_fd** new)
 int
 vfs_dup2(int oldfd, int newfd)
 {
+    int errno;
+    struct v_fdtable* fdtab;
+    struct v_fd *oldfd_s, *newfd_s;
+    
     if (newfd == oldfd) {
         return newfd;
     }
 
-    int errno;
-    struct v_fd *oldfd_s, *newfd_s;
     if ((errno = vfs_getfd(oldfd, &oldfd_s))) {
         goto done;
     }
@@ -1425,15 +1581,25 @@ vfs_dup2(int oldfd, int newfd)
         goto done;
     }
 
-    newfd_s = __current->fdtable->fds[newfd];
+    fdtab = __current->fdtable;
+    lock_fdtable(fdtab);
+
+    newfd_s = fdtab->fds[newfd];
     if (newfd_s && (errno = vfs_close(newfd_s->file))) {
-        goto done;
+        goto unlock_and_done;
     }
 
-    if (!(errno = vfs_dup_fd(oldfd_s, &newfd_s))) {
-        __current->fdtable->fds[newfd] = newfd_s;
-        return newfd;
+    if ((errno = vfs_dup_fd(oldfd_s, &newfd_s))) {
+        goto unlock_and_done;
     }
+
+    fdtab->fds[newfd] = newfd_s;
+    
+    unlock_fdtable(fdtab);
+    return newfd;
+
+unlock_and_done:
+    unlock_fdtable(fdtab);
 
 done:
     return DO_STATUS(errno);
@@ -1650,6 +1816,7 @@ vfs_do_rename(struct v_dnode* current, struct v_dnode* target)
 
     lock_dnode(current);
     lock_dnode(target);
+
     if (oldparent)
         lock_dnode(oldparent);
     if (newparent)
@@ -1678,6 +1845,7 @@ vfs_do_rename(struct v_dnode* current, struct v_dnode* target)
 
 cleanup:
     unlock_dnode(current);
+    
     if (oldparent)
         unlock_dnode(oldparent);
     if (newparent)

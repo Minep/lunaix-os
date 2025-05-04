@@ -9,6 +9,8 @@ sources([
     "maze",
     "mkdir",
     "rm",
+    "testfork",
+    "fragfile",
 ])
 
 compile_opts([

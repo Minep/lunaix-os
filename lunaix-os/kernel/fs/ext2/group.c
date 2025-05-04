@@ -89,8 +89,8 @@ __try_load_bitmap(struct v_superblock* vsb,
     struct ext2_sbinfo* ext2sb;
     struct ext2_bmp* bmp;
     struct llist_header* flist, *flist_entry;
+    unsigned int bmp_blk_id, bmp_size;
     bbuf_t buf;
-    unsigned int blk_id, bmp_blk_id, bmp_size;
 
     ext2sb = EXT2_SB(vsb);
 
@@ -111,8 +111,7 @@ __try_load_bitmap(struct v_superblock* vsb,
     flist = &ext2sb->free_list_sel[type];
     flist_entry = &gd->free_list_sel[type];
 
-    blk_id = ext2_datablock(vsb, bmp_blk_id);
-    buf    = fsblock_get(vsb, blk_id);
+    buf = fsblock_get(vsb, bmp_blk_id);
     if (blkbuf_errbuf(buf)) {
         return false;
     }
@@ -127,7 +126,7 @@ __try_load_bitmap(struct v_superblock* vsb,
 }
 
 int
-ext2gd_take(struct v_superblock* vsb, 
+ext2gd_take_at(struct v_superblock* vsb, 
                unsigned int index, struct ext2_gdesc** out)
 {
     bbuf_t part, buf;
@@ -169,6 +168,8 @@ ext2gd_take(struct v_superblock* vsb,
         .base = index * ext2sb->raw->s_blk_per_grp,
         .ino_base = index * ext2sb->raw->s_ino_per_grp
     };
+
+    mutex_init(&gd->lock);
 
     *out = gd;
     
@@ -236,16 +237,8 @@ ext2bmp_init(struct ext2_bmp* e_bmp, bbuf_t bmp_buf, unsigned int nr_bits)
     __ext2bmp_update_next_free_cell(e_bmp);
 }
 
-bool
-ext2bmp_check_free(struct ext2_bmp* e_bmp)
-{
-    assert(e_bmp->raw);
-
-    return valid_bmp_slot(e_bmp->next_free);
-}
-
 int
-ext2bmp_alloc_one(struct ext2_bmp* e_bmp)
+ext2bmp_alloc_nolock(struct ext2_bmp* e_bmp)
 {
     assert(e_bmp->raw);
     
@@ -276,7 +269,7 @@ ext2bmp_alloc_one(struct ext2_bmp* e_bmp)
 }
 
 void
-ext2bmp_free_one(struct ext2_bmp* e_bmp, unsigned int pos)
+ext2bmp_free_nolock(struct ext2_bmp* e_bmp, unsigned int pos)
 {
     assert(e_bmp->raw);
 
@@ -292,7 +285,7 @@ ext2bmp_free_one(struct ext2_bmp* e_bmp, unsigned int pos)
 }
 
 void
-ext2bmp_discard(struct ext2_bmp* e_bmp)
+ext2bmp_discard_nolock(struct ext2_bmp* e_bmp)
 {
     assert(e_bmp->raw);
 

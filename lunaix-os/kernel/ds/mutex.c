@@ -2,6 +2,12 @@
 #include <lunaix/process.h>
 #include <lunaix/kpreempt.h>
 
+#define __do_lock(mutext)               \
+    ({                                  \
+        atomic_fetch_add(&mutex->lk, 1);\
+        mutex->owner = __current->pid;  \
+    })
+
 static inline bool must_inline
 __mutex_check_owner(mutex_t* mutex)
 {
@@ -15,8 +21,7 @@ __mutext_lock(mutex_t* mutex)
         preempt_current();
     }
 
-    atomic_fetch_add(&mutex->lk, 1);
-    mutex->owner = __current->pid;
+    __do_lock(mutex);
 }
 
 static inline void must_inline
@@ -30,6 +35,16 @@ void
 mutex_lock(mutex_t* mutex)
 {
     __mutext_lock(mutex);
+}
+
+bool
+mutex_trylock(mutex_t* mutex)
+{
+    if (atomic_load(&mutex->lk))
+        return false;
+
+    __do_lock(mutex);
+    return true;
 }
 
 void
