@@ -86,8 +86,8 @@ __vfs_do_unmount(struct v_mount* mnt)
 
     // detached the inodes from cache, and let lru policy to recycle them
     for (size_t i = 0; i < VFS_HASHTABLE_SIZE; i++) {
-        __detach_node_cache_ref(&sb->i_cache[i]);
-        __detach_node_cache_ref(&sb->d_cache[i]);
+        __detach_node_cache_ref(&sb->i_cache.pool[i]);
+        __detach_node_cache_ref(&sb->d_cache.pool[i]);
     }
 
     struct v_dnode *pos, *next;

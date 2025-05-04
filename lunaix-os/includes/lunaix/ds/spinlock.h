@@ -8,6 +8,9 @@ struct spinlock
     volatile bool flag;
 };
 
+#define DEFINE_SPINLOCK(name)   \
+    struct spinlock name = { .flag = false }
+
 typedef struct spinlock spinlock_t;
 
 /*

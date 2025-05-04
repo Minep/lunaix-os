@@ -45,18 +45,6 @@ region_maybe_cow(struct mm_region* region)
     tlb_flush_vmr_all(region);
 }
 
-static inline void
-__dup_fdtable(struct proc_info* pcb)
-{
-    for (size_t i = 0; i < VFS_MAX_FD; i++) {
-        struct v_fd* fd = __current->fdtable->fds[i];
-        if (!fd)
-            continue;
-        vfs_dup_fd(fd, &pcb->fdtable->fds[i]);
-    }
-}
-
-
 static void
 __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
 {
@@ -172,7 +160,7 @@ dup_proc()
         vfs_ref_dnode(pcb->cwd);
     }
 
-    __dup_fdtable(pcb);
+    fdtable_copy(pcb->fdtable, __current->fdtable);
     uscope_copy(&pcb->uscope, current_user_scope());
 
     struct proc_mm* mm = vmspace(pcb);

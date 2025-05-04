@@ -1,8 +1,6 @@
 #ifndef __LUNAIX_VFS_H
 #define __LUNAIX_VFS_H
 
-#include <lunaix/clock.h>
-#include <lunaix/device.h>
 #include <lunaix/ds/btrie.h>
 #include <lunaix/ds/hashtable.h>
 #include <lunaix/ds/hstr.h>
@@ -10,6 +8,10 @@
 #include <lunaix/ds/llist.h>
 #include <lunaix/ds/lru.h>
 #include <lunaix/ds/mutex.h>
+#include <lunaix/ds/rwlock.h>
+
+#include <lunaix/clock.h>
+#include <lunaix/device.h>
 #include <lunaix/status.h>
 #include <lunaix/spike.h>
 #include <lunaix/bcache.h>
@@ -76,6 +78,11 @@
         lru_use_one(dnode_lru, &dnode->lru);                                   \
     })
 
+#define dnode_atomic(dnode, ops)    \
+    do { lock_dnode(dnode); ops; unlock_dnode(dnode); } while(0)
+
+#define locked_node(node) mutex_on_hold(&(node)->lock)
+
 #define assert_fs(cond) assert_p(cond, "FS")
 #define fail_fs(msg) fail_p(msg, "FS")
 
@@ -117,6 +124,28 @@ struct fs_iter
     struct filesystem* fs;
 };
 
+struct vncache
+{
+    struct hbucket* pool;
+    rwlock_t lock;
+};
+#define cache_atomic_read(cache, ops)           \
+    do {                                        \
+        rwlock_begin_read(&(cache)->lock);      \
+        ops;                                    \
+        rwlock_end_read(&(cache)->lock);        \
+    } while (0)
+
+#define cache_atomic_write(cache, ops)          \
+    do {                                        \
+        rwlock_begin_write(&(cache)->lock);     \
+        ops;                                    \
+        rwlock_end_write(&(cache)->lock);       \
+    } while (0)
+
+#define dnode_cache(dnode)   (&(dnode)->super_block->d_cache)
+#define inode_cache(inode)   (&(inode)->sb->i_cache)
+
 struct v_superblock
 {
     struct llist_header sb_list;
@@ -124,8 +153,8 @@ struct v_superblock
     struct v_dnode* root;
     struct filesystem* fs;
     struct blkbuf_cache* blks;
-    struct hbucket* i_cache;
-    struct hbucket* d_cache;
+    struct vncache i_cache;
+    struct vncache d_cache;
     
     void* data;
     unsigned int ref_count;
@@ -305,7 +334,10 @@ struct v_dnode
 struct v_fdtable
 {
     struct v_fd* fds[VFS_MAX_FD];
+    mutex_t lock;   // inter-threads contention
 };
+#define lock_fdtable(fdtab)     mutex_lock(&(fdtab)->lock)
+#define unlock_fdtable(fdtab)   mutex_unlock(&(fdtab)->lock)
 
 struct pcache
 {
@@ -363,6 +395,21 @@ fsm_itend(struct fs_iter* iterator)
 {
     iterator->fs = NULL;
 }
+
+void
+vfs_vncache_init(struct vncache* cache);
+
+void
+vfs_vncache_free(struct vncache* cache);
+
+void
+vfs_vncache_add(struct vncache* cache, size_t key, struct hlist_node* node);
+
+#define vncache_lock_read(cache)    rwlock_begin_read(&(cache)->lock);
+#define vncache_unlock_read(cache)  rwlock_end_read(&(cache)->lock);
+
+#define vncache_lock_write(cache)    rwlock_begin_write(&(cache)->lock);
+#define vncache_unlock_write(cache)  rwlock_end_write(&(cache)->lock);
 
 void
 vfs_init();
@@ -653,6 +700,18 @@ xattr_getcache(struct v_inode* inode, struct hstr* name);
 
 void
 xattr_addcache(struct v_inode* inode, struct v_xattr_entry* xattr);
+
+
+/* --- fdtable --- */
+
+struct v_fdtable*
+fdtable_create();
+
+void
+fdtable_copy(struct v_fdtable* dest, struct v_fdtable* src);
+
+void
+fdtable_free(struct v_fdtable* table);
 
 
 /* --- misc stuff --- */

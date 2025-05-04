@@ -14,6 +14,9 @@ typedef struct rwlock_s
 } rwlock_t;
 
 void
+rwlock_init(rwlock_t* rwlock);
+
+void
 rwlock_begin_read(rwlock_t* rwlock);
 
 void
