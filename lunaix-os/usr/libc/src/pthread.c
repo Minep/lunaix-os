@@ -1,4 +1,4 @@
-#include <lunaix/syscall.h>
+#include <syscall.h>
 #include <pthread.h>
 
 int 
@@ -14,7 +14,7 @@ pthread_create(pthread_t* thread,
     th_param.arg1 = arg;
 
     extern void th_trampoline();
-    ret = do_lunaix_syscall(__SYSCALL_th_create, thread, 
+    ret = do_lunaix_syscall(__NR__lxsys_th_create, thread, 
                             &th_param, th_trampoline);
     return ret;
 }
@@ -22,29 +22,29 @@ pthread_create(pthread_t* thread,
 int 
 pthread_detach(pthread_t thread)
 {
-    return do_lunaix_syscall(__SYSCALL_th_detach, thread);
+    return do_lunaix_syscall(__NR__lxsys_th_detach, thread);
 }
 
 void 
 pthread_exit(void *value_ptr)
 {
-    do_lunaix_syscall(__SYSCALL_th_exit, value_ptr);
+    do_lunaix_syscall(__NR__lxsys_th_exit, value_ptr);
 }
 
 int 
 pthread_join(pthread_t thread, void **value_ptr)
 {
-    return do_lunaix_syscall(__SYSCALL_th_join, thread, value_ptr);
+    return do_lunaix_syscall(__NR__lxsys_th_join, thread, value_ptr);
 }
 
 int 
 pthread_kill(pthread_t thread, int sig)
 {
-    return do_lunaix_syscall(__SYSCALL_th_kill, thread, sig);
+    return do_lunaix_syscall(__NR__lxsys_th_kill, thread, sig);
 }
 
 pthread_t 
 pthread_self(void)
 {
-    return do_lunaix_syscall(__SYSCALL_th_self);
+    return do_lunaix_syscall(__NR__lxsys_th_self);
 }

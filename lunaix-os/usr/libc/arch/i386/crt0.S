@@ -24,7 +24,7 @@
         
     1:
         movl %eax, %ebx
-        movl $__SYSCALL__exit, %eax
+        movl $__NR__lxsys_exit, %eax
         int $33
 
         ud2 // should not reach

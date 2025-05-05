@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_TERMIOS_H
-#define __LUNAIX_TERMIOS_H
+#ifndef __LUNALIBC_TERMIOS_H
+#define __LUNALIBC_TERMIOS_H
 
 #include <lunaix/term.h>
 
@@ -118,4 +118,4 @@ int     tcgetattr(int, struct termios *);
 int     tcsendbreak(int, int);
 int     tcsetattr(int, int, const struct termios *);
 
-#endif /* __LUNAIX_TERMIOS_H */
+#endif /* __LUNALIBC_TERMIOS_H */

@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_STRING_H
-#define __LUNAIX_STRING_H
+#ifndef __LUNALIBC_STRING_H
+#define __LUNALIBC_STRING_H
 
 #include <stddef.h>
 
@@ -15,4 +15,4 @@ extern char* strcpy(char* dest, const char* src);
 
 extern int strcmp(const char* s1, const char* s2);
 
-#endif /* __LUNAIX_STRING_H */
+#endif /* __LUNALIBC_STRING_H */

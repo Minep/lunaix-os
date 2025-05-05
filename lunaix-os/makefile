@@ -34,6 +34,8 @@ $(kbuild_dir):
 	@mkdir -p $(os_img_dir)/usr
 
 .PHONY: kernel
+.PHONY: rootfs all clean-user clean tool
+
 export BUILD_DIR=$(kbin_dir)
 export BUILD_NAME=$(kbin)
 kernel: $(lbuild_mkinc)
@@ -41,15 +43,22 @@ kernel: $(lbuild_mkinc)
 
 	@$(MAKE) $(MKFLAGS) -I $(mkinc_dir) -f kernel.mk all
 
-.PHONY: rootfs all clean-user clean tool
-
-tool:
-	$(call status,TASK,$@)
-	@$(MAKE) $(MKFLAGS) -C scripts all -I $(mkinc_dir)
-
 .NOTPARALLEL:
 export LBUILD ARCH MODE
 all: $(kbuild_dir) tool kernel
+
+# --- begin stock user --- #
+
+export PREFIX=usr/includes
+usr/includes: install-header
+
+export LBUILD ARCH MODE
+user: usr/includes
+	$(call status,TASK,$@)
+	@$(MAKE) $(MKFLAGS) -C usr all -I $(mkinc_dir)
+
+clean-user:
+	@$(MAKE) -C usr clean -I $(mkinc_dir)
 
 rootfs: usr/build
 	$(call status,TASK,$(notdir $@))
@@ -57,15 +66,8 @@ rootfs: usr/build
 
 usr/build: user
 
-prepare: $(os_img_dir)
+# --- end stock user --- #
 
-export LBUILD ARCH MODE
-user:
-	$(call status,TASK,$@)
-	@$(MAKE) $(MKFLAGS) -C usr all -I $(mkinc_dir)
-
-clean-user:
-	@$(MAKE) -C usr clean -I $(mkinc_dir)
 
 clean:
 	@$(MAKE) $(MKFLAGS) -C usr clean -I $(mkinc_dir)
@@ -76,6 +78,18 @@ clean:
 	@rm -rf $(kbuild_dir) || exit 1
 	@rm -rf .builder || exit 1
 
+
+# --- begin misc --- #
+
 export CFLAGS=-include $(lbuild_config_h)
 unit-test: $(lbuild_config_h)
 	@$(MAKE) $(MKFLAGS) -C tests/units run 
+
+tool:
+	$(call status,TASK,$@)
+	@$(MAKE) $(MKFLAGS) -C scripts all -I $(mkinc_dir)
+
+install-header:
+	@$(MAKE) $(MKFLAGS) -I $(mkinc_dir) -f install_headers.mk all
+
+# --- end misc --- #

@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_SYS_DIRENT_H
-#define __LUNAIX_SYS_DIRENT_H
+#ifndef __LUNALIBC_SYS_DIRENT_H
+#define __LUNALIBC_SYS_DIRENT_H
 
 #include <lunaix/dirent_defs.h>
 
@@ -27,4 +27,4 @@ readdir(DIR* dir);
 extern int
 sys_readdir(int fd, struct lx_dirent* dirent);
 
-#endif /* __LUNAIX_DIRENT_H */
+#endif /* __LUNALIBC_DIRENT_H */

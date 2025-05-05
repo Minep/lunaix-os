@@ -18,7 +18,7 @@
 !LConfig
 !makefile
 !live_debug.sh
-!kernel.mk
+!*.mk
 
 *.[od]
 *.ld

@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_SYS_UNISTD_H
-#define __LUNAIX_SYS_UNISTD_H
+#ifndef __LUNALIBC_SYS_UNISTD_H
+#define __LUNALIBC_SYS_UNISTD_H
 
 #include <lunaix/types.h>
 #include <stddef.h>
@@ -111,4 +111,4 @@ fsetxattr(int fd, const char* name, void* value, size_t len);
 extern int
 execve(const char* filename, const char* argv[], const char* envp[]);
 
-#endif /* __LUNAIX_UNISTD_H */
+#endif /* __LUNALIBC_UNISTD_H */

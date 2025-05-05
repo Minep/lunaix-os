@@ -1,0 +1,15 @@
+include toolchain.mkinc
+include lunabuild.mkinc
+include utils.mkinc
+
+include $(lbuild_mkinc)
+
+ksrc_objs := $(addsuffix .o,$(_LBUILD_SRCS))
+ksrc_deps := $(addsuffix .d,$(_LBUILD_SRCS))
+khdr_opts := $(addprefix -include ,$(_LBUILD_HDRS))
+kinc_opts := $(addprefix -I,$(_LBUILD_INCS))
+config_h += -include $(lbuild_config_h)
+
+kcflags := $(khdr_opts) $(kinc_opts) $(config_h)
+
+-include $(ksrc_deps)

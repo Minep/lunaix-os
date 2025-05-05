@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_SYS_LUNAIX_H
-#define __LUNAIX_SYS_LUNAIX_H
+#ifndef __LUNALIBC_SYS_LUNAIX_H
+#define __LUNALIBC_SYS_LUNAIX_H
 
 #include <lunaix/types.h>
 #include <stddef.h>
@@ -19,4 +19,4 @@ syslog(int level, const char* fmt, ...);
 int
 realpathat(int fd, char* buf, size_t size);
 
-#endif /* __LUNAIX_LUNAIX_H */
+#endif /* __LUNALIBC_LUNAIX_H */

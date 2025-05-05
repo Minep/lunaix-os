@@ -1,4 +1,4 @@
-#include <lunaix/syscall.h>
+#include <syscall.h>
 #include <lunaix/ioctl.h>
 #include <stdarg.h>
 
@@ -8,7 +8,7 @@ ioctl(int fd, int req, ...)
     va_list ap;
     va_start(ap, req);
 
-    int ret = do_lunaix_syscall(__SYSCALL_ioctl, fd, req, &ap);
+    int ret = do_lunaix_syscall(__NR__lxsys_ioctl, fd, req, &ap);
     
     va_end(ap);
     return ret;
