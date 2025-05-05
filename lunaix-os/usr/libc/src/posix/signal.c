@@ -1,6 +1,6 @@
 #include <syscall.h>
-#include <lunaix/signal_defs.h>
-#include <lunaix/types.h>
+#include <lunaix/signal.h>
+#include <sys/types.h>
 
 int
 sigpending(sigset_t *set)

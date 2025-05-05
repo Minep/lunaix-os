@@ -7,7 +7,7 @@
 #include <lunaix/status.h>
 #include <lunaix/syslog.h>
 
-#include <usr/lunaix/ioctl_defs.h>
+#include <usr/lunaix/ioctl.h>
 
 LOG_MODULE("term");
 

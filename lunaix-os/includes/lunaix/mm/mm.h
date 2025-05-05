@@ -6,7 +6,7 @@
 
 #include <asm/pagetable.h>
 
-#include <usr/lunaix/mann_flags.h>
+#include <usr/lunaix/mman.h>
 
 /**
  * @brief 私有区域，该区域中的页无法进行任何形式的共享。

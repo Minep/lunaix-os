@@ -1,5 +1,5 @@
 #include <syscall.h>
-#include <lunaix/dirent_defs.h>
+#include <lunaix/dirent.h>
 
 int
 sys_readdir(int fd, struct lx_dirent* dirent)

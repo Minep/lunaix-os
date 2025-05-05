@@ -1,7 +1,7 @@
 #ifndef __LUNALIBC_SYS_MOUNT_H
 #define __LUNALIBC_SYS_MOUNT_H
 
-#include <lunaix/types.h>
+#include <sys/types.h>
 
 extern int mount(const char* source, const char* target, const char* fstype, int flags);
 

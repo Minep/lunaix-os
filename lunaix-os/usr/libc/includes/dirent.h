@@ -1,7 +1,7 @@
 #ifndef __LUNALIBC_SYS_DIRENT_H
 #define __LUNALIBC_SYS_DIRENT_H
 
-#include <lunaix/dirent_defs.h>
+#include <lunaix/dirent.h>
 
 typedef struct
 {

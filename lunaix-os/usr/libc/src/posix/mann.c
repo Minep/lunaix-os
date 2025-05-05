@@ -1,6 +1,6 @@
 #include <syscall.h>
-#include <lunaix/mann.h>
-#include <lunaix/types.h>
+#include <sys/mman.h>
+#include <sys/types.h>
 
 void*
 mmap(void* addr, size_t length, int proct, int flags, int fd, off_t offset)

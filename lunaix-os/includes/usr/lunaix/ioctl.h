@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_SYS_IOCTL_DEFS_H
-#define __LUNAIX_SYS_IOCTL_DEFS_H
+#ifndef _LUNAIX_UHDR_SYS_IOCTL_H
+#define _LUNAIX_UHDR_SYS_IOCTL_H
 
 #define IOREQ(cmd, arg_num) ((((cmd) & 0xffff) << 8) | ((arg_num) & 0xff))
 
@@ -22,4 +22,4 @@
 
 #define TIMERIO_GETINFO IOREQ(1, 0)
 
-#endif /* __LUNAIX_IOCTL_DEFS_H */
+#endif /* _LUNAIX_UHDR_IOCTL_H */

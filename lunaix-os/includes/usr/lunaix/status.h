@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_STATUS_H
-#define __LUNAIX_STATUS_H
+#ifndef _LUNAIX_UHDR_STATUS_H
+#define _LUNAIX_UHDR_STATUS_H
 
 #define ENOMEM              -3
 #define EINVAL              -6
@@ -32,4 +32,4 @@
 #define EPERM               -33
 #define EACCESS             -34
 
-#endif /* __LUNAIX_STATUS_H */
+#endif /* _LUNAIX_UHDR_STATUS_H */

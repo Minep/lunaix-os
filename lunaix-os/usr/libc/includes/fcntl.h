@@ -1,8 +1,8 @@
 #ifndef __LUNALIBC_SYS_FCNTL_H
 #define __LUNALIBC_SYS_FCNTL_H
 
-#include <lunaix/fcntl_defs.h>
-#include <lunaix/types.h>
+#include <lunaix/fcntl.h>
+#include <sys/types.h>
 
 extern int
 open(const char* path, int flags);

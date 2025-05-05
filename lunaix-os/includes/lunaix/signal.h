@@ -2,7 +2,7 @@
 #define __LUNAIX_SIGNAL_H
 
 #include <lunaix/types.h>
-#include <usr/lunaix/signal_defs.h>
+#include <usr/lunaix/signal.h>
 
 #define _SIG_NUM 16
 

@@ -1,8 +1,8 @@
 #ifndef __LUNALIBC_SYS_SIGNAL_H
 #define __LUNALIBC_SYS_SIGNAL_H
 
-#include <lunaix/signal_defs.h>
-#include <lunaix/types.h>
+#include <lunaix/signal.h>
+#include <sys/types.h>
 
 extern sighandler_t
 signal(int signum, sighandler_t handler);

@@ -1,4 +1,4 @@
-#include <lunaix/lunaix.h>
+#include <sys/wait.h>
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>

@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_SYS_MANN_FLAGS_H
-#define __LUNAIX_SYS_MANN_FLAGS_H
+#ifndef _LUNAIX_UHDR_SYS_MMAN_H
+#define _LUNAIX_UHDR_SYS_MMAN_H
 
 // POSIX compliant.
 
@@ -40,4 +40,4 @@ struct usr_mmap_param
     unsigned long offset;
 };
 
-#endif /* __LUNAIX_MANN_FLAGS_H */
+#endif /* _LUNAIX_UHDR_MMAN_H */

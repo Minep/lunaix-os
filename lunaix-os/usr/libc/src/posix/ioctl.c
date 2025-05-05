@@ -1,5 +1,5 @@
 #include <syscall.h>
-#include <lunaix/ioctl.h>
+#include <sys/ioctl.h>
 #include <stdarg.h>
 
 int __attribute__((noinline))

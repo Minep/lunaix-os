@@ -2,11 +2,11 @@
 #define __LUNAIX_FSAPI_H
 
 #include <lunaix/fs.h>
-#include <lunaix/fcntl_defs.h>
 #include <lunaix/blkbuf.h>
 #include <klibc/string.h>
 
-#include <usr/lunaix/dirent_defs.h>
+#include <usr/lunaix/fcntl.h>
+#include <usr/lunaix/dirent.h>
 
 struct fsapi_vsb_ops
 {

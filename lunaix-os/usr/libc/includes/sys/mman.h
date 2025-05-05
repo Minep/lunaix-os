@@ -2,8 +2,8 @@
 #define __LUNALIBC_SYS_MANN_H
 
 #include <stddef.h>
-#include <lunaix/mann_flags.h>
-#include <lunaix/types.h>
+#include <lunaix/mman.h>
+#include <sys/types.h>
 
 void* mmap(void* addr, size_t length, int proct, int flags, int fd, off_t offset);
 

@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_SYS_SIGNAL_DEFS_H
-#define __LUNAIX_SYS_SIGNAL_DEFS_H
+#ifndef _LUNAIX_UHDR_SYS_SIGNAL_DEFS_H
+#define _LUNAIX_UHDR_SYS_SIGNAL_DEFS_H
 
 #define SIGALRM 1
 #define SIGCHLD 2
@@ -35,4 +35,4 @@ struct siginfo
     // TODO
 };
 
-#endif /* __LUNAIX_SIGNAL_DEFS_H */
+#endif /* _LUNAIX_UHDR_SIGNAL_DEFS_H */

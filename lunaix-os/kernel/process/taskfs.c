@@ -8,7 +8,7 @@
 #include <klibc/strfmt.h>
 #include <klibc/string.h>
 
-#include <usr/lunaix/dirent_defs.h>
+#include <usr/lunaix/dirent.h>
 
 #define COUNTER_MASK ((1 << 16) - 1)
 

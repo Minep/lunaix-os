@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_FSTYPES_H
-#define __LUNAIX_FSTYPES_H
+#ifndef _LUNAIX_UHDR_FSTYPES_H
+#define _LUNAIX_UHDR_FSTYPES_H
 
 /*
   7 6 5 4 3   2 1 0
@@ -20,4 +20,4 @@
 #define F_PIPE      0b00010000
 #define F_SYMLINK   0b00100000
 
-#endif /* __LUNAIX_FSTYPES_H */
+#endif /* _LUNAIX_UHDR_FSTYPES_H */

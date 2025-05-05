@@ -1,43 +1,19 @@
-#ifndef __LUNAIX_SYS_TYPES_H
-#define __LUNAIX_SYS_TYPES_H
+#ifndef _LUNAIX_UHDR_SYS_TYPES_H
+#define _LUNAIX_UHDR_SYS_TYPES_H
 
-#undef NULL
-#define NULL (void*)0
-#define NULLPTR 0
+typedef int             __lunaix_pid_t;
+typedef int             __lunaix_tid_t;
+typedef int             __lunaix_uid_t;
+typedef int             __lunaix_gid_t;
+typedef unsigned long   __lunaix_size_t;
+typedef signed long     __lunaix_ssize_t;
+typedef unsigned int    __lunaix_ino_t;
 
-#define PEXITTERM 0x100
-#define PEXITSTOP 0x200
-#define PEXITSIG 0x400
-
-#define PEXITNUM(flag, code) (flag | (code & 0xff))
-
-#define WNOHANG 1
-#define WUNTRACED 2
-#define WEXITSTATUS(wstatus) ((wstatus & 0xff))
-#define WIFSTOPPED(wstatus) ((wstatus & PEXITSTOP))
-#define WIFEXITED(wstatus)                                                     \
-    ((wstatus & PEXITTERM) && ((char)WEXITSTATUS(wstatus) >= 0))
-
-#define WIFSIGNALED(wstatus) ((wstatus & PEXITSIG))
-
-typedef signed long ssize_t;
-
-typedef int pid_t;
-typedef int tid_t;
-typedef int uid_t;
-typedef int gid_t;
-
-typedef __SIZE_TYPE__ size_t;
-
-typedef __SIZE_TYPE__ off_t;
-
-typedef unsigned int ino_t;
-
-typedef struct dev_t
+typedef struct
 {
     unsigned int meta;
     unsigned int unique;
     unsigned int index;
-} dev_t;
+} __lunaix_dev_t;
 
-#endif /* __LUNAIX_TYPES_H */
+#endif /* _LUNAIX_UHDR_TYPES_H */

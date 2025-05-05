@@ -1,6 +1,6 @@
 #include <errno.h>
-#include <lunaix/ioctl.h>
-#include <lunaix/lunaix.h>
+#include <sys/ioctl.h>
+#include <sys/wait.h>
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>

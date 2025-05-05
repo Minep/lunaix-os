@@ -3,7 +3,7 @@
 #include <lunaix/process.h>
 #include <lunaix/spike.h>
 
-#include <usr/lunaix/fcntl_defs.h>
+#include <usr/lunaix/fcntl.h>
 
 #include <klibc/string.h>
 

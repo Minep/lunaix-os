@@ -7,7 +7,7 @@
 
 #include <asm/mm_defs.h>
 
-#include <usr/lunaix/mann_flags.h>
+#include <usr/lunaix/mman.h>
 
 // any size beyond this is bullshit
 #define BS_SIZE (KERNEL_RESIDENT - USR_MMAP)
