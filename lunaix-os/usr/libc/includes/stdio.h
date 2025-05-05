@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_USTDIO_H
-#define __LUNAIX_USTDIO_H
+#ifndef __LUNALIBC_USTDIO_H
+#define __LUNALIBC_USTDIO_H
 
 #include <stdarg.h>
 
@@ -15,4 +15,4 @@ vsnprintf(char* buffer, unsigned int size, const char* fmt, va_list ap);
 int
 snprintf(char* buffer, unsigned int size, const char* fmt, ...);
 
-#endif /* __LUNAIX_USTDIO_H */
+#endif /* __LUNALIBC_USTDIO_H */

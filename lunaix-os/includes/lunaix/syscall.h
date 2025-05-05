@@ -1,7 +1,7 @@
 #ifndef __LUNAIX_SYSCALL_H
 #define __LUNAIX_SYSCALL_H
 
-#include <usr/lunaix/syscallid.h>
+#define __SYSCALL_MAX 1024
 
 #ifndef __ASM__
 

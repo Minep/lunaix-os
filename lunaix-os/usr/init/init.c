@@ -1,10 +1,12 @@
 #include <errno.h>
 #include <fcntl.h>
-#include <lunaix/lunaix.h>
-#include <lunaix/mount.h>
+#include <sys/wait.h>
+#include <sys/mount.h>
 #include <termios.h>
 #include <stdio.h>
 #include <unistd.h>
+
+#include <sys/lunaix.h>
 
 #define must_mount(src, target, fs, opts)                                      \
     do {                                                                       \

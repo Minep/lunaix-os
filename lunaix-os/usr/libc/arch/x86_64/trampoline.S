@@ -20,7 +20,7 @@
         leaq 4(%rax), %rdx     // (struct siguctx*)&sigact
         call sig_dohandling
         
-        movq $__SYSCALL_sigreturn, %rax
+        movq $__NR__lxsys_sigreturn, %rax
         popq %rbx
         int $33
     
@@ -32,5 +32,5 @@
         callq *%rax
 
         movq %rax, %rbx
-        movq $__SYSCALL_th_exit, %rax
+        movq $__NR__lxsys_th_exit, %rax
         int $33

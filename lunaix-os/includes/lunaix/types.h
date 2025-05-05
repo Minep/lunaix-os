@@ -1,33 +1,39 @@
 #ifndef __LUNAIX_TYPES_H
 #define __LUNAIX_TYPES_H
 
+#include <stdarg.h>
 #include <lunaix/compiler.h>
 #include <lunaix/limits.h>
-#include <stdarg.h>
 #include <usr/lunaix/types.h>
 
-// TODO: WTERMSIG
+#undef  NULL
+#define NULL                (void*)0
 
-// TODO: replace the integer type with these. To make thing more portable.
-
-typedef unsigned char u8_t;
-typedef unsigned short u16_t;
-typedef unsigned int u32_t;
-typedef unsigned long ptr_t;
-typedef unsigned long reg_t;
+typedef unsigned char       u8_t;
+typedef unsigned short      u16_t;
+typedef unsigned int        u32_t;
 
 #ifndef CONFIG_ARCH_BITS_64
-typedef unsigned long long u64_t;
+typedef unsigned long long  u64_t;
 #else
-typedef unsigned long u64_t;
+typedef unsigned long       u64_t;
 #endif
 
-typedef int pid_t;
-typedef signed long ssize_t;
+typedef __lunaix_pid_t      pid_t;
+typedef __lunaix_tid_t      tid_t;
+typedef __lunaix_uid_t      uid_t;
+typedef __lunaix_gid_t      gid_t;
+typedef __lunaix_size_t     size_t;
+typedef __lunaix_ssize_t    ssize_t;
+typedef __lunaix_size_t     off_t;
+typedef __lunaix_ino_t      ino_t;
 
-typedef unsigned int cpu_t;
+typedef unsigned long       ptr_t;
+typedef unsigned long       reg_t;
+typedef unsigned int        cpu_t;
+typedef u64_t               lba_t;
 
-typedef u64_t lba_t;
+typedef __lunaix_dev_t      dev_t;
 
 #define true 1
 #define false 0

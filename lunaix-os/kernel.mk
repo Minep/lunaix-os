@@ -1,42 +1,31 @@
-include toolchain.mkinc
-include lunabuild.mkinc
-
-include $(lbuild_mkinc)
+include kbuild_deps.mkinc
 
 kbin_dir := $(BUILD_DIR)
 kbin := $(BUILD_NAME)
 
-ksrc_objs := $(addsuffix .o,$(_LBUILD_SRCS))
-ksrc_deps := $(addsuffix .d,$(_LBUILD_SRCS))
-khdr_opts := $(addprefix -include ,$(_LBUILD_HDRS))
-kinc_opts := $(addprefix -I,$(_LBUILD_INCS))
-config_h += -include $(lbuild_config_h)
-
 tmp_kbin  := $(BUILD_DIR)/tmpk.bin
 klinking  := link/lunaix.ld
 
-CFLAGS += $(khdr_opts) $(kinc_opts) $(config_h) -MMD -MP
-
--include $(ksrc_deps)
+CFLAGS += $(kcflags) -MMD -MP
 
 all_linkable = $(filter-out $(klinking),$(1))
 
 %.S.o: %.S $(khdr_files) kernel.mk
-	$(call status_,AS,$<)
+	$(call status,AS,$<)
 	@$(CC) $(CFLAGS) -c $< -o $@
 
 %.c.o: %.c kernel.mk
-	$(call status_,CC,$<)
+	$(call status,CC,$<)
 	@$(CC) $(CFLAGS) -c $< -o $@
 
 
 $(klinking): link/lunaix.ldx
-	$(call status_,PP,$<)
+	$(call status,PP,$<)
 	@$(CC) $(CFLAGS) -x c -E -P $< -o $@
 
 
 $(tmp_kbin): $(klinking) $(ksrc_objs)
-	$(call status_,LD,$@)
+	$(call status,LD,$@)
 
 	@$(CC) -T $(klinking) $(config_h) $(LDFLAGS) -o $@ \
 			$(call all_linkable,$^)
@@ -47,13 +36,13 @@ ksecsmap  := lunaix_ksecsmap.o
 kautogen  := $(ksecsmap) $(ksymtable)
 
 $(ksymtable): $(tmp_kbin)
-	$(call status_,KSYM,$@)
+	$(call status,KSYM,$@)
 	@ARCH=$(ARCH) scripts/gen-ksymtable DdRrTtAGg $< > lunaix_ksymtable.S
 
 	@$(CC) $(CFLAGS) -c lunaix_ksymtable.S -o $@
 
 $(ksecsmap): $(tmp_kbin)
-	$(call status_,KGEN,$@)
+	$(call status,KGEN,$@)
 	@scripts/elftool.tool -p -i $< > lunaix_ksecsmap.S
 
 	@$(CC) $(CFLAGS) -c lunaix_ksecsmap.S -o $@
@@ -61,7 +50,7 @@ $(ksecsmap): $(tmp_kbin)
 .PHONY: __do_relink
 
 __do_relink: $(klinking) $(ksrc_objs) $(kautogen)
-	$(call status_,LD,$(kbin))
+	$(call status,LD,$(kbin))
 
 	@$(CC) -T $(klinking) $(config_h) $(LDFLAGS) -o $(kbin) \
 			$(call all_linkable,$^)

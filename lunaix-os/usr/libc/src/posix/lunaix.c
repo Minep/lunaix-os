@@ -1,23 +1,23 @@
-#include <lunaix/syscall.h>
-#include <lunaix/types.h>
+#include <syscall.h>
+#include <sys/types.h>
 #include <stdio.h>
 
 void
 yield()
 {
-    do_lunaix_syscall(__SYSCALL_yield);
+    do_lunaix_syscall(__NR__lxsys_yield);
 }
 
 pid_t
 wait(int* status)
 {
-    return do_lunaix_syscall(__SYSCALL_wait, status);
+    return do_lunaix_syscall(__NR__lxsys_wait, status);
 }
 
 pid_t
 waitpid(pid_t pid, int* status, int options)
 {
-    return do_lunaix_syscall(__SYSCALL_waitpid, pid, status, options);
+    return do_lunaix_syscall(__NR__lxsys_waitpid, pid, status, options);
 }
 
 void
@@ -28,7 +28,7 @@ syslog(int level, const char* fmt, ...)
     va_start(ap, fmt);
 
     unsigned int size = vsnprintf(buf, 1024, fmt, ap);
-    do_lunaix_syscall(__SYSCALL_syslog, level, buf, size);
+    do_lunaix_syscall(__NR__lxsys_syslog, level, buf, size);
 
     va_end(ap);
 }
@@ -36,5 +36,5 @@ syslog(int level, const char* fmt, ...)
 int
 realpathat(int fd, char* buf, size_t size)
 {
-    return do_lunaix_syscall(__SYSCALL_realpathat, fd, buf, size);
+    return do_lunaix_syscall(__NR__lxsys_realpathat, fd, buf, size);
 }

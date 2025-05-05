@@ -1,6 +1,6 @@
 #include <errno.h>
 #include <fcntl.h>
-#include <lunaix/lunaix.h>
+#include <sys/lunaix.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>

@@ -1,0 +1,22 @@
+#!/bin/bash
+
+outfile="$1"
+
+read -d '' payload <<EOF
+#define SYSCALL(x) __NR##x __COUNTER__
+#include <asm/syscall_nr.inc>
+EOF
+
+body=$(echo "$payload" \
+      | gcc $CFLAGS -x none -E - -o- -nostdlib -P \
+      | sed -e 's/^__NR__/#define __NR__/' \
+      | sed -e '/#define/!d')
+
+cat <<EOF > "$outfile" 
+#ifndef __LUNAIX_SYSCALL_H
+#define __LUNAIX_SYSCALL_H
+
+$body
+
+#endif
+EOF

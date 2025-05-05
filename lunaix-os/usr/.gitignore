@@ -3,3 +3,5 @@ build/
 .vscode/
 
 uexec.ld
+
+includes/**

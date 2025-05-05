@@ -21,7 +21,7 @@
         
     1:
         movq %rax, %rbx
-        movq $__SYSCALL__exit, %rax
+        movq $__NR__lxsys_exit, %rax
         int $33
 
         ud2 // should not reach

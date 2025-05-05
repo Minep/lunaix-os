@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_UPOLL_H
-#define __LUNAIX_UPOLL_H
+#ifndef _LUNAIX_UHDR_UPOLL_H
+#define _LUNAIX_UHDR_UPOLL_H
 
 struct poll_info
 {
@@ -25,4 +25,4 @@ struct poll_info
 #define _POLLEE_ALWAYS 1
 #define _POLLEE_RM_ON_ERR (1 << 1)
 
-#endif /* __LUNAIX_UPOLL_H */
+#endif /* _LUNAIX_UHDR_UPOLL_H */

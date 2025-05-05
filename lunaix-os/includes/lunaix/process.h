@@ -15,6 +15,8 @@
 #include <lunaix/hart_state.h>
 #include <lunaix/usrscope.h>
 
+#include <usr/lunaix/wait.h>
+
 #include <stdint.h>
 
 

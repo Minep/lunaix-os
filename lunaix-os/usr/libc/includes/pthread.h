@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_PTHREAD_H
-#define __LUNAIX_PTHREAD_H
+#ifndef __LUNALIBC_PTHREAD_H
+#define __LUNALIBC_PTHREAD_H
 
 #include <lunaix/threads.h>
 
@@ -30,4 +30,4 @@ pthread_t pthread_self(void);
 
 
 
-#endif /* __LUNAIX_PTHREAD_H */
+#endif /* __LUNALIBC_PTHREAD_H */

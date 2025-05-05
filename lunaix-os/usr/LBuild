@@ -9,7 +9,6 @@ sources([
     "maze",
     "mkdir",
     "rm",
-    "testfork",
     "fragfile",
 ])
 

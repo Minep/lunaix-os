@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_SYS_DIRENT_DEFS_H
-#define __LUNAIX_SYS_DIRENT_DEFS_H
+#ifndef _LUNAIX_UHDR_SYS_DIRENT_DEFS_H
+#define _LUNAIX_UHDR_SYS_DIRENT_DEFS_H
 
 #define DIRENT_NAME_MAX_LEN 256
 
@@ -16,4 +16,4 @@ struct lx_dirent
     char d_name[DIRENT_NAME_MAX_LEN];
 };
 
-#endif /* __LUNAIX_DIRENT_DEFS_H */
+#endif /* _LUNAIX_UHDR_DIRENT_DEFS_H */

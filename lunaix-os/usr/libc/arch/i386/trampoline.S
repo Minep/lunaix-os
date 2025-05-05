@@ -15,7 +15,7 @@
 
         addl $12, %esp
         
-        movl $__SYSCALL_sigreturn, %eax
+        movl $__NR__lxsys_sigreturn, %eax
         popl %ebx
         int $33
 
@@ -28,5 +28,5 @@
         calll *%eax
 
         movl %eax, %ebx
-        movl $__SYSCALL_th_exit, %eax
+        movl $__NR__lxsys_th_exit, %eax
         int $33

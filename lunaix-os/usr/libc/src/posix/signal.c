@@ -1,35 +1,35 @@
-#include <lunaix/syscall.h>
-#include <lunaix/signal_defs.h>
-#include <lunaix/types.h>
+#include <syscall.h>
+#include <lunaix/signal.h>
+#include <sys/types.h>
 
 int
 sigpending(sigset_t *set)
 {
-    return do_lunaix_syscall(__SYSCALL_sigpending, set);
+    return do_lunaix_syscall(__NR__lxsys_sigpending, set);
 }
 
 int
 sigsuspend(const sigset_t *mask)
 {
-    return do_lunaix_syscall(__SYSCALL_sigsuspend, mask);
+    return do_lunaix_syscall(__NR__lxsys_sigsuspend, mask);
 }
 
 int
 sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
 {
-    return do_lunaix_syscall(__SYSCALL_sigprocmask, how, set, oldset);
+    return do_lunaix_syscall(__NR__lxsys_sigprocmask, how, set, oldset);
 }
 
 int
 sys_sigaction(int signum, struct sigaction* action)
 {
-    return do_lunaix_syscall(__SYSCALL_sys_sigaction, signum, action);
+    return do_lunaix_syscall(__NR__lxsys_sys_sigaction, signum, action);
 }
 
 int
 kill(pid_t pid, int signum)
 {
-    return do_lunaix_syscall(__SYSCALL_kill, pid, signum);
+    return do_lunaix_syscall(__NR__lxsys_kill, pid, signum);
 }
 
 extern void

@@ -1,5 +1,5 @@
 #include <termios.h>
-#include <lunaix/ioctl.h>
+#include <sys/ioctl.h>
 
 int
 tcgetattr(int fd, struct termios* termios_p) 

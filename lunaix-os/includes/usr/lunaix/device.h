@@ -1,7 +1,7 @@
-#ifndef __LUNAIX_UDEVICE_H
-#define __LUNAIX_UDEVICE_H
+#ifndef _LUNAIX_UHDR_UDEVICE_H
+#define _LUNAIX_UHDR_UDEVICE_H
 
-#include "ioctl_defs.h"
+#include "ioctl.h"
 
 struct dev_info
 {
@@ -20,4 +20,4 @@ struct dev_info
     } dev_name;
 };
 
-#endif /* __LUNAIX_UDEVICE_H */
+#endif /* _LUNAIX_UHDR_UDEVICE_H */

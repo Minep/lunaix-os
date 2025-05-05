@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_UTERM_H
-#define __LUNAIX_UTERM_H
+#ifndef _LUNAIX_UHDR_UTERM_H
+#define _LUNAIX_UHDR_UTERM_H
 
 #define _BRKINT (1)
 #define _ICRNL (1 << 1)
@@ -104,4 +104,4 @@ struct termios
     speed_t c_baud;
 };
 
-#endif /* __LUNAIX_UTERM_H */
+#endif /* _LUNAIX_UHDR_UTERM_H */

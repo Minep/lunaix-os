@@ -4,8 +4,8 @@
 #include <lunaix/device.h>
 #include <lunaix/ds/rbuffer.h>
 #include <lunaix/ds/waitq.h>
-#include <lunaix/signal_defs.h>
 
+#include <usr/lunaix/signal.h>
 #include <usr/lunaix/term.h>
 
 struct term;

@@ -1,8 +1,8 @@
-#ifndef __LUNAIX_SYS_SIGNAL_H
-#define __LUNAIX_SYS_SIGNAL_H
+#ifndef __LUNALIBC_SYS_SIGNAL_H
+#define __LUNALIBC_SYS_SIGNAL_H
 
-#include <lunaix/signal_defs.h>
-#include <lunaix/types.h>
+#include <lunaix/signal.h>
+#include <sys/types.h>
 
 extern sighandler_t
 signal(int signum, sighandler_t handler);
@@ -29,4 +29,4 @@ int
 pthread_sigmask(int how, const sigset_t *restrict set,
                     sigset_t *restrict oset);
 
-#endif /* __LUNAIX_SIGNAL_H */
+#endif /* __LUNALIBC_SIGNAL_H */

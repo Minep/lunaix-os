@@ -1,11 +1,12 @@
-#ifndef __LUNAIX_USR_THREADS_H
-#define __LUNAIX_USR_THREADS_H
+#ifndef _LUNAIX_UHDR_USR_THREADS_H
+#define _LUNAIX_UHDR_USR_THREADS_H
 
 #include "types.h"
 
-struct uthread_param {
+struct uthread_param 
+{
     void* th_handler;
     void* arg1;
 };
 
-#endif /* __LUNAIX_USR_THREADS_H */
+#endif /* _LUNAIX_UHDR_USR_THREADS_H */

@@ -55,7 +55,7 @@
 
 #include <lunaix/fs/twifs.h>
 
-#include <usr/lunaix/dirent_defs.h>
+#include <usr/lunaix/dirent.h>
 
 #define INODE_ACCESSED  0
 #define INODE_MODIFY    1

@@ -1,5 +1,5 @@
-#ifndef __LUNAIX_UGFX_H
-#define __LUNAIX_UGFX_H
+#ifndef _LUNAIX_UHDR_UGFX_H
+#define _LUNAIX_UHDR_UGFX_H
 
 #define GFX_CMDA(type, cmd_id) (((type) << 8) | ((cmd_id) & 0xf))
 
@@ -41,4 +41,4 @@ struct gfxa_clut
     size_t len;
 };
 
-#endif /* __LUNAIX_UGFX_H */
+#endif /* _LUNAIX_UHDR_UGFX_H */

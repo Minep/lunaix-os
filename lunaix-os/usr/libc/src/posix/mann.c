@@ -1,6 +1,6 @@
-#include <lunaix/syscall.h>
-#include <lunaix/mann.h>
-#include <lunaix/types.h>
+#include <syscall.h>
+#include <sys/mman.h>
+#include <sys/types.h>
 
 void*
 mmap(void* addr, size_t length, int proct, int flags, int fd, off_t offset)
@@ -14,11 +14,11 @@ mmap(void* addr, size_t length, int proct, int flags, int fd, off_t offset)
         .offset = offset
     };
 
-    return (void*)do_lunaix_syscall(__SYSCALL_sys_mmap, &mparam);
+    return (void*)do_lunaix_syscall(__NR__lxsys_sys_mmap, &mparam);
 }
 
 int
 munmap(void* addr, size_t length)
 {
-    return do_lunaix_syscall(__SYSCALL_munmap, addr, length);
+    return do_lunaix_syscall(__NR__lxsys_munmap, addr, length);
 }

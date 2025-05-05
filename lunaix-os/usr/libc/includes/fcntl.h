@@ -1,8 +1,8 @@
-#ifndef __LUNAIX_SYS_FCNTL_H
-#define __LUNAIX_SYS_FCNTL_H
+#ifndef __LUNALIBC_SYS_FCNTL_H
+#define __LUNALIBC_SYS_FCNTL_H
 
-#include <lunaix/fcntl_defs.h>
-#include <lunaix/types.h>
+#include <lunaix/fcntl.h>
+#include <sys/types.h>
 
 extern int
 open(const char* path, int flags);
@@ -10,4 +10,4 @@ open(const char* path, int flags);
 extern int
 fstat(int fd, struct file_stat* stat);
 
-#endif /* __LUNAIX_FCNTL_H */
+#endif /* __LUNALIBC_FCNTL_H */
