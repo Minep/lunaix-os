@@ -1,15 +1,6 @@
-use("acpi")
-use("ahci")
-use("char")
-use("gfxa")
-use("rtc")
-use("term")
-use("timer")
-use("bus")
+from . import acpi, ahci, char, gfxa, rtc, term, timer, bus
 
-if config("use_devicetree"):
-    use("devtree")
+if config.use_devicetree:
+    from . import devtree
 
-sources([
-    "irq.c"
-])
+src.c += "irq.c"

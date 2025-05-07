@@ -1,22 +1,28 @@
 
-@Group
+@(parent := architecture_support)
 def x86_configurations():
-    
-    add_to_collection(architecture_support)
 
-    @Term("Use SSE2/3/4 extension")
-    def x86_enable_sse_feature():
+    require(arch_x86)
+
+    @flag
+    def x86_bl_mb() -> bool:
+        return x86_bl.val == "mb"
+    
+    @flag
+    def x86_bl_mb2() -> bool:
+        return x86_bl.val == "mb2"
+    
+    @"Use SSE2/3/4 extension"
+    def x86_enable_sse_feature() -> bool:
         """ 
             Config whether to allow using SSE feature for certain
             optimization
         """
         
-        type(bool)
-        default(False)
+        return False
 
-
-    @Term("Bootloader Model")
-    def x86_bl():
+    @"Bootloader Model"
+    def x86_bl() -> "mb" | "mb2":
         """
             Select the bootloader interface
             
@@ -26,9 +32,4 @@ def x86_configurations():
                 none:    do not use any interface
         """
 
-        type(["mb"])
-        # type(["mb", "mb2", "none"])
-        default("mb")
-
-
-    return v(arch) in ["i386", "x86_64"]
+        return "mb"

@@ -1,15 +1,13 @@
-use("uart")
+from . import uart
 
-sources([
+if config.vga_console:
+    src.c += "lxconsole.c"
+
+if config.chargame_console:
+    src.c += "chargame.c"
+
+src.c += (
     "devnull.c",
     "serial.c",
     "devzero.c",
-])
-
-if config("vga_console"):
-
-    sources("lxconsole.c")
-
-if config("chargame_console"):
-    
-    sources("chargame.c")
+)

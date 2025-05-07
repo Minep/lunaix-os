@@ -1,4 +1,4 @@
-sources([
+src.c += (
     "elfbfmt.c",
     "ldelf.c"
-])
+)

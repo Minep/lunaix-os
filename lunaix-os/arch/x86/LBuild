@@ -1,26 +1,26 @@
-use("hal")
+from . import hal
 
-sources([
+src.c += (
     "exceptions/interrupts.c",
     "exceptions/isrdef.c",
     "exceptions/intrhnds.S",
-])
+)
 
-sources([
+src.c += (
     "boot/mb_parser.c",
     "boot/kpt_setup.c",
     "boot/boot_helper.c",
-])
+)
 
-sources([
+src.c += (
     "mm/fault.c",
     "mm/tlb.c",
     "mm/pmm.c",
     "mm/gdt.c",
     "mm/vmutils.c"
-])
+)
 
-sources([
+src.c += (
     "klib/fast_crc.c",
     "klib/fast_str.c",
     "exec/exec.c",
@@ -31,11 +31,11 @@ sources([
     "hart.c",
     "failsafe.S",
     "syscall_lut.S"
-])
+)
 
-sources({
-    config("arch"): {
-        "x86_64": [
+match config.arch:
+    case "x86_64":
+        src.c += (
             "hart64.c",
             "syscall64.S",
             "exceptions/interrupt64.S",
@@ -44,8 +44,9 @@ sources({
             "boot/x86_64/prologue64.S",
             "boot/x86_64/kremap64.c",
             "exec/elf64.c"
-        ],
-        "i386": [
+        )
+    case "i386":
+        src.c += (
             "hart32.c",
             "syscall32.S",
             "exceptions/interrupt32.S",
@@ -54,28 +55,21 @@ sources({
             "boot/i386/prologue32.S",
             "boot/i386/kremap32.c",
             "exec/elf32.c"
-        ]
-    }
-})
+        )
 
-headers([
-    "includes"
-])
+src.h += "includes"
 
-
-if config("arch") == "x86_64":
-    compile_opts([
+if config.arch == "x86_64":
+    flag.cc += (
         "-m64", 
         "-fno-unwind-tables", 
         "-fno-asynchronous-unwind-tables",
         "-mcmodel=large"
-    ])
-    linking_opts([
-        "-m64",
-    ])
+    )
+    flag.ld += "-m64"
 else:
-    compile_opts("-m32")
-    linking_opts("-m32")
+    flag.cc += "-m32"
+    flag.ld += "-m32"
 
-if not config("x86_enable_sse_feature"):
-    compile_opts("-mno-sse")
+if not config.x86_enable_sse_feature:
+    flag.cc += "-mno-sse"

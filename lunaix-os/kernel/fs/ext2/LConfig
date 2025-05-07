@@ -1,11 +1,10 @@
 
-@Collection("ext2")
+@"ext2"
+@(parent := file_system)
 def ext2_fs():
-    add_to_collection(file_system)
 
-    @Term("Debug Messages")
-    def ext2_debug_msg():
-        type(bool)
-        default(False)
+    require(fs_ext2)
 
-    return v(fs_ext2)
+    @"Debug Messages"
+    def ext2_debug_msg() -> bool:
+        return False

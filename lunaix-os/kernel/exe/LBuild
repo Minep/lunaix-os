@@ -1,5 +1,3 @@
-use("elf-generic")
+import_("elf-generic")
 
-sources([
-    "exec.c"
-])
+src.c += "exec.c"

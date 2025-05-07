@@ -1,3 +1,1 @@
-sources([
-    "rtc_device.c"
-])
+src.c += "rtc_device.c"

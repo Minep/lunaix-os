@@ -1,3 +1,3 @@
 
-if config("pci_enable"):
-    sources("pci.c")
+if config.pci_enable:
+    src.c += "pci.c"

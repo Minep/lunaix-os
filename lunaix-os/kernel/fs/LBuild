@@ -1,13 +1,12 @@
-use("twifs")
-use("ramfs")
+from . import twifs, ramfs
 
-if configured("fs_iso9660"):
-    use("iso9660")
+if config.fs_ext2:
+    from . import ext2
 
-if configured("fs_ext2"):
-    use("ext2")
+if config.fs_iso9660:
+    from . import iso9660
 
-sources([
+src.c += (
     "twimap.c",
     "pcache.c",
     "mount.c",
@@ -17,5 +16,5 @@ sources([
     "path_walk.c",
     "fsm.c",
     "fs_export.c",
-])
+)
 

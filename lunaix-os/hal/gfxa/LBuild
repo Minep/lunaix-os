@@ -1,5 +1,3 @@
-use("vga")
+from . import vga
 
-sources([
-    "gfxm.c"
-])
+src.c += "gfxm.c"

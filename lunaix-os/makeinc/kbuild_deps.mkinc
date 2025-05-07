@@ -3,13 +3,17 @@ include lunabuild.mkinc
 include utils.mkinc
 
 include $(lbuild_mkinc)
+include $(lconfig_mkinc)
 
-ksrc_objs := $(addsuffix .o,$(_LBUILD_SRCS))
-ksrc_deps := $(addsuffix .d,$(_LBUILD_SRCS))
-khdr_opts := $(addprefix -include ,$(_LBUILD_HDRS))
-kinc_opts := $(addprefix -I,$(_LBUILD_INCS))
+ksrc_objs := $(addsuffix .o,$(BUILD_SRCS))
+ksrc_deps := $(addsuffix .d,$(BUILD_SRCS))
+khdr_opts := $(addprefix -include ,$(BUILD_HDR))
+kinc_opts := $(addprefix -I,$(BUILD_INC))
 config_h += -include $(lbuild_config_h)
 
 kcflags := $(khdr_opts) $(kinc_opts) $(config_h)
+
+CFLAGS += $(BUILD_CFLAGS)
+LDFLAGS += $(BUILD_LDFLAGS)
 
 -include $(ksrc_deps)

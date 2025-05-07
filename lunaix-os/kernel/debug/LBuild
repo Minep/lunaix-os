@@ -1,5 +1,5 @@
-sources([
+src.c += (
     "failsafe.c",
     "trace.c",
     # "gdbstub.c"
-])
+)

@@ -1,8 +1,8 @@
-sources([
+src.c += (
     "device.c",
     "potentem.c",
     "devdb.c",
     "devfs.c",
     "input.c",
     "poll.c",
-])
+)
