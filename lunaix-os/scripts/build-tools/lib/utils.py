@@ -8,9 +8,12 @@ def join_path(stem, path):
 
 
 class Schema:
-    class Empty:
+    class Any:
         def __init__(self):
             pass
+
+        def __str__(self):
+            return "Any"
 
     class Union:
         def __init__(self, *args):
@@ -41,6 +44,9 @@ class Schema:
         return False
 
     def __match(self, val, scheme):
+        if isinstance(scheme, Schema.Any):
+            return True
+        
         if isinstance(scheme, Schema):
             return scheme.match(val)
         
@@ -61,8 +67,6 @@ class Schema:
 
         for field, t in self.__fields.items():
             if not hasattr(instance, field):
-                if isinstance(t, Schema.Empty):
-                    continue
                 return False
             
             field_val = getattr(instance, field)

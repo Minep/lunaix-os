@@ -1,4 +1,5 @@
 import ast
+import textwrap
 
 from lib.utils  import ConfigAST, ConfigASTVisitor
 from .common     import NodeProperty, ConfigNodeError, ValueTypeConstrain
@@ -69,7 +70,7 @@ class NodeBuilder(ConfigASTVisitor):
                 astns.append(sub)
 
             NodeProperty.Token[cfgn] = node
-            NodeProperty.HelpText[cfgn] = help_text
+            NodeProperty.HelpText[cfgn] = textwrap.dedent(help_text)
             
             if cfgn_type is TermNode:
                 NodeProperty.Type[cfgn] = ValueTypeConstrain(cfgn, node.returns)
