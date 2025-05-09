@@ -1,27 +1,23 @@
-use("kernel")
-use("libs")
-use("arch")
-use("hal")
+from . import kernel, libs, arch, hal
 
-headers([
-    "includes",
-    "includes/usr"
-])
+src.h += "includes", "includes/usr"
 
-# compliation setting
+flag.cc += "-ffreestanding", "-fno-pie"
 
-compile_opts([
-    "-ffreestanding",
-    "-fno-pie"
-])
+flag.cc += (
+    "-Wall -Wextra -Werror",
+    "-Wno-unknown-pragmas",
+    "-Wno-unused-function",
+    "-Wno-unused-variable",
+    "-Wno-unused-but-set-variable",
+    "-Wno-unused-parameter",
+    "-Wno-discarded-qualifiers",
+    "-Werror=incompatible-pointer-types"
+)
 
-linking_opts([
-    "-nostdlib", 
-    "-nolibc", 
-    "-z noexecstack", 
-    "-no-pie", 
-])
+flag.cc += (
+    "-fno-omit-frame-pointer",
+    "-finline-small-functions",
+)
 
-linking_opts([
-    "-Wl,--build-id=none"
-])
+flag.ld += "-nostdlib", "-nolibc", "-z noexecstack", "-no-pie", "-Wl,--build-id=none"

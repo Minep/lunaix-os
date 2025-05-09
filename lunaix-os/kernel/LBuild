@@ -1,13 +1,6 @@
-use("block")
-use("debug")
-use("device")
-use("ds")
-use("exe")
-use("fs")
-use("mm")
-use("process")
+from . import block, debug, device, ds, exe, fs, mm, process
 
-sources([
+src.c += (
     "boot_helper.c",
     "kcmd.c",
     "kinit.c",
@@ -21,5 +14,5 @@ sources([
     "kprint/kp_records.c",
     "kprint/kprintf.c",
     "time/clock.c",
-    "time/timer.c",
-])
+    "time/timer.c"
+)

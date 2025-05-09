@@ -1,23 +1,18 @@
+from . import ext2
 
-@Collection("File Systems")
+@"File Systems"
+@(parent := kernel_feature)
 def file_system():
     """ Config feature related to file system supports """
 
-    add_to_collection(kernel_feature)
-
-    @Term("ext2 support")
-    def fs_ext2():
+    @"ext2 support"
+    def fs_ext2() -> bool:
         """ Enable ext2 file system support """
 
-        type(bool)
-        default(True)
+        return True
     
-    @Term("iso9660 support")
-    def fs_iso9660():
+    @"iso9660 support"
+    def fs_iso9660() -> bool:
         """ Enable iso9660 file system support """
 
-        type(bool)
-        default(True)
-
-
-include("ext2")
+        return True

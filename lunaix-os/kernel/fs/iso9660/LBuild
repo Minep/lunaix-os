@@ -1,8 +1,8 @@
-sources([
+src.c += (
     "inode.c",
     "file.c",
     "mount.c",
     "directory.c",
     "utils.c",
     "rockridge.c"
-])
+)

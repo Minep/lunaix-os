@@ -1,11 +1,8 @@
-@Term("Architecture")
-def arch():
+@"Architecture"
+def arch() -> "i386" | "x86_64" | "aarch64" | "rv64":
     """
         set the ISA target
     """
-    type(["i386", "x86_64", "aarch64", "rv64"])
-    default("i386")
 
-    env_val = env("ARCH")
-    if env_val is not None:
-        set_value(env_val)
+    _arch = env("ARCH")
+    return _arch if _arch else "x86_64"

@@ -1,29 +1,44 @@
 lbuild_dir := $(CURDIR)/.builder
-lbuild_config_h := $(lbuild_dir)/configs.h
-lbuild_mkinc := $(lbuild_dir)/lbuild.mkinc
+lbuild_config_h := $(lbuild_dir)/config.h
+lbuild_mkinc := $(lbuild_dir)/build.mkinc
+lconfig_mkinc := $(lbuild_dir)/config.mkinc
 lconfig_save := $(CURDIR)/.config.json
 
-lbuild_opts := --lconfig-file LConfig
-
 all_lconfigs = $(shell find $(CURDIR) -name "LConfig")
+all_lbuilds = $(shell find $(CURDIR) -name "LBuild")
 
-LCONFIG_FLAGS += --config $(lbuild_opts) --config-save $(lconfig_save)
+.PHONY: __gen_config __gen_build __gen_both config
+
+define __gen_config
+	@echo restarting configuration...
+	@$(LBUILD) --gen-config $(lbuild_dir)
+endef
+
+define __gen_build
+	@echo restarting configuration...
+	@$(LBUILD) --gen-config $(lbuild_dir)
+endef
+
+define __gen_both
+	@echo restarting configuration...
+	@$(LBUILD) --gen-build --gen-config $(lbuild_dir)
+endef
 
 export
 $(lconfig_save): $(all_lconfigs)
-	@echo restarting configuration...
-	@$(LBUILD) $(LCONFIG_FLAGS)  --force -o $(lbuild_dir)/
+	$(call __gen_config)
 
 export
-$(lbuild_config_h): $(lconfig_save)
-	@$(LBUILD) $(LCONFIG_FLAGS) -o $(@D)
+$(lconfig_mkinc): $(all_lconfigs)
+	$(call __gen_config)
 
 export
-$(lbuild_mkinc): $(lbuild_config_h)
-	@$(LBUILD) LBuild $(lbuild_opts) -o $(@D)
+$(lbuild_config_h): $(all_lbuilds)
+	$(call __gen_build)
 
-.PHONY: config
 export
-config: $(all_lconfigs)
-	@$(LBUILD) $(LCONFIG_FLAGS) --force\
-			   -o $(lbuild_dir)/
+$(lbuild_mkinc): $(all_lbuilds)
+	$(call __gen_build)
+
+config: $(all_lbuilds) $(all_lconfigs)
+	$(call __gen_both)

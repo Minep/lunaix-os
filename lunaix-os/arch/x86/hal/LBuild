@@ -1,4 +1,4 @@
-sources([
+src.c += (
     "apic.c",
     "rngx86.c",
     "cpu.c",
@@ -6,4 +6,4 @@ sources([
     "apic_timer.c",
     "mc146818a.c",
     "pci.c"
-])
+)

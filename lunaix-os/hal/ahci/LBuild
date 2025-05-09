@@ -1,5 +1,5 @@
-if config("ahci_enable"):
-    sources([
+if config.ahci_enable:
+    src.c += (
         "ahci_pci.c",
         "hbadev_export.c",
         "ahci.c",
@@ -7,4 +7,4 @@ if config("ahci_enable"):
         "io_event.c",
         "atapi.c",
         "ata.c"
-    ])
+    )

@@ -1,3 +1,1 @@
-sources([
-    "twifs.c"
-])
+src.c += "twifs.c"

@@ -1,59 +1,57 @@
-from lib.utils import join_path
-import os
+import ast
+from pathlib import Path
 
-class BuildEnvironment:
-    def __init__(self, workspace_dir, generator) -> None:
-        self.__config_provider = None
-        self.__sources = []
-        self.__headers = []
-        self.__inc_dir = []
-        self.__ws_dir = workspace_dir
-        self.__ext_object = {}
-        self.__ext_function = {}
-        self.__generator = generator
+class DirectoryTracker:
+    def __init__(self):
+        self.__stack = []
 
-    def set_config_provider(self, provider):
-        self.__config_provider = provider
+    def push(self, dir):
+        self.__stack.append(Path(dir))
+
+    def pop(self):
+        self.__stack.pop()
     
-    def config_provider(self):
-        return self.__config_provider
+    def active_relative(self):
+        root = self.__stack[0]
+        return self.__stack[-1].relative_to(root)
+
+    @staticmethod
+    def context_name():
+        return "__FILESTACK__"
     
-    def add_sources(self, sources):
-        self.__sources += sources
-
-    def add_headers(self, sources):
-        for h in sources:
-            if not os.path.isdir(h):
-                self.__headers.append(h)
-            else:
-                self.__inc_dir.append(h)
-
-    def to_wspath(self, file):
-        path = join_path(self.__ws_dir, file)
-        return os.path.relpath(path, self.__ws_dir)
+    @staticmethod
+    def get(context):
+        return context[DirectoryTracker.context_name()]
     
-    def export(self):
-        self.__generator.generate(self)
+    @staticmethod
+    def bind(context):
+        name = DirectoryTracker.context_name()
+        context[name] = DirectoryTracker()
 
-    def get_object(self, key, _default=None):
-        return _default if key not in self.__ext_object else self.__ext_object[key]
+    @staticmethod
+    def emit_enter(dir):
+        name = DirectoryTracker.context_name()
+        return ast.Expr(
+                    ast.Call(
+                        func=ast.Attribute(
+                            value=ast.Name(name, ctx=ast.Load()),
+                            attr="push",
+                            ctx=ast.Load()
+                        ),
+                        args=[
+                            ast.Constant(str(dir))
+                        ],
+                        keywords=[]))
 
-    def set_object(self, key, object):
-        self.__ext_object[key] = object
-
-    def srcs(self):
-        return list(self.__sources)
-    
-    def headers(self):
-        return list(self.__headers)
-    
-    def includes(self):
-        return list(self.__inc_dir)
-    
-    def add_external_func(self, function):
-        name = function.__name__
-        invk = lambda *args, **kwargs: function(self, *args, **kwargs)
-        self.__ext_function[name] = invk
-
-    def external_func_table(self):
-        return self.__ext_function
+    @staticmethod
+    def emit_leave():
+        name = DirectoryTracker.context_name()
+        return ast.Expr(
+                    ast.Call(
+                        func=ast.Attribute(
+                            value=ast.Name(name, ctx=ast.Load()),
+                            attr="pop",
+                            ctx=ast.Load()
+                        ),
+                        args=[],
+                        keywords=[]))

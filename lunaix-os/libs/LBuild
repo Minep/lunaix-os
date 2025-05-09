@@ -1,4 +1,4 @@
-sources([
+src.c += (
     "crc.c",
     "hash.c",
     "klibc/itoa.c",
@@ -9,4 +9,4 @@ sources([
     "klibc/string/strcpy.c",
     "klibc/string/strlen.c",
     "klibc/string/trim.c"
-])
+)

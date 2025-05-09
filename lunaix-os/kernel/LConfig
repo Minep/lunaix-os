@@ -1,7 +1,6 @@
-@Collection
+from . import fs, mm
+
+@"Kernel Feature"
 def kernel_feature():
     """ Config kernel features """
     pass
-
-include("fs")
-include("mm")

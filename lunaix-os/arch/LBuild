@@ -1,10 +1,11 @@
-use("generic")
+from . import generic
 
-use({
-    config("arch"): {
-        "i386": "x86",
-        "x86_64": "x86",
-        "aarch64": "arm",
-        "rv64": "riscv"
-    }
-})
+match config.arch:
+    case "i386" | "x86_64":
+        from . import x86
+    # case "aarch64":
+    #     from . import arm64
+    # case "rv64":
+    #     from . import rv64
+    case _:
+        from . import x86

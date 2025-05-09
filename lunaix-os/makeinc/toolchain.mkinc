@@ -4,29 +4,12 @@ AS := $(CX_PREFIX)as
 AR := $(CX_PREFIX)ar
 LBUILD ?= $(shell realpath ./scripts/build-tools/luna_build.py)
 
-
-W := -Wall -Wextra -Werror \
-		-Wno-unknown-pragmas \
-		-Wno-unused-function \
-		-Wno-unused-variable\
-		-Wno-unused-but-set-variable \
-		-Wno-unused-parameter \
-		-Wno-discarded-qualifiers\
-		-Werror=incompatible-pointer-types
-
-OFLAGS := -fno-omit-frame-pointer	\
-	      -finline-small-functions
-
-CFLAGS := -std=gnu99 $(OFLAGS) $(W) -g
-
 ifeq ($(MODE),debug)
 	O := -Og
 else
 	O := -O2
 endif
 
-CFLAGS += $(O)
-
 LDFLAGS := $(O)
-
+CFLAGS  := -std=gnu99 -g $(O)
 MKFLAGS := --no-print-directory

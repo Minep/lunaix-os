@@ -1,5 +1,5 @@
-sources([
+src.c += (
     "parser/madt_parser.c",
     "parser/mcfg_parser.c",
     "acpi.c"
-])
+)

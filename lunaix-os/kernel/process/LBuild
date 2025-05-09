@@ -1,4 +1,4 @@
-sources([
+src.c += (
     "signal.c",
     "sched.c",
     "fork.c",
@@ -8,4 +8,4 @@ sources([
     "thread.c",
     "preemption.c",
     "switch.c",
-])
+)

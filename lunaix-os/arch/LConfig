@@ -1,27 +1,34 @@
-include("x86/LConfig")
+from . import x86
 
-@Collection("Platform")
+@"Platform"
 def architecture_support():
     """
         Config ISA related features
     """
 
-    @Term("Architecture")
-    def arch():
+    @flag
+    def arch_x86_32() -> bool:
+        return arch.val == "i386"
+    
+    @flag
+    def arch_x86_64() -> bool:
+        return arch.val == "x86_64"
+    
+    @flag
+    def arch_x86() -> bool:
+        return arch.val in ["x86_64", "i386"]
+
+    @"Architecture"
+    def arch() -> "i386" | "x86_64":
         """ 
             Config ISA support 
         """
-        # type(["i386", "x86_64", "aarch64", "rv64"])
-        type(["i386", "x86_64"])
-        default("x86_64")
+        _arch = env("ARCH")
+        return _arch if _arch else "x86_64"
 
-        env_val = env("ARCH")
-        if env_val:
-            set_value(env_val)
-
-    @Term("Base operand size")
-    @ReadOnly
-    def arch_bits():
+    @"Base operand size"
+    @readonly
+    def arch_bits() -> 32 | 64:
         """ 
             Defines the base size of a general register of the 
             current selected ISA.
@@ -29,16 +36,15 @@ def architecture_support():
             This the 'bits' part when we are talking about a CPU
         """
 
-        type(["64", "32"])
-        match v(arch):
+        match arch.val:
             case "i386": 
-                default("32")
+                return 32
             case "aarch64": 
-                default("64")
+                return 64
             case "rv64": 
-                default("64")
+                return 64
             case "x86_64": 
-                default("64")
+                return 64
             case _:
-                default("32")
+                return 32
         
