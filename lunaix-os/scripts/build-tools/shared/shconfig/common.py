@@ -1,6 +1,5 @@
 import inspect
 import textwrap
-import re
 
 from typing         import Callable, Any
 from lib.utils      import Schema
@@ -83,7 +82,6 @@ class Executor:
             textwrap.indent(self.help, '\t')
         ])
 
-TypeRe = re.compile(r"^.*?__fn_(.+)$")
 class CmdTable:     
     def __init__(self):
         self._cmd_map = []
@@ -91,8 +89,6 @@ class CmdTable:
         fns = inspect.getmembers(self, 
                                  lambda p: isinstance(p, Callable))
         for _, fn in fns:
-            if not isinstance(fn, Callable):
-                continue
             if not hasattr(fn, "__annotations__"):
                 continue
             if "__CMD__" not in fn.__annotations__:
