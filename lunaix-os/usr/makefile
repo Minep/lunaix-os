@@ -1,8 +1,6 @@
 include utils.mkinc
 include toolchain.mkinc
 
-LCONFIG_FLAGS := --quiet
-
 include lunabuild.mkinc
 
 include $(lbuild_mkinc)
@@ -10,6 +8,9 @@ include $(lbuild_mkinc)
 ifndef ARCH
 $(error ARCH is not set)
 endif
+
+CFLAGS += $(BUILD_CFLAGS)
+LDFLAGS += $(BUILD_LDFLAGS)
 
 task := all
 
@@ -29,7 +30,7 @@ BUILD_NAME := $(libc_name).a
 LIBC_INCLUDE := $(build_dir)/usr/includes
 
 mkapp-list := $(addprefix app-, $(shell cat apps.list))
-mkexec-list := $(addprefix $(build_dir)/bin/, $(_LBUILD_SRCS))
+mkexec-list := $(addprefix $(build_dir)/bin/, $(BUILD_SRCS))
 
 uexec_ld := $(CURDIR)/uexec.ld
 
@@ -51,7 +52,7 @@ $(build_dir)/$(libc_name).a: $(build_dir)/bin \
 	@$(MAKE) $(MKFLAGS) -C libc/ $(task)
 
 $(uexec_ld): $(uexec_ld)x
-	@$(CC) -include $(lbuild_config_h) -x c -P -E $< -o $@
+	@$(CC) $(CFLAGS) -x c -P -E $< -o $@
 
 # Application (with standalone makefile)
 export LD_SCRIPT := $(uexec_ld)

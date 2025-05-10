@@ -12,7 +12,7 @@ from shared.export      import ExportJsonFile
 from shared.export      import ExportHeaderFile
 from shared.export      import ExportMakefileRules
 from shared.export      import restore_config_value
-from shared.scopes      import ConfigScope
+from shared.scopes      import ConfigScope, EnvScope
 from shared.build_gen   import BuildScriptGenerator
 from shared.shconfig    import shconfig
 
@@ -34,6 +34,8 @@ class LunaBuild:
         scope.subscope("cc")
         scope.subscope("ld")
         self.__lbuilder.register_scope(scope)
+
+        self.__lbuilder.register_scope(EnvScope())
 
         self.__json  = ExportJsonFile(self.__lconfig)
         self.__make  = ExportMakefileRules(self.__lconfig)
@@ -76,6 +78,13 @@ class LunaBuild:
             self.__headr.export(outdir / "config.h")
 
     def visual_config(self):
+        if not self.__lconfig.loaded():
+            print("no config file loaded, skipped interactive config")
+            return
+        
+        if not self.__opt.gen_config:
+            return
+        
         if not shconfig(self.__lconfig):
             print("configuration process aborted")
             exit(1)

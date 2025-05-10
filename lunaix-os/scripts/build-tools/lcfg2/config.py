@@ -85,6 +85,9 @@ class ConfigEnvironment:
         return self.__globals
         
     def refresh(self):
+        if not self.__exec:
+            return
+
         self.__update_globals()
 
         for name, node in self.__node_table.items():
@@ -110,3 +113,6 @@ class ConfigEnvironment:
         for node in self.__node_table.values():
             if isinstance(node, TermNode):
                 yield node
+
+    def loaded(self):
+        return self.__exec is not None

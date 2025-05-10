@@ -16,7 +16,7 @@ endef
 
 define __gen_build
 	@echo restarting configuration...
-	@$(LBUILD) --gen-config $(lbuild_dir)
+	@$(LBUILD) --gen-build $(lbuild_dir)
 endef
 
 define __gen_both

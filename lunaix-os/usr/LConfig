@@ -1,8 +1,0 @@
-@"Architecture"
-def arch() -> "i386" | "x86_64" | "aarch64" | "rv64":
-    """
-        set the ISA target
-    """
-
-    _arch = env("ARCH")
-    return _arch if _arch else "x86_64"

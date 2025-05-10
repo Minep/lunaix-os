@@ -1,5 +1,6 @@
 import ast
 import textwrap
+import os
 
 from lib.utils  import ConfigAST, ConfigASTVisitor
 from .common     import NodeProperty, ConfigNodeError, ValueTypeConstrain
@@ -99,6 +100,10 @@ class NodeBuilder(ConfigASTVisitor):
 
     @staticmethod
     def build(env, rootfile):
+        if not os.path.exists(rootfile):
+            print(f"warning: config file '{rootfile}' not detected, skipped")
+            return
+
         build = NodeBuilder(env)
         ast = ConfigAST(rootfile)
         

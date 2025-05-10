@@ -76,7 +76,6 @@ clean:
 	@$(MAKE) -f kernel.mk clean -I $(mkinc_dir)
 	
 	@rm -rf $(kbuild_dir) || exit 1
-	@rm -rf .builder || exit 1
 
 
 # --- begin misc --- #
