@@ -1,6 +1,6 @@
 import ast
 
-from lib.utils  import SourceLogger, Schema
+from lib.utils   import SourceLogger, Schema
 from .common     import NodeProperty, ConfigNodeError, NodeDependency
 from .lazy       import LazyLookup
 from .rewriter   import ConfigNodeASTRewriter
@@ -40,8 +40,13 @@ class ConfigNode:
         NodeProperty.Readonly[self] = False
         NodeProperty.Status[self]   = "Empty"
 
-    def set_node_body(self, ast_nodes, rewriter = ConfigNodeASTRewriter):
-        new_ast = ast.Module(ast_nodes, [])
+    def set_node_body(self, ast_nodes):
+        self.__exec = ast.Module(ast_nodes, [])
+        
+    def apply_node_body(self, rewriter = ConfigNodeASTRewriter):
+        assert isinstance(self.__exec, ast.Module)
+
+        new_ast = self.__exec
         validator.validate(self, new_ast)
         
         new_ast = rewriter(self).rewrite(new_ast)

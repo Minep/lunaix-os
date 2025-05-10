@@ -32,8 +32,6 @@ class SyntaxRule(RuleCollection):
     
     TrivialReturn  = Schema(Schema.Union(
         TrivialValue,
-        TrivialTest,
-        InlineIf,
         ast.JoinedStr
     ))
 

@@ -20,7 +20,7 @@ class Commands(CmdTable):
             raise ShconfigException(f"no such config: {name}")
         return node
     
-    def __get_opt_line(self, node):
+    def __get_opt_line(self, node, color_hint = False):
         aligned = 40
         name    = f"CONFIG_{node._name.upper()}"
         value   = NodeProperty.Value[node]
@@ -36,7 +36,11 @@ class Commands(CmdTable):
                 
         line = f"[{status}] {name}"
         to_pad = max(aligned - len(line), 4)
-        return f"{line} {'.' * to_pad} {val_txt}"
+        line = f"{line} {'.' * to_pad} {val_txt}"
+
+        if color_hint and not enabled:
+            line = f"\x1b[90;49m{line}\x1b[0m"
+        return line
     
     @cmd("help", "h")
     def __fn_help(self):
@@ -70,7 +74,7 @@ class Commands(CmdTable):
         ]
 
         for node in self.__env.terms():
-            lines.append(self.__get_opt_line(node))    
+            lines.append(self.__get_opt_line(node, True))    
 
         pydoc.pager("\n".join(lines))
 
@@ -99,21 +103,22 @@ class Commands(CmdTable):
         Show the dependency chain and boolean conditionals
         """
 
-        def __print_dep_recursive(env, node, level = 0):
-            indent = " "*(level * 4)
+        def __print_dep_recursive(env, node, inds = 0):
+            indent = " "*inds
             dep: NodeDependency = NodeProperty.Dependency[node]
-
-            print(f"{indent}+ {node._name} -> {NodeProperty.Value[node]}")
+            
+            state = 'enabled' if NodeProperty.Value[node] else 'disabled'
+            print(f"{indent}* {node._name} (currently {state})")
             if dep is None:
                 return
             
-            print(f"{indent}= {dep._expr}")
+            print(f"  {indent}predicate: {dep._expr}")
+            print(f"  {indent}dependents:")
             for name in dep._names:
                 n = env.get_node(name)
-                __print_dep_recursive(env, n, level + 1)
+                __print_dep_recursive(env, n, inds + 6)
 
         node = self.__get_node(name)
-        print(node._name)
         __print_dep_recursive(self.__env, node)
 
     @cmd("opt", "val", "v")
@@ -138,4 +143,23 @@ class Commands(CmdTable):
         print()
         print(textwrap.indent(help.strip(), "  |\t", lambda _:True))
         print()
+
+
+    @cmd("effect", "link")
+    def __fn_effect(self, name: str):
+        """
+        Show the effects of this option on other options
+        """
+        
+        node = self.__get_node(name)
+        link = NodeProperty.Linkage[node]
+
+        if not link:
+            return
+        
+        for other, exprs in link.linkages():
+            print(f" {other}:")
+            for expr in exprs:
+                print(f"   > when {expr}")
+            print()
     

@@ -7,8 +7,11 @@ def char_device():
 
     @"VGA 80x25 text-mode console"
     def vga_console() -> bool:
-        """ Enable VGA console device (text mode only) """
-
+        """ 
+            Enable VGA console device (text mode only) 
+        """
+        require (use_graphic_dev)
+        
         return True
 
     @"VGA character game device"
@@ -18,5 +21,6 @@ def char_device():
 
             You normally don't need to include this, unless you want some user space fun ;)
         """
+        require (vga_console)
 
         return False

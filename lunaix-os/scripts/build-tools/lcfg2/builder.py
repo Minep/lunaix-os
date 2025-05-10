@@ -106,5 +106,8 @@ class NodeBuilder(ConfigASTVisitor):
         ast.visit(TreeSanitiser())
         ast.visit(build)
 
+        for node in env.nodes():
+            node.apply_node_body()
+
         env.set_exec_context(build.__noncfg_astns)
         env.relocate_children()

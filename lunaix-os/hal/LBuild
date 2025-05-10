@@ -1,6 +1,9 @@
-from . import acpi, ahci, char, gfxa, rtc, term, timer, bus
+from . import acpi, ahci, char, rtc, term, timer, bus
 
 if config.use_devicetree:
     from . import devtree
+
+if config.use_graphic_dev:
+    from . import gfxa
 
 src.c += "irq.c"

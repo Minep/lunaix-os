@@ -24,8 +24,19 @@ def architecture_support():
         """ 
             Config ISA support 
         """
-        _arch = env("ARCH")
-        return _arch if _arch else "x86_64"
+
+        match env("ARCH"):
+            case "i386": 
+                return "i386"
+            case "aarch64": 
+                return "aarch64"
+            case "rv64": 
+                return "rv64"
+            case "x86_64": 
+                return "x86_64"
+
+        print("unknown ARCH:", env("ARCH"), "default to x86_64")
+        return "x86_64"
 
     @"Base operand size"
     @readonly

@@ -29,3 +29,10 @@ def hal():
         require (use_devicetree)
 
         return 256
+    
+    @"Graphic Devices"
+    def use_graphic_dev() -> int:
+        """
+            Support of graphical devices and display protocol
+        """
+        return False

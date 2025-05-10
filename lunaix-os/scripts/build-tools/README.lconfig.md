@@ -59,7 +59,7 @@ def group1():
 Multiple `LConfig`s may be defined across different sub-directory in large scale
 project for better maintainability
 
-LunaConfig allow you to import content of other LBuild using python's relative import
+LunaConfig allow you to import content of other LConfig using python's relative import
 feature:
 
 ```py
@@ -67,7 +67,7 @@ from . import module
 ```
 
 This import mechanism works like `#include` directive in C preprocessor,
-the `from . import` construct will automatically intercepted by the LBuild interpreter and 
+the `from . import` construct will automatically intercepted by the LConfig interpreter and 
 be replaced with the content from `./module/LConfig`
 
 You can also address file in the deeper hierarchy of the directory tree, for example
@@ -294,7 +294,7 @@ If a dependency can not be satisfied, then the feature is disabled. This will ca
 
 Note that the dependency check only perform on the enablement of the node but not visibility.
 
-### Auto Toggling
+### Auto Toggling (Inverse Dependency)
 
 > usage: `Terms` with `bool` value type
 
@@ -323,7 +323,7 @@ For configuration language being a python superset will have a risk of abusing d
 
 For prevention of this potential drawback, LunaConfig implemented a syntactical validator to identify these possible bad-practice and issue warning (or rise a fatal-error depending on the user setting).
 
-Currently, LunaConfig detect the misuses based on these rule rules:
+Currently, LunaConfig detect the misuses based on these rules:
 
 + `dynamic-logic`: The presence of conditional branching that could lead to complex logic. However, pattern matching is allowed.
 + `while-loop`, `for-loop`: The presence of any loop structure.

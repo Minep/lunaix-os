@@ -2,7 +2,7 @@ import ast
 
 from lib.utils  import Schema
 from .lazy       import Lazy
-from .common     import NodeProperty
+from .common     import NodeProperty, NodeInverseDependency
 
 class RewriteRule:
     MaybeBuiltin = Schema(
@@ -32,6 +32,16 @@ class ConfigNodeASTRewriter(ast.NodeTransformer):
         self.__cfg_node = cfg_node
 
         self.__when_epxr = None
+
+    def __put_linkage(self, to_node, item):
+        node = self.__cfg_node._env.get_node(to_node)
+        link = NodeProperty.Linkage[node]
+        
+        if not link:
+            link = NodeInverseDependency()
+            NodeProperty.Linkage[node] = link
+        
+        link.add_linkage(self.__cfg_node._name, ast.unparse(item))
 
     def __subscript_accessor(self, name, ctx, token):
         return ast.Subscript(
@@ -67,7 +77,7 @@ class ConfigNodeASTRewriter(ast.NodeTransformer):
 
         if RewriteRule.WhenToggler != node:
             raise cfgn.config_error(
-                f"invalid when(...) expression: {ast.unparse(node)}")
+                f"when(...): invalid expression: {ast.unparse(node)}")
 
         if RewriteRule.WhenTogglerItem == node:
             and_list.append(node)
@@ -77,10 +87,16 @@ class ConfigNodeASTRewriter(ast.NodeTransformer):
         for i in range(len(and_list)):
             item = and_list[i]
             operator = item.ops[0]
+
+            if RewriteRule.WhenTogglerItem != item:
+                raise cfgn.config_error(
+                        f"when(...): non-trivial subclause : {ast.unparse(node)}")
             
             name = Lazy.from_type(cfgn, Lazy.NodeValue, item.left.id)
             acc = self.__subscript_accessor(name, ast.Load(), node)
             
+            self.__put_linkage(item.left.id, item)
+
             if isinstance(operator, ast.Is):
                 operator = ast.Eq()
             else:
@@ -122,7 +138,7 @@ class ConfigNodeASTRewriter(ast.NodeTransformer):
         return None
     
     def visit_Return(self, node):
-        if NodeProperty.WhenToggle[self.__cfg_node]:
+        if self.__when_epxr:
             return None
         return self.generic_visit(node)
     

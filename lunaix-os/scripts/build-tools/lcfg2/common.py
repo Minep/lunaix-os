@@ -19,6 +19,7 @@ class NodeProperty:
     Enabled     = PropertyAccessor("$enabled")
     Status      = PropertyAccessor("$status")
     Dependency  = PropertyAccessor("$depends")
+    Linkage     = PropertyAccessor("$linkage")
     Hidden      = PropertyAccessor("hidden")
     Parent      = PropertyAccessor("parent")
     Label       = PropertyAccessor("label")
@@ -133,3 +134,17 @@ class NodeDependency:
         
         dep = NodeDependency(node, expr)
         NodeProperty.Dependency[node] = dep
+
+
+class NodeInverseDependency:
+    def __init__(self):
+        self.__map = {}
+
+    def add_linkage(self, name, expr):
+        if name not in self.__map:
+            self.__map[name] = [expr]
+        else:
+            self.__map[name].append(expr)
+
+    def linkages(self):
+        return self.__map.items()
