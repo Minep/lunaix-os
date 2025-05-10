@@ -565,7 +565,8 @@ ext2dr_insert(struct v_inode* this, struct ext2b_dirent* dirent,
         __release_dnode_blocks(e_dno);
     }
     else {
-        *e_dno_out = e_dno;
+        *e_dno_out = valloc(sizeof(*e_dno));
+        memcpy(*e_dno_out, e_dno, sizeof(*e_dno));
     }
 
     return errno;
