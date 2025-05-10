@@ -84,9 +84,14 @@ class Lazy:
         
         type_ = astn.attr
         target = astn.value.id
+       
+        return Lazy.from_type(cfgnode, type_, target)
+    
+    @staticmethod
+    def from_type(cfgnode, type_, target):   
         key = Lazy.get_key_from(type_, target)
-
         lz = cfgnode._lazy_table.get(key)
+        
         if lz:
             return key
 
@@ -94,3 +99,4 @@ class Lazy:
         cfgnode._lazy_table.put(lz)
 
         return key
+

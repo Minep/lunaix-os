@@ -8,15 +8,16 @@ def architecture_support():
 
     @flag
     def arch_x86_32() -> bool:
-        return arch.val == "i386"
+        when(arch is "i386")
     
     @flag
     def arch_x86_64() -> bool:
-        return arch.val == "x86_64"
+        when(arch is "x86_64")
     
     @flag
     def arch_x86() -> bool:
-        return arch.val in ["x86_64", "i386"]
+        when(arch is "i386")
+        when(arch is "x86_64")
 
     @"Architecture"
     def arch() -> "i386" | "x86_64":

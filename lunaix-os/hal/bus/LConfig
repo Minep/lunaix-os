@@ -22,4 +22,4 @@ def bus_if():
         require(not pcie_ext and pci_enable)
         require(arch_x86)
 
-        return arch.val in [ "i386", "x86_64" ]
+        return True

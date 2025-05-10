@@ -1,7 +1,6 @@
 import ast
 
 from lib.utils import Schema, ConfigASTVisitor, SourceLogger
-from .common import NodeProperty
 
 class TreeSanitiser(ConfigASTVisitor):
     DecoNative = Schema(ast.Name, id="native")

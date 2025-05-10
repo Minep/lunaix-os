@@ -6,6 +6,7 @@ from lbuild.build       import BuildEnvironment
 from lbuild.scope       import ScopeProvider
 from lcfg2.builder      import NodeBuilder
 from lcfg2.config       import ConfigEnvironment
+from lcfg2.common       import ConfigNodeError
 
 from shared.export      import ExportJsonFile
 from shared.export      import ExportHeaderFile
@@ -91,8 +92,12 @@ def main():
     opts = parser.parse_args()
     builder = LunaBuild(opts)
 
-    builder.load()
-    builder.restore()
+    try:
+        builder.load()
+        builder.restore()
+    except ConfigNodeError as e:
+        print(e)
+        exit(1)
     
     builder.visual_config()
     

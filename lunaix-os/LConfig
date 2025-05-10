@@ -2,6 +2,15 @@ from datetime import datetime, date
 
 from . import kernel, arch, hal
 
+@native
+def get_patch_seq():
+    today = date.today()
+    year = today.year
+    start_of_year = datetime(year, 1, 1).date()
+    seq_num = (today - start_of_year).days
+    
+    return "%d%d"%(year - 2000, seq_num)
+
 @"Kernel Version"
 @readonly
 def lunaix_ver() -> str:
@@ -9,12 +18,7 @@ def lunaix_ver() -> str:
     Lunaix kernel version
     """
     
-    today = date.today()
-    year = today.year
-    start_of_year = datetime(year, 1, 1).date()
-    seq_num = (today - start_of_year).days
-    
-    return "%s v0.%d%d"%(arch.val, year - 2000, seq_num)
+    return f"{arch.val} v0.0.{get_patch_seq()}"
 
 @"Kernel Debug and Testing"
 def debug_and_testing():

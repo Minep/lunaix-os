@@ -5,6 +5,10 @@ from .common     import NodeProperty, ConfigNodeError, NodeDependency
 from .lazy       import LazyLookup
 from .rewriter   import ConfigNodeASTRewriter
 
+from .ast_validator import NodeValidator
+from .rules import SyntaxRule
+
+validator = NodeValidator(SyntaxRule())
 
 class ConfigDecorator:
     Label       = Schema(ast.Constant)
@@ -37,7 +41,10 @@ class ConfigNode:
         NodeProperty.Status[self]   = "Empty"
 
     def set_node_body(self, ast_nodes, rewriter = ConfigNodeASTRewriter):
-        new_ast = rewriter(self).visit(ast.Module(ast_nodes))
+        new_ast = ast.Module(ast_nodes, [])
+        validator.validate(self, new_ast)
+        
+        new_ast = rewriter(self).rewrite(new_ast)
         NodeDependency.try_create(self)
 
         fn_name = f"__fn_{self._name}"

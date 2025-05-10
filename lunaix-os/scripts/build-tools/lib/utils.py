@@ -1,5 +1,6 @@
 import os, ast
 from pathlib import Path
+from typing import Any, List
 
 def join_path(stem, path):
     if os.path.isabs(path):
@@ -14,6 +15,9 @@ class Schema:
 
         def __str__(self):
             return "Any"
+        
+        def __repr__(self):
+            return self.__str__()
 
     class Union:
         def __init__(self, *args):
@@ -22,6 +26,20 @@ class Schema:
         def __str__(self):
             strs = [Schema.get_type_str(t) for t in self.union]
             return f"{' | '.join(strs)}"
+        
+        def __repr__(self):
+            return self.__str__()
+        
+    class List:
+        def __init__(self, el_type):
+            self.el_type = el_type
+        
+        def __str__(self):
+            strs = Schema.get_type_str(self.el_type)
+            return f"*{strs}"
+        
+        def __repr__(self):
+            return self.__str__()
 
     def __init__(self, type, **kwargs):
         self.__type = type
@@ -37,6 +55,16 @@ class Schema:
             
         return True
     
+    def __match_list_member(self, actual, expect):
+        if not isinstance(actual, List):
+            return False
+        
+        for a in actual:
+            if not self.__match(a, expect.el_type):
+                return False
+            
+        return True
+    
     def __match_union(self, actual, union):
         for s in union.union:
             if self.__match(actual, s):
@@ -44,11 +72,14 @@ class Schema:
         return False
 
     def __match(self, val, scheme):
-        if isinstance(scheme, Schema.Any):
+        if scheme is Any:
             return True
         
         if isinstance(scheme, Schema):
             return scheme.match(val)
+        
+        if isinstance(scheme, Schema.List):
+            return self.__match_list_member(val, scheme)
         
         if isinstance(scheme, list) and isinstance(val, list):
             return self.__match_list(val, scheme)

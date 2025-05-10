@@ -5,7 +5,7 @@ from .common import CmdTable, ShconfigException
 from .common import select, cmd
 
 from lcfg2.config   import ConfigEnvironment
-from lcfg2.common   import NodeProperty, NodeDependency
+from lcfg2.common   import NodeProperty, NodeDependency, ConfigNodeError
 
 class Commands(CmdTable):
     def __init__(self, env: ConfigEnvironment):
@@ -84,8 +84,14 @@ class Commands(CmdTable):
         if node is None:
             raise ShconfigException(f"no such config: {name}")
         
-        NodeProperty.Value[node] = value
-        self.__env.refresh()
+        if NodeProperty.Readonly[node]:
+            raise ShconfigException(f"node is read only")
+        
+        try:
+            NodeProperty.Value[node] = value
+            self.__env.refresh()
+        except ConfigNodeError as e:
+            print(e)
 
     @cmd("dep")
     def __fn_dep(self, name: str):

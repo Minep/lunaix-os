@@ -6,11 +6,11 @@ def x86_configurations():
 
     @flag
     def x86_bl_mb() -> bool:
-        return x86_bl.val == "mb"
+        when (x86_bl is "mb")
     
     @flag
     def x86_bl_mb2() -> bool:
-        return x86_bl.val == "mb2"
+        when (x86_bl is "mb2")
     
     @"Use SSE2/3/4 extension"
     def x86_enable_sse_feature() -> bool:
@@ -18,7 +18,7 @@ def x86_configurations():
             Config whether to allow using SSE feature for certain
             optimization
         """
-        
+
         return False
 
     @"Bootloader Model"
