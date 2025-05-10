@@ -6,8 +6,8 @@ def sata_ahci():
     @"Enable AHCI support"
     def ahci_enable() -> bool:
         """ Enable the support of SATA AHCI. 
-            Must require PCI at current stage """
-        require(pci_enable)
+            Must require  PCI at current stage """
+        require (pci_enable)
         
         return True
 

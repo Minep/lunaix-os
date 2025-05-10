@@ -16,7 +16,7 @@ def hal():
             devicetree might be mandatory and perhaps the only
             way.
         """
-        require(not arch_x86)
+        require (not arch_x86)
 
         return False
 
@@ -26,6 +26,6 @@ def hal():
         """
             Maximum size for a firmware provided device tree blob
         """
-        require(use_devicetree)
+        require (use_devicetree)
 
         return 256

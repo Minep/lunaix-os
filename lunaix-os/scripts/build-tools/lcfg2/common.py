@@ -19,7 +19,6 @@ class NodeProperty:
     Enabled     = PropertyAccessor("$enabled")
     Status      = PropertyAccessor("$status")
     Dependency  = PropertyAccessor("$depends")
-    WhenToggle  = PropertyAccessor("$when")
     Hidden      = PropertyAccessor("hidden")
     Parent      = PropertyAccessor("parent")
     Label       = PropertyAccessor("label")

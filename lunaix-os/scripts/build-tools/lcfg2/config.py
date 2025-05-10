@@ -110,5 +110,3 @@ class ConfigEnvironment:
         for node in self.__node_table.values():
             if isinstance(node, TermNode):
                 yield node
-
-import json

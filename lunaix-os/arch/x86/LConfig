@@ -2,7 +2,7 @@
 @(parent := architecture_support)
 def x86_configurations():
 
-    require(arch_x86)
+    require (arch_x86)
 
     @flag
     def x86_bl_mb() -> bool:

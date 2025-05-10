@@ -1,26 +1,23 @@
-# LunaixOS 源代码
+# Luniax Kernel
 
-我知道这个目录结构看起来相当的劝退。特别是并没有像初代Linux那种一个文件夹里就只是一堆文件的简单朴素。但至少，就我而言，把结构细分一点儿总是好的。
+This is the source code tree for lunaix kernel.
 
-## 目录结构
+## Organisation
 
-+ `arch` 平台，CPU架构相关代码。
-+ `hal`  硬件抽象层，包含了平台设备基本驱动的实现。
-+ `includes`  所有头文件
-+ `makeinc` makefile配置文件
-+ `kernel` 这里就是内核了
-  + `block` 块IO抽象层
-  + `debug`  内核调试服务器
-  + `device` 设备（通用）抽象层
-  + `ds` 提供一些基本的数据结构支持。
-  + `exe` 可执行文件的解析与加载。
-  + `fs` 文件系统。
-  + `mm` 各类内存管理器。
-  + `peripheral` 外部设备驱动（如键盘）。
-  + `process` 进程相关
-  + `time` 为内核提供基本的时间，计时服务。
-  + `tty` 提供基本的，CGA服务。
-+ `libs` 一些内核使用的运行时库，主要提供是内核模式下的一些C标准库里的实现。
-+ `link` 链接器脚本
-+ `scripts` 其他脚本（如：用于代码生成）
-+ `usr` 用户空间代码库，包含了一些实用的用户程序，编译过程独立与内核。
+| Directory | Description |
+| -------   | ------      |
+| `arch`    | ISA specific code |
+| `hal`     | drivers |
+| `includes`| headers |
+| `kernel`  | kernel source files |
+| `link`    | linker scripts |
+| `libs`    | kernel library |
+| `makeinc` | includes for makefile |
+| `scripts` | auxiliary scripts |
+| `tests`   | kernel test cases |
+| `usr`     | stock user space environment (debug only) |
+
+## Build System
+
+See: [Build system of Lunaix](./scripts/build-tools/README.md)
+

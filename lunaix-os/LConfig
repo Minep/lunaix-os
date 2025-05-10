@@ -50,7 +50,7 @@ def debug_and_testing():
         Set the maximum time (in seconds) spent in kernel before considered
         to be stalled.
         """
-        require(check_stall)
+        require (check_stall)
 
         return 10
     
@@ -62,7 +62,7 @@ def debug_and_testing():
 
         Setting it to 0 disable this check
         """
-        require(check_stall)
+        require (check_stall)
 
         return 0
 

@@ -3,7 +3,7 @@
 @(parent := file_system)
 def ext2_fs():
 
-    require(fs_ext2)
+    require (fs_ext2)
 
     @"Debug Messages"
     def ext2_debug_msg() -> bool:

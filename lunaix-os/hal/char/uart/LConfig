@@ -7,7 +7,7 @@ def uart_16x50():
     @"16x50 XT-Compat"
     def xt_16x50() -> bool:
         """ Enable the 16x50 for PC-compatible platform  """
-        require(arch_x86)
+        require (arch_x86)
         
         return True
     

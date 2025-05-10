@@ -29,7 +29,7 @@ def memory_subsystem():
         @"PMalloc Thresholds"
         def pmalloc_simple_po_thresholds():
 
-            require (pmalloc_method_simple)
+            require  (pmalloc_method_simple)
             
             @"Maximum cached order-0 free pages"
             def pmalloc_simple_max_po0() -> int:

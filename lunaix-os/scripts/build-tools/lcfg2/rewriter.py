@@ -31,6 +31,8 @@ class ConfigNodeASTRewriter(ast.NodeTransformer):
 
         self.__cfg_node = cfg_node
 
+        self.__when_epxr = None
+
     def __subscript_accessor(self, name, ctx, token):
         return ast.Subscript(
             value=ast.Name("__lzLut__", ctx=ast.Load()),
@@ -92,12 +94,12 @@ class ConfigNodeASTRewriter(ast.NodeTransformer):
                         op=ast.And(), 
                         values=[ast.Constant(True), *and_list])
         
-        expr = NodeProperty.WhenToggle[cfgn]
+        expr = self.__when_epxr
         if expr:
             assert isinstance(expr, ast.expr)
             current = ast.BoolOp(op=ast.Or(), values=[expr, current])
 
-        NodeProperty.WhenToggle[cfgn] = current
+        self.__when_epxr = current
 
     def visit_Attribute(self, node):
         return self.__gen_accessor(node)
@@ -131,11 +133,9 @@ class ConfigNodeASTRewriter(ast.NodeTransformer):
         assert isinstance(node, ast.Module)
         node = self.visit(node)
 
-        expr = NodeProperty.WhenToggle[self.__cfg_node]
+        expr = self.__when_epxr
         if not expr:
             return node
-        
-        del NodeProperty.WhenToggle[self.__cfg_node]
-        
+
         node.body.append(ast.Return(expr, lineno=0, col_offset=0))
         return node

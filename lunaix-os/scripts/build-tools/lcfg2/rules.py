@@ -9,21 +9,15 @@ class SyntaxRule(RuleCollection):
                             ctx=ast.Store)
     TrivialValue = Schema(Schema.Union(
         ast.Constant, 
-        ast.Name, 
-        Schema(ast.Subscript, 
-               value=Schema(ast.Name, id='__lzLut__'), 
-               slice=ast.Constant)
+        ast.Name
     ))
 
     BoolOperators = Schema(Schema.Union(ast.Or, ast.And))
     
     TrivialTest    = Schema(ast.Compare, 
                           left=TrivialValue, 
-                          ops=[Schema.Union(ast.Eq, ast.In)],
-                          comparators=[Schema.Union(
-                              ast.Constant, 
-                              Schema(ast.List, elts=Schema.List(ast.Constant))
-                          )])
+                          ops=[Schema.Union(ast.Eq)],
+                          comparators=[ast.Constant])
     
     InlineIf       = Schema(ast.IfExp, 
                             test=Schema.Union(TrivialTest, TrivialValue), 
@@ -38,8 +32,8 @@ class SyntaxRule(RuleCollection):
     
     TrivialReturn  = Schema(Schema.Union(
         TrivialValue,
+        TrivialTest,
         InlineIf,
-        TrivialLogic,
         ast.JoinedStr
     ))
 

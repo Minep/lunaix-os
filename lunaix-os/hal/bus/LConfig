@@ -12,14 +12,14 @@ def bus_if():
     @"PCI Express"
     def pcie_ext() -> bool:
         """ Enable support of PCI-Express extension """
-        require(pci_enable)
+        require (pci_enable)
 
         return False
 
     @"Use PMIO for PCI"
     def pci_pmio() -> bool:
         """ Use port-mapped I/O interface for controlling PCI """
-        require(not pcie_ext and pci_enable)
-        require(arch_x86)
+        require (not pcie_ext and pci_enable)
+        require (arch_x86)
 
         return True
