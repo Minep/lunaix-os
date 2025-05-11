@@ -10,12 +10,12 @@ BUILD_NAME ?= liblunac
 src_dirs := src
 src_dirs += arch/$(ARCH)
 
-obj_files := $(addsuffix .o, $(_LBUILD_SRCS))
+obj_files := $(addsuffix .o, $(BUILD_SRCS))
 
 build_lib := $(BUILD_DIR)/lib
 
 libc_include_opt = $(addprefix -I, $(libc_include))
-global_include_opt = $(addprefix -I, $(INCLUDES) $(_LBUILD_INCS))
+global_include_opt = $(addprefix -I, $(INCLUDES) $(BUILD_INC))
 
 check_folders := $(src_dirs)
 check_folders += $(build_lib) $(LIBC_INCLUDE)

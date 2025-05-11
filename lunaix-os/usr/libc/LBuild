@@ -1,4 +1,4 @@
-sources([
+src.c += (
     "src/string.c",
     "src/termios.c",
     "src/itoa.c",
@@ -6,9 +6,9 @@ sources([
     "src/readdir.c",
     "src/pthread.c",
     "src/printf.c"
-])
+)
 
-sources([
+src.c += (
     "src/posix/signal.c",
     "src/posix/mount.c",
     "src/posix/errno.c",
@@ -18,11 +18,10 @@ sources([
     "src/posix/unistd.c",
     "src/posix/mann.c",
     "src/posix/lunaix.c"
-])
+)
 
-use({
-    env("ARCH"): {
-        "i386": "arch/i386",
-        "x86_64": "arch/x86_64",
-    }
-})
+match env.ARCH:
+    case "i386":
+        from .arch import i386
+    case "x86_64":
+        from .arch import x86_64

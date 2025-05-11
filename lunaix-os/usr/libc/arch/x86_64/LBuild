@@ -1,8 +1,8 @@
-sources([
+src.c += (
     "crt0.S",
     "syscall.S",
     "trampoline.S",
-])
+)
 
-compile_opts("-m64")
-linking_opts("-m64")
+flag.cc += "-m64"
+flag.ld += "-m64"

@@ -1,3 +1,1 @@
-sources([
-    "timer_device.c"
-])
+src.c += "timer_device.c"

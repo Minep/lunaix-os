@@ -1,13 +1,11 @@
-include("char")
-include("bus")
-include("ahci")
+from . import char, bus, ahci
 
-@Collection("Devices & Peripherials")
+@"Devices & Peripherials"
 def hal():
     """ Lunaix hardware asbtraction layer """
 
-    @Term("Devicetree for hardware discovery")
-    def use_devicetree():
+    @"Devicetree for hardware discovery"
+    def use_devicetree() -> bool:
         """
             Decide whether to use Devicetree for platform
             resource topology sensing.
@@ -18,18 +16,23 @@ def hal():
             devicetree might be mandatory and perhaps the only
             way.
         """
+        require (not arch_x86)
 
-        type(bool)
-        default(not v(arch).startswith("x86"))
+        return False
 
-    @ReadOnly
-    @Term("Maximum size of device tree blob (in KiB)")
-    def dtb_maxsize():
+    @"Maximum size of device tree blob (in KiB)"
+    @readonly
+    def dtb_maxsize() -> int:
         """
             Maximum size for a firmware provided device tree blob
         """
+        require (use_devicetree)
 
-        type(int)
-        default(256)
-
-        return v(use_devicetree)
+        return 256
+    
+    @"Graphic Devices"
+    def use_graphic_dev() -> int:
+        """
+            Support of graphical devices and display protocol
+        """
+        return False

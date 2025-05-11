@@ -1,18 +1,14 @@
 
-@Collection("AHCI")
+@"AHCI"
+@(parent := hal)
 def sata_ahci():
 
-    add_to_collection(hal)
-
-    @Term("Enable AHCI support")
-    def ahci_enable():
+    @"Enable AHCI support"
+    def ahci_enable() -> bool:
         """ Enable the support of SATA AHCI. 
-            Must require PCI at current stage """
+            Must require  PCI at current stage """
+        require (pci_enable)
         
-        type(bool)
-        default(True)
-
-        if not v(pci_enable):
-            set_value(False)
+        return True
 
         

@@ -1,4 +1,4 @@
-sources([
+src.c += (
     "testp",
     "ls",
     "signal_demo",
@@ -10,36 +10,43 @@ sources([
     "mkdir",
     "rm",
     "fragfile",
-])
+)
 
-compile_opts([
+flag.cc += (
     "-ffreestanding",
-    "-fno-pie"
-])
+    "-fno-pie",
+    "-Werror"
+)
 
-linking_opts([
+flag.ld += (
     "-nostdlib", 
     "-nolibc", 
     "-z noexecstack", 
     "-no-pie", 
-])
+)
 
-linking_opts([
+flag.ld += (
     "-Wl,--build-id=none"
-])
+)
 
-if config("arch") == "x86_64":
-    compile_opts([
-        "-m64", 
-        "-fno-unwind-tables", 
-        "-fno-asynchronous-unwind-tables",
-        "-mcmodel=large"
-    ])
-    linking_opts([
-        "-m64",
-    ])
-else:
-    compile_opts("-m32")
-    linking_opts("-m32")
+match env.ARCH:
+    case "x86_64":
+        flag.cc += (
+            "-m64", 
+            "-fno-unwind-tables", 
+            "-fno-asynchronous-unwind-tables",
+            "-mcmodel=large",
+            "-DCONFIG_ARCH_X86_64"
+        )
+        flag.ld += (
+            "-m64",
+        )
+    case "i386":
+        flag.cc += "-m32", "-DCONFIG_ARCH_X86_32"
+        flag.ld += "-m32"
 
-compile_opts("-mno-sse")
+flag.cc += "-mno-sse"
+
+flag.cc += (
+    "-Wno-discarded-qualifiers"
+)

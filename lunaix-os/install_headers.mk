@@ -4,6 +4,8 @@ ifndef PREFIX
 	$(error "Must specify PREFIX to header install location")
 endif
 
+CFLAGS += $(kcflags)
+
 USR_HEADER := includes/usr
 
 HEADERS := $(shell cat $(USR_HEADER)/headers)

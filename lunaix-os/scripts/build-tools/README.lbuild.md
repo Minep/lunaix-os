@@ -3,99 +3,85 @@
 LunaBuild is programmable source file selection tool. It does not build things
 by itself, rather, it selects which source file should be feed as input to
 other tranditional build tools such as make. The selection logic is completely
-programmable and convey through `LBuild` file which is essentially a python
-script. As the primary design goal for LunaBuild is simple, lightweight and
-standalone. It just plain python, with some extra predefined functions and
-automatic variables, so does not force user to learn some other weird domain
-specific language (yes, that's you, CMake!).
+programmable and convey through `LBuild` using python syntax. 
+Since the primary design goal for LunaBuild is simple, lightweight and
+standalone. It introduce minimal customisations on the python syntax for better
+readbility and it is essentially modified python.
 
-## Usage
+## Functionalities
 
-Invoke `./luna_build.py <root_lbuild> -o <out_dir>`. It will output two file
-to the `<out_dir>`: `sources.list` and `headers.list`. Contains all the source
-files and header files to be used by the build process.
+### Native Python Environment
 
-## Core Functions
+LunaBuild is a superset of python, meaning that all existing functionalities of 
+python language is still intacted and supported.
 
-LunaBuild provide following function to help user select source files.
+This will gives you maximum flexibility on defining your build logic.
 
-### [func] `use(lbuild_path)`
+### Import other `LBuild`
 
-Include another LBuild file. `lbuild_path` is the path relative to current
-directory, pointed to the file. It can be also pointed to a directory, for
-which the LBuild file is inferred as `$lbuild_path/LBuild`.
+Multiple `LBuild`s may be defined across different sub-directory in large scale
+project for better maintainability
 
-For example:
+LunaBuild allow you to import content of other LBuild using python's relative import
+feature:
 
 ```py
-use("dir")
-use("dir/LBuild")
+from . import subdirectory
 ```
 
-both are equivalent.
+This import mechanism works like `#include` directive in C preprocessor,
+the `from . import` construct will automatically intercepted by the LBuild interpreter and 
+be replaced with the content from `./subdirectory/LBuild`
 
-### [func] `sources(src_list)`
-
-Select a list of source files, all paths used are relative to current
-directory. For example,
+You can also address file in the deeper hierarchy of the directory tree, for example
 
 ```py
-sources([ "a.c", "b.c", "c.c" ])
+from .sub1.sub2 import sub3
 ```
 
-### [func] `headers(src_list)`
+This will be translated into `./sub1/sub2/sub3/LBuild`
 
-Select a list of header file or include directory, all paths used are
-relative to current directory. For example,
+It can also be used in any valid python conditional branches to support 
+conditional import
 
 ```py
-headers([ "includes/", "includes/some.h" ])
+if feature1_enabled:
+    from . import feature1
+elif feature3_enabled
+    from . import feature3
 ```
 
-### [func] `configured(name)`
 
-Check whether a configuration is present, the name for the configuration
-is defined by external configuration provider.
+### Scoped Data Banks
 
-### [func] `config(name)`
+Almost every build systems is evolved around the list data structure, as its
+main task is to collect all interested source files, headers or other build 
+process relative information. This is also true for LunaBuild.
 
-Read the value of a configuration, raise exception is not exists.
+To better represent this in a more readable way, LunaBuild introduce the concept 
+of scoped data banks, represented as a automatic global object in the script.
 
-### [var] `_script`
-
-Automatic variable, a path to the current build file.
-
-## Short-hands
-
-LunaBuild provide some useful short-hand notations
-
-### Conditional Select
-
-Suppose you have two source files `src_a.c` and `src_b.c`, for which
-their selection will be depends on the value of a configuration
-`WHICH_SRC`. A common way is to use `if-else` construct
+Take a look in the example:
 
 ```py
-if config("WHICH_SRC") == "select_a":
-    sources("src_a.c")
-elif config("WHICH_SRC") == "select_b":
-    sources("src_b.c")
+src.c += "source1.c", "source2.c"
 ```
 
-LunaBuild allow you to short hand it as such:
+This will append `"source1.c"` and `"source2.c"` into the list named `c` under
+the scope of `src`. Which can be clearly interpreted as "collection of c source files"
 
-```py
-sources({
-    config("WHICH_SRC"): {
-        "select_a": "src_a.c",
-        "select_b": "src_b.c",
-        # more...
-    }
-})
-```
+It is also important to notice that not all databanks are in the forms of list.
+Some data banks served special purpose, as we will see below.
 
-It can also be extended easily for multiple choices and allow nesting.
+LunaBuild defines the following databanks and scope:
 
-You may also notice we no longer wrap the parameter with square bracket,
-this is also another short-hand, the array notation is not needed when
-there is only one element to add.
++ `src` (source files):
+    + `c` (c files, type: `[]`)
+    + `h` (headers or include directories, type: `[]`)
++ `flag` (source files):
+    + `cc` (compiler flags, type: `[]`)
+    + `ld` (linker flags, type: `[]`)
++ `config` (configuration options from `LConfig`)
+    + `CONFIG_<OptionName>` (any valid config name, type: `Any`)
++ `env` (environmental variables)
+    + `<Name>` (any valid env variable name, type: `Any`)

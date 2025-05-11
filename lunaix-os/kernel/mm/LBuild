@@ -1,4 +1,4 @@
-sources([
+src.c += (
     "mmap.c",
     "valloc.c",
     "cake.c",
@@ -13,4 +13,4 @@ sources([
     "cake_export.c",
     "vmap.c",
     "dmm.c"
-])
+)

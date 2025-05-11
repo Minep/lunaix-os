@@ -1,28 +1,18 @@
 
-@Collection("16x50 Serial Controller")
+@"16x50 Serial Controller"
+@(parent := char_device)
 def uart_16x50():
     """ 16x50 serial controller  """
 
-    # hal/char/LConfig::char_device
-    add_to_collection(char_device)
-
-    @Term("16x50 XT-Compat")
-    def xt_16x50():
+    @"16x50 XT-Compat"
+    def xt_16x50() -> bool:
         """ Enable the 16x50 for PC-compatible platform  """
-
-        type(bool)
-
-        default(True)
+        require (arch_x86)
         
-        is_x86 = v(arch) in ["i386", "x86_64"]
-        if not is_x86:
-            set_value(False)
-
-        return is_x86
+        return True
     
-    @Term("16x50 PCI")
-    def pci_16x50():
+    @"16x50 PCI"
+    def pci_16x50() -> bool:
         """ Enable the support of PCI 16x50 """
-        type(bool)
 
-        default(True)
+        return True

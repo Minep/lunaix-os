@@ -1,35 +1,25 @@
 
-@Collection("Buses & Interconnects")
+@"Buses & Interconnects"
+@(parent := hal)
 def bus_if():
     """ System/platform bus interface """
 
-    add_to_collection(hal)
-
-    @Term("PCI")
-    def pci_enable():
+    @"PCI"
+    def pci_enable() -> bool:
         """ Peripheral Component Interconnect (PCI) Bus """
-        type(bool)
-        default(True)
+        return True
 
-    @Term("PCI Express")
-    def pcie_ext():
+    @"PCI Express"
+    def pcie_ext() -> bool:
         """ Enable support of PCI-Express extension """
-        type(bool)
-        default(False)
+        require (pci_enable)
 
-        return v(pci_enable)
+        return False
 
-    @Term("Use PMIO for PCI")
-    def pci_pmio():
+    @"Use PMIO for PCI"
+    def pci_pmio() -> bool:
         """ Use port-mapped I/O interface for controlling PCI """
-        type(bool)
+        require (not pcie_ext and pci_enable)
+        require (arch_x86)
 
-        has_pcie = v(pcie_ext)
-        is_x86 = v(arch) in [ "i386", "x86_64" ]
-
-        default(not has_pcie)
-        
-        if not is_x86 or has_pcie:
-            set_value(False)
-
-        return is_x86 and v(pci_enable)
+        return True

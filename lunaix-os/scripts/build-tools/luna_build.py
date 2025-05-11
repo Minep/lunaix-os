@@ -1,121 +1,118 @@
 #!/usr/bin/env python 
+from argparse           import ArgumentParser
+from pathlib            import Path
 
-from lbuild.contract import LunaBuildFile
-from lbuild.common import BuildEnvironment
+from lbuild.build       import BuildEnvironment
+from lbuild.scope       import ScopeProvider
+from lcfg2.builder      import NodeBuilder
+from lcfg2.config       import ConfigEnvironment
+from lcfg2.common       import ConfigNodeError
 
-from lcfg.common import LConfigEnvironment
-from integration.config_io import CHeaderConfigProvider
-from integration.lbuild_bridge import LConfigProvider
-from integration.render_ishell import InteractiveShell
-from integration.build_gen import MakefileBuildGen, install_lbuild_functions
-from integration.lunamenu import menuconfig, TerminalSizeCheckFailed
+from shared.export      import ExportJsonFile
+from shared.export      import ExportHeaderFile
+from shared.export      import ExportMakefileRules
+from shared.export      import restore_config_value
+from shared.scopes      import ConfigScope, EnvScope
+from shared.build_gen   import BuildScriptGenerator
+from shared.shconfig    import shconfig
 
-import lcfg.types as lcfg_type
-import lcfg.builtins as builtin
+class LunaBuild:
+    def __init__(self, options):
+        self.__lbuilder = BuildEnvironment()
+        self.__lconfig  = ConfigEnvironment()
+        self.__opt = options
 
-from os import getcwd
-from os import mkdir
-from os.path import abspath, basename, dirname, exists
-from argparse import ArgumentParser
-from lib.utils import join_path
+        scope = ConfigScope(self.__lconfig)
+        self.__lbuilder.register_scope(scope)
 
-def prepare_lconfig_env(out_dir):
-    provider = CHeaderConfigProvider(join_path(out_dir, "configs.h"))
-    env = LConfigEnvironment(getcwd(), provider)
+        scope = ScopeProvider("src")
+        scope.file_subscope("c")
+        scope.file_subscope("h")
+        self.__lbuilder.register_scope(scope)
 
-    env.register_builtin_func(builtin.v)
-    env.register_builtin_func(builtin.term_type)
-    env.register_builtin_func(builtin.parent)
-    env.register_builtin_func(builtin.default)
-    env.register_builtin_func(builtin.include)
-    env.register_builtin_func(builtin.env)
-    env.register_builtin_func(builtin.set_value)
+        scope = ScopeProvider("flag")
+        scope.subscope("cc")
+        scope.subscope("ld")
+        self.__lbuilder.register_scope(scope)
 
-    env.type_factory().regitser(lcfg_type.PrimitiveType)
-    env.type_factory().regitser(lcfg_type.MultipleChoiceType)
+        self.__lbuilder.register_scope(EnvScope())
 
-    return env
+        self.__json  = ExportJsonFile(self.__lconfig)
+        self.__make  = ExportMakefileRules(self.__lconfig)
+        self.__headr = ExportHeaderFile(self.__lconfig)
+        self.__build = BuildScriptGenerator(self.__lbuilder)
 
-def do_config(opt, lcfg_env):
-    redo_config = not exists(opt.config_save) or opt.force
-    if not redo_config or opt.quiet:
-        return
+    def load(self):
+        file = self.__opt.lconfig
+        NodeBuilder.build(self.__lconfig, file)
 
-    try:
-        clean_quit = menuconfig(lcfg_env)
-    except TerminalSizeCheckFailed as e:
-        least = e.args[0]
-        current = e.args[1]
-        print(
-            f"Your terminal size: {current} is less than minimum requirement of {least}.\n"
-            "menuconfig will not function properly, switch to prompt based.\n")
+        file = self.__opt.lbuild
+        self.__lbuilder.load(file)
 
-        shell = InteractiveShell(lcfg_env)
-        clean_quit = shell.render_loop()
+        self.__lconfig.refresh()
+        self.__lbuilder.update()
     
-    if not clean_quit:
-        print("Configuration aborted. Nothing has been saved.")
-        exit(-1)
+    def restore(self):
+        save = self.__opt.save
+        if not Path(save).exists():
+            return False
 
-def do_buildfile_gen(opts, lcfg_env):
-    root_path = abspath(opts.root)
-    ws_path = dirname(root_path)
-    root_name = basename(root_path)
+        restore_config_value(self.__lconfig, save)
+        return True
 
-    mkgen = MakefileBuildGen(opts.out_dir)
-    env = BuildEnvironment(ws_path, mkgen)
-
-    install_lbuild_functions(env)
-
-    cfg_provider = LConfigProvider(lcfg_env)
-    env.set_config_provider(cfg_provider)
-
-    root = LunaBuildFile(env, root_name)
-
-    try:
-        root.resolve()
-    except Exception as err:
-        print("failed to resolve root build file")
-        raise err
+    def save(self):
+        save = self.__opt.save
+        self.__json.export(save)
+        return True
     
-    env.export()
+    def generate(self):
+        outdir = Path(self.__opt.export_dir)
+        if not outdir.exists():
+            outdir.mkdir()
+
+        if self.__opt.gen_build:
+            self.__build.generate(outdir / "build.mkinc")
+
+        if self.__opt.gen_config:
+            self.__make.export(outdir / "config.mkinc")
+            self.__headr.export(outdir / "config.h")
+
+    def visual_config(self):
+        if not self.__lconfig.loaded():
+            print("no config file loaded, skipped interactive config")
+            return
+        
+        if not self.__opt.gen_config:
+            return
+        
+        if not shconfig(self.__lconfig):
+            print("configuration process aborted")
+            exit(1)
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument("--config", action="store_true", default=False)
-    parser.add_argument("--quiet", action="store_true", default=False)
-    parser.add_argument("--lconfig-file", default="LConfig")
-    parser.add_argument("--config-save", default=".config.json")
-    parser.add_argument("--force", action="store_true", default=False)
-    parser.add_argument("root", nargs="?", default="LBuild")
-    parser.add_argument("-o", "--out-dir", required=True)
+    parser.add_argument("--lconfig", default="LConfig")
+    parser.add_argument("--lbuild", default="LBuild")
+    parser.add_argument("--save", default=".config.json")
+    parser.add_argument("--gen-build", action="store_true", default=False)
+    parser.add_argument("--gen-config", action="store_true", default=False)
+    parser.add_argument("export_dir")
 
     opts = parser.parse_args()
-    out_dir = opts.out_dir
-    if not exists(out_dir):
-        mkdir(out_dir)
-    
-    lcfg_env = prepare_lconfig_env(out_dir)
-    require_config = exists(opts.lconfig_file)
-    try:
-        if require_config:
-            lcfg_env.resolve_module(opts.lconfig_file)
-            lcfg_env.update()
-            lcfg_env.load()
-    except Exception as e:
-        print(e)
-    
-    if opts.config:
-        if require_config:
-            do_config(opts, lcfg_env)
-        else:
-            print("No configuration file detected, skipping...")
-        
-        lcfg_env.update()
-        lcfg_env.save(opts.config_save)
-        lcfg_env.export()
+    builder = LunaBuild(opts)
 
-    do_buildfile_gen(opts, lcfg_env)
+    try:
+        builder.load()
+        builder.restore()
+    except ConfigNodeError as e:
+        print(e)
+        exit(1)
+    
+    builder.visual_config()
+    
+    builder.save()
+    builder.generate()
+
 
 if __name__ == "__main__":
     main()

@@ -1,73 +1,68 @@
-import time
 from datetime import datetime, date
 
-include("kernel")
-include("arch")
-include("hal")
+from . import kernel, arch, hal
 
-@Term("Kernel Version")
-@ReadOnly
-def lunaix_ver():
-    """
-    Lunaix kernel version
-    """
-
-    type(str)
-    
+@native
+def get_patch_seq():
     today = date.today()
     year = today.year
     start_of_year = datetime(year, 1, 1).date()
     seq_num = (today - start_of_year).days
     
-    default("%s v0.%d%d"%(v(arch), year - 2000, seq_num))
+    return "%d%d"%(year - 2000, seq_num)
 
-@Collection("Kernel Debug and Testing")
+@"Kernel Version"
+@readonly
+def lunaix_ver() -> str:
+    """
+    Lunaix kernel version
+    """
+    
+    return f"{arch.val} v0.0.{get_patch_seq()}"
+
+@"Kernel Debug and Testing"
 def debug_and_testing():
     """
     General settings for kernel debugging feature
     """
 
-    @Term("Supress assertion")
-    def no_assert():
+    @"Supress assertion"
+    def no_assert() -> bool:
         """
         Supress all assertion fail activity.
         Note: Enable this is highly NOT recommended and would result system
               extermly unstable
         """
-        type(bool)
-        default(False)
 
-    @Term("Report on stalled thread")
-    def check_stall():
+        return False
+
+    @"Report on stalled thread"
+    def check_stall() -> bool:
         """
         Check and report on any thread that spend too much time in kernel.
         """
 
-        type(bool)
-        default(True)
+        return True
         
-    @Term("Max kernel time allowance")
-    def stall_timeout():
+    @"Max kernel time allowance"
+    def stall_timeout() -> int:
         """
         Set the maximum time (in seconds) spent in kernel before considered
         to be stalled.
         """
+        require (check_stall)
 
-        type(int)
-        default(10)
-
-        return v(check_stall)
+        return 10
     
-    @Term("Max number of preemptions")
-    def stall_max_preempts():
+    @"Max number of preemptions"
+    def stall_max_preempts() -> int:
         """
         Set the maximum number of preemptions that a task can take
         before it is considered to be stucked in some loops.
 
         Setting it to 0 disable this check
         """
+        require (check_stall)
 
-        type(int)
-        default(0)
+        return 0
 
-        return v(check_stall)

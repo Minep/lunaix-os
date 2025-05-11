@@ -1,27 +1,54 @@
-include("x86/LConfig")
+from . import x86
 
-@Collection("Platform")
+@"Platform"
 def architecture_support():
     """
         Config ISA related features
     """
 
-    @Term("Architecture")
-    def arch():
+    @flag
+    def arch_x86_32() -> bool:
+        when (arch is "i386")
+    
+    @flag
+    def arch_x86_64() -> bool:
+        when (arch is "x86_64")
+    
+    @flag
+    def arch_x86() -> bool:
+        when (arch is "i386")
+        when (arch is "x86_64")
+
+    @flag
+    def arch_bits_64() -> bool:
+        when (arch_bits is 64)
+
+    @flag
+    def arch_bits_32() -> bool:
+        when (arch_bits is 32)
+
+    @"Architecture"
+    def arch() -> "i386" | "x86_64":
         """ 
             Config ISA support 
         """
-        # type(["i386", "x86_64", "aarch64", "rv64"])
-        type(["i386", "x86_64"])
-        default("x86_64")
 
-        env_val = env("ARCH")
-        if env_val:
-            set_value(env_val)
+        match env("ARCH"):
+            case "i386": 
+                return "i386"
+            case "aarch64": 
+                return "aarch64"
+            case "rv64": 
+                return "rv64"
+            case "x86_64": 
+                return "x86_64"
 
-    @Term("Base operand size")
-    @ReadOnly
-    def arch_bits():
+        print("unknown ARCH:", env("ARCH"), "default to x86_64")
+        return "x86_64"
+
+    @"Base operand size"
+    @readonly
+    def arch_bits() -> 32 | 64:
         """ 
             Defines the base size of a general register of the 
             current selected ISA.
@@ -29,16 +56,15 @@ def architecture_support():
             This the 'bits' part when we are talking about a CPU
         """
 
-        type(["64", "32"])
-        match v(arch):
+        match arch.val:
             case "i386": 
-                default("32")
+                return 32
             case "aarch64": 
-                default("64")
+                return 64
             case "rv64": 
-                default("64")
+                return 64
             case "x86_64": 
-                default("64")
+                return 64
             case _:
-                default("32")
+                return 32
         

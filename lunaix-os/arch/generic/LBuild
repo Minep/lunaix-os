@@ -1,10 +1,10 @@
-headers("includes")
+src.h += "includes"
 
-sources([
+src.c += (
     "bootmem.c",
     "trace.c",
     "vmutils.c",
     "procvm.c",
     "arch.c",
     "kremap.c"
-])
+)

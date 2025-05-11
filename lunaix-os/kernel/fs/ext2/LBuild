@@ -1,8 +1,8 @@
-sources([
+src.c += (
     "alloc.c",
     "dir.c",
     "file.c",
     "group.c",
     "inode.c",
     "mount.c"
-])
+)
