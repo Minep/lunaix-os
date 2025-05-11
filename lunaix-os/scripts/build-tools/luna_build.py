@@ -82,9 +82,6 @@ class LunaBuild:
             print("no config file loaded, skipped interactive config")
             return
         
-        if not self.__opt.gen_config:
-            return
-        
         if not shconfig(self.__lconfig):
             print("configuration process aborted")
             exit(1)
@@ -108,10 +105,12 @@ def main():
         print(e)
         exit(1)
     
-    builder.visual_config()
+    if opts.gen_config:
+        builder.visual_config()
+        builder.save()
     
-    builder.save()
-    builder.generate()
+    if opts.gen_build:
+        builder.generate()
 
 
 if __name__ == "__main__":

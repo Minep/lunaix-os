@@ -15,7 +15,6 @@ define __gen_config
 endef
 
 define __gen_build
-	@echo restarting configuration...
 	@$(LBUILD) --gen-build $(lbuild_dir)
 endef
 
@@ -29,16 +28,21 @@ $(lconfig_save): $(all_lconfigs)
 	$(call __gen_config)
 
 export
-$(lconfig_mkinc): $(all_lconfigs)
+$(lconfig_mkinc): $(lconfig_save)
 	$(call __gen_config)
 
 export
-$(lbuild_config_h): $(all_lbuilds)
+$(lbuild_config_h): $(lconfig_save) $(all_lbuilds)
 	$(call __gen_build)
 
 export
-$(lbuild_mkinc): $(all_lbuilds)
+$(lbuild_mkinc): $(lconfig_save) $(all_lbuilds)
 	$(call __gen_build)
 
 config: $(all_lbuilds) $(all_lconfigs)
+	$(call __gen_both)
+
+reconfig:
+	@rm -rf $(lbuild_dir)
+	@rm -rf $(lconfig_save)
 	$(call __gen_both)

@@ -10,7 +10,10 @@
 
 The Lunaix kernel (or soon-to-be LunaixOS) is a hobby kernel, written entirely from scratch. Designed to be POSIX-compliance, performance critical and modern, with some independent thoughts being applied in architectural design.
 
-This project is based solely on first principles. Meaning that it does neither copy-pasting nor recycling other os projects/tutorials. However, this doesn't necessarily imply superiority; In fact, Lunaix starts out as a mean to challenge my understanding in OS theory and also a platform for experimenting some advanced (and cool) kernel features. If you are a kernel hobbyist who want some new perspectives or just simply get fatigued on those recycled content, then you have came to the right place!
+
+This project is built entirely from first principles - meaning no code was copy-pasted or recycled from other OS projects or tutorials. Lunaix didn't begin as an attempt to outperform anything; it started as a personal challenge to learn OS theory and explore advanced kernel features through original design and implementation. Everything you see here was developed solo, part-time, with only hardware specs and my beloved **Modern Operating Systems** as guidance.
+
+If you're a kernel hobbyist looking for a fresh take or tired of mass-produced projects, then welcome, you're in the right place!
 
 
 | ![showcase_lunaix-over-serial.png](docs/img/showcase_lunaix-over-serial.png) |
@@ -25,81 +28,90 @@ This project is based solely on first principles. Meaning that it does neither c
 
 ## Features
 
-In a nutshell, Lunaix is a multi-architectural general purpose kernel, and she is:
+Lunaix is a multi-architecture, general-purpose kernel built with performance, modularity, and robustness in mind. Its design emphasizes advanced abstractions, proactive error detection, and subsystem isolation. Lunaix is
 
-+ fully-preemptive
-+ modular design with configurable components at compile-time and extendable subsystems
-+ high-performance by utilising advanced caching techniques and infrastructure.
-+ fault-tolerance with sophisticated builtin error handling and tracing techniques.
-+ robust in nature with techniques such as proactive deadlock detection and driver isolation mechanism.
++ **Fully-preemptive** for responsive multi-tasking
++ **Modular** with compile-time configurable components and extensible subsystems
++ **High-performance**, leveraging modern caching strategies and efficient infrastructures.
++ **Fault-tolerant**, with built-in error handling and stack backtracing
++ **Robust by design**, using mechanisms like proactive deadlock detection and driver isolation
 
-The author has put a significant amount of time on devising better abstractions, advance kernel features and various optimisation techniques. To give a better understanding (and appreciation) of the works being done, the following non-exhaust list has been compiled with features that are currently supported in lunaix:
+A significant amount of effort has gone into crafting clean abstractions, implementing advanced kernel features, and applying performance optimizations throughout the system.
+
+To better illustrate the scope of work already done, the following non-exhaustive list outlines currently supported features in Lunaix:
+
+<details>
+
+<summary>List of all features implemented</summary>
 
 + Multi-ISA
   + x86_32
   + x86_64
-  + Aarch64 (W.I.P)
+  + Aarch64 (WIP)
 + Boot protocol
   + abstraction for different protocol
   + configurable kernel boot-time parameters
 + Platform resource management and definition
-  + ACPI
-  + Devicetree
+  + read-only ACPI table interpretation
+  + full devicetree implementation
 + Memory management
   + architecture-neutral abstraction
+  + highmem
+  + copy-on-write
+  + page sharing
+  + explicit huge page
   + on-demand paging
-  + copy-on-write and page sharing
-  + compound page support
-  + explicit huge page support (sorry, not THP!)
-  + reverse mapping indexing (rmap)
-  + memory compaction (W.I.P)
-  + slab-alike object allocator
-  + highmem support
-  + remote address space accessing
+  + compound page
+  + reverse mapping (rmap)
+  + memory compaction (WIP)
+  + slab-style object allocator
+  + inter-process address space access
 + Multi-tasking
-  + Protection level and process image isolation
-  + Native threading support (no more lightweight process nonsense)
-  + Signal mechanism
-  + Kernel level multi-tasking (i.e. kernel threads)
-  + Round-robin scheduling (for now)
-  + Preemptive kernel design
+  + fully preemptive
+  + protection levels
+  + process isolation
+  + native threading
+  + signal mechanism
+  + round-robin scheduler (for now)
+  + kernel level multi-tasking (i.e. kernel threads)
   + taskfs: file system interface to process and threads
 + File system
+  + POSIX-compliant interface
   + virtual file system framework
-  + ...with POSIX compliant interfaces
   + file system mounting mechanism
   + page cache for file IO
-  + node cache for vfs structure representation.
+  + inode/dnode caching
   + ext2 (rev.0, rev.1)
   + iso9660 (rock-ridge)
-  + twifs: file system interface to kernel states.
+  + twifs: kernel state fs interface.
 + Device management and interrupt handling
-  + architecture-neutral design
-  + generalised driver framework
-  + generalised irq framework
-  + driver modularisation design
-  + support asynchronous device model
-  + devfs: file system interface to device subsystem
+  + unified IRQ framework
+  + unified driver framework for heterogenous devices
+  + modular driver model allow compiled-time toggling
+  + asynchronous operation model supported
+  + devfs: device fs interface.
 + Block I/O (blkio)
-  + generalised block IO interface and encapsulation
-  + blkio packets caching
-  + asynchronous blkio operation in nature
+  + unified block IO interface
+  + IO request packets caching
+  + asynchronous IO operation
 + Serial I/O
-  + POSIX-compliant serial port model
-  + serial device driver framework (part of driver framework)
+  + POSIX-compliant serial IO model
 + Caching Infrastructure
-  + primitive: generic sparse associative array (spatial data)
   + LRU replacement policy and pooling
-  + kernel daemon for scheduled cache eviction
+  + kernel daemon for dynamic and transparent cache managements
 + Error handling and detection
-  + stack back-tracing with symbol resolution
-  + nested exception unfolding
+  + stack backtracing with symbol resolution
+  + stack unwinding for nested exception
   + CPU state dumping
-  + Deadlock/hung-up detection
+  + deadlock/hung-up detection
 
-For the device drivers that are currently support see below:
+</details>
 
-+ Arhcitecture Neutral
+<details>
+
+<summary>List of currently supported device</summary>
+
++ Architecture Neutral
   + UART 16650-compatible driver
   + Serial ATA AHCI
   + PCI 3.0
@@ -107,12 +119,13 @@ For the device drivers that are currently support see below:
   + Standard VGA
 + Intel x86
   + RTC (Intel PCH)
-  + IOAPIC irq controller
+  + IOAPIC IRQ controller
   + APIC Timer
   + Legacy i8042 keyboard controller
 + ARM
   + GICv3
-  + PL011 (W.I.P)
+  + PL011 (WIP)
+</details>
 
 ## Project Structure
 
@@ -152,7 +165,83 @@ A successful build will give `build/bin/kernel.bin`.
 
 If you are impatient, or just want something to run and don't want to went through tedious process of configuring rootfs and tweak kernel parameters. You can use the `live_debug.sh` provided in the lunaix root directory to quickly bring up the system with default parameters (also used by the author for debugging).
 
-Following the steps:
+### Quick Start
+
+This will get you up and running real quick. We will use `x86_64` as example.
+
+Assuming a Linux or other Unix-like shell environment.
+
+#### Select your target
+```sh
+$ export ARCH=x86_64
+```
+
+#### Check Python
+```sh
+$ python --version
+```
+
+Ensure at least `3.11`
+
+#### Check compiler
+```sh
+$ gcc -dumpmachine
+```
+
+Ensure `x86_64-linux-gnu` or anything resemble `x86_64`
+
+#### Check QEMU
+```sh
+$ which qemu-system-x86_64
+```
+
+Should display a valid installation path
+
+#### Optional: Setting up Cross-Compiler
+```sh
+$ export CX_PREFIX=x86_64-linux-gnu-
+```
+
+#### Run Configuration
+```sh
+make config
+```
+
+Then hitting `q` in the interactive shell to save and quit
+
+#### Build stock rootfs
+
+```sh
+make rootfs
+```
+
+#### Build & Run
+```sh
+./live_debug.sh
+```
+
+you should see gdb now take control of your shell
+
+#### Connect to serial via telnet
+
+Open up another window or session
+```sh
+telnet localhost 12345
+```
+
+#### Commence simulation
+
+Back to the gdb session and type `c` to countine
+
+
+#### Watch Lunaix booting!
+
+Congrats, enjoy your lunaix! (or submit an issue)
+
+
+### Not so Quick Start
+
+Here is a slower and yet more verbose steps:
 
 1. Select an architecture `<arch>`
 2. Check the compilation prerequisites and presence of `qemu-system-<arch>`
