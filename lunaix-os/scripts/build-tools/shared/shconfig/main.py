@@ -1,5 +1,6 @@
 import readline, textwrap
 
+from shlex          import split as shsplit
 from rlcompleter    import Completer
 from lcfg2.config   import ConfigEnvironment
 from .common        import ShconfigException, get_config_name
@@ -30,7 +31,7 @@ def next_input(cmds: Commands):
     if len(line) == 0:
         return True
     
-    parts = line.split(' ')
+    parts = shsplit(line)
     name, args = parts[0], parts[1:]
 
     if name in ['q', 'exit']:
@@ -77,4 +78,3 @@ def shconfig(env: ConfigEnvironment):
             return False
         except Exception as e:
             raise e
-            return False

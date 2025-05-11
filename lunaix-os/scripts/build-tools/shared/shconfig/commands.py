@@ -1,8 +1,9 @@
 import textwrap
 import pydoc
+import re
 
 from .common import CmdTable, ShconfigException
-from .common import select, cmd
+from .common import select, cmd, get_config_name
 
 from lcfg2.config   import ConfigEnvironment
 from lcfg2.common   import NodeProperty, NodeDependency, ConfigNodeError
@@ -33,6 +34,13 @@ class Commands(CmdTable):
                 f"{select(hidden, 'h', '.')}"      \
                                     
         val_txt = f"{value if value is not None else '<?>'}"
+
+        if value is True:
+            val_txt = "y"
+        elif value is False:
+            val_txt = "n"
+        elif isinstance(value, str):
+            val_txt = f'"{val_txt}"'
                 
         line = f"[{status}] {name}"
         to_pad = max(aligned - len(line), 4)
@@ -41,6 +49,24 @@ class Commands(CmdTable):
         if color_hint and not enabled:
             line = f"\x1b[90;49m{line}\x1b[0m"
         return line
+    
+    def __format_config_list(self, nodes):
+        lines = []
+        disabled = []
+        
+        for node in nodes:
+            _l = disabled if not NodeProperty.Enabled[node] else lines
+            _l.append(self.__get_opt_line(node, True))
+
+        if disabled:
+            lines += [
+                "",
+                "\t---- disabled ----",
+                "",
+                *disabled
+            ]
+
+        return lines
     
     @cmd("help", "h")
     def __fn_help(self):
@@ -68,13 +94,16 @@ class Commands(CmdTable):
             "      r    Read-Only config",
             "      h    Hidden config",
             "",
+            "   VALUE (bool)",
+            "      y    True",
+            "      n    False",
+            "",
             "",
             "Defined configuration terms",
             ""
         ]
 
-        for node in self.__env.terms():
-            lines.append(self.__get_opt_line(node, True))    
+        lines += self.__format_config_list(self.__env.terms())
 
         pydoc.pager("\n".join(lines))
 
@@ -130,7 +159,7 @@ class Commands(CmdTable):
         node = self.__get_node(name)        
         print(self.__get_opt_line(node))
 
-    @cmd("what", "?")
+    @cmd("what", "help", "?")
     def __fn_what(self, name: str):
         """
         Show the documentation associated with the option
@@ -145,8 +174,8 @@ class Commands(CmdTable):
         print()
 
 
-    @cmd("effect", "link")
-    def __fn_effect(self, name: str):
+    @cmd("affects")
+    def __fn_affect(self, name: str):
         """
         Show the effects of this option on other options
         """
@@ -163,3 +192,24 @@ class Commands(CmdTable):
                 print(f"   > when {expr}")
             print()
     
+    @cmd("find")
+    def __fn_search(self, fuzz: str):
+        """
+        Perform fuzzy search on configs (accept regex)
+        """
+
+        nodes = []
+        expr = re.compile(fuzz)
+        for node in self.__env.terms():
+            name = get_config_name(node._name)
+            if not expr.findall(name):
+                continue
+            nodes.append(node)
+
+        if not nodes:
+            print("no matches")
+            return
+
+        lines = self.__format_config_list(nodes)
+
+        pydoc.pager("\n".join(lines))

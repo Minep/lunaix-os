@@ -76,7 +76,9 @@ class ValueTypeConstrain:
 
     def __parse_type(self, type):
         if type not in ValueTypeConstrain.TypeMap:
-            raise Exception(f"unknown type: {type}")
+            SourceLogger.warn(self.__node, self.__raw, 
+                              f"unknwon type: '{type}'. Fallback to 'str'")
+            return str
         
         return ValueTypeConstrain.TypeMap[type]
     
@@ -103,7 +105,7 @@ class ValueTypeConstrain:
         raise node.config_error(
                 f"unmatched type:",
                 f"expect: '{self.schema}',",
-                f"got: '{val}' ({type(val)})") 
+                f"got: '{type(val).__name__}' (val: {val})") 
 
 class NodeDependency:
     class SimpleWalker(ast.NodeVisitor):

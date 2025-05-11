@@ -7,31 +7,9 @@ class SyntaxRule(RuleCollection):
     NodeAssigment = Schema(ast.Subscript, 
                             value=Schema(ast.Name, id='__lzLut__'), 
                             ctx=ast.Store)
-    TrivialValue = Schema(Schema.Union(
-        ast.Constant, 
-        ast.Name
-    ))
 
-    BoolOperators = Schema(Schema.Union(ast.Or, ast.And))
-    
-    TrivialTest    = Schema(ast.Compare, 
-                          left=TrivialValue, 
-                          ops=[Schema.Union(ast.Eq)],
-                          comparators=[ast.Constant])
-    
-    InlineIf       = Schema(ast.IfExp, 
-                            test=Schema.Union(TrivialTest, TrivialValue), 
-                            body=TrivialValue, 
-                            orelse=TrivialValue)
-    
-    TrivialLogic   = Schema(ast.BoolOp, 
-                            op=BoolOperators, 
-                            values=Schema.List(
-                                Schema.Union(TrivialTest, ast.Name)
-                            ))
-    
     TrivialReturn  = Schema(Schema.Union(
-        TrivialValue,
+        ast.Constant,
         ast.JoinedStr
     ))
 
@@ -83,6 +61,6 @@ class SyntaxRule(RuleCollection):
     @rule(ast.Return, None, "non-trivial-value")
     def __nontrivial_return(self, reducer, node):
         """
-        Option default should be kept as constant or simple membership check
+        Use of non-trivial value as default value
         """
         return SyntaxRule.TrivialReturn == node.value 

@@ -1,6 +1,6 @@
 import ast
 
-from lib.utils  import Schema
+from lib.utils  import Schema, SourceLogger
 from .lazy       import Lazy
 from .common     import NodeProperty, NodeInverseDependency
 
@@ -139,6 +139,10 @@ class ConfigNodeASTRewriter(ast.NodeTransformer):
     
     def visit_Return(self, node):
         if self.__when_epxr:
+            SourceLogger.warn(self.__cfg_node, node, 
+                              "mixed use of `return` and `when` directive. "
+                              "`when` have higher precedence than `return`. "
+                              "consider remove `return` to avoid confusion")
             return None
         return self.generic_visit(node)
     
