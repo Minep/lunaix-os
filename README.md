@@ -8,12 +8,21 @@
 
 # The Lunaix Project
 
-The Lunaix kernel (or soon-to-be LunaixOS) is a hobby kernel, written entirely from scratch. Designed to be POSIX-compliance, performance critical and modern, with some independent thoughts being applied in architectural design.
+The Lunaix kernel (or soon-to-be LunaixOS) is a hobby kernel, started in 2022, 
+written entirely from scratch. With a big ambition of being POSIX-compliance, 
+and designed with performance and modernity in mind, with some independent 
+thoughts being applied in architectural design.
 
 
-This project is built entirely from first principles - meaning no code was copy-pasted or recycled from other OS projects or tutorials. Lunaix didn't begin as an attempt to outperform anything; it started as a personal challenge to learn OS theory and explore advanced kernel features through original design and implementation. Everything you see here was developed solo, part-time, with only hardware specs and my beloved **Modern Operating Systems** as guidance.
+This project is built entirely from first principles - meaning no code was 
+copy-pasted or recycled from other OS projects or tutorials. Lunaix didn't begin 
+as an attempt to outperform anything; it started as a personal challenge to 
+learn OS theory and explore advanced kernel features through original design 
+and implementation. Everything you see here was developed solo, part-time, 
+with only hardware specs and my beloved **Modern Operating Systems** as guidance.
 
-If you're a kernel hobbyist looking for a fresh take or tired of mass-produced projects, then welcome, you're in the right place!
+If you're a kernel hobbyist looking for a fresh take or tired of mass-produced, tutorial-style 
+projects, then welcome, you're in the right place!
 
 
 | ![showcase_lunaix-over-serial.png](docs/img/showcase_lunaix-over-serial.png) |
@@ -28,21 +37,30 @@ If you're a kernel hobbyist looking for a fresh take or tired of mass-produced p
 
 ## Features
 
-Lunaix is a multi-architecture, general-purpose kernel built with performance, modularity, and robustness in mind. Its design emphasizes advanced abstractions, proactive error detection, and subsystem isolation. Lunaix is
+Lunaix is a multi-architecture, general-purpose kernel built with performance, 
+modularity, and robustness in mind. Its design emphasizes advanced abstractions, 
+proactive error detection, and subsystem isolation. Lunaix is
 
 + **Fully-preemptive** for responsive multi-tasking
-+ **Modular** with compile-time configurable components and extensible subsystems
-+ **High-performance**, leveraging modern caching strategies and efficient infrastructures.
++ **Modular** with compile-time configurable components and extensible 
+  subsystems
++ **High-performance**, leveraging modern caching strategies and efficient 
+  infrastructures.
 + **Fault-tolerant**, with built-in error handling and stack backtracing
-+ **Robust by design**, using mechanisms like proactive deadlock detection and driver isolation
++ **Robust by design**, using mechanisms like proactive deadlock detection 
+  and driver isolation
 
-A significant amount of effort has gone into crafting clean abstractions, implementing advanced kernel features, and applying performance optimizations throughout the system.
+A significant amount of effort has gone into crafting clean abstractions, 
+implementing advanced kernel features, and applying performance optimizations 
+throughout the system.
 
-To better illustrate the scope of work already done, the following non-exhaustive list outlines currently supported features in Lunaix:
+To better illustrate the scope of work already done, the following non-exhaustive 
+list outlines currently supported features in Lunaix:
 
+### List of All Features
 <details>
 
-<summary>List of all features implemented</summary>
+<summary>Click to Expand</summary>
 
 + Multi-ISA
   + x86_32
@@ -107,9 +125,11 @@ To better illustrate the scope of work already done, the following non-exhaustiv
 
 </details>
 
+### List of Built-in Drivers
+
 <details>
 
-<summary>List of currently supported device</summary>
+<summary>Click to Expand</summary>
 
 + Architecture Neutral
   + UART 16650-compatible driver
@@ -127,26 +147,28 @@ To better illustrate the scope of work already done, the following non-exhaustiv
   + PL011 (WIP)
 </details>
 
-## Project Structure
+## Documentations
 
-| Path | Description |
-|-----|------|
-| [lunaix-os](../lunaix-os/) | LunaixOS source code |
-| [slides](../slides/) | Slides used in my videos |
-| [reference-material](../reference-material/)| References |
+There are documentations avaliable if you want to dig deeper. Keep in mind they are still work in progress and missing localisation.
+
++ [Luna's Tour - Into Lunaix's Inner Workings](docs/lunaix-internal.md)
++ [Syscall Number Assignments](docs/lunaix-syscall-table.md)
 
 ## Compile and Build
 
-Building lunaix is simple, no more bloated dependencies to install, basic `build-essentials` installation plus a python are sufficient.
+Building lunaix is simple, no more bloated dependencies to install, basic 
+`build-essentials` installation plus a python are sufficient.
 
 + gcc (recommend v12+)
 + binutils
 + make
 + python (recommend v3.11+)
 
-And also one should have environment variable `ARCH=<arch>` exported, where `<arch>` is one of the supported arhcitecture (`x86_32`, `x86_64`, `aarch64`).
+And also one should have environment variable `ARCH=<arch>` exported, where 
+`<arch>` is one of the supported arhcitecture (`x86_32`, `x86_64`, `aarch64`).
 
-For cross compilation, also export `CX_PREFIX` to the gcc prefix for the corresponding `<arch>`.
+For cross compilation, also export `CX_PREFIX` to the gcc prefix for the 
+corresponding `<arch>`.
 
 The following `make` actions are then available to use.
 
@@ -155,86 +177,95 @@ The following `make` actions are then available to use.
 | `make all`               | Build the kernel bin |
 | `make rootfs`            | Build the stock rootfs |
 | `make clean`             | clean |
-| `make config`            | menuconfig |
+| `make config`            | run configuration tool |
+| `make reconfig`          | revert to default and restart configuration |
 
 A successful build will give `build/bin/kernel.bin`.
 
-**Please note: this is the kernel, not a bootable image, it require a bootloader to boot and specify the rootfs.**
+> Please note: this is the kernel, not a bootable image, it require a bootloader 
+> to boot and specify the rootfs.
 
 ## Get Started
 
-If you are impatient, or just want something to run and don't want to went through tedious process of configuring rootfs and tweak kernel parameters. You can use the `live_debug.sh` provided in the lunaix root directory to quickly bring up the system with default parameters (also used by the author for debugging).
+If you are impatient, or just want something to run and don't want to went 
+through tedious process of configuring rootfs and tweak kernel parameters. You 
+can use the `live_debug.sh` provided in the lunaix root directory to quickly 
+bring up the system with default parameters (also used by the author for 
+debugging).
 
 ### Quick Start
 
 This will get you up and running real quick. We will use `x86_64` as example.
 
-Assuming a Linux or other Unix-like shell environment.
+Assuming a Linux or other Unix-like shell environment. We also expect you to be able to sort out trivial issues like missing packages.
 
-#### Select your target
+**Select your target**
 ```sh
 $ export ARCH=x86_64
 ```
 
-#### Check Python
+**Check Python**
 ```sh
 $ python --version
 ```
 
 Ensure at least `3.11`
 
-#### Check compiler
+**Check compiler**
 ```sh
 $ gcc -dumpmachine
 ```
 
 Ensure `x86_64-linux-gnu` or anything resemble `x86_64`
 
-#### Check QEMU
+**Check QEMU**
 ```sh
 $ which qemu-system-x86_64
 ```
 
 Should display a valid installation path
 
-#### Optional: Setting up Cross-Compiler
+**Optional: Setting up Cross-Compiler**
+
 ```sh
 $ export CX_PREFIX=x86_64-linux-gnu-
 ```
 
-#### Run Configuration
+**Run Configuration**
 ```sh
 make config
 ```
 
-Then hitting `q` in the interactive shell to save and quit
+Then hitting `q` in the interactive shell to accept default setting.
 
-#### Build stock rootfs
+**Build stock rootfs**
 
 ```sh
 make rootfs
 ```
 
-#### Build & Run
+Note, this requires root for creating fs image. You can check script `lunaix-os/scripts/mkrootfs` if you feel uncertain.
+
+**Build & Run**
 ```sh
 ./live_debug.sh
 ```
 
 you should see gdb now take control of your shell
 
-#### Connect to serial via telnet
+**Connect to serial via telnet**
 
 Open up another window or session
 ```sh
 telnet localhost 12345
 ```
 
-#### Commence simulation
+**Commence simulation**
 
 Back to the gdb session and type `c` to countine
 
 
-#### Watch Lunaix booting!
+**Watch Lunaix booting!**
 
 Congrats, enjoy your lunaix! (or submit an issue)
 
@@ -246,8 +277,10 @@ Here is a slower and yet more verbose steps:
 1. Select an architecture `<arch>`
 2. Check the compilation prerequisites and presence of `qemu-system-<arch>`
 3. Optionally export `CX_PREFIX` if you are building for another architecture.
-4. Run `make ARCH=<arch> rootfs` to build stock rootfs image, require support of `dd`，`mkfs.ext2`, `mount -o loop`, `mktemp`.
-5. Run `ARCH=<arch> live_debug.sh` to boot in QEMU with gdb hooked (one should see a gdb session)
+4. Run `make ARCH=<arch> rootfs` to build stock rootfs image, require support 
+   of `dd`，`mkfs.ext2`, `mount -o loop`, `mktemp`.
+5. Run `ARCH=<arch> live_debug.sh` to boot in QEMU with gdb hooked (one should 
+   see a gdb session)
 6. telnet to `localhost:12345`, this is QEMU emulated serial port
 7. type `c` in the active gdb session and commence emulation.
 8. Congrats, enjoy your lunaix!
@@ -256,12 +289,18 @@ Here is a slower and yet more verbose steps:
 
 ## Booting the kernel
 
-Since lunaix is a kernel, much like linux. It requires additional setup to do the magic. And, as in "much like linux", methods to make linux kernel boot can also apply to lunaix without or with little translation, as we will discuss below.
+Since lunaix is a kernel, much like linux. It requires additional setup to do 
+the magic. And, as in "much like linux", methods to make linux kernel boot can 
+also apply to lunaix without or with little translation, as we will discuss 
+below.
 
-The bootloader part is generic, any bootloader, for example GRUB will work (not tested for UEFI, but I expect this would be an exception), or booting up in QEMU using `-kernel` option
+The bootloader part is generic, any bootloader, for example GRUB will work (not 
+tested for UEFI, but I expect this would be an exception), or booting up in QEMU 
+using `-kernel` option
 
 The kernel command line, is however, a bit differentiated.
-The syntax is similar, both takes form of space-separated array of `<key>=<val>` pairs or boolean `<flag>`.
+The syntax is similar, both takes form of space-separated array of `<key>=<val>` 
+pairs or boolean `<flag>`.
 
 Currently, lunaix support the following options
 
@@ -294,23 +333,39 @@ If one ran into bug, one can submit an issue by filling up the following templat
 
 ## Limitations
 
-The development process is still in motion, any limitation can be categorised as a feature yet to be. However, some features that the author considered to be the most urgent and wish the matters to be discussed.
+The development process is still in motion, any limitation can be categorised as 
+a feature yet to be. However, some features that the author considered to be the 
+most urgent and wish the matters to be discussed.
 
-Lunaix is under impression of uniprocessor and not capable of running in SMP environment. This is major held back of being a modern operating system. It has the highest priority among all other tasks
+Lunaix is under impression of uniprocessor and not capable of running in SMP 
+environment. This is major held back of being a modern operating system. It has 
+the highest priority among all other tasks
 
-Lunaix do not have a mature (or even, an infant) user space ecosystem, mainly because the lack of a proper and sophisticated libc. Efforts need to be done for porting one to the target. However, given the author's tight schedule, this task is unfortunately still beyond the horizon.
+Lunaix do not have a mature (or even, an infant) user space ecosystem, mainly 
+because the lack of a proper and sophisticated libc. Efforts need to be done for 
+porting one to the target. However, given the author's tight schedule, this task 
+is unfortunately still beyond the horizon.
 
 ## Acknowledgement
 
-Albeit one must realise that the author has mentioned it in the very beginning, the author would like to emphaise **again** on the nature of this project.
+Albeit one must realise that the author has mentioned it in the very beginning, 
+the author would like to emphaise **again** on the nature of this project.
 
-As a personal challenge, this project is independently developed by the author single-handly, which means:
+As a personal challenge, this project is independently developed by the author 
+single-handly, which means:
 
-+ No reference to existing tutorials, books, online courses or any open source project that might provide any example, hint or working prototype on the design and implementation of kernel, subsystems or anythings that can be contributed towards a working prototype.
-+ The author has no prior knowledge on Linux kernel through out 90% of the project time.
-+ All knowledge on the kernel design is coming from the basic textbook on operating system theory, that is, *Modern Operating System* by Tanenbaum.
-+ All knowledge on the system programming is coming from the basic textbook, that is, *Computer System - A Programmer's Perspective Third Edition*
-+ All knowledge on the generic framework design and driver development are ingested from various technical specifications gathered across the Internet.
++ No reference to existing tutorials, books, online courses or any open source 
+  project that might provide any example, hint or working prototype on the 
+  design and implementation of kernel, subsystems or anythings that can be 
+  contributed towards a working prototype.
++ The author has no prior knowledge on Linux kernel through out 90% of the 
+  project time.
++ All knowledge on the kernel design is coming from the basic textbook on 
+  operating system theory, that is, *Modern Operating System* by Tanenbaum.
++ All knowledge on the system programming is coming from the basic textbook, 
+  that is, *Computer System - A Programmer's Perspective Third Edition*
++ All knowledge on the generic framework design and driver development are 
+  ingested from various technical specifications gathered across the Internet.
 
 ## References
 
@@ -345,106 +400,41 @@ As a personal challenge, this project is independently developed by the author s
 
 ## Appendix 1: Supported System Call<a id="appendix1"></a>
 
-**Unix/Linux/POSIX**
-
-1. `sleep(3)`
-1. `wait(2)`
-1. `waitpid(2)`
-1. `fork(2)`
-1. `getpid(2)`
-1. `getppid(2)`
-1. `getpgid(2)`
-1. `setpgid(2)`
-1. `brk(2)`
-1. `sbrk(2)`
-1. `_exit(2)`
-1. `sigreturn(2)`
-1. `sigprocmask(2)`
-1. `signal(2)`
-1. `kill(2)`
-1. `sigpending(2)`
-1. `sigsuspend(2)`
-2. `read(2)`
-2. `write(2)`
-2. `open(2)`
-2. `close(2)`
-2. `mkdir(2)`
-2. `lseek(2)`
-2. `readdir(2)`
-2. `readlink(2)`
-2. `readlinkat(2)`
-2. `rmdir(2)`
-2. `unlink(2)`
-2. `unlinkat(2)`
-2. `link(2)`
-2. `fsync(2)`
-2. `dup(2)`
-2. `dup2(2)`
-2. `symlink(2)`
-2. `chdir(2)`
-2. `fchdir(2)`
-2. `getcwd(2)`
-2. `rename(2)`※
-2. `mount(2)`
-2. `unmount` (a.k.a `umount(2)`)
-2. `getxattr(2)`※
-2. `setxattr(2)`※
-2. `fgetxattr(2)`※
-2. `fsetxattr(2)`※
-2. `ioctl(2)`
-2. `getpgid(2)`
-2. `setpgid(2)`
-2. `mmap(2)`
-2. `munmap(2)`
-2. `execve(2)`
-3. `poll(2)` (via `pollctl`)
-3. `epoll_create(2)` (via `pollctl`)
-3. `epoll_ctl(2)` (via `pollctl`)
-3. `epoll_wait(2)` (via `pollctl`)
-4. `pthread_create`
-4. `pthread_self`
-4. `pthread_exit`
-4. `pthread_join`
-4. `pthread_kill`
-4. `pthread_detach`
-4. `pthread_sigmask`
-4. `getuid`
-4. `getgid`
-4. `geteuid`
-4. `getegid`
-4. `getgroups`
-4. `setuid`
-4. `setgid`
-4. `seteuid`
-4. `setegid`
-4. `setgroups`
-4. `chroot`
-4. `fchmodat`
-4. `fchownat`
-4. `faccessat`
-
-**LunaixOS**
-
-1. `yield`
-2. `geterrno`
-3. `realpathat`
-
-( **※**：Indicate syscall is not tested )
+Refer to [Lunaix Syscall Table](docs/lunaix-syscall-table.md)
 
 ## Appendix 2: Debugging with GDB remotely via UART
 
 **(((( Broken after a refactoring years ago, need rework ))))**
 
-The LunaixOS kernel comes with a built-in GDB debugging server, which runs on COM1@9600Bd. However, LunaixOS must be in debug mode before involving GDB.
+<details>
+<summary> Click to expand </summary>
+The LunaixOS kernel comes with a built-in GDB debugging server, which runs on 
+COM1@9600Bd. However, LunaixOS must be in debug mode before involving GDB.
 
-One could trigger the debug mode by writing a byte sequence `0x40` `0x63` `0x6D` `0x63`, to the same serial port. A text "DEBUG MODE" with magenta-coloured background shall be present at the bottom of the screen.
+One could trigger the debug mode by writing a byte sequence `0x40` `0x63` `0x6D` 
+`0x63`, to the same serial port. A text "DEBUG MODE" with magenta-coloured background shall be present at the bottom of the screen.
 
-Note that, whenever the text appears, the LunaixOS always halt all activities other than the debugging server, which means no scheduling and no external interrupt servicing. Users are now recommended to attach their GDB and drive the kernel with the debugging workflow.
+Note that, whenever the text appears, the LunaixOS always halt all activities 
+other than the debugging server, which means no scheduling and no external 
+interrupt servicing. Users are now recommended to attach their GDB and drive 
+the kernel with the debugging workflow.
 
-Currently, LunaixOS implements the required minimal server-side command subset required by GDB Remote Protocol, namely, `g`, `G`, `p`, `P`, `Q`, `S`, `k`, `?`, `m`, `M`, `X`. Which should be enough to cover most debugging activities.
+Currently, LunaixOS implements the required minimal server-side command subset 
+required by GDB Remote Protocol, namely, `g`, `G`, `p`, `P`, `Q`, `S`, `k`, `?`, 
+`m`, `M`, `X`. Which should be enough to cover most debugging activities.
 
-When debugging is finished, one shall disconnect with `kill` command. This command will not force LunaixOS to power down the computer, instead it just resume the execution (identical behavior as `c` command). However, disconnecting does not means exiting of debug mode. The debug mode is still actived and any subsequent GDB attaching request shall remain the highest priority amongst all other activity. One shall deactivate the debug mode by writing byte sequence `0x40` `0x79` `0x61` `0x79` to the port, after GDB detached.
+When debugging is finished, one shall disconnect with `kill` command. This 
+command will not force LunaixOS to power down the computer, instead it just 
+resume the execution (identical behavior as `c` command). However, disconnecting 
+does not means exiting of debug mode. The debug mode is still actived and any 
+subsequent GDB attaching request shall remain the highest priority amongst all 
+other activity. One shall deactivate the debug mode by writing byte sequence 
+`0x40` `0x79` `0x61` `0x79` to the port, after GDB detached.
 
 ### Limitations
 
-Currently, one should avoid the use of `info stack`, `bt` or any other command that involves stack unwinding or stack backtracing. As it will somehow corrupt the stack layout and result in undefined behaviour. This issue should be addressed in future releases.
+Currently, one should avoid the use of `info stack`, `bt` or any other command 
+that involves stack unwinding or stack backtracing. As it will somehow corrupt 
+the stack layout and result in undefined behaviour. This issue should be 
+addressed in future releases.
+</details>

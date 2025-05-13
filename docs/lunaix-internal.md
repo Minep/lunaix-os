@@ -1,11 +1,19 @@
 # Luna's Tour
 
-这里是一个目录，收集了关于 Lunaix 内核设计的种种文档。
+Welcome to Luna's Tour!
 
-需要注意的是，这里的文档并不是教程，而是为读者提供一个
-针对Lunaix内核架构的高层次描述和概览，帮助读者快速的，
-清晰的，掌握整个架构的设计；以便更容易进行源代码的阅读。
+In here you will find documentations, specifications and diagrams that
+capture the essence of Lunaix's inner workings. Also the defintions
+and explanations about the kernel features mentioned in the huge list 
+in the landing page.
 
-+ [虚拟内存资源划分](./lunaix-mem-map.md)
-+ [启动流程概览](./lunaix-boot.md)
+Keep in mind that the Lunaix is still on her way to document stuff,
+and it is very incompleted, for example the lack of content and no
+localisations (all of them are written in Chinese at current stage).
 
+People are encouraged to contribute to the translations.
+
++ [Virtual Memory Map (CN_ZH)](./lunaix-mem-map.md)
++ [Design of Lunaix' VFS (CN_ZH)](./fs/vfs-design.md)
++ [Boot Sequence (CN_ZH)](./lunaix-boot.md)
++ [Lunaix Source Code Analysis by FFreestanding (CN_ZH)](./tutorial/0-教程介绍和环境搭建.md)
