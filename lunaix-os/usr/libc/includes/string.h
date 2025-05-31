@@ -1,7 +1,7 @@
 #ifndef __LUNALIBC_STRING_H
 #define __LUNALIBC_STRING_H
 
-#include <stddef.h>
+#include <sys/types.h>
 
 extern size_t strlen(const char* str);
 

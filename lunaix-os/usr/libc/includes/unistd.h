@@ -2,7 +2,6 @@
 #define __LUNALIBC_SYS_UNISTD_H
 
 #include <sys/types.h>
-#include <stddef.h>
 
 extern const char** environ;
 

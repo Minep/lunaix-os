@@ -2,7 +2,7 @@
 #define __LUNAIX__MYSTDIO_H
 
 #include <stdarg.h>
-#include <stddef.h>
+#include <sys/types.h>
 
 int
 __vprintf_internal(char* buffer,

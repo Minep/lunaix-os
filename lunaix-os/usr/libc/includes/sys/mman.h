@@ -1,7 +1,6 @@
 #ifndef __LUNALIBC_SYS_MANN_H
 #define __LUNALIBC_SYS_MANN_H
 
-#include <stddef.h>
 #include <lunaix/mman.h>
 #include <sys/types.h>
 
