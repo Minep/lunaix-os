@@ -18,6 +18,7 @@ flag.cc += (
 flag.cc += (
     "-fno-omit-frame-pointer",
     "-finline-small-functions",
+    "-fno-stack-protector"
 )
 
 flag.ld += "-nostdlib", "-nolibc", "-z noexecstack", "-no-pie", "-Wl,--build-id=none"
