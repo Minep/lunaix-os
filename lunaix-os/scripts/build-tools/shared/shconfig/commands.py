@@ -136,7 +136,7 @@ class Commands(CmdTable):
             indent = " "*inds
             dep: NodeDependency = NodeProperty.Dependency[node]
             
-            state = 'enabled' if NodeProperty.Value[node] else 'disabled'
+            state = 'enabled' if NodeProperty.Enabled[node] else 'disabled'
             print(f"{indent}* {node._name} (currently {state})")
             if dep is None:
                 return

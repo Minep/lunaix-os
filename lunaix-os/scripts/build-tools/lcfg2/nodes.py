@@ -136,7 +136,7 @@ class ConfigNode:
         parent = NodeProperty.Parent[self]
 
         if isinstance(val, bool):
-            en = en and val
+            en = val
         
         if isinstance(parent, ConfigNode):
             en = en and parent.enabled()
