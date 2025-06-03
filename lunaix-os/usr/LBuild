@@ -15,6 +15,7 @@ src.c += (
 flag.cc += (
     "-ffreestanding",
     "-fno-pie",
+    "-fno-stack-protector",
     "-Werror"
 )
 
