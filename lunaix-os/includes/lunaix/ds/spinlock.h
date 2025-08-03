@@ -1,11 +1,12 @@
 #ifndef __LUNAIX_SPIN_H
 #define __LUNAIX_SPIN_H
 
+#include <asm/atom_ops.h>
 #include <lunaix/types.h>
 
 struct spinlock
 {
-    volatile bool flag;
+    bool flag;
 };
 
 #define DEFINE_SPINLOCK(name)   \
@@ -24,31 +25,32 @@ typedef struct spinlock spinlock_t;
 static inline void
 spinlock_init(spinlock_t* lock)
 {
-    lock->flag = false;
+    atom_clrf(&lock->flag); 
 }
 
-static inline bool spinlock_try_acquire(spinlock_t* lock)
+static inline bool spin_try_lock(spinlock_t* lock)
 {
-    if (lock->flag){
+    if (atom_ldi(&lock->flag)) {
         return false;
     }
-
-    return (lock->flag = true);
+    
+    atom_setf(&lock->flag);
+    return true;
 }
 
-static inline void spinlock_acquire(spinlock_t* lock)
+static inline void spin_lock(spinlock_t* lock)
 {
-    while (lock->flag);
-    lock->flag = true;
+    while (atom_ldi(&lock->flag));
+    atom_setf(&lock->flag);
 }
 
-static inline void spinlock_release(spinlock_t* lock)
+static inline void spin_unlock(spinlock_t* lock)
 {
-    lock->flag = false;
+    atom_clrf(&lock->flag);
 }
 
-#define DEFINE_SPINLOCK_OPS(type, lock_accessor)                            \
-    static inline void lock(type obj) { spinlock_acquire(&obj->lock_accessor); }    \
-    static inline void unlock(type obj) { spinlock_release(&obj->lock_accessor); }    
+#define DEFINE_SPINLOCK_OPS(type, name, lock_accessor)                            \
+    static inline void lock_##name(type obj) { spin_lock(&obj->lock_accessor); }    \
+    static inline void unlock_##name(type obj) { spin_unlock(&obj->lock_accessor); }    
 
 #endif /* __LUNAIX_SPIN_H */

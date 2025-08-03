@@ -5,6 +5,13 @@
 #include <asm/cpu.h>
 #include <lunaix/process.h>
 
+#define not_preemptable(body) \
+    do {                      \
+	no_preemption();      \
+	body;                 \
+	set_preemption();     \
+    } while(0)
+
 static inline void
 set_preemption() 
 {

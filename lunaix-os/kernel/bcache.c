@@ -1,11 +1,11 @@
+#include "lunaix/ds/spinlock.h"
 #include <lunaix/bcache.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 
 static struct lru_zone* bcache_global_lru;
 
-#define lock(bc)  spinlock_acquire(&((bc)->lock))
-#define unlock(bc)  spinlock_release(&((bc)->lock))
+DEFINE_SPINLOCK_OPS(struct bcache*, bc, lock);
 
 static void 
 __evict_internal_locked(struct bcache_node* node)
@@ -27,10 +27,10 @@ __try_evict_bcache(struct lru_node* node)
     bnode = container_of(node, struct bcache_node, lru_node);
     cache = bnode->holder;
     
-    lock(cache);
+    lock_bc(cache);
 
     if (bnode->refs) {
-        unlock(cache);
+        unlock_bc(cache);
         return false;
     }
     
@@ -40,7 +40,7 @@ __try_evict_bcache(struct lru_node* node)
 
     vfree(bnode);
 
-    unlock(cache);
+    unlock_bc(cache);
 
     return true;
 }
@@ -73,7 +73,7 @@ bcache_put_and_ref(struct bcache* cache, unsigned long tag, void* block)
 {
     struct bcache_node* node;
 
-    lock(cache);
+    lock_bc(cache);
 
     node = (struct bcache_node*)btrie_get(&cache->root, tag);
 
@@ -97,7 +97,7 @@ bcache_put_and_ref(struct bcache* cache, unsigned long tag, void* block)
     lru_use_one(cache->lru, &node->lru_node);
     llist_append(&cache->objs, &node->objs);
 
-    unlock(cache);
+    unlock_bc(cache);
 
     return (bcobj_t)node;
 }
@@ -107,11 +107,11 @@ bcache_tryget(struct bcache* cache, unsigned long tag, bcobj_t* result)
 {
     struct bcache_node* node;
 
-    lock(cache);
+    lock_bc(cache);
 
     node = (struct bcache_node*)btrie_get(&cache->root, tag);
     if (!node) {
-        unlock(cache);
+        unlock_bc(cache);
         *result = NULL;
 
         return false;
@@ -121,7 +121,7 @@ bcache_tryget(struct bcache* cache, unsigned long tag, bcobj_t* result)
 
     *result = (bcobj_t)node;
 
-    unlock(cache);
+    unlock_bc(cache);
     
     return true;
 }
@@ -153,12 +153,12 @@ bcache_evict(struct bcache* cache, unsigned long tag)
 {
     struct bcache_node* node;
 
-    lock(cache);
+    lock_bc(cache);
 
     node = (struct bcache_node*)btrie_get(&cache->root, tag);
     
     if (!node || node->refs) {
-        unlock(cache);
+        unlock_bc(cache);
         return;
     }
 
@@ -170,7 +170,7 @@ bcache_evict(struct bcache* cache, unsigned long tag)
 
     vfree(node);
 
-    unlock(cache);
+    unlock_bc(cache);
 }
 
 static void
@@ -188,22 +188,22 @@ bcache_flush_locked(struct bcache* cache)
 void
 bcache_flush(struct bcache* cache)
 {
-    lock(cache);
+    lock_bc(cache);
     
     bcache_flush_locked(cache);
 
-    unlock(cache);
+    unlock_bc(cache);
 }
 
 void
 bcache_free(struct bcache* cache)
 {
-    lock(cache);
+    lock_bc(cache);
     
     bcache_flush_locked(cache);
     btrie_release(&cache->root);
 
-    unlock(cache);
+    unlock_bc(cache);
 
     vfree(cache);
 }

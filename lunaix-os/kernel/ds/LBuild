@@ -3,7 +3,6 @@ src.c += (
     "buffer.c",
     "rbuffer.c",
     "btrie.c",
-    "semaphore.c",
     "mutex.c",
     "hstr.c",
     "fifo.c",

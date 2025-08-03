@@ -8,7 +8,7 @@
 
 static struct llist_header zone_lead = { .next = &zone_lead, .prev = &zone_lead };
 
-DEFINE_SPINLOCK_OPS(struct lru_zone*, lock);
+DEFINE_SPINLOCK_OPS(struct lru_zone*, lruz, lock);
 
 
 static void
@@ -58,7 +58,7 @@ lru_new_zone(const char* name, evict_cb try_evict_cb)
 void
 lru_free_zone(struct lru_zone* zone)
 {
-    lock(zone);
+    lock_lruz(zone);
 
     __lru_evict_all_lockness(zone);
 
@@ -77,13 +77,13 @@ lru_free_zone(struct lru_zone* zone)
     zone->delayed_free = true;
     zone->attempts++;
 
-    unlock(zone);
+    unlock_lruz(zone);
 }
 
 void
 lru_use_one(struct lru_zone* zone, struct lru_node* node)
 {
-    lock(zone);
+    lock_lruz(zone);
 
     assert(!zone->delayed_free);
 
@@ -97,13 +97,13 @@ lru_use_one(struct lru_zone* zone, struct lru_node* node)
     llist_prepend(&zone->lead_node, &node->lru_nodes);
     zone->hotness++;
 
-    unlock(zone);
+    unlock_lruz(zone);
 }
 
 void
 lru_evict_one(struct lru_zone* zone)
 {
-    lock(zone);
+    lock_lruz(zone);
 
     struct llist_header* tail = zone->lead_node.prev;
     if (tail == &zone->lead_node) {
@@ -112,13 +112,13 @@ lru_evict_one(struct lru_zone* zone)
 
     __do_evict_lockless(zone, tail);
 
-    unlock(zone);
+    unlock_lruz(zone);
 }
 
 void
 lru_evict_half(struct lru_zone* zone)
 {
-    lock(zone);
+    lock_lruz(zone);
 
     int target = (int)(zone->objects / 2);
     struct llist_header* tail = zone->lead_node.prev;
@@ -130,32 +130,32 @@ lru_evict_half(struct lru_zone* zone)
 
     zone->evict_stats.n_half++;
 
-    unlock(zone);
+    unlock_lruz(zone);
 }
 
 void
 lru_evict_all(struct lru_zone* zone)
 {
-    lock(zone);
+    lock_lruz(zone);
     
     __lru_evict_all_lockness(zone);
 
     zone->evict_stats.n_full++;
 
-    unlock(zone);
+    unlock_lruz(zone);
 }
 
 void
 lru_remove(struct lru_zone* zone, struct lru_node* node)
 {
-    lock(zone);
+    lock_lruz(zone);
 
     if (node->lru_nodes.next && node->lru_nodes.prev) {
         llist_delete(&node->lru_nodes);
     }
     zone->objects--;
 
-    unlock(zone);
+    unlock_lruz(zone);
 }
 
 static void

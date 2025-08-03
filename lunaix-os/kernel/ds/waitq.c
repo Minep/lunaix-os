@@ -1,3 +1,4 @@
+#include "lunaix/types.h"
 #include <lunaix/ds/waitq.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
@@ -31,12 +32,10 @@ static inline void must_inline
 __pwait(waitq_t* queue, bool check_stall)
 {
     // prevent race condition.
-    no_preemption();
-
-    prepare_to_wait(queue);
-    __try_wait(check_stall);
-
-    set_preemption();
+    not_preemptable({
+        prepare_to_wait(queue);
+        __try_wait(check_stall);
+    });
 }
 
 void
@@ -102,11 +101,11 @@ prepare_to_wait(waitq_t* queue)
 void
 try_wait()
 {
-    __try_wait(false);
+    not_preemptable(__try_wait(false));
 }
 
 void
 try_wait_check_stall()
 {
-    __try_wait(true);
+    not_preemptable(__try_wait(true));
 }

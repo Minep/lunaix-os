@@ -1,25 +1,26 @@
 #ifndef __LUNAIX_MUTEX_H
 #define __LUNAIX_MUTEX_H
 
+#include "asm/atom_ops.h"
+#include <lunaix/atomic.h>
 #include <lunaix/types.h>
-#include <stdatomic.h>
 
 typedef struct mutex_s
 {
-    atomic_uint lk;
+    int lk;
     pid_t owner;
 } mutex_t;
 
 static inline void
 mutex_init(mutex_t* mutex)
 {
-    mutex->lk = ATOMIC_VAR_INIT(0);
+    mutex->lk = 0;
 }
 
 static inline int
 mutex_on_hold(mutex_t* mutex)
 {
-    return atomic_load(&mutex->lk);
+    return atom_ldi(&mutex->lk);
 }
 
 void
@@ -37,7 +38,5 @@ mutex_unlock_nested(mutex_t* mutex);
 void
 mutex_unlock_for(mutex_t* mutex, pid_t pid);
 
-bool
-mutex_trylock(mutex_t* mutex);
 
 #endif /* __LUNAIX_MUTEX_H */

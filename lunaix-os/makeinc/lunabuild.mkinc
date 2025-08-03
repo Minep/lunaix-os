@@ -28,10 +28,6 @@ $(lconfig_save): $(all_lconfigs)
 	$(call __gen_config)
 
 export
-$(lconfig_mkinc): $(lconfig_save)
-	$(call __gen_config)
-
-export
 $(lbuild_config_h): $(lconfig_save) $(all_lbuilds)
 	$(call __gen_build)
 
