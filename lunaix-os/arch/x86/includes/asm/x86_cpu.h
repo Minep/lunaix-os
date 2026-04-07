@@ -2,6 +2,7 @@
 #define __LUNAIX_CPU_X86_H
 
 #include "cpu.h"
+#include "lunaix/types.h"
 #include "x86_crx.h"
 
 #ifdef CONFIG_ARCH_X86_64
@@ -60,6 +61,19 @@ static inline void
 cpu_chvmspace(reg_t val)
 {
     asm(_MOV "%0, %%cr3" ::"r"(val));
+}
+
+/**
+ * @brief Read current virtual memory space
+ *
+ * @return reg_t
+ */
+static inline ptr_t
+cpu_ldvmspace()
+{
+    ptr_t val;
+    asm volatile(_MOV "%%cr3, %0" : "=r"(val));
+    return val;
 }
 
 /**
