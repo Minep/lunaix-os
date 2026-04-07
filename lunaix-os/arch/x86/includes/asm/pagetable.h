@@ -16,40 +16,10 @@
 
 #endif
 
-/* General mask to get page offset of a LnT huge page */
-
-#define L0T_MASK            ( L0T_SIZE - 1 )
-#define L1T_MASK            ( L1T_SIZE - 1 )
-#define L2T_MASK            ( L2T_SIZE - 1 )
-#define L3T_MASK            ( L3T_SIZE - 1 )
-#define LFT_MASK            ( LFT_SIZE - 1 )
-
-/* Masks to get index of a LnTE */
-
-#define L0T_INDEX_MASK      ( VMS_MASK ^ L0T_MASK )
-#define L1T_INDEX_MASK      ( L0T_MASK ^ L1T_MASK )
-#define L2T_INDEX_MASK      ( L1T_MASK ^ L2T_MASK )
-#define L3T_INDEX_MASK      ( L2T_MASK ^ L3T_MASK )
-#define LFT_INDEX_MASK      ( L3T_MASK ^ LFT_MASK )
-
-#define PAGE_SHIFT          _PAGE_BASE_SHIFT
-#define PAGE_SIZE           _PAGE_BASE_SIZE
-#define PAGE_MASK           _PAGE_BASE_MASK
-
-#define LEVEL_SHIFT         _PAGE_LEVEL_SHIFT
-#define LEVEL_SIZE          _PAGE_LEVEL_SIZE
-#define LEVEL_MASK          _PAGE_LEVEL_MASK
-
-// max PTEs number
-#define MAX_PTEN            _PAGE_LEVEL_SIZE
-
-// max translation level supported
-#define MAX_LEVEL           _PTW_LEVEL
-
 typedef struct __pte pte_t;
 
-
-#define _PTE_PPFN_MASK          ( (~PAGE_MASK & PMS_MASK))
+#define _PAGE_MASK              ( ( 1UL << _PAGE_BASE_SHIFT ) - 1)
+#define _PTE_PPFN_MASK          ( ( ( 1UL << _PA_BITS ) - 1 ) << _PAGE_BASE_SHIFT )
 #define _PTE_PROT_MASK          ( ~_PTE_PPFN_MASK )
 
 #define KERNEL_PAGE             ( _PTE_P )
@@ -94,14 +64,14 @@ static inline pte_t
 mkpte(ptr_t paddr, pte_attr_t prot)
 {
     pte_attr_t attrs = (prot & _PTE_PROT_MASK) | _PTE_P;
-    return __mkpte_from((paddr & ~_PAGE_BASE_MASK) | attrs);
+    return __mkpte_from((paddr & ~_PAGE_MASK) | attrs);
 }
 
 static inline pte_t
 mkpte_root(ptr_t paddr, pte_attr_t prot)
 {
     pte_attr_t attrs = (prot & _PTE_PROT_MASK) | _PTE_P;
-    return __mkpte_from((paddr & ~_PAGE_BASE_MASK) | attrs);
+    return __mkpte_from((paddr & ~_PAGE_MASK) | attrs);
 }
 
 static inline pte_t
@@ -119,13 +89,13 @@ pte_setpaddr(pte_t pte, ptr_t paddr)
 static inline pte_t
 pte_setppfn(pte_t pte, pfn_t ppfn)
 {
-    return pte_setpaddr(pte, ppfn * PAGE_SIZE);
+    return pte_setpaddr(pte, ppfn << _PAGE_BASE_SHIFT);
 }
 
 static inline ptr_t
 pte_paddr(pte_t pte)
 {
-    return __paddr(pte.val) & ~_PTE_PROT_MASK;
+    return pte.val & _PTE_PPFN_MASK;
 }
 
 static inline pfn_t
@@ -292,4 +262,4 @@ pte_at(pte_t* ptep) {
 pte_t
 translate_vmr_prot(unsigned int vmr_prot, pte_t pte);
 
-#endif /* __LUNAIX_ARCH_PAGETABLE_H */
+#endif /* __LUNAIX_ARCH_PAGETABLE_ */
