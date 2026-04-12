@@ -7,20 +7,20 @@ ioremap(ptr_t paddr, u32_t size)
 {
     // FIXME implement a page policy interface allow to decouple the 
     //       arch-dependent caching behaviour
-
-    pfn_t start = pfn(paddr);
-    size_t npages = leaf_count(size);
     
-    // Ensure the range is reservable (not already in use)
-    assert(pmm_onhold_range(start, npages));
+    pte_t pte;
+    ptr_t addr;
 
-    ptr_t addr = vmap_range(start, npages, KERNEL_DATA);
-    return addr + va_offset(paddr);
+    // Ensure the range is reservable (not already in use)
+    assert(pmm_onhold_range(page_index(paddr), size / PAGE_SIZE));
+    
+    addr = vmap_ptes_at(mkpte(paddr, KERNEL_DATA), size / PAGE_SIZE);
+    return addr + page_offset(paddr);
 }
 
 void
 iounmap(ptr_t vaddr, u32_t size)
 {
     assert(vaddr >= VMAP && vaddr < VMAP_END);
-    vunmap_range(pfn(vaddr), leaf_count(size));
+    vunmap_at(vaddr, size / PAGE_SIZE);
 }

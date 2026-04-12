@@ -96,6 +96,7 @@
 */
 
 
+#include "asm/mm_defs.h"
 struct __pte;
 typedef struct __pte pte_t;
 
@@ -108,6 +109,12 @@ typedef struct __pte pte_t;
 #define PT_LEVEL                _PTW_LEVEL
 #define LnT_ENABLED(n)	        ((n) < PT_LEVEL - 1)
 
+/**
+ * Check if the specified translation level is enabled.
+ * Applicable to level 1~3 level. L0T and LFT is always enabled.
+ */
+#define has_ptlevel(n)          ((n) < PT_LEVEL - 1)
+
 #define VA_BITS                 _VA_BITS
 #define PA_BITS                 _PA_BITS
 
@@ -118,16 +125,16 @@ typedef struct __pte pte_t;
 #define PAGE_SIZE               ( 1UL << PAGE_SHIFT )
 #define PAGE_MASK               ( ~( PAGE_SIZE - 1 ) )
 
-#define LFT_SHIFT               ( _PAGE_BASE_SHIFT )
-#define L3T_SHIFT               ( _LFT_LEVEL_WIDTH + LFT_SHIFT )
-#define L2T_SHIFT               ( _L3T_LEVEL_WIDTH + L3T_SHIFT )
-#define L1T_SHIFT               ( _L2T_LEVEL_WIDTH + L2T_SHIFT )
-#define L0T_SHIFT               ( _L1T_LEVEL_WIDTH + L1T_SHIFT )
+#define LFT_PAGE_SHIFT          ( _PAGE_BASE_SHIFT )
+#define L3T_PAGE_SHIFT          ( _LFT_LEVEL_WIDTH + LFT_PAGE_SHIFT )
+#define L2T_PAGE_SHIFT          ( _L3T_LEVEL_WIDTH + L3T_PAGE_SHIFT )
+#define L1T_PAGE_SHIFT          ( _L2T_LEVEL_WIDTH + L2T_PAGE_SHIFT )
+#define L0T_PAGE_SHIFT          ( _L1T_LEVEL_WIDTH + L1T_PAGE_SHIFT )
 
-#define L0T_SIZE                ( 1UL << L0T_SHIFT )
-#define L1T_SIZE                ( 1UL << L1T_SHIFT )
-#define L2T_SIZE                ( 1UL << L2T_SHIFT )
-#define L3T_SIZE                ( 1UL << L3T_SHIFT )
+#define L0T_SIZE                ( 1UL << L0T_PAGE_SHIFT )
+#define L1T_SIZE                ( 1UL << L1T_PAGE_SHIFT )
+#define L2T_SIZE                ( 1UL << L2T_PAGE_SHIFT )
+#define L3T_SIZE                ( 1UL << L3T_PAGE_SHIFT )
 #define LFT_SIZE                ( PAGE_SIZE )
 
 #define L0T_LENGTH              ( 1 << _L0T_LEVEL_WIDTH )
@@ -135,6 +142,7 @@ typedef struct __pte pte_t;
 #define L2T_LENGTH              ( 1 << _L2T_LEVEL_WIDTH )
 #define L3T_LENGTH              ( 1 << _L3T_LEVEL_WIDTH )
 #define LFT_LENGTH              ( 1 << _LFT_LEVEL_WIDTH )
+
 
 #define L0T_MASK                ( ( 1UL << _L0T_LEVEL_WIDTH ) - 1 )
 #define L1T_MASK                ( ( 1UL << _L1T_LEVEL_WIDTH ) - 1 )
@@ -149,14 +157,14 @@ typedef struct __pte pte_t;
 #define LFT                     F
 
 #define _level_size(n)          L##n##T_SIZE
-#define _level_shift(n)         L##n##T_SHIFT
+#define _level_page_shift(n)    L##n##T_PAGE_SHIFT
 #define _level_length(n)        L##n##T_LENGTH
 #define _level_mask(n)          L##n##T_LENGTH
 #define _level_width(n)         L##n##T_WIDTH
-#define _level_index(va, n)     (((va) >> L##n##T_SHIFT) & L##n##T_MASK)
+#define _level_index(va, n)     (((va) >> L##n##T_PAGE_SHIFT) & L##n##T_MASK)
 
 #define level_size(n)           _level_size(n)
-#define level_shift(n)          _level_shift(n)
+#define level_page_shift(n)     _level_page_shift(n)
 #define level_length(n)         _level_length(n)
 #define level_mask(n)           _level_mask(n)
 #define level_width(n)          _level_width(n)
@@ -166,8 +174,67 @@ typedef struct __pte pte_t;
 #define __sanitize_paddr(va)    ( (va) & PA_MASK )
 #define __vaddr_tag(va)         ( (va) >> _VA_BITS )
 
-extern pte_t 
-alloc_kpage_at(pte_t* ptep, pte_t pte, int order);
+#define ptep_at(table, va, level)       \
+    ( &((pte_t*)(table))[_level_index(va, level)] )
 
+static inline pfn_t
+page_index(ptr_t addr_like)
+{
+    return addr_like / PAGE_SIZE;
+}
+
+static inline unsigned int
+page_offset(ptr_t addr_like)
+{
+    return addr_like & ~PAGE_MASK;
+}
+
+static inline ptr_t
+page_frame(ptr_t addr_like)
+{
+    return addr_like & PAGE_MASK;
+}
+
+static inline int
+ptep_entry_index(pte_t* ptep)
+{
+    return page_offset((ptr_t)ptep) / sizeof(pte_t);
+}
+
+static inline void
+set_ptes(pte_t* ptep, pte_t attrs, ptr_t pa, int n)
+{
+    while (n--) {
+        set_pte(ptep, pte_setpaddr(attrs, pa));
+
+        ptep++;
+        pa += PAGE_SIZE;
+    }
+}
+
+static inline void
+fill_ptes(pte_t* ptep, pte_t val, int nr)
+{
+    while (nr--)
+        set_pte(ptep++, val);
+}
+
+static inline pte_t*
+ptep_next_table(pte_t* ptep)
+{
+    pte_t pte;
+
+    pte = pte_at(ptep);
+    if (pte_isnull(pte) || pte_huge(pte))
+        return NULL;
+
+    return (pte_t*)phy_to_virt(pte_paddr(pte));
+}
+
+static inline ptr_t
+pte_page_va(pte_t pte)
+{
+    return phy_to_virt(pte_paddr(pte));
+}
 
 #endif /* __LUNAIX_PAGETABLE_H */

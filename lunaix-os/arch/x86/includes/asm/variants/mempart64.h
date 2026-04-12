@@ -13,11 +13,11 @@
 
 #define KSTACK_AREA             __ulong(0x0000000100000000)
 #define KSTACK_AREA_SIZE        __ulong(0x0000000040000000)
-#define KSTACK_AREA_END END_POINT(KSTACK_AREA)
+#define KSTACK_AREA_END         END_POINT(KSTACK_AREA)
 
 #define USR_EXEC                __ulong(0x0000008000000000)
 #define USR_EXEC_SIZE           __ulong(0x0000002000000000)
-#define USR_EXEC_END END_POINT(USR_EXEC)
+#define USR_EXEC_END            END_POINT(USR_EXEC)
 
 #define USR_MMAP                __ulong(0x0000018000000000)
 #define USR_MMAP_SIZE           __ulong(0x00007e6000000000)
@@ -26,12 +26,16 @@
 #define USR_STACK               __ulong(0x00007fe000000000)
 #define USR_STACK_SIZE          __ulong(0x2000000000)
 #define USR_STACK_SIZE_THREAD   __ulong(0x0000000000200000)
-#define USR_STACK_END END_POINT(USR_STACK)
+#define USR_STACK_END           END_POINT(USR_STACK)
 
 
 // la casa del kernel
 
-#define KERNEL_RESIDENT         __kaddr(0xfff000000000)     // -2.5T
+#define KERNEL_RESIDENT         __kaddr(0xfb8000000000)     // -2.5T
+
+#define PPAGE_POOL              __kaddr(0xfb8000000000)
+#define PPAGE_POOL_SIZE         __ulong(0x40000000000)
+#define PPAGE_POOL_END          END_POINT(PPAGE_POOL)
 
 #define PMAP                    __kaddr(0xfff000000000)
 #define PMAP_SIZE               __ulong(0xc00000000)        // 48G

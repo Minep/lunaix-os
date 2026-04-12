@@ -1,6 +1,7 @@
 #ifndef __LUNAIX_CONTEXT_H
 #define __LUNAIX_CONTEXT_H
 
+struct proc_mm;
 struct exec_param;
 struct regcontext;
 struct hart_state;
@@ -18,7 +19,7 @@ struct hart_transition
 };
 
 bool
-install_hart_transition(ptr_t vm_mnt, struct hart_transition* tctx);
+install_hart_transition(struct proc_mm* procvm, struct hart_transition* ht);
 
 void
 hart_prepare_transition(struct hart_transition* tctx, 

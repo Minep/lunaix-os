@@ -34,7 +34,6 @@ struct exec_arrptr
 struct exec_host
 {
     struct proc_info* proc;
-    ptr_t vms_mnt;
 
     struct load_context exe;
     struct v_inode* inode;
@@ -70,7 +69,6 @@ exec_kexecve(const char* filename, const char* argv[], const char* envp[]);
 void
 exec_init_container(struct exec_host* param,
                     struct thread* thread,
-                    ptr_t vms,
                     const char** argv,
                     const char** envp);
 

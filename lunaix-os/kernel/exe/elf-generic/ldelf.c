@@ -1,3 +1,5 @@
+#include <lunaix/mm/page.h>
+#include <lunaix/mm/pagetable.h>
 #include <lunaix/exebi/elf.h>
 #include <lunaix/load.h>
 #include <lunaix/mm/mmap.h>
@@ -14,7 +16,7 @@ elf_smap(struct load_context* ldctx,
 {
     struct v_file* elfile = (struct v_file*)elf->elf_file;
 
-    assert(!va_offset(phdre->p_offset));
+    assert(!page_offset(phdre->p_offset));
 
     int proct = 0;
     if ((phdre->p_flags & PF_R)) {
@@ -29,21 +31,20 @@ elf_smap(struct load_context* ldctx,
 
     uintptr_t va = phdre->p_va + base_va;
     struct exec_host* container = ldctx->container;
-    struct mmap_param param = { .vms_mnt = container->vms_mnt,
-                                .pvms = vmspace(container->proc),
+    struct mmap_param param = { .pvms = vmspace(container->proc),
                                 .proct = proct,
-                                .offset = page_aligned(phdre->p_offset),
-                                .mlen = page_upaligned(phdre->p_memsz),
+                                .offset = page_frame(phdre->p_offset),
+                                .mlen = count_pages(phdre->p_memsz) * PAGE_SIZE,
                                 .flen = phdre->p_filesz,
                                 .flags = MAP_FIXED | MAP_PRIVATE,
                                 .type = REGION_TYPE_CODE };
 
     struct mm_region* seg_reg;
-    int status = mmap_user(NULL, &seg_reg, page_aligned(va), elfile, &param);
+    int status = mmap_user(NULL, &seg_reg, page_frame(va), elfile, &param);
 
     if (!status) {
         size_t next_addr = phdre->p_memsz + va;
-        ldctx->end = MAX(ldctx->end, page_upaligned(next_addr));
+        ldctx->end = MAX(ldctx->end, ROUNDUP(next_addr, PAGE_SIZE));
         ldctx->mem_sz += phdre->p_memsz;
     } else {
         // we probably fucked up our process
@@ -62,7 +63,7 @@ load_executable(struct load_context* context, const struct v_file* exefile)
     struct elf elf;
     struct exec_host* container = context->container;
 
-    if ((errno = elf_openat(&elf, exefile))) {
+    if ((errno = elf_openat(&elf, (void*)exefile))) {
         goto done;
     }
 

@@ -2,7 +2,6 @@
 
 #include <lunaix/process.h>
 #include <lunaix/hart_state.h>
-#include <lunaix/mm/vmm.h>
 #include <klibc/string.h>
 
 #include <asm/mempart.h>

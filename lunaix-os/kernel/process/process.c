@@ -28,15 +28,12 @@ spawn_process(struct thread** created, ptr_t entry, bool with_ustack)
     struct thread* kthread = create_thread(kproc, with_ustack);
 
     if (!kthread) {
-        procvm_unmount(mm);
         delete_process(kproc);
         return -1;
     }
 
     commit_process(kproc);
     start_thread(kthread, entry);
-
-    procvm_unmount(mm);
 
     if (created) {
         *created = kthread;
@@ -66,7 +63,7 @@ spawn_process_usr(struct thread** created, char* path,
     }
 
     struct exec_host container;
-    exec_init_container(&container, main_thread, VMS_MOUNT_1, argv, envp);
+    exec_init_container(&container, main_thread, argv, envp);
     if ((errno = exec_load_byname(&container, path))) {
         goto fail;
     }
@@ -78,11 +75,9 @@ spawn_process_usr(struct thread** created, char* path,
         *created = main_thread;
     }
 
-    procvm_unmount(mm);
     return 0;
 
 fail:
-    procvm_unmount(mm);
     delete_process(proc);
     return errno;
 }

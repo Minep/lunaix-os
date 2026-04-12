@@ -4,12 +4,14 @@
  * Virtual Address Space Translation/Traverse Machinery (VASTM)
  */
 
+#include <lunaix/mm/page.h>
+#include <lunaix/status.h>
 #include <lunaix/spike.h>
 #include <lunaix/types.h>
 #include <lunaix/mm/pagetable.h>
 #include <lunaix/mm/procvm.h>
 
-#include <asm/vastm.h>
+#include <asm/mm_defs.h>
 
 #define ASTM_L0T 0
 
@@ -39,20 +41,6 @@
 #define RES_L1T         ( RES_L2T + _L1T_LEVEL_WIDTH )
 #define RES_L0T         ( RES_L1T + _L0T_LEVEL_WIDTH ) 
 
-enum vastm_action
-{
-    VASTM_CONTINUE = 0,
-    VASTM_BREAK_LEVEL = 1,
-    VASTM_DONE = 2,
-    VASTM_RETRY = 3
-};
-
-typedef enum vastm_action (*entry_hanlder_t)(ptr_t va, pte_t* entry, void*);
-
-struct vastm {
-    entry_hanlder_t tra_cb[PT_LEVEL];
-    void* cb_data;
-};
 
 struct ptroot;
 typedef struct ptroot ptroot_t;
@@ -97,6 +85,23 @@ vastm_ptroot(pte_t* table)
     return vastm_ptroot_at(table, RES_L0T);
 }
 
+static inline pte_t*
+vastm_ptep_at_resolution(pte_t* root, ptr_t va, int res)
+{
+    if (res == RES_L0T)
+        return ptep_at(root, va, L0T);
+    else if (res == RES_L1T)
+        return ptep_at(root, va, L1T);
+    else if (res == RES_L2T)
+        return ptep_at(root, va, L2T);
+    else if (res == RES_L3T)
+        return ptep_at(root, va, L3T);
+    else if (res == RES_LFT)
+        return ptep_at(root, va, LFT);
+    else
+        return NULL;
+}
+
 /**
  * Get the ptep of a specific entry along the path
  * in this level of page table represented by ptroot
@@ -104,23 +109,28 @@ vastm_ptroot(pte_t* table)
 static inline pte_t*
 vastm_ptep_from(ptroot_t root, ptr_t va)
 {
-    int res;
-    res = vastm_ptroot_res(root);
+    return vastm_ptep_at_resolution(
+            vastm_ptroot_ptr(root), va, vastm_ptroot_res(root));
+}
 
-    if (res == RES_L0T)
-        va = level_index(va, 0);
-    else if (res == RES_L1T)
-        va = level_index(va, 1);
-    else if (res == RES_L2T)
-        va = level_index(va, 2);
-    else if (res == RES_L3T)
-        va = level_index(va, 3);
-    else if (res == RES_LFT)
-        va = level_index(va, F);
-    else
+static inline pte_t*
+vastm_table_get_or_make(pte_t* ptep, pte_t attr)
+{
+    struct ppage* page;
+
+    if (pte_huge(pte_at(ptep)))
         return NULL;
 
-    return &vastm_ptroot_ptr(root)[va];
+    ptep = ptep_next_table(ptep);
+    if (ptep)
+        return ptep;
+
+    page = alloc_page();
+    if (!page)
+        return NULL;
+    
+    set_pte(ptep, pte_setpaddr(attr, ppage_addr(page)));
+    return (pte_t*)ppage_va(page);
 }
 
 /**
@@ -133,7 +143,6 @@ vastm_current_root()
     return vastm_ptroot((pte_t*)phy_to_virt(current_vas()));
 }
 
-
 static inline ptroot_t
 vastm_procvm_root(struct proc_mm* vms)
 {
@@ -141,38 +150,131 @@ vastm_procvm_root(struct proc_mm* vms)
 }
 
 /**
- * Walk along a given translation route, bounded by the 
+ * Walk along a given translation route, bou<S-Insert>nded by the 
  * translation tree resolution
  *
  * @param ptroot Root of translation tree
  * @param va Translation route
  * @param res Resolution, in terms of page order.
  */
-ptroot_t
-vastm_walk_along(ptroot_t root, ptr_t va, int resolution, struct vastm* cb);
+static inline ptroot_t
+vastm_walk_along(ptroot_t root, ptr_t va, int resolution)
+{
+    int cur_res = vastm_ptroot_res(root);
+    pte_t* ptep = vastm_ptroot_ptr(root);
+    pte_t* next_ptep;
+
+    if (cur_res < resolution && cur_res == RES_L0T) {
+        next_ptep = ptep_next_table(ptep_at(ptep, va, L0T));
+        if (!next_ptep)
+            goto done;
+
+        ptep = next_ptep;
+        cur_res -= RES_L0T;
+    }
+
+#if has_ptlevel(L1T)
+    if (cur_res < resolution && cur_res == RES_L1T) {
+        next_ptep = ptep_next_table(ptep_at(ptep, va, L1T));
+        if (!next_ptep)
+            goto done;
+
+        ptep = next_ptep;
+        cur_res -= RES_L1T;
+    }
+#endif
+
+#if has_ptlevel(L2T)
+    if (cur_res < resolution && cur_res == RES_L2T) {
+        next_ptep = ptep_next_table(ptep_at(ptep, va, L2T));
+        if (!next_ptep)
+            goto done;
+
+        ptep = next_ptep;
+        cur_res -= RES_L2T;
+    }
+#endif
+
+#if has_ptlevel(L3T)
+    if (cur_res < resolution && cur_res == RES_L3T) {
+        next_ptep = ptep_next_table(ptep_at(ptep, va, L3T));
+        if (!next_ptep)
+            goto done;
+
+        ptep = next_ptep;
+        cur_res -= RES_L3T;
+    }
+#endif
+
+done:
+    return vastm_ptroot_at(ptep, cur_res);
+}
+
+
+static inline pte_t*
+vastm_make_along(ptroot_t root, ptr_t va, int resolution, pte_t attr)
+{
+    int cur_res = vastm_ptroot_res(root);
+    pte_t* ptep = vastm_ptroot_ptr(root);
+
+    attr = pte_mkroot(attr);
+
+    if (cur_res < resolution && cur_res == RES_L0T) {
+        ptep = vastm_table_get_or_make(ptep_at(ptep, va, L0T), attr);
+        if (!ptep)
+            return NULL;
+        cur_res -= RES_L0T;
+    }
+
+#if has_ptlevel(L1T)
+    if (cur_res < resolution && cur_res == RES_L1T) {
+        ptep = vastm_table_get_or_make(ptep_at(ptep, va, L1T), attr);
+        if (!ptep)
+            return NULL;
+        cur_res -= RES_L1T;
+    }
+#endif
+
+#if has_ptlevel(L2T)
+    if (cur_res < resolution && cur_res == RES_L2T) {
+        ptep = vastm_table_get_or_make(ptep_at(ptep, va, L2T), attr);
+        if (!ptep)
+            return NULL;
+        cur_res -= RES_L2T;
+    }
+#endif
+
+#if has_ptlevel(L3T)
+    if (cur_res < resolution && cur_res == RES_L3T) {
+        ptep = vastm_table_get_or_make(ptep_at(ptep, va, L3T), attr);
+        if (!ptep)
+            return NULL;
+        cur_res -= RES_L3T;
+    }
+#endif
+
+    return vastm_ptep_at_resolution(ptep, va, cur_res);
+}
 
 static inline pte_t*
 vastm_walk_ptep(ptroot_t root, ptr_t va, int resolution)
 {
     ptroot_t r;
 
-    r = vastm_walk_along(root, va, resolution, NULL);
+    r = vastm_walk_along(root, va, resolution);
     return vastm_ptep_from(r, va);
 }
 
-bool
-vastm_walk_between(ptroot_t root, ptr_t from, ptr_t to, int resolution, struct vastm* cb);
-
-static inline bool
-vastm_walk_until(ptroot_t root, ptr_t end, int resolution, struct vastm* cb)
+static inline pte_t*
+vastm_walk_ptep_strict(ptroot_t root, ptr_t va, int resolution)
 {
-    return vastm_walk_between(root, 0, end, resolution, cb);
-}
+    ptroot_t r;
 
-static inline bool
-vastm_walk_until_page(ptroot_t root, ptr_t end, struct vastm* cb)
-{
-    return vastm_walk_between(root, 0, end, PAGE_SHIFT, cb);
+    r = vastm_walk_along(root, va, resolution);
+    if (vastm_ptroot_res(r) != resolution)
+        return NULL;
+
+    return vastm_ptep_from(r, va);
 }
 
 static inline int
@@ -191,4 +293,107 @@ __vastm_resolution_level(int res)
 
     fail("invalid translation tree resolution value.");
 }
+
+enum vastm_action
+{
+    VASTM_CONTINUE = 0,
+    VASTM_BREAK = 1,
+};
+
+struct vastm_state;
+typedef enum vastm_action (*entry_hanlder_t)(struct vastm_state*, pte_t* ptep, void*);
+
+struct vastm_cb {
+    entry_hanlder_t tra_cb[PT_LEVEL];
+    void* cb_data;
+};
+
+
+struct vastm
+{
+    struct vastm_cb cb;
+    int err_like;
+};
+
+struct vastm_state
+{
+    ptr_t va;
+    ptr_t va_end;
+    int min_res;
+    int cur_res;
+    struct vastm* param;
+};
+
+static inline void
+vastm_param_prepare(struct vastm* param, void* cb_data)
+{
+    param->cb = (struct vastm_cb){ .cb_data = cb_data };
+    param->err_like = 0;
+}
+
+static inline void
+vastm_param_cb_set_interims(struct vastm* param, entry_hanlder_t cb)
+{
+    param->cb.tra_cb[ASTM_L0T] = cb;
+    param->cb.tra_cb[ASTM_L1T] = cb;
+    param->cb.tra_cb[ASTM_L2T] = cb;
+    param->cb.tra_cb[ASTM_L3T] = cb;
+}
+
+static inline void
+vastm_param_cb_set_uniform(struct vastm* param, entry_hanlder_t cb)
+{
+    vastm_param_cb_set_interims(param, cb);
+    param->cb.tra_cb[ASTM_LFT] = cb;
+}
+
+static inline void
+vastm_param_cb_set(struct vastm* param, int level, entry_hanlder_t cb)
+{
+    param->cb.tra_cb[level] = cb;
+}
+
+static inline void
+vastm_walk_flag_err(struct vastm_state* state, int err)
+{
+    state->param->err_like = err;
+}
+
+static inline enum vastm_action
+vastm_walk_flag_complete(struct vastm_state* state)
+{
+    state->param->err_like = 1;
+    return VASTM_BREAK;
+}
+
+static inline int
+vastm_walk_errno(struct vastm* param) 
+{
+    return param->err_like < 0 ? param->err_like : 0;
+}
+
+void
+vastm_visit_next(struct vastm_state state, pte_t* next_table);
+
+void
+vastm_walk(struct vastm* param, 
+            ptroot_t root, ptr_t va_start, ptr_t va_end, int res);
+
+static inline bool
+vastm_helper_create_intrim_table(struct vastm_state *state, pte_t* ptep, pte_attr_t prot)
+{
+    pte_t* next_table, pte;
+    struct leaflet* leaflet;
+    
+    leaflet = alloc_page_table();
+    if (!leaflet) {
+        vastm_walk_flag_err(state, ENOMEM);
+        return false;
+    }
+
+    next_table = (pte_t*)leaflet_va(leaflet);
+    set_pte(ptep, mkpte(leaflet_addr(leaflet), prot));
+    return true;
+}
+
 #endif

@@ -10,6 +10,7 @@
  *
  */
 
+#include <lunaix/mm/pagetable.h>
 #include <klibc/string.h>
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/page.h>
@@ -38,7 +39,7 @@ __alloc_cake_pages(unsigned int cake_pg)
         return NULL;
     }
     
-    return (void*)vmap(leaflet, KERNEL_DATA);
+    return (void*)leaflet_va(leaflet);
 }
 
 static struct cake_fl*
@@ -226,10 +227,7 @@ static void
 __destory_cake(struct cake_s* cake)
 {
     // Pinkie Pie is going to MAD!
-
-    struct leaflet* leaflet;
     struct cake_pile* owner;
-    pfn_t _pfn;
     ptr_t page_va;
 
     owner = cake->owner;
@@ -247,11 +245,7 @@ __destory_cake(struct cake_s* cake)
         page_va = __ptr(cake);
     }
 
-    _pfn = pfn(vmm_v2p(page_va));
-    leaflet = ppfn_leaflet(_pfn);
-    vunmap(page_va, leaflet);
-
-    leaflet_return(leaflet);
+    leaflet_return(leaflet_from_va(page_va));
 }
 
 void

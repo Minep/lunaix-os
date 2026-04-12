@@ -45,6 +45,11 @@ shared_writable_region(struct mm_region* mm) {
     return !!(mm->attr & REGION_WSHARED);
 }
 
+static inline bool
+shared_readonly_region(struct mm_region* mm) {
+    return (mm->attr & REGION_MODE_MASK) == REGION_RSHARED;
+}
+
 
 struct mm_region*
 region_create(ptr_t start, ptr_t end, u32_t attr);
@@ -71,7 +76,7 @@ struct mm_region*
 region_dup(struct mm_region* origin);
 
 static inline pte_t
-region_tweakpte(struct mm_region* vmr, pte_t pte)
+region_set_pte_attrs(struct mm_region* vmr, pte_t pte)
 {
     return translate_vmr_prot(vmr->attr, pte);
 }

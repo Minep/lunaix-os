@@ -1,7 +1,8 @@
+#include <lunaix/mm/vastm.h>
 #include <lunaix/mm/fault.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/region.h>
-#include <lunaix/mm/vmm.h>
+#include <lunaix/mm/vmtlb.h>
 #include <lunaix/sched.h>
 #include <lunaix/signal.h>
 #include <lunaix/status.h>
@@ -17,103 +18,78 @@
 LOG_MODULE("pf")
 
 static void
-__gather_memaccess_info(struct fault_context* context)
-{
-    pte_t* ptep = (pte_t*)context->fault_va;
-    ptr_t mnt = ptep_vm_mnt(ptep);
-    ptr_t refva;
-    
-    context->mm = vmspace(__current);
-
-    if (!vmnt_packed(ptep)) {
-        refva = (ptr_t)ptep;
-        goto done;
-    }
-
-    context->ptep_fault = true;
-    context->remote_fault = !active_vms(mnt);
-    
-    if (context->remote_fault && context->mm) {
-        context->mm = context->mm->guest_mm;
-        assert(context->mm);
-    }
-
-    // unpack the ptep to reveal the one true va!
-
-#if LnT_ENABLED(1)
-    ptep = (pte_t*)page_addr(ptep_pfn(ptep));
-    mnt  = ptep_vm_mnt(ptep);
-    if (!vmnt_packed(ptep)) {
-        refva = (ptr_t)ptep;
-        goto done;
-    }
-#endif
-
-#if LnT_ENABLED(2)
-    ptep = (pte_t*)page_addr(ptep_pfn(ptep));
-    mnt  = ptep_vm_mnt(ptep);
-    if (!vmnt_packed(ptep)) {
-        refva = (ptr_t)ptep;
-        goto done;
-    }
-#endif
-
-#if LnT_ENABLED(3)
-    ptep = (pte_t*)page_addr(ptep_pfn(ptep));
-    mnt  = ptep_vm_mnt(ptep);
-    if (!vmnt_packed(ptep)) {
-        refva = (ptr_t)ptep;
-        goto done;
-    }
-#endif
-
-    ptep = (pte_t*)page_addr(ptep_pfn(ptep));
-    mnt  = ptep_vm_mnt(ptep);
-    
-    assert(!vmnt_packed(ptep));
-    refva = (ptr_t)ptep;
-
-done:
-    context->fault_refva = refva;
-}
-
-static void
 __prepare_fault_context(struct fault_context* fault)
 {
-    pte_t* fault_ptep      = fault->fault_ptep;
+    pte_t* fault_ptep, victim_pte, to_resolved;
+    ptroot_t fault_vms;
     ptr_t  fault_va        = fault->fault_va;
-    pte_t  fault_pte       = *fault_ptep;
     bool   kernel_vmfault  = kernel_addr(fault_va);
-    bool   kernel_refaddr  = kernel_addr(fault->fault_refva);
     
-    // for a ptep fault, the parent page tables should match the actual
-    //  accesser permission
-    if (kernel_refaddr) {
-        ptep_alloc_hierarchy(fault_ptep, fault_va, KERNEL_PGTAB);
+    if (kernel_vmfault) {
+        fault_vms = vastm_current_root();
     } else {
-        ptep_alloc_hierarchy(fault_ptep, fault_va, USER_PGTAB);
+        fault_vms = vastm_procvm_root(fault->mm);
     }
 
-    fault->fault_pte = fault_pte;
+    fault_ptep = vastm_walk_ptep(fault_vms, fault_va, RES_LFT);
+    victim_pte = *fault_ptep;
 
-    if (fault->ptep_fault) {
-        // fault on intermediate levels.
-        fault_pte = pte_setprot(fault_pte, KERNEL_PGTAB);
+    if (pte_isnull(victim_pte)) {
+        if (kernel_vmfault)
+            to_resolved = mkpte_prot(KERNEL_PAGE);
+        else
+            to_resolved = mkpte_prot(USER_PAGE);
+    } 
+    else {
+        to_resolved = victim_pte;
     }
     
-    if (!kernel_refaddr) {
-        fault_pte = pte_mkuser(fault_pte);
-    }
+    fault->resolved.attr = to_resolved;
+    fault->resolved.leaflet = NULL;
 
-    fault->resolving = pte_mkloaded(fault_pte);
+    fault->fault_pte = victim_pte;
+    fault->fault_vms = fault_vms;
     fault->kernel_vmfault = kernel_vmfault;
     fault->kernel_access  = kernel_context(fault->hstate);
 }
 
 static inline void
-__flush_staled_tlb(struct fault_context* fault, struct leaflet* leaflet)
+__flush_staled(struct fault_context* fault)
 {
-    tlb_flush_mm_range(fault->mm, fault->fault_va, leaflet_nfold(leaflet));
+    tlb_flush_mm_range(fault->mm, fault->fault_va, 
+                        leaflet_nfold(fault->resolved.leaflet));
+}
+
+static inline void
+__resolve_fault_ptes(struct fault_context* fault)
+{
+    struct leaflet* resolved_leaflet;
+    pte_t* ptep, pte;
+    ptr_t pa;
+    int page_counts;
+    
+    resolved_leaflet = fault->resolved.leaflet;
+    page_counts = leaflet_nfold(resolved_leaflet);
+    
+    pa = leaflet_addr(resolved_leaflet);
+    pte = fault->resolved.attr;
+
+    ptep = vastm_make_along(fault->fault_vms, fault->fault_va, 
+                            leaflet_order(resolved_leaflet), pte);
+    
+    for (int i = 0; i < page_counts; i++) {
+        pte = pte_setpaddr(pte, pa + i * PAGE_SIZE);
+        set_pte(ptep + i, pte);
+    }
+
+    __flush_staled(fault);
+}
+
+static inline void
+__discard_prealloc_leaflet(struct fault_context* fault)
+{
+    if (fault->prealloc)
+        leaflet_return(fault->prealloc);
 }
 
 static void
@@ -139,12 +115,9 @@ __handle_conflict_pte(struct fault_context* fault)
         pte = pte_mkuntouch(pte);
         pte = pte_mkclean(pte);
 
-        ptep_map_leaflet(fault->fault_ptep, pte, duped_leaflet);
-        __flush_staled_tlb(fault, duped_leaflet);
-
         leaflet_return(fault_leaflet);
 
-        fault_resolved(fault, NO_PREALLOC);
+        fault_resolved(fault, pte, duped_leaflet);
     }
 
     return;
@@ -154,92 +127,74 @@ __handle_conflict_pte(struct fault_context* fault)
 static void
 __handle_anon_region(struct fault_context* fault)
 {
-    pte_t pte = fault->resolving;
-    pte = region_tweakpte(fault->vmr, pte);
+    pte_t pte;
 
-    // TODO Potentially we can get different order of leaflet here
-    struct leaflet* region_part = alloc_leaflet(0);
+    pte = fault->resolved.attr;
+    pte = region_set_pte_attrs(fault->vmr, pte);
     
-    ptep_map_leaflet(fault->fault_ptep, pte, region_part);
-    __flush_staled_tlb(fault, region_part);
-
-    fault_resolved(fault, NO_PREALLOC);
+    // we use prealloced leaflet
+    fault_resolved(fault, pte, fault->prealloc);
 }
 
 
 static void
 __handle_named_region(struct fault_context* fault)
 {
-    int errno = 0;
-    struct mm_region* vmr = fault->vmr;
-    struct v_file* file = vmr->mfile;
-    struct v_file_ops * fops = file->ops;
+    int errno;
+    struct mm_region *vmr;
+    struct v_file *file;
+    struct leaflet* leaflet;
 
-    pte_t pte       = fault->resolving;
-    ptr_t fault_va  = page_aligned(fault->fault_va);
+    pte_t pte;
+    ptr_t page_va;
+    u32_t mseg_off, mfile_off;
+    size_t mapped_len;
 
-    u32_t mseg_off  = (fault_va - vmr->start);
-    u32_t mfile_off = mseg_off + vmr->foff;
-    size_t mapped_len = vmr->flen;
+    errno = 0;
+    vmr = fault->vmr;
+    file = vmr->mfile;
+    leaflet = fault->prealloc;
+    pte = fault->resolved.attr;
 
-    // TODO Potentially we can get different order of leaflet here
-    struct leaflet* region_part = alloc_leaflet(0);
-
-    pte = region_tweakpte(vmr, pte);
-    ptep_map_leaflet(fault->fault_ptep, pte, region_part);
+    mseg_off  = (page_frame(fault->fault_va) - vmr->start);
+    mfile_off = mseg_off + vmr->foff;
+    mapped_len = vmr->flen;
+    page_va = leaflet_va(leaflet);
 
     if (mseg_off < mapped_len) {
         mapped_len = MIN(mapped_len - mseg_off, PAGE_SIZE);
-    }
-    else {
+    } else {
         mapped_len = 0;
     }
 
     if (mapped_len == PAGE_SIZE) {
-        errno = fops->read_page(file->inode, (void*)fault_va, mfile_off);
-    }
-    else {
-        leaflet_wipe(region_part);
+        errno = file->ops->read_page(
+                    file->inode, (void*)page_va, mfile_off);
+    } else {
+        leaflet_wipe(leaflet);
         
         if (mapped_len) {
-            errno = fops->read(file->inode, 
-                    (void*)fault_va, mapped_len, mfile_off);
+            errno = file->ops->read(
+                        file->inode, (void*)page_va, mapped_len, mfile_off);
         }
     }
 
     if (errno < 0) {
         ERROR("fail to populate page (%d)", errno);
-
-        ptep_unmap_leaflet(fault->fault_ptep, region_part);
-        leaflet_return(region_part);
-
+        leaflet_return(leaflet);
         return;
     }
 
-    __flush_staled_tlb(fault, region_part);
-
-    fault_resolved(fault, NO_PREALLOC);
+    pte = region_set_pte_attrs(vmr, pte);
+    fault_resolved(fault, pte, leaflet);
 }
 
 static void
 __handle_kernel_page(struct fault_context* fault)
 {
-    // we must ensure only ptep fault is resolvable
-    if (!is_ptep(fault->fault_va)) {
-        return;
-    }
-    
-    struct leaflet* leaflet = fault->prealloc;
-
-    pin_leaflet(leaflet);
-    leaflet_wipe(leaflet);
-    
-    pte_t pte = fault->resolving;
-    ptep_map_leaflet(fault->fault_ptep, pte, leaflet);
-
-    tlb_flush_kernel_ranged(fault->fault_va, leaflet_nfold(leaflet));
-
-    fault_resolved(fault, 0);
+    // We shouldn't expect any fault from kernel 
+    //  at this stage of development
+    return;
 }
 
 
@@ -253,7 +208,7 @@ fault_prealloc_page(struct fault_context* fault)
     pte_t pte;
     
     struct leaflet* leaflet = alloc_leaflet(0);
-    if (!leaflet) {
+    if (unlikely(!leaflet)) {
         return;
     }
 
@@ -264,9 +219,7 @@ fault_prealloc_page(struct fault_context* fault)
 void noret
 fault_resolving_failed(struct fault_context* fault)
 {
-    if (fault->prealloc) {
-        leaflet_return(fault->prealloc);
-    }
+    __discard_prealloc_leaflet(fault);
 
     ERROR("(pid: %d) Segmentation fault on %p (%p,e=0x%x)",
           __current->pid,
@@ -295,7 +248,10 @@ fault_resolving_failed(struct fault_context* fault)
 static bool
 __try_resolve_fault(struct fault_context* fault)
 {
-    pte_t fault_pte = fault->fault_pte;
+    pte_t fault_pte;
+
+    fault_pte = fault->fault_pte;
+
     if (pte_isguardian(fault_pte)) {
         ERROR("memory region over-running");
         return false;
@@ -307,8 +263,7 @@ __try_resolve_fault(struct fault_context* fault)
     }
 
     assert(fault->mm);
-    vm_regions_t* vmr = &fault->mm->regions;
-    fault->vmr = region_get(vmr, fault->fault_va);
+    fault->vmr = region_get(&fault->mm->regions, fault->fault_va);
 
     if (!fault->vmr) {
         return false;
@@ -329,13 +284,12 @@ __try_resolve_fault(struct fault_context* fault)
     }
     
 done:
-    return !!(fault->resolve_type & RESOLVE_OK);
+    return !!(fault->resolved.result & RESOLVE_OK);
 }
 
 bool
 handle_page_fault(struct fault_context* fault)
 {
-    __gather_memaccess_info(fault);
     __prepare_fault_context(fault);
 
     fault_prealloc_page(fault);
@@ -344,12 +298,10 @@ handle_page_fault(struct fault_context* fault)
         return false;
     }
 
-    if ((fault->resolve_type & NO_PREALLOC)) {
-        if (fault->prealloc) {
-            leaflet_return(fault->prealloc);
-        }
+    if ((fault->resolved.result & NO_PREALLOC)) {
+        __discard_prealloc_leaflet(fault);
     }
 
-    tlb_flush_kernel(fault->fault_va);
+    __resolve_fault_ptes(fault);
     return true;
 }

@@ -5,9 +5,11 @@
 #include <lunaix/mm/region.h>
 #include <lunaix/types.h>
 
+#define MEM_FLUSH_MSYNC_MASK         0xffff
+#define MEM_FLUSH_UNMAP              ( 1 << 16 )
+
 struct mmap_param
 {
-    ptr_t vms_mnt;        // vm mount point
     struct proc_mm* pvms; // process vm
     off_t offset;         // mapped file offset
     size_t mlen;          // mapped memory length
@@ -39,23 +41,15 @@ mem_map(void** addr_out,
         struct mmap_param* param);
 
 int
-mem_unmap(ptr_t mnt, vm_regions_t* regions, ptr_t addr, size_t length);
+mem_unmap(vm_regions_t* regions, ptr_t addr, size_t length);
 
 void
-mem_unmap_region(ptr_t mnt, struct mm_region* region);
+mem_unmap_region(struct mm_region* region);
 
 void
-mem_sync_pages(ptr_t mnt,
-               struct mm_region* region,
-               ptr_t start,
-               ptr_t length,
-               int options);
+mem_flush_pages(struct mm_region* region, ptr_t start, ptr_t end, int options);
 
 int
-mem_msync(ptr_t mnt,
-          vm_regions_t* regions,
-          ptr_t addr,
-          size_t length,
-          int options);
+mem_msync(vm_regions_t* regions, ptr_t addr, size_t length, int options);
 
 #endif /* __LUNAIX_MMAP_H */
