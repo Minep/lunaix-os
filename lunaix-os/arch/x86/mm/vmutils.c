@@ -10,9 +10,8 @@ dup_leaflet(struct leaflet* leaflet)
     
     new_leaflet = alloc_leaflet(leaflet_order(leaflet));
 
-    // TODO need a proper long term fix for the contention of page mount point
-    dest_va = vmap(new_leaflet, KERNEL_DATA);
-    src_va = leaflet_mount(leaflet);
+    dest_va = leaflet_va(new_leaflet);
+    src_va = leaflet_va(leaflet);
 
     size_t cnt_wordsz = leaflet_size(new_leaflet) / sizeof(ptr_t);
 
@@ -33,9 +32,6 @@ dup_leaflet(struct leaflet* leaflet)
                  : "memory", "%edi", "%esi");
 
 #endif
-
-    leaflet_unmount(leaflet);
-    vunmap(dest_va, new_leaflet);
 
     return new_leaflet;
 }

@@ -1,3 +1,4 @@
+#include <lunaix/mm/pagetable.h>
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
 #include <lunaix/syscall.h>
@@ -6,6 +7,7 @@
 #include <lunaix/mm/page.h>
 #include <lunaix/syslog.h>
 #include <lunaix/kpreempt.h>
+#include <lunaix/mm/vastm.h>
 
 #include <usr/lunaix/threads.h>
 
@@ -16,59 +18,113 @@ LOG_MODULE("THREAD")
 
 static ptr_t
 __alloc_user_thread_stack(struct proc_info* proc, 
-                          struct mm_region** stack_region, ptr_t vm_mnt)
+                          struct mm_region** stack_region)
 {
-    ptr_t th_stack_top = (proc->thread_count + 1) * USR_STACK_SIZE_THREAD;
-    th_stack_top = ROUNDUP(USR_STACK_END - th_stack_top, PAGE_SIZE);
-
     struct mm_region* vmr;
-    struct proc_mm* mm = vmspace(proc);
-    struct mmap_param param = { .vms_mnt = vm_mnt,
-                                .pvms = mm,
-                                .mlen = USR_STACK_SIZE_THREAD,
-                                .proct = PROT_READ | PROT_WRITE,
-                                .flags = MAP_ANON | MAP_PRIVATE,
-                                .type = REGION_TYPE_STACK };
-
+    struct mmap_param param;
+    ptr_t th_stack_top;
+    pte_t *guardp;
     int errno;
-    
+
+    th_stack_top = (proc->thread_count + 1) * USER_STACK_UNITSIZE;
+    th_stack_top = mempart_end(USER_STACK_ZONE) - th_stack_top;
+    th_stack_top = ROUNDUP(th_stack_top, PAGE_SIZE);
+
+    param = (struct mmap_param) { 
+              .pvms = vmspace(proc),
+              .mlen = USER_STACK_UNITSIZE,
+              .proct = PROT_READ | PROT_WRITE,
+              .flags = MAP_ANON | MAP_PRIVATE,
+              .type = REGION_TYPE_STACK 
+    };
+
     errno = mmap_user((void**)&th_stack_top, &vmr, th_stack_top, NULL, &param);
     if (errno) {
         WARN("failed to create user thread stack: %d", errno);
         return 0;
     }
 
-    pte_t* guardp = mkptep_va(vm_mnt, vmr->start);
+    guardp = vastm_make_along(vastm_procvm_root(param.pvms), 
+                              vmr->start, RES_LFT, mkpte_prot(USER_DATA));
     set_pte(guardp, guard_pte);
 
     *stack_region = vmr;
 
-    ptr_t stack_top = align_stack(th_stack_top + USR_STACK_SIZE_THREAD - 1);
-    return stack_top;
+    return align_stack(th_stack_top + USR_STACK_SIZE_THREAD - 1);
+}
+
+struct __kstack_alloc
+{
+    pte_t* ptep;
+    ptr_t va;
+};
+
+static enum vastm_action
+__alloc_kstack_mkinterim(struct vastm_state *state, pte_t *entry, void* data)
+{
+    if (pte_isnull(pte_at(entry))) {
+        vastm_helper_create_intrim_table(state, entry, KERNEL_PGTAB);
+    } 
+
+    vastm_visit_next(*state, ptep_next_table(entry));
+    return VASTM_CONTINUE;
+}
+
+static enum vastm_action
+__alloc_kstack_find_slot(struct vastm_state *state, pte_t *entry, void* data)
+{
+    int i;
+    const int nr_pages = KERNEL_STACK_UNITSIZE / PAGE_SIZE;
+    struct __kstack_alloc *result;
+    
+    result = (struct __kstack_alloc*)data;
+    i = ptep_entry_index(entry);
+
+    while (state->va < state->va_end && i < LFT_LENGTH)
+    {
+        if (pte_isnull(pte_at(&entry[i]))) {
+            result->ptep = &entry[i];
+            result->va = state->va;
+            return vastm_walk_flag_complete(state);
+        }
+
+        state->va += KERNEL_STACK_UNITSIZE;
+        i += nr_pages;
+    }
+
+    return VASTM_BREAK;
 }
 
 static ptr_t
-__alloc_kernel_thread_stack(struct proc_info* proc, ptr_t vm_mnt)
+__alloc_kernel_thread_stack(struct proc_info* proc)
 {
-    pfn_t kstack_top = pfn(KSTACK_AREA_END);
-    pfn_t kstack_end = pfn(KSTACK_AREA);
-    pte_t* ptep      = mkptep_pn(vm_mnt, kstack_top);
-    while (ptep_pfn(ptep) > kstack_end) {
-        ptep -= KSTACK_PAGES;
+    /**
+     *  FIXME (2026-KMEM_REGION) kthread stack refactor
+     *
+     *  The creation and deletion of kthread stack should 
+     *  be part of a specical proc_vm - `kproc_vm`, thus
+     *  it can follow the same route of mem_map
+     */
 
-        pte_t pte = pte_at(ptep);
-        if (pte_isnull(pte)) {
-            goto found;
-        }
+    struct __kstack_alloc result;
+    struct vastm param;
 
-        ptep--;
+    result.ptep = NULL;
+    vastm_param_prepare(&param, &result);
+    vastm_param_cb_set_interims(&param, __alloc_kstack_mkinterim);
+    vastm_param_cb_set(&param, ASTM_LFT, __alloc_kstack_find_slot);
+
+    vastm_walk(
+            &param, vastm_procvm_root(proc->mm), 
+            mempart(KERNEL_STACK_ZONE), mempart_end(KERNEL_STACK_ZONE), 
+            RES_LFT);
+    
+    if (!result.ptep) {
+        WARN("failed to create kernel stack: max stack num reach\n");
+        return 0;
     }
 
-    WARN("failed to create kernel stack: max stack num reach\n");
-    return 0;
-
-found:;
-    unsigned int po = count_order(KSTACK_PAGES);
+    unsigned int po = count_order(KERNEL_STACK_UNITSIZE / PAGE_SIZE);
     struct leaflet* leaflet = alloc_leaflet(po);
 
     if (!leaflet) {
@@ -76,57 +132,55 @@ found:;
         return 0;
     }
 
-    set_pte(ptep++, guard_pte);
-    ptep_map_leaflet(ptep, mkpte_prot(KERNEL_DATA), leaflet);
+    set_pte(result.ptep++, guard_pte);
+    set_ptes(result.ptep, mkpte_prot(KERNEL_DATA), 
+            leaflet_addr(leaflet), 1 << po);
 
-    ptep += KSTACK_PAGES;
-    return align_stack(ptep_va(ptep, LFT_SIZE) - 1);
+    return align_stack(result.va + KERNEL_STACK_UNITSIZE - 1);
 }
 
 void
 thread_release_mem(struct thread* thread)
 {
+    pte_t *ptep;
     struct leaflet* leaflet;
     struct proc_mm* mm = vmspace(thread->process);
-    ptr_t vm_mnt = mm->vm_mnt;
 
-    // Ensure we have mounted
-    assert(vm_mnt);
+    ptep = vastm_walk_ptep_strict(
+            vastm_procvm_root(mm), thread->kstack, RES_LFT);
 
-    pte_t* ptep = mkptep_va(vm_mnt, thread->kstack);
-    leaflet = pte_leaflet(*ptep);
+    assert(ptep);
+    leaflet = pte_leaflet(pte_at(ptep));
     
-    ptep -= KSTACK_PAGES;
-    set_pte(ptep, null_pte);
-    ptep_unmap_leaflet(ptep + 1, leaflet);
+    ptep -= leaflet_nfold(leaflet);
+    fill_ptes(ptep, null_pte, leaflet_nfold(leaflet));
 
     leaflet_return(leaflet);
     
-    if (thread->ustack) {
-        if ((thread->ustack->start & 0xfff)) {
-            fail("invalid ustack struct");
-        }
-        mem_unmap_region(vm_mnt, thread->ustack);
-    }
+    if (!thread->ustack)
+        return;
+
+    if ((thread->ustack->start & 0xfff))
+        fail("invalid ustack struct");
+
+    mem_unmap_region(thread->ustack);
 }
 
 struct thread*
 create_thread(struct proc_info* proc, bool with_ustack)
 {
     struct proc_mm* mm = vmspace(proc);
-    assert(mm->vm_mnt);
 
-    ptr_t vm_mnt = mm->vm_mnt;
     struct mm_region* ustack_region = NULL;
     if (with_ustack && 
-        !(__alloc_user_thread_stack(proc, &ustack_region, vm_mnt))) 
+        !(__alloc_user_thread_stack(proc, &ustack_region))) 
     {
         return NULL;
     }
 
-    ptr_t kstack = __alloc_kernel_thread_stack(proc, vm_mnt);
+    ptr_t kstack = __alloc_kernel_thread_stack(proc);
     if (!kstack) {
-        mem_unmap_region(vm_mnt, ustack_region);
+        mem_unmap_region(ustack_region);
         return NULL;
     }
 
@@ -148,12 +202,9 @@ create_thread(struct proc_info* proc, bool with_ustack)
 void
 start_thread(struct thread* th, ptr_t entry)
 {
-    assert(th && entry);
-    struct proc_mm* mm = vmspace(th->process);
-
-    assert(mm->vm_mnt);
-    
     struct hart_transition transition;
+    
+    assert(th && entry);
     if (!kernel_addr(entry)) {
         assert(th->ustack);
 
@@ -163,7 +214,7 @@ start_thread(struct thread* th, ptr_t entry)
         hart_kernel_transfer(&transition, th->kstack, entry);
     }
 
-    install_hart_transition(mm->vm_mnt, &transition);
+    install_hart_transition(vmspace(th->process), &transition);
     th->hstate = (struct hart_state*)transition.inject;
 
     commit_thread(th);

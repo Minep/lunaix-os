@@ -1,3 +1,4 @@
+#include "lunaix/mm/pagetable.h"
 #include <klibc/string.h>
 #include <lunaix/ds/btrie.h>
 #include <lunaix/fs.h>
@@ -50,7 +51,7 @@ pcache_alloc_page()
         return NULL;
     }
 
-    if (!(va = (ptr_t)vmap(leaflet, KERNEL_DATA))) {
+    if (!(va = (ptr_t)leaflet_va(leaflet))) {
         leaflet_return(leaflet);
         return NULL;
     }
@@ -61,9 +62,7 @@ pcache_alloc_page()
 static void
 pcache_free_page(void* va)
 {
-    pte_t* ptep = mkptep_va(VMS_SELF, (ptr_t)va);
-    pte_t pte = pte_at(ptep);
-    leaflet_return(pte_leaflet(pte));
+    leaflet_return(leaflet_from_va((ptr_t)va));
 }
 
 void
@@ -144,7 +143,7 @@ __getpage_and_lock(struct pcache* pcache, unsigned int tag,
 static inline int
 __fill_page(struct v_inode* inode, struct pcache_pg* pg, unsigned int index)
 {
-    return inode->default_fops->read_page(inode, pg->data, page_addr(index));
+    return inode->default_fops->read_page(inode, pg->data, index * PAGE_SIZE);
 }
 
 int
@@ -160,8 +159,8 @@ pcache_write(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
     pcache = inode->pg_cache;
     
     while (fpos < end && errno >= 0) {
-        tag = pfn(fpos);
-        off = va_offset(fpos);
+        tag = page_index(fpos);
+        off = page_offset(fpos);
         wr_cnt = MIN(end - fpos, PAGE_SIZE - off);
 
         obj = __getpage_and_lock(pcache, tag, &pg);
@@ -208,9 +207,9 @@ pcache_read(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
 
     pcache = inode->pg_cache;
 
-    while (fpos < page_upaligned(end)) {
-        tag = pfn(fpos);
-        off = va_offset(fpos);
+    while (fpos < page_frame(end)) {
+        tag = page_index(fpos);
+        off = page_offset(fpos);
 
         obj = __getpage_and_lock(pcache, tag, &pg);
 
@@ -234,7 +233,7 @@ pcache_read(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
 
         data += rd_cnt;
         size += rd_cnt;
-        fpos = page_aligned(fpos + PAGE_SIZE);
+        fpos = page_frame(fpos + PAGE_SIZE);
     }
 
     return errno < 0 ? errno : (int)size;
@@ -254,7 +253,7 @@ pcache_commit(struct v_inode* inode, struct pcache_pg* page)
     }
 
     int errno;
-    unsigned int fpos = page_addr(page->index);
+    unsigned int fpos = page->index * PAGE_SIZE;
     
     errno = inode->default_fops->write_page(inode, page->data, fpos);
     if (!errno) {

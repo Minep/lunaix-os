@@ -2,6 +2,7 @@
 #define __LUNAIX_PMM_H
 // Physical memory manager
 
+#include "lunaix/mm/pagetable.h"
 #include <lunaix/boot_generic.h>
 #include <lunaix/mm/physical.h>
 #include <lunaix/types.h>
@@ -15,7 +16,16 @@ enum {
 typedef unsigned int ppage_type_t;
 
 // Maximum non-huge page order.
-#define MAX_PAGE_ORDERS ( LEVEL_SHIFT - 1 )
+
+#if has_ptlevel(L3T)
+#define MAX_PAGE_ORDERS ( level_page_shift(L3T) - PAGE_SHIFT - 1 )
+#elif has_ptlevel(L2T)
+#define MAX_PAGE_ORDERS ( level_page_shift(L2T) - PAGE_SHIFT - 1 )
+#elif has_ptlevel(L1T)
+#define MAX_PAGE_ORDERS ( level_page_shift(L1T) - PAGE_SHIFT - 1 )
+#else
+#define MAX_PAGE_ORDERS ( level_page_shift(L0T) - PAGE_SHIFT - 1 )
+#endif
 
 #define RESERVE_MARKER 0xf0f0f0f0
 

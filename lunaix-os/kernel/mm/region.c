@@ -10,8 +10,8 @@
 struct mm_region*
 region_create(ptr_t start, ptr_t end, u32_t attr)
 {
-    assert_msg(!va_offset(start), "not page aligned");
-    assert_msg(!va_offset(end), "not page aligned");
+    assert_msg(!page_offset(start), "not page aligned");
+    assert_msg(!page_offset(end), "not page aligned");
     struct mm_region* region = valloc(sizeof(struct mm_region));
     *region =
       (struct mm_region){ .attr = attr, .start = start, .end = end - 1 };
@@ -21,8 +21,8 @@ region_create(ptr_t start, ptr_t end, u32_t attr)
 struct mm_region*
 region_create_range(ptr_t start, size_t length, u32_t attr)
 {
-    assert_msg(!va_offset(start), "not page aligned");
-    assert_msg(!va_offset(length), "not page aligned");
+    assert_msg(!page_offset(start), "not page aligned");
+    assert_msg(!page_offset(length), "not page aligned");
     struct mm_region* region = valloc(sizeof(struct mm_region));
     *region = (struct mm_region){ .attr = attr,
                                   .start = start,
@@ -130,7 +130,7 @@ region_get(vm_regions_t* lead, unsigned long vaddr)
 
     struct mm_region *pos, *n;
 
-    vaddr = page_aligned(vaddr);
+    vaddr = page_frame(vaddr);
 
     llist_for_each(pos, n, lead, head)
     {

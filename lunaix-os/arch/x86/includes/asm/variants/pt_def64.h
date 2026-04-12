@@ -6,12 +6,9 @@
 
 #define _PTW_LEVEL              4
 
-// Note: we set VMS_SIZE = VMS_MASK as it is impossible
-//       to express 4Gi in 32bit unsigned integer
-
 #define _PAGE_BASE_SHIFT        12
 
-#define _LFT_LEVEL_WIDTH            9
+#define _LFT_LEVEL_WIDTH        9
 #define _L0T_LEVEL_WIDTH        _LFT_LEVEL_WIDTH
 #define _L1T_LEVEL_WIDTH        _LFT_LEVEL_WIDTH
 #define _L2T_LEVEL_WIDTH        _LFT_LEVEL_WIDTH

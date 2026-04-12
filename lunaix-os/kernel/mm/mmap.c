@@ -1,3 +1,4 @@
+#include <lunaix/mm/vastm.h>
 #include <lunaix/mm/mmap.h>
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/valloc.h>
@@ -68,28 +69,6 @@ mmap_user(void** addr_out,
     param->range_start = USR_EXEC;
 
     return mem_map(addr_out, created, addr, file, param);
-}
-
-static void
-__remove_ranged_mappings(pte_t* ptep, size_t npages)
-{
-    struct leaflet* leaflet;
-    pte_t pte; 
-    for (size_t i = 0, n = 0; i < npages; i++, ptep++) {
-        pte = pte_at(ptep);
-
-        set_pte(ptep, null_pte);
-        if (!pte_isloaded(pte)) {
-            continue;
-        }
-
-        leaflet = pte_leaflet_aligned(pte);
-        leaflet_return(leaflet);
-
-        n = ptep_unmap_leaflet(ptep, leaflet) - 1;
-        i += n;
-        ptep += n;
-    }
 }
 
 static ptr_t
@@ -187,13 +166,16 @@ mem_map(void** addr_out,
         struct v_file* file,
         struct mmap_param* param)
 {
-    assert_msg(addr, "addr can not be NULL");
-
-    ptr_t last_end = USR_EXEC, found_loc = page_aligned(addr);
     struct mm_region *pos, *n;
+    ptr_t last_end, found_loc;
+    vm_regions_t* vm_regions;
+    
+    last_end = USR_EXEC;
+    found_loc = page_frame(addr);
+    vm_regions = &param->pvms->regions;
 
-    vm_regions_t* vm_regions = &param->pvms->regions;
-
+    assert_msg(addr, "addr can not be NULL");
+    
     if ((param->flags & MAP_FIXED_NOREPLACE)) {
         if (mem_has_overlap(vm_regions, found_loc, param->mlen + found_loc)) {
             return EEXIST;
@@ -203,7 +185,7 @@ mem_map(void** addr_out,
 
     if ((param->flags & MAP_FIXED)) {
         int status =
-          mem_unmap(param->vms_mnt, vm_regions, found_loc, param->mlen);
+          mem_unmap(vm_regions, found_loc, param->mlen);
         if (status) {
             return status;
         }
@@ -263,70 +245,116 @@ mem_remap(void** addr_out,
     return EINVAL;
 }
 
-void
-mem_sync_pages(ptr_t mnt,
-               struct mm_region* region,
-               ptr_t start,
-               ptr_t length,
-               int options)
+struct mem_sync_state {
+    struct mm_region* region;
+    int options;
+};
+
+static enum vastm_action
+__mem_flush_handler(struct vastm_state* state, pte_t* ptep, void* data)
 {
+    pte_t pte, next_pte;
+    struct mem_sync_state *ms;
+    struct mm_region* region;
+    struct v_file* file;
+    ptr_t va;
+    
+    va = state->va;
+    pte = pte_at(ptep);
+    next_pte = pte;
+
+    ms = (struct mem_sync_state*)data;
+    region = ms->region;
+    file = region->mfile;
+
+    if (!pte_isloaded(pte))
+        return VASTM_CONTINUE;
+
+    if (pte_dirty(pte)) 
+    {
+        size_t offset = va - region->start + region->foff;
+
+        file->ops->write_page(file->inode, (void*)va, offset);
+
+        next_pte = pte_mkclean(pte);
+    }
+    
+    else if ((ms->options & MS_INVALIDATE)) 
+    {
+        next_pte = null_pte;
+        leaflet_return(pte_leaflet(pte));
+        goto done;
+    }
+    
+    /*
+     * Unmap only leafs and keeps the interim roots.
+     * It looks like wasting memory at first, but it could actually helped 
+     * to speed up the fault resolution should the same region re-mapped 
+     * later.
+     */
+    if (ms->options & MEM_FLUSH_UNMAP || ms->options & MS_INVALIDATE_ALL) {
+        set_pte(ptep, null_pte);
+        leaflet_return(pte_leaflet(pte));
+
+        // No tlb flushing on small pages. It will be VERY expensive when 
+        // we are unmapping the whole regions, let the caller do bulk flushing.
+        if (pte_huge(pte))
+            tlb_flush_vmr(region, va);
+
+        return VASTM_CONTINUE;
+    }
+
+done:
+    if (pte_val(pte) == pte_val(next_pte)) {
+        set_pte(ptep, next_pte);
+        tlb_flush_vmr(region, va);
+    }
+
+    return VASTM_CONTINUE;
+}
+
+void
+mem_flush_pages(struct mm_region* region, ptr_t start, ptr_t end, int options)
+{
+    struct mem_sync_state ms;
+    struct vastm param;
+
     if (!region->mfile || !(region->attr & REGION_WSHARED)) {
         return;
     }
+
+    ms.region = region;
+    ms.options = options;
     
-    pte_t* ptep = mkptep_va(mnt, start);
-    ptr_t va    = page_aligned(start);
+    vastm_param_prepare(&param, &ms);
+    vastm_param_cb_set(&param, ASTM_LFT, __mem_flush_handler);
+    
+    vastm_walk(&param, vastm_procvm_root(region->proc_vms), 
+                start, end, RES_LFT);
 
-    for (; va < start + length; va += PAGE_SIZE, ptep++) {
-        pte_t pte = vmm_tryptep(ptep, LFT_SIZE);
-        if (pte_isnull(pte)) {
-            continue;
-        }
-
-        if (pte_dirty(pte)) {
-            size_t offset = va - region->start + region->foff;
-            struct v_inode* inode = region->mfile->inode;
-
-            region->mfile->ops->write_page(inode, (void*)va, offset);
-
-            set_pte(ptep, pte_mkclean(pte));
-            tlb_flush_vmr(region, va);
-            
-        } else if ((options & MS_INVALIDATE)) {
-            goto invalidate;
-        }
-
-        if (options & MS_INVALIDATE_ALL) {
-            goto invalidate;
-        }
-
-        continue;
-
-        // FIXME what if mem_sync range does not aligned with
-        //       a leaflet with order > 1
-    invalidate:
-        set_pte(ptep, null_pte);
-        leaflet_return(pte_leaflet(pte));
-        tlb_flush_vmr(region, va);
-    }
+    if (options & (MEM_FLUSH_UNMAP | MS_INVALIDATE_ALL))
+        tlb_flush_range(start, (end - start) / PAGE_SIZE);
 }
 
 int
-mem_msync(ptr_t mnt,
-          vm_regions_t* regions,
-          ptr_t addr,
-          size_t length,
-          int options)
+mem_msync(vm_regions_t* regions, ptr_t addr, size_t length, int options) 
 {
-    struct mm_region* pos = list_entry(regions->next, struct mm_region, head);
-    while (length && (ptr_t)&pos->head != (ptr_t)regions) {
-        if (pos->end >= addr && pos->start <= addr) {
+    struct mm_region* pos;
+
+    pos = list_entry(regions->next, struct mm_region, head);
+    options = options & MEM_FLUSH_MSYNC_MASK;
+
+    while (length && (ptr_t)&pos->head != (ptr_t)regions) 
+    {
+        if (pos->end >= addr && pos->start <= addr) 
+        {
             size_t l = MIN(length, pos->end - addr);
-            mem_sync_pages(mnt, pos, addr, l, options);
+            mem_flush_pages(pos, addr, addr + l, options);
 
             addr += l;
             length -= l;
         }
+
         pos = list_entry(pos->head.next, struct mm_region, head);
     }
 
@@ -338,7 +366,7 @@ mem_msync(ptr_t mnt,
 }
 
 void
-mem_unmap_region(ptr_t mnt, struct mm_region* region)
+mem_unmap_region(struct mm_region* region)
 {
     if (!region) {
         return;
@@ -346,13 +374,7 @@ mem_unmap_region(ptr_t mnt, struct mm_region* region)
     
     valloc_ensure_valid(region);
     
-    pfn_t pglen = leaf_count(region->end - region->start);
-    mem_sync_pages(mnt, region, region->start, pglen * PAGE_SIZE, 0);
-
-    pte_t* ptep = mkptep_va(mnt, region->start);
-    __remove_ranged_mappings(ptep, pglen);
-
-    tlb_flush_vmr_all(region);
+    mem_flush_pages(region, region->start, region->end, MEM_FLUSH_UNMAP);
     
     llist_delete(&region->head);
     region_release(region);
@@ -375,10 +397,7 @@ mem_unmap_region(ptr_t mnt, struct mm_region* region)
     ((vmr)->start > (addr) && ((addr) + (len)) > (vmr)->end)
 
 static void
-__unmap_overlapped_cases(ptr_t mnt,
-                         struct mm_region* vmr,
-                         ptr_t* addr,
-                         size_t* length)
+__unmap_overlapped_cases(struct mm_region* vmr, ptr_t* addr, size_t* length)
 {
     // seg start, umapped segement start
     ptr_t seg_start = *addr, umps_start = 0;
@@ -422,12 +441,7 @@ __unmap_overlapped_cases(ptr_t mnt,
         umps_start = vmr->start;
     }
 
-    mem_sync_pages(mnt, vmr, vmr->start, umps_len, 0);
-
-    pte_t *ptep = mkptep_va(mnt, vmr->start);
-    __remove_ranged_mappings(ptep, leaf_count(umps_len));
-
-    tlb_flush_vmr_range(vmr, vmr->start, umps_len);
+    mem_flush_pages(vmr, vmr->start, umps_len, MEM_FLUSH_UNMAP);
 
     vmr->start += displ;
     vmr->end -= shrink;
@@ -446,10 +460,10 @@ __unmap_overlapped_cases(ptr_t mnt,
 }
 
 int
-mem_unmap(ptr_t mnt, vm_regions_t* regions, ptr_t addr, size_t length)
+mem_unmap(vm_regions_t* regions, ptr_t addr, size_t length)
 {
     length = ROUNDUP(length, PAGE_SIZE);
-    ptr_t cur_addr = page_aligned(addr);
+    ptr_t cur_addr = page_frame(addr);
     struct mm_region *pos, *n;
 
     llist_for_each(pos, n, regions, head)
@@ -467,7 +481,7 @@ mem_unmap(ptr_t mnt, vm_regions_t* regions, ptr_t addr, size_t length)
             break;
         }
 
-        __unmap_overlapped_cases(mnt, pos, &cur_addr, &remaining);
+        __unmap_overlapped_cases(pos, &cur_addr, &remaining);
 
         pos = n;
     }
@@ -494,7 +508,7 @@ __DEFINE_LXSYSCALL1(void*, sys_mmap, struct usr_mmap_param*, mparam)
     errno  = 0;
     result = (void*)-1;
 
-    if (!length || length > BS_SIZE || va_offset(addr_ptr)) {
+    if (!length || length > BS_SIZE || page_offset(addr_ptr)) {
         errno = EINVAL;
         goto done;
     }
@@ -530,8 +544,7 @@ __DEFINE_LXSYSCALL1(void*, sys_mmap, struct usr_mmap_param*, mparam)
                                 .offset = offset,
                                 .type = REGION_TYPE_GENERAL,
                                 .proct = proct,
-                                .pvms = vmspace(__current),
-                                .vms_mnt = VMS_SELF };
+                                .pvms = vmspace(__current) };
 
     errno = mmap_user(&result, NULL, addr_ptr, file, &param);
 
@@ -542,21 +555,16 @@ done:
 
 __DEFINE_LXSYSCALL2(int, munmap, void*, addr, size_t, length)
 {
-    return mem_unmap(
-      VMS_SELF, vmregions(__current), (ptr_t)addr, length);
+    return mem_unmap(vmregions(__current), (ptr_t)addr, length);
 }
 
 __DEFINE_LXSYSCALL3(int, msync, void*, addr, size_t, length, int, flags)
 {
-    if (va_offset((ptr_t)addr) || ((flags & MS_ASYNC) && (flags & MS_SYNC))) {
+    if (page_offset((ptr_t)addr) || ((flags & MS_ASYNC) && (flags & MS_SYNC))) {
         return DO_STATUS(EINVAL);
     }
 
-    int status = mem_msync(VMS_SELF,
-                           vmregions(__current),
-                           (ptr_t)addr,
-                           length,
-                           flags);
+    int status = mem_msync(vmregions(__current), (ptr_t)addr, length, flags);
 
     return DO_STATUS(status);
 }

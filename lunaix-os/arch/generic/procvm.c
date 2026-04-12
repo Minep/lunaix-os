@@ -1,31 +1,18 @@
+#include "asm/mempart.h"
 #include <lunaix/mm/procvm.h>
 #include <lunaix/mm/pagetable.h>
 #include <lunaix/mm/page.h>
 
 _default void
-procvm_link_kernel(ptr_t dest_mnt)
+procvm_link_kernel(pte_t* dest_l0t, pte_t* src_l0t)
 {
-    pte_t *ptep_smx, *src_smx;
-    struct leaflet* leaflet;
-    unsigned int i;
+    int index, end;
+
+    index = level_index(KERNEL_AREA_BEGIN, L0T);
+    end = level_index(KERNEL_AREA_END, L0T);
     
-    i = va_level_index(KERNEL_RESIDENT, L0T_SIZE);
-    ptep_smx = mkl1tep_va(VMS_SELF, dest_mnt);
-    src_smx  = mkl0tep_va(VMS_SELF, 0);
-
-    for (; i < LEVEL_SIZE; i++)
-    {
-        pte_t* ptep = &ptep_smx[i];
-        pte_t  pte  = pte_at(&src_smx[i]);
-        if (lntep_implie_vmnts(ptep, L0T_SIZE)) {
-            continue;
-        }
-
-        // sanity check
-        leaflet = pte_leaflet_aligned(pte);
-        assert(leaflet_refcount(leaflet) > 0);
-
-        set_pte(ptep, pte);
+    for(; index <= end; index++) {
+        set_pte(&dest_l0t[index], pte_at(&src_l0t[index]));
     }
 }
 

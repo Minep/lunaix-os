@@ -65,9 +65,6 @@ found:;
     nhuge = page_count(pool_size, L0T_SIZE);
     ptep = mkl0tep_va(VMS_SELF, PMAP);
     
-    // since VMAP and PMAP share same address space
-    // we need to shift VMAP to make room
-    vmap_set_start(VMAP + nhuge * L0T_SIZE);
     vmm_set_ptes_contig(ptep, pte_mkhuge(pte), L0T_SIZE, nhuge);
 #endif
 

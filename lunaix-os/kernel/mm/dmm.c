@@ -1,5 +1,4 @@
 #include <lunaix/mm/mmap.h>
-#include <lunaix/mm/vmm.h>
 #include <lunaix/process.h>
 #include <lunaix/status.h>
 
@@ -17,7 +16,6 @@ int
 create_heap(struct proc_mm* pvms, ptr_t addr)
 {
     struct mmap_param map_param = { .pvms = pvms,
-                                    .vms_mnt = VMS_SELF,
                                     .flags = MAP_ANON | MAP_PRIVATE,
                                     .type = REGION_TYPE_HEAP,
                                     .proct = PROT_READ | PROT_WRITE,

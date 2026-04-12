@@ -2,8 +2,6 @@
 #define __LUNAIX_PAGE_H
 
 #include <lunaix/mm/pmm.h>
-#include <lunaix/mm/vmm.h>
-#include <lunaix/mm/vmtlb.h>
 
 #include <klibc/string.h>
 
@@ -40,18 +38,6 @@ static inline struct ppage*
 get_ppage(struct leaflet* leaflet)
 {
     return (struct ppage*)leaflet;
-}
-
-static inline struct leaflet*
-alloc_leaflet(int order)
-{
-    return (struct leaflet*)pmm_alloc_napot_type(POOL_UNIFIED, order, 0);
-}
-
-static inline struct leaflet*
-alloc_leaflet_pinned(int order)
-{
-    return (struct leaflet*)pmm_alloc_napot_type(POOL_UNIFIED, order, PP_FGLOCKED);
 }
 
 static inline void
@@ -107,18 +93,8 @@ ppfn_leaflet(pfn_t ppfn)
 static inline struct leaflet*
 pte_leaflet(pte_t pte)
 {
-    struct ppage* ppfn = ppage(pfn(pte_paddr(pte)));
+    struct ppage* ppfn = ppage(page_index(pte_paddr(pte)));
     return get_leaflet(ppfn);
-}
-
-static inline struct leaflet*
-pte_leaflet_aligned(pte_t pte)
-{
-    struct ppage* ppfn = ppage(pfn(pte_paddr(pte)));
-    struct leaflet* _l = get_leaflet(ppfn);
-
-    assert((ptr_t)_l == (ptr_t)ppfn);
-    return _l;
 }
 
 static inline pfn_t
@@ -130,7 +106,7 @@ leaflet_ppfn(struct leaflet* leaflet)
 static inline ptr_t
 leaflet_addr(struct leaflet* leaflet)
 {
-    return page_addr(ppfn(get_ppage(leaflet)));
+    return ppage_addr(get_ppage(leaflet));
 }
 
 static inline void
@@ -143,83 +119,6 @@ static inline void
 pin_leaflet(struct leaflet* leaflet)
 {
     change_page_type(get_ppage(leaflet), PP_FGLOCKED);
-}
-
-/**
- * @brief Map a leaflet
- * 
- * @param ptep 
- * @param leaflet 
- * @return pages folded into that leaflet
- */
-static inline size_t
-ptep_map_leaflet(pte_t* ptep, pte_t pte, struct leaflet* leaflet)
-{
-    // We do not support huge leaflet yet
-    assert(leaflet_order(leaflet) < LEVEL_SHIFT);
-
-    pte = pte_setppfn(pte, leaflet_ppfn(leaflet));
-    pte = pte_mkloaded(pte);
-
-    int n = leaflet_nfold(leaflet);
-    vmm_set_ptes_contig(ptep, pte, LFT_SIZE, n);
-
-    return n;
-}
-
-/**
- * @brief Unmap a leaflet
- * 
- * @param ptep 
- * @param leaflet 
- * @return pages folded into that leaflet
- */
-static inline size_t
-ptep_unmap_leaflet(pte_t* ptep, struct leaflet* leaflet)
-{
-    // We do not support huge leaflet yet
-    assert(leaflet_order(leaflet) < LEVEL_SHIFT);
-
-    int n = leaflet_nfold(leaflet);
-    vmm_unset_ptes(ptep, n);
-
-    return n;
-}
-
-static inline ptr_t
-leaflet_mount(struct leaflet* leaflet)
-{
-    pte_t* ptep = mkptep_va(VMS_SELF, PG_MOUNT_VAR);    
-    ptep_map_leaflet(ptep, mkpte_prot(KERNEL_DATA), leaflet);
-
-    tlb_flush_kernel_ranged(PG_MOUNT_VAR, leaflet_nfold(leaflet));
-
-    return PG_MOUNT_VAR;
-}
-
-static inline void
-leaflet_unmount(struct leaflet* leaflet)
-{
-    pte_t* ptep = mkptep_va(VMS_SELF, PG_MOUNT_VAR);    
-    vmm_unset_ptes(ptep, leaflet_nfold(leaflet));
-
-    tlb_flush_kernel_ranged(PG_MOUNT_VAR, leaflet_nfold(leaflet));
-}
-
-static inline void
-leaflet_fill(struct leaflet* leaflet, unsigned int val)
-{
-    ptr_t mnt;
-    
-    mnt = leaflet_mount(leaflet);
-    memset((void*)mnt, val, leaflet_size(leaflet));
-    leaflet_unmount(leaflet);
-}
-
-static inline void
-leaflet_wipe(struct leaflet* leaflet)
-{
-    leaflet_fill(leaflet, 0);
 }
 
 /**
@@ -242,83 +141,84 @@ dup_leaflet(struct leaflet* leaflet);
  * @return ptr_t 
  */
 ptr_t
-vmap_ptes_at(pte_t pte, size_t lvl_size, int n);
-
-/**
- * @brief Maps a number of contiguous ptes in kernel 
- *        address space (leaf page size)
- * 
- * @param pte the pte to be mapped
- * @param n number of ptes
- * @return ptr_t 
- */
-static inline ptr_t
-vmap_leaf_ptes(pte_t pte, int n)
-{
-    return vmap_ptes_at(pte, LFT_SIZE, n);
-}
-
-/**
- * @brief Maps a contiguous range of physical address 
- *        into kernel address space (leaf page size)
- * 
- * @param paddr start of the physical address range
- * @param size size of the physical range
- * @param prot default protection to be applied
- * @return ptr_t 
- */
-static inline ptr_t
-vmap(struct leaflet* leaflet, pte_attr_t prot)
-{
-    pte_t _pte = mkpte(page_addr(leaflet_ppfn(leaflet)), prot);
-    return vmap_ptes_at(_pte, LFT_SIZE, leaflet_nfold(leaflet));
-}
+vmap_ptes_at(pte_t pte, int n);
 
 void
-vunmap(ptr_t ptr, struct leaflet* leaflet);
+vunmap_at(ptr_t vmap_addr, int n);
 
 static inline ptr_t
-vmap_range(pfn_t start, size_t npages, pte_attr_t prot)
+leaflet_va(struct leaflet* leaflet)
 {
-    pte_t _pte = mkpte(page_addr(start), prot);
-    return vmap_ptes_at(_pte, LFT_SIZE, npages);
+    if (unlikely(!leaflet))
+        return 0;
+    return phy_to_virt(leaflet_ppfn(leaflet) * PAGE_SIZE);
+}
+
+static inline struct leaflet*
+leaflet_from_va(ptr_t va)
+{
+    return ppfn_leaflet(virt_to_phy(va) / PAGE_SIZE);
+}
+
+static inline ptr_t
+ppage_va(struct ppage* page)
+{
+    if (unlikely(!page))
+        return 0;
+    return phy_to_virt(ppfn(page));
+}
+
+static inline struct ppage*
+ppage_from_va(ptr_t va)
+{
+    return ppage(virt_to_phy(va) / PAGE_SIZE);
 }
 
 static inline void
-vunmap_range(pfn_t start, size_t npages)
+leaflet_fill(struct leaflet* leaflet, unsigned int val)
 {
-    pte_t* ptep = mkptep_va(VMS_SELF, start);
-    vmm_set_ptes_contig(ptep, null_pte, LFT_SIZE, npages);
+    ptr_t va = leaflet_va(leaflet);
+    memset((void*)va, val, leaflet_size(leaflet));
 }
 
-
-/**
- * @brief Allocate a page in kernel space.
- * 
- * @param ptep 
- * @param pte 
- * @param order 
- * @return pte_t 
- */
-pte_t 
-alloc_kpage_at(pte_t* ptep, pte_t pte, int order);
-
-static inline void*
-vmalloc_page(int order)
+static inline void
+leaflet_wipe(struct leaflet* leaflet)
 {
-    struct leaflet* leaf = alloc_leaflet(0);
-    if (!leaf) {
+    leaflet_fill(leaflet, 0);
+}
+
+static inline struct leaflet*
+alloc_leaflet(int order)
+{
+    return (struct leaflet*)pmm_alloc_napot_type(POOL_UNIFIED, order, 0);
+}
+
+static inline struct ppage*
+alloc_page()
+{
+    return pmm_alloc_napot_type(POOL_UNIFIED, 0, 0);
+}
+
+static inline struct leaflet*
+alloc_leaflet_pinned(int order)
+{
+    return (struct leaflet*)pmm_alloc_napot_type(POOL_UNIFIED, order, PP_FGLOCKED);
+}
+
+static inline struct leaflet*
+alloc_page_table()
+{
+    struct leaflet* leaflet = alloc_leaflet_pinned(0);
+    if (!leaflet)
         return NULL;
-    }
 
-    return (void*)vmap(leaf, KERNEL_DATA);
+    leaflet_wipe(leaflet);
+    return leaflet;
 }
 
-static inline void
-vmfree(void* ptr)
+static inline size_t
+count_pages(size_t size) 
 {
-    struct leaflet* leaf = ppfn_leaflet(pfn((ptr_t)ptr));
-    leaflet_return(leaf);
+    return ROUNDUP(size, PAGE_SIZE);
 }
-
 #endif /* __LUNAIX_PAGE_H */

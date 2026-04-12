@@ -83,7 +83,6 @@ done:
 void
 exec_init_container(struct exec_host* param,
                struct thread* thread,
-               ptr_t vms,
                const char** argv,
                const char** envp)
 {
@@ -92,7 +91,6 @@ exec_init_container(struct exec_host* param,
     *param = (struct exec_host) 
     { 
         .proc = thread->process,
-        .vms_mnt = vms,
         .exe = { 
             .container = param 
         },
@@ -176,16 +174,8 @@ exec_load(struct exec_host* container, struct v_file* executable)
     struct proc_mm* pvms = vmspace(proc);
 
     if (pvms->heap) {
-        mem_unmap_region(container->vms_mnt, pvms->heap);
+        mem_unmap_region(pvms->heap);
         pvms->heap = NULL;
-    }
-
-    if (!active_vms(container->vms_mnt)) {
-        /*
-            TODO Setup remote mapping of user stack for later use
-        */
-        fail("not implemented");
-
     }
 
     if ((errno = count_length(argv))) {
@@ -258,7 +248,7 @@ exec_kexecve(const char* filename, const char* argv[], const char* envp[])
 
     assert(argv && envp);
 
-    exec_init_container(&container, current_thread, VMS_SELF, argv, envp);
+    exec_init_container(&container, current_thread, argv, envp);
 
     errno = exec_load_byname(&container, filename);
 
@@ -289,7 +279,7 @@ __DEFINE_LXSYSCALL3(int, execve, const char*, filename,
     }
 
     exec_init_container(
-      &container, current_thread, VMS_SELF, argv, envp);
+      &container, current_thread, argv, envp);
 
     if ((errno = exec_load_byname(&container, filename))) {
         goto done;

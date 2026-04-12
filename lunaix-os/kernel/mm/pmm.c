@@ -3,6 +3,7 @@
 #include <lunaix/spike.h>
 #include <lunaix/owloysius.h>
 #include <lunaix/syslog.h>
+#include <lunaix/mm/page.h>
 
 #include "pmm_internal.h"
 
@@ -40,7 +41,7 @@ pmm_init(struct boot_handoff* bctx)
     }
 
     pfn_t pplist_size = memory.list_len * sizeof(struct ppage);
-    pmm_onhold_range(pfn(pplist_pa), leaf_count(pplist_size));
+    pmm_onhold_range(page_index(pplist_pa), count_pages(pplist_size));
 }
 
 static inline bool must_inline optimize("-fipa-cp-clone")

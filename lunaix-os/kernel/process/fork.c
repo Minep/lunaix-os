@@ -1,3 +1,6 @@
+#include <lunaix/mm/vmtlb.h>
+#include "asm/mempart.h"
+#include "lunaix/mm/vastm.h"
 #include <lunaix/mm/region.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/page.h>
@@ -18,60 +21,45 @@
 LOG_MODULE("FORK")
 
 static void
-region_maybe_cow(struct mm_region* region)
+__dup_kernel_stack(struct thread* thread)
 {
-    int attr = region->attr;
-    if ((attr & REGION_WSHARED)) {
-        return;
-    }
+    // FIXME (2026.DUP_KSTACK)  integrate into vmrcpy workflow
+    // Kernel stacks should be a dedicated mm_region as user stacks.
+    // It make sense if we can reuse the logic of vmrcpy 
 
-    pfn_t start_pn = pfn(region->start);
-    pfn_t end_pn = pfn(region->end);
-    
-    for (size_t i = start_pn; i <= end_pn; i++) {
-        pte_t* self = mkptep_pn(VMS_SELF, i);
-        pte_t* guest = mkptep_pn(VMS_MOUNT_1, i);
-        ptr_t va = page_addr(ptep_pfn(self));
-
-        if ((attr & REGION_MODE_MASK) == REGION_RSHARED) {
-            set_pte(self, pte_mkwprotect(*self));
-            set_pte(guest, pte_mkwprotect(*guest));
-        } else {
-            // 如果是私有页，则将该页从新进程中移除。
-            set_pte(guest, null_pte);
-        }
-    }
-
-    tlb_flush_vmr_all(region);
-}
-
-static void
-__dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
-{
     struct leaflet* leaflet;
+    ptr_t kstack;
+    struct proc_mm* mm;
+    pte_t *dest, *src, p;
+    int nr_pages;
 
-    ptr_t kstack_pn = pfn(current_thread->kstack);
-    kstack_pn -= pfn(KSTACK_SIZE);
+    mm = vmspace(thread->process);
 
-    // copy the kernel stack
-    pte_t* src_ptep = mkptep_pn(VMS_SELF, kstack_pn);
-    pte_t* dest_ptep = mkptep_pn(vm_mnt, kstack_pn);
-    for (size_t i = 0; i <= pfn(KSTACK_SIZE); i++) {
-        pte_t p = *src_ptep;
+    kstack = (current_thread->kstack) - KERNEL_STACK_UNITSIZE;
+
+    dest = vastm_walk_ptep_strict(vastm_procvm_root(mm), kstack, RES_LFT);
+    src = vastm_walk_ptep_strict(
+            vastm_procvm_root(__current->mm), kstack, RES_LFT);
+
+    assert(dest && src);
+
+    for (size_t i = 0; i <= count_pages(KERNEL_STACK_UNITSIZE); i++) 
+    {
+        p = pte_at(&src[i]);
 
         if (pte_isguardian(p)) {
-            set_pte(dest_ptep, guard_pte);
+            set_pte(&dest[i], guard_pte);
         } else {
             leaflet = dup_leaflet(pte_leaflet(p));
-            i += ptep_map_leaflet(dest_ptep, p, leaflet);
-        }
+            nr_pages = leaflet_nfold(leaflet);
 
-        src_ptep++;
-        dest_ptep++;
+            set_ptes(&dest[i], p, leaflet_addr(leaflet), nr_pages);
+            i += nr_pages;
+        }
     }
 
-    struct proc_mm* mm = vmspace(thread->process);
-    tlb_flush_mm_range(mm, kstack_pn, leaf_count(KSTACK_SIZE));
+    tlb_flush_mm_range(
+            mm, page_index(kstack), count_pages(KERNEL_STACK_UNITSIZE));
 }
 
 /*
@@ -88,7 +76,7 @@ __dup_kernel_stack(struct thread* thread, ptr_t vm_mnt)
 */
 
 static struct thread*
-dup_active_thread(ptr_t vm_mnt, struct proc_info* duped_pcb) 
+dup_active_thread(struct proc_info* duped_pcb) 
 {
     struct thread* th = alloc_thread(duped_pcb);
     if (!th) {
@@ -106,7 +94,7 @@ dup_active_thread(ptr_t vm_mnt, struct proc_info* duped_pcb)
      */
     store_retval_to(th, 0);
 
-    __dup_kernel_stack(th, vm_mnt);
+    __dup_kernel_stack(th);
 
     if (!current_thread->ustack) {
         goto done;
@@ -122,7 +110,7 @@ dup_active_thread(ptr_t vm_mnt, struct proc_info* duped_pcb)
         }
 
         if (!same_region(pos, old_stack)) {
-            mem_unmap_region(vm_mnt, pos);
+            mem_unmap_region(pos);
         }
         else {
             th->ustack = pos;
@@ -138,9 +126,12 @@ done:
 pid_t
 dup_proc()
 {
+    struct thread* main_thread;
+    struct proc_info* pcb;
+    
     no_preemption();
     
-    struct proc_info* pcb = alloc_process();
+    pcb = alloc_process();
     if (!pcb) {
         syscall_result(ENOMEM);
         return -1;
@@ -163,25 +154,14 @@ dup_proc()
     fdtable_copy(pcb->fdtable, __current->fdtable);
     uscope_copy(&pcb->uscope, current_user_scope());
 
-    struct proc_mm* mm = vmspace(pcb);
-    procvm_dupvms_mount(mm);
+    procvm_dupvms(vmspace(pcb));
 
-    struct thread* main_thread = dup_active_thread(mm->vm_mnt, pcb);
+    main_thread = dup_active_thread(pcb);
     if (!main_thread) {
         syscall_result(ENOMEM);
-        procvm_unmount(mm);
         delete_process(pcb);
         return -1;
     }
-
-    // 根据 mm_region 进一步配置页表
-    struct mm_region *pos, *n;
-    llist_for_each(pos, n, &pcb->mm->regions, head)
-    {
-        region_maybe_cow(pos);
-    }
-
-    procvm_unmount(mm);
 
     commit_process(pcb);
     commit_thread(main_thread);

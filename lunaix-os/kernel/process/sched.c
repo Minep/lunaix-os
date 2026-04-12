@@ -56,7 +56,6 @@ run(struct thread* thread)
     thread->process->state = PS_RUNNING;
     thread->process->th_active = thread;
 
-    procvm_mount_self(vmspace(thread->process));
     set_current_executing(thread);
 
     switch_context();
@@ -84,12 +83,7 @@ cleanup_detached_threads()
             continue;
         }
 
-        struct proc_mm* mm = vmspace(pos->process);
-
-        procvm_mount(mm);
         destory_thread(pos);
-        procvm_unmount(mm);
-        
         i++;
     }
 
@@ -193,7 +187,6 @@ schedule()
 
     }
 
-    procvm_unmount_self(vmspace(__current));
     check_sleepers();
 
     // round-robin scheduler
@@ -531,8 +524,6 @@ delete_process(struct proc_info* proc)
 
     signal_free_registry(proc->sigreg);
 
-    procvm_mount(mm);
-    
     struct thread *pos, *n;
     llist_for_each(pos, n, &proc->threads, proc_sibs) {
         // terminate and destory all thread unconditionally

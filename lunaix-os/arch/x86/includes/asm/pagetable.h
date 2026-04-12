@@ -18,7 +18,7 @@
 
 typedef struct __pte pte_t;
 
-#define _PAGE_MASK              ( ( 1UL << _PAGE_BASE_SHIFT ) - 1)
+#define _PAGE_MASK              ~( ( 1UL << _PAGE_BASE_SHIFT ) - 1)
 #define _PTE_PPFN_MASK          ( ( ( 1UL << _PA_BITS ) - 1 ) << _PAGE_BASE_SHIFT )
 #define _PTE_PROT_MASK          ( ~_PTE_PPFN_MASK )
 
@@ -64,14 +64,14 @@ static inline pte_t
 mkpte(ptr_t paddr, pte_attr_t prot)
 {
     pte_attr_t attrs = (prot & _PTE_PROT_MASK) | _PTE_P;
-    return __mkpte_from((paddr & ~_PAGE_MASK) | attrs);
+    return __mkpte_from((paddr & _PAGE_MASK) | attrs);
 }
 
 static inline pte_t
 mkpte_root(ptr_t paddr, pte_attr_t prot)
 {
     pte_attr_t attrs = (prot & _PTE_PROT_MASK) | _PTE_P;
-    return __mkpte_from((paddr & ~_PAGE_MASK) | attrs);
+    return __mkpte_from((paddr & _PAGE_MASK) | attrs);
 }
 
 static inline pte_t
@@ -137,7 +137,7 @@ pte_mkvolatile(pte_t pte)
 static inline pte_t
 pte_mkroot(pte_t pte) 
 {
-    return __mkpte_from(pte.val & ~_PTE_PS);
+    return __mkpte_from(pte.val & ~(_PTE_PS | _PTE_NX) | _PTE_W);
 }
 
 static inline pte_t

@@ -1,3 +1,4 @@
+#include <lunaix/mm/vastm.h>
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
@@ -5,90 +6,105 @@
 
 #include <asm/mempart.h>
 
-static ptr_t start = VMAP;
-static volatile ptr_t prev_va = 0;
+static volatile ptr_t prev_va = VMAP;
 
-void
-vmap_set_start(ptr_t start_addr) {
-    start = start_addr;
+struct vmap_state {
+    int n;
+    pte_t attr;
+    ptr_t pa;
+    ptr_t va;
+};
+
+static enum vastm_action
+__vmap_create_interim(struct vastm_state *state, pte_t *entry, void *data)
+{
+    if (pte_isnull(pte_at(entry))) {
+        vastm_helper_create_intrim_table(state, entry, KERNEL_PGTAB);
+    } 
+
+    vastm_visit_next(*state, ptep_next_table(entry));
+    return VASTM_CONTINUE;
 }
 
-static pte_t*
-__alloc_contig_ptes(pte_t* ptep, size_t base_sz, int n)
+static inline int
+__locate_vacant_slots(pte_t* ptep, int nr)
 {
-    int _n     = 0;
-    size_t sz  = L0T_SIZE;
-    ptr_t va   = page_addr(ptep_pfn(ptep));
+    int i = ptep_entry_index(ptep);
+    int slots = nr;
 
-    ptep = mkl0tep(ptep);
-
-    while (_n < n && va < VMAP_END) {
-        pte_t pte = *ptep;
-        if (pte_isnull(pte)) {
-            _n += sz / base_sz;
-        } 
-        else if ((sz / LEVEL_SIZE) < base_sz) {
-            _n = 0;
-        }
-        else {
-            sz = sz / LEVEL_SIZE;
-            ptep = ptep_step_into(ptep);
-            continue;
-        }
-
-        if (ptep_vfn(ptep) + 1 == LEVEL_SIZE) {
-            ptep = ptep_step_out(++ptep);
-            va += sz;
-            
-            sz = sz * LEVEL_SIZE;
-            continue;
-        }
+    while (slots && i < LFT_LENGTH) {
+        slots--;
         
-        va += sz;
+        if (!pte_isnull(pte_at(ptep))) {
+            slots = nr;
+        }
+
         ptep++;
+        i++;
     }
 
-    if (va >= VMAP_END) {
-        return NULL;
-    }
+    if (slots)
+        return -1;
 
-    va -= base_sz * _n;
-    
-    prev_va = va;
-    return mkptep_va(ptep_vm_mnt(ptep), va);
+    return nr;
+}
+
+static enum vastm_action
+__setup_mappings(struct vastm_state *state, pte_t *entry, void *data)
+{
+    int offset;
+    struct vmap_state* vmap_state;
+
+    vmap_state = (struct vmap_state*)data;
+    offset = __locate_vacant_slots(entry, vmap_state->n);
+
+    if (offset < 0)
+        return VASTM_BREAK;
+
+    vmap_state->va = state->va + offset * PAGE_SIZE;
+    set_ptes(&entry[offset], vmap_state->attr, vmap_state->pa, vmap_state->n);
+
+    return vastm_walk_flag_complete(state);
 }
 
 ptr_t
-vmap_ptes_at(pte_t pte, size_t lvl_size, int n)
+vmap_ptes_at(pte_t pte, int n)
 {
-    pte_t* ptep = mkptep_va(VMS_SELF, start);
-    ptep = __alloc_contig_ptes(ptep, lvl_size, n);
-
-    if (!ptep) {
-        return 0;
-    }
-
-    vmm_set_ptes_contig(ptep, pte, lvl_size, n);
-
-    ptr_t va = page_addr(ptep_pfn(ptep));
-
-    tlb_flush_kernel_ranged(va, n);
+    struct vmap_state state;
+    struct vastm param;
     
-    return va;
+    state.n = n;
+    state.pa = pte_paddr(pte);
+    state.attr = pte_setpaddr(pte, 0);
+    state.va = 0;
+    
+    vastm_param_prepare(&param, &state);
+    vastm_param_cb_set_interims(&param, __vmap_create_interim);
+    vastm_param_cb_set(&param, ASTM_LFT, __setup_mappings);
+    
+    vastm_walk(&param, vastm_current_root(), 
+                prev_va, VMAP_END, RES_LFT);
+    
+    if (state.va) {
+        prev_va = state.va >= VMAP_END ? VMAP : state.va;
+    }
+ 
+    return state.va;
 }
 
 void
-vunmap(ptr_t ptr, struct leaflet* leaflet)
-{    
+vunmap_at(ptr_t vmap_addr, int n)
+{
     pte_t* ptep;
-    unsigned int npages;
- 
-    assert(start <= ptr && ptr <= VMAP_END);
+
+    vmap_addr = vmap_addr & PAGE_MASK;
     
-    npages = leaflet_nfold(leaflet);
-    ptep = mkptep_va(VMS_SELF, ptr);
+    ptep = vastm_walk_ptep_strict(vastm_current_root(), vmap_addr, RES_LFT);
+    if (!ptep)
+        return;
 
-    vmm_unset_ptes(ptep, npages);
+    while (n--)
+        set_pte(ptep++, null_pte);
 
-    tlb_flush_kernel_ranged(ptr, npages);
+    tlb_flush_kernel_ranged(vmap_addr, n);
 }

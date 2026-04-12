@@ -3,6 +3,7 @@
 
 #include "mempart.h"
 #include "pagetable.h"
+#include "x86_cpu.h"
 
 /*
     Regardless architecture we need to draw the line very carefully, and must 
@@ -36,5 +37,18 @@
 
 #define to_kphysical(k_va)      ((ptr_t)(k_va) - KERNEL_IMG)
 #define to_kvirtual(k_pa)       ((ptr_t)(k_pa) + KERNEL_IMG)
+
+
+#define phy_to_virt(page)   ( (page) + PHYPAGE_POOL_START ) 
+#define virt_to_phy(va)     ( ( (va) & PAGE_MASK) - PHYPAGE_POOL_START )
+
+
+static inline unsigned long
+x86_current_vas()
+{
+    return cpu_ldvmspace() & (-1UL << 12);
+}
+
+#define current_vas() x86_current_vas()
 
 #endif /* __LUNAIX_MM_DEFS_H */

@@ -8,6 +8,7 @@
  * @copyright Copyright (c) 2022
  *
  */
+#include "asm/mm_defs.h"
 #include <hal/ahci/ahci.h>
 #include <hal/ahci/hba.h>
 #include <hal/ahci/sata.h>
@@ -125,18 +126,22 @@ ahci_driver_init(struct ahci_driver_param* param)
 #endif
 
         struct leaflet* leaflet;
+
+        // FIXME (2026.DEVPAGE) FIS & CLB page should be a device/IO page
+        // make a route in mm/mmio.c to handle that
         if (!clbp) {
             // 每页最多4个命令队列
             leaflet = alloc_leaflet(0);
             clb_pa = leaflet_addr(leaflet);
-            clb_pg_addr = vmap(leaflet, KERNEL_DATA);
+            clb_pg_addr = leaflet_va(leaflet);
             memset((void*)clb_pg_addr, 0, 0x1000);
         }
+
         if (!fisp) {
             // 每页最多16个FIS
             leaflet = alloc_leaflet(0);
             fis_pa = leaflet_addr(leaflet);
-            fis_pg_addr = vmap(leaflet, KERNEL_DATA);
+            fis_pg_addr = leaflet_va(leaflet);
             memset((void*)fis_pg_addr, 0, 0x1000);
         }
 
@@ -237,8 +242,10 @@ hba_bind_sbuf(struct hba_cmdh* cmdh, struct hba_cmdt* cmdt, struct membuf mbuf)
 {
     assert_msg(mbuf.size <= 0x400000U, "HBA: Buffer too big");
     cmdh->prdt_len = 1;
+
+    // FIXME (2026-DEVPAGE) need to be remap as device page
     cmdt->entries[0] =
-      (struct hba_prdte){ .data_base = vmm_v2p((ptr_t)mbuf.buffer),
+      (struct hba_prdte){ .data_base = virt_to_phy((ptr_t)mbuf.buffer),
                           .byte_count = mbuf.size - 1 };
 
     return 0;
@@ -255,8 +262,9 @@ hba_bind_vbuf(struct hba_cmdh* cmdh, struct hba_cmdt* cmdt, struct vecbuf* vbuf)
         assert_msg(pos->buf.size <= 0x400000U, "HBA: Buffer too big");
         assert_msg(pos->buf.size, "HBA: expect a non-zero buffer size");
 
+        // FIXME (2026-DEVPAGE) need to be remap as device page
         cmdt->entries[i++] =
-          (struct hba_prdte){ .data_base = vmm_v2p((ptr_t)pos->buf.buffer),
+          (struct hba_prdte){ .data_base = virt_to_phy((ptr_t)pos->buf.buffer),
                               .byte_count = pos->buf.size - 1 };
         pos = list_entry(pos->components.next, struct vecbuf, components);
     } while (pos != vbuf);
@@ -281,7 +289,8 @@ hba_prepare_cmd(struct hba_port* port,
     memset(cmd_header, 0, sizeof(*cmd_header));
 
     // 将命令表挂到命令头上
-    cmd_header->cmd_table_base = vmm_v2p((ptr_t)cmd_table);
+    // FIXME (2026-DEVPAGE) need to be remap as device page
+    cmd_header->cmd_table_base = virt_to_phy((ptr_t)cmd_table);
     cmd_header->options =
       HBA_CMDH_FIS_LEN(sizeof(struct sata_reg_fis)) | HBA_CMDH_CLR_BUSY;
 
