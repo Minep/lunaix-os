@@ -19,7 +19,7 @@
 typedef struct __pte pte_t;
 
 #define _PAGE_MASK              ~( ( 1UL << _PAGE_BASE_SHIFT ) - 1)
-#define _PTE_PPFN_MASK          ( ( ( 1UL << _PA_BITS ) - 1 ) << _PAGE_BASE_SHIFT )
+#define _PTE_PPFN_MASK          ( (-1UL << _PAGE_BASE_SHIFT) & ( (1UL << _PA_BITS) - 1 ) )
 #define _PTE_PROT_MASK          ( ~_PTE_PPFN_MASK )
 
 #define KERNEL_PAGE             ( _PTE_P )
@@ -46,6 +46,10 @@ typedef struct __pte pte_t;
 #define guard_pte               ( __mkpte_from(__MEMGUARD) )
 #define pte_val(pte)            ( pte.val )
 
+
+#define __sanitize_vaddr(va)    ( va )
+#define __sanitize_paddr(pa)    ( (pa) & ~(-1UL << _PA_BITS) )
+#define __vaddr_tag(va)         ( 0 )
 
 static inline bool
 pte_isguardian(pte_t pte)
@@ -137,7 +141,7 @@ pte_mkvolatile(pte_t pte)
 static inline pte_t
 pte_mkroot(pte_t pte) 
 {
-    return __mkpte_from(pte.val & ~(_PTE_PS | _PTE_NX) | _PTE_W);
+    return __mkpte_from((pte.val & ~(_PTE_PS | _PTE_NX)) | _PTE_W);
 }
 
 static inline pte_t

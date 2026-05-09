@@ -248,6 +248,7 @@ exec_kexecve(const char* filename, const char* argv[], const char* envp[])
 
     assert(argv && envp);
 
+    // FIXME [2026-QUALIFIER] enforce volatile modifiers.
     exec_init_container(&container, current_thread, argv, envp);
 
     errno = exec_load_byname(&container, filename);
@@ -278,6 +279,7 @@ __DEFINE_LXSYSCALL3(int, execve, const char*, filename,
         goto done;
     }
 
+    // FIXME [2026-QUALIFIER] enforce volatile modifiers.
     exec_init_container(
       &container, current_thread, argv, envp);
 
@@ -287,10 +289,14 @@ __DEFINE_LXSYSCALL3(int, execve, const char*, filename,
 
     // we will jump to new entry point (_u_start) upon syscall's
     // return so execve 'will not return' from the perspective of it's invoker
+    
+    // FIXME [2026-QUALIFIER] enforce volatile modifiers.
     exec_arch_prepare_entry(current_thread, &container);
 
     // these become meaningless once execved!
     current_thread->ustack_top = 0;
+    
+    // FIXME [2026-QUALIFIER] enforce volatile modifiers.
     signal_reset_context(&current_thread->sigctx);
     signal_reset_registry(__current->sigreg);
 

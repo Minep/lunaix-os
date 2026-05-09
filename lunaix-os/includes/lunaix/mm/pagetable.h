@@ -143,12 +143,17 @@ typedef struct __pte pte_t;
 #define L3T_LENGTH              ( 1 << _L3T_LEVEL_WIDTH )
 #define LFT_LENGTH              ( 1 << _LFT_LEVEL_WIDTH )
 
+#define L0T_LEVEL_MASK          ( ( 1UL << _L0T_LEVEL_WIDTH ) - 1 )
+#define L1T_LEVEL_MASK          ( ( 1UL << _L1T_LEVEL_WIDTH ) - 1 )
+#define L2T_LEVEL_MASK          ( ( 1UL << _L2T_LEVEL_WIDTH ) - 1 )
+#define L3T_LEVEL_MASK          ( ( 1UL << _L3T_LEVEL_WIDTH ) - 1 )
+#define LFT_LEVEL_MASK          ( ( 1UL << _LFT_LEVEL_WIDTH ) - 1 )
 
-#define L0T_MASK                ( ( 1UL << _L0T_LEVEL_WIDTH ) - 1 )
-#define L1T_MASK                ( ( 1UL << _L1T_LEVEL_WIDTH ) - 1 )
-#define L2T_MASK                ( ( 1UL << _L2T_LEVEL_WIDTH ) - 1 )
-#define L3T_MASK                ( ( 1UL << _L3T_LEVEL_WIDTH ) - 1 )
-#define LFT_MASK                ( ( 1UL << _LFT_LEVEL_WIDTH ) - 1 )
+#define L0T_MASK                ( ~( L0T_SIZE - 1 ) )
+#define L1T_MASK                ( ~( L1T_SIZE - 1 ) )
+#define L2T_MASK                ( ~( L2T_SIZE - 1 ) )
+#define L3T_MASK                ( ~( L3T_SIZE - 1 ) )
+#define LFT_MASK                ( ~( LFT_SIZE - 1 ) )
 
 #define L0T                     0
 #define L1T                     1
@@ -159,9 +164,9 @@ typedef struct __pte pte_t;
 #define _level_size(n)          L##n##T_SIZE
 #define _level_page_shift(n)    L##n##T_PAGE_SHIFT
 #define _level_length(n)        L##n##T_LENGTH
-#define _level_mask(n)          L##n##T_MASK
-#define _level_width(n)         L##n##T_WIDTH
-#define _level_index(va, n)     (((va) >> L##n##T_PAGE_SHIFT) & L##n##T_MASK)
+#define _level_mask(n)          L##n##T_LEVEL_MASK
+#define _level_width(n)         _L##n##T_LEVEL_WIDTH
+#define _level_index(va, n)     (((va) >> L##n##T_PAGE_SHIFT) & L##n##T_LEVEL_MASK)
 
 #define level_size(n)           _level_size(n)
 #define level_page_shift(n)     _level_page_shift(n)
@@ -170,9 +175,9 @@ typedef struct __pte pte_t;
 #define level_width(n)          _level_width(n)
 #define level_index(va, n)      _level_index(va, n)
 
-#define __sanitize_vaddr(va)    ( (va) & VA_MASK )
-#define __sanitize_paddr(va)    ( (va) & PA_MASK )
-#define __vaddr_tag(va)         ( (va) >> _VA_BITS )
+#define sanitize_vaddr(va)      __sanitize_vaddr(va)
+#define sanitize_paddr(pa)      __sanitize_paddr(pa)
+#define vaddr_tag(va)           __vaddr_tag(va)
 
 #define ptep_at(table, va, level)       \
     ( &((pte_t*)(table))[_level_index(va, level)] )

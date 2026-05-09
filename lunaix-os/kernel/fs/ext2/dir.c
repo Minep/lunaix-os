@@ -502,7 +502,7 @@ ext2dr_insert(struct v_inode* this, struct ext2b_dirent* dirent,
     
     errno = __find_free_dirent_slot(this, &locator);
     if (errno < 0) {
-        goto failed;
+        return errno;
     }
 
     e_dno = &locator.result;
@@ -542,6 +542,7 @@ ext2dr_insert(struct v_inode* this, struct ext2b_dirent* dirent,
 
     else
     {
+        assert_fs(new_reclen > 0);
         prev_dirent = e_dno->prev.dirent;
         old_reclen  = prev_dirent->rec_len;
         old_reclen -= new_reclen;
@@ -553,7 +554,6 @@ ext2dr_insert(struct v_inode* this, struct ext2b_dirent* dirent,
     ext2_debug("dr_insert: state=%d, blk=%d, prev_rlen=%d, new_rlen=%d", 
                 locator.state, locator.db_pos, new_reclen, old_reclen);
 
-    assert_fs(new_reclen > 0);
     assert_fs(old_reclen > 0);
 
     dirent->rec_len = old_reclen;

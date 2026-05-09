@@ -20,7 +20,7 @@ __cached_gdesc_evict(struct bcache* bc, void* data)
 }
 
 static void
-__cached_gdesc_sync(struct bcache*, unsigned long tag, void* data)
+__cached_gdesc_sync(struct bcache* bc, unsigned long tag, void* data)
 {
     // since all mods to gdesc goes directly into fs buffer,
     // we just need to invoke the sync on the underlying.

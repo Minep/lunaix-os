@@ -5,6 +5,7 @@
 #include <lunaix/syslog.h>
 
 #include <asm/mempart.h>
+#include <asm/tlb.h>
 
 static volatile ptr_t prev_va = VMAP;
 

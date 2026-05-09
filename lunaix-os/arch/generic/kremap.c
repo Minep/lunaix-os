@@ -24,7 +24,7 @@ kpt_alloc_table(struct pt_alloc* alloc)
     return next;
 }
 
-static inline pte_t*
+static inline must_inline pte_t*
 __get_next_level(struct ptw_state* state, pte_t* ptep)
 {
     pte_t pte, *next;
@@ -40,7 +40,7 @@ __get_next_level(struct ptw_state* state, pte_t* ptep)
     return next;
 }
 
-static inline void must_inline
+static inline must_inline void 
 __walk_until(struct ptw_state* state, ptr_t addr, unsigned long stop_lvl)
 {
     pte_t *table, *ptep;
@@ -87,7 +87,8 @@ unsigned int boot_text
 kpt_set_ptes_flatten(struct ptw_state* state, ptr_t addr, 
                 pte_t pte, unsigned long lsize, unsigned int nr)
 {
-    unsigned int tab_i, _n, level_len;
+    unsigned int _n;
+    int level_len;
     pte_t *lntp;
 
     _n = 0;
@@ -103,13 +104,13 @@ kpt_set_ptes_flatten(struct ptw_state* state, ptr_t addr,
         __walk_until(state, addr, lsize);
 
         lntp  = state->lntp;
-        tab_i = ptep_entry_index(lntp);
         
         if (!pte_isnull(pte_at(lntp)))
             spin();
 
-        while (_n < nr && tab_i < level_len) {
-            set_pte(lntp, pte);
+        while (_n < nr && ptep_entry_index(lntp) < level_len) 
+        {
+            set_pte(lntp++, pte);
 
             pte = pte_setpaddr(pte, pte_paddr(pte) + lsize);
             addr += lsize;

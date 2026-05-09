@@ -1,8 +1,6 @@
 #ifndef __LUNAIX_MEMPART_H
 #define __LUNAIX_MEMPART_H
 
-#include <lunaix/compiler.h>
-
 #ifdef CONFIG_ARCH_X86_64
 #   include "variants/mempart64.h"
 #else
@@ -31,8 +29,8 @@
 
 #define USERLAND
 #define USERLAND_START                  USR_EXEC
-#define USERLAND_END                    USR_EXEC_END
-#define USERLAND_SIZE                   USR_EXEC_SIZE
+#define USERLAND_END                    USR_STACK_END
+#define USERLAND_SIZE                   (USERLAND_END - USR_EXEC + 1)
 
 #define USER_MMAP
 #define USER_MMAP_START                 USR_MMAP
@@ -57,6 +55,6 @@
 
 // User stack maximum limit per thread
 #define USER_STACK_UNITSIZE             USR_STACK_SIZE_THREAD 
-#define KERNEL_STACK_UNITSIZE           ( 5 * 4096 )
+#define KERNEL_STACK_UNITSIZE           ( 4 * 4096 )
 
 #endif

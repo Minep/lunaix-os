@@ -115,18 +115,20 @@ blkio_commit(struct blkio_req* req, int options)
     // As we don't want to overwhelming the interrupt context and also keep the
     // request RTT as small as possible, hence #1 is preferred.
 
-    /*
-        FIXME
-        Potential racing here.
-        happened when blkio is committed at high volumn, while the
-         block device has very little latency.
-        This is particular serious for non-async blkio, it could
-         completed before we do pwait, causing the thread hanged indefinitely
-    */
 
     if (blkio_stalled(ctx)) {
         if ((options & BLKIO_WAIT)) {
             blkio_schedule(ctx);
+
+            /* FIXME [2026-BLKIO] Race with wait()
+                A race between blkio request completion and wait() could happened
+                if there is no latency in the disk layer (e.g., functional model
+                like QEMU). Current workaround is to add temporary latency.
+
+                Proposed fix: introduce a new scheduler state: PS_WAIT and let
+                the scheduler check for awking eligibility.
+            */
+            for (int i = 0;i < 1000; i++);
             try_wait_check_stall();
             return;
         }

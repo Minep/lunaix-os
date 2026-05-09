@@ -1,6 +1,8 @@
 #ifndef __LUNAIX_PAGE_H
 #define __LUNAIX_PAGE_H
 
+#include "lunaix/mm/pagetable.h"
+#include "lunaix/spike.h"
 #include <lunaix/mm/pmm.h>
 
 #include <klibc/string.h>
@@ -165,7 +167,7 @@ ppage_va(struct ppage* page)
 {
     if (unlikely(!page))
         return 0;
-    return phy_to_virt(ppfn(page));
+    return phy_to_virt(ppfn(page) * PAGE_SIZE);
 }
 
 static inline struct ppage*
@@ -193,6 +195,7 @@ alloc_leaflet(int order)
     return (struct leaflet*)pmm_alloc_napot_type(POOL_UNIFIED, order, 0);
 }
 
+// TODO [2026-PAGE_ALLOC_POLICY] allow specifying different allocation policy
 static inline struct ppage*
 alloc_page()
 {
@@ -219,6 +222,6 @@ alloc_page_table()
 static inline size_t
 count_pages(size_t size) 
 {
-    return ROUNDUP(size, PAGE_SIZE);
+    return CEIL(size, PAGE_SHIFT);
 }
 #endif /* __LUNAIX_PAGE_H */

@@ -4,7 +4,7 @@
 
 #include <asm/mempart.h>
 
-bool
+void
 install_hart_transition(struct proc_mm* procvm, struct hart_transition* ht)
 {
     pte_t *ptep;
@@ -12,12 +12,10 @@ install_hart_transition(struct proc_mm* procvm, struct hart_transition* ht)
     
     ptep = vastm_walk_ptep_strict(
                 vastm_procvm_root(procvm), ht->inject, RES_LFT);
-    if (!ptep) 
-        return false;
+    
+    assert(ptep);
 
-    mount_inject = leaflet_va(pte_leaflet(pte_at(ptep)));
+    mount_inject = phy_to_virt(pte_paddr(pte_at(ptep)));
     mount_inject += page_offset(ht->inject);
     memcpy((void*)mount_inject, &ht->transfer, sizeof(ht->transfer));
-    
-    return true;
 }
