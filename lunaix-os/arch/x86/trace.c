@@ -31,6 +31,8 @@ trace_print_transition_full(struct hart_state* hstate)
 void
 trace_dump_state(struct hart_state* hstate)
 {
+    // FIXME [2026 QUALIFIER] enforce volatile modifiers.
+    
     struct regcontext* rh = &hstate->registers;
     struct exec_param* ep = hstate->execp;
     trace_log("hart state dump (depth=%d)", hstate->depth);

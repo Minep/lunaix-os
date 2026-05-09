@@ -1,3 +1,4 @@
+#include <lunaix/mm/page.h>
 #include <asm/tlb.h>
 #include <lunaix/process.h>
 
@@ -24,7 +25,7 @@ void
 tlb_flush_vmr_all(struct mm_region* vmr)
 {
     tlb_flush_asid_range(procvm_asid(vmr->proc_vms), 
-                            vmr->start, leaf_count(vmr->end - vmr->start));
+                            vmr->start, count_pages(vmr->end - vmr->start));
 }
 
 void

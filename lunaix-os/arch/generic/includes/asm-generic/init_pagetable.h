@@ -16,8 +16,6 @@ struct ptw_state
     struct pt_alloc* alloc;
     pte_t* root;
     pte_t* lntp;
-    int tab_index;
-    int level;
 };
 
 /**
@@ -56,7 +54,6 @@ init_ptw_state(struct ptw_state* state, struct pt_alloc* alloc, ptr_t root)
     *state = (struct ptw_state) {
         .alloc = alloc,
         .root  = (pte_t*) root,
-        .level = 0
     };
 }
 

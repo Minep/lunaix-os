@@ -1,3 +1,4 @@
+#include <lunaix/mman.h>
 #include <lunaix/mm/page.h>
 
 #include <asm/mm_defs.h>
@@ -36,6 +37,7 @@ dup_leaflet(struct leaflet* leaflet)
     return new_leaflet;
 }
 
+// FIXME [2026 ARCH_DEPENDS] is this really arch-dependent?
 pte_t
 translate_vmr_prot(unsigned int vmr_prot, pte_t pte)
 {
