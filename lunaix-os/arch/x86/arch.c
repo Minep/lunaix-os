@@ -3,10 +3,7 @@
 #include <lunaix/spike.h>
 #include <lunaix/process.h>
 
-#include "asm/x86.h"
-#include "asm/hart.h"
-
-#include "hal/apic_timer.h"
+#include <asm/x86.h>
 
 void
 exception_init()

@@ -159,7 +159,7 @@ typedef struct __pte pte_t;
 #define _level_size(n)          L##n##T_SIZE
 #define _level_page_shift(n)    L##n##T_PAGE_SHIFT
 #define _level_length(n)        L##n##T_LENGTH
-#define _level_mask(n)          L##n##T_LENGTH
+#define _level_mask(n)          L##n##T_MASK
 #define _level_width(n)         L##n##T_WIDTH
 #define _level_index(va, n)     (((va) >> L##n##T_PAGE_SHIFT) & L##n##T_MASK)
 
@@ -202,14 +202,20 @@ ptep_entry_index(pte_t* ptep)
 }
 
 static inline void
-set_ptes(pte_t* ptep, pte_t attrs, ptr_t pa, int n)
+set_ptes_level(pte_t* ptep, pte_t attrs, ptr_t pa, int n, size_t lsize)
 {
     while (n--) {
         set_pte(ptep, pte_setpaddr(attrs, pa));
 
         ptep++;
-        pa += PAGE_SIZE;
+        pa += lsize;
     }
+}
+
+static inline void
+set_ptes(pte_t* ptep, pte_t attrs, ptr_t pa, int n)
+{
+    set_ptes_level(ptep, attrs, pa, n, PAGE_SIZE);
 }
 
 static inline void

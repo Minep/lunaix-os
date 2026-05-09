@@ -57,6 +57,11 @@ struct boot_handoff
     // XXX: should arch specific boot detect platform interface provider?
 };
 
+#define for_each_boot_mmapent(bctx, pos)        \
+    for (size_t ___i = 0; \
+         ((pos) = &(bctx)->mem.mmap[___i]) && ___i < (bctx)->mem.mmap_len; \
+         ___i++)
+
 #ifndef __BOOT_CODE__
 void
 boot_begin(struct boot_handoff*);

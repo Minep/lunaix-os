@@ -95,13 +95,6 @@
 
         jmp _ia32e_compat
 
-        # clear the pipeline, 
-        # although cpu might already cleared for us upon mode switching
-        .nop
-        .nop
-        .nop
-        .nop
-
         # x86_64 compatibility mode
         # load a temporary gdt for getting into long mode
     _ia32e_compat:

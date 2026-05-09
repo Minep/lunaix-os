@@ -11,7 +11,6 @@ __arch_prepare_fault_context(struct fault_context* fault)
         return false;
     }
 
-    fault->fault_ptep  = mkptep_va(VMS_SELF, ptr);
     fault->fault_data  = ictx->execp->err_code;
     fault->fault_instn = hart_pc(ictx);
     fault->fault_va    = ptr;
@@ -28,7 +27,8 @@ intr_routine_page_fault(const struct hart_state* hstate)
         // XXX should we failed silently?
         spin();
     }
-
+    
+    // FIXME [2026-QUALIFIER] enforce const modifiers.
     struct fault_context fault = { .hstate = hstate };
 
     if (!__arch_prepare_fault_context(&fault)) {
