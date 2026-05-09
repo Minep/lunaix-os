@@ -8,11 +8,12 @@
 
 #define _PAGE_BASE_SHIFT        12
 
-#define _LFT_LEVEL_WIDTH        9
-#define _L0T_LEVEL_WIDTH        _LFT_LEVEL_WIDTH
-#define _L1T_LEVEL_WIDTH        _LFT_LEVEL_WIDTH
-#define _L2T_LEVEL_WIDTH        _LFT_LEVEL_WIDTH
+#define _PTW_VPNBITS            9
+#define _L0T_LEVEL_WIDTH        _PTW_VPNBITS
+#define _L1T_LEVEL_WIDTH        _PTW_VPNBITS
+#define _L2T_LEVEL_WIDTH        _PTW_VPNBITS
 #define _L3T_LEVEL_WIDTH        0
+#define _LFT_LEVEL_WIDTH        _PTW_VPNBITS
 
 #define _VA_BITS                48
 #define _PA_BITS                52

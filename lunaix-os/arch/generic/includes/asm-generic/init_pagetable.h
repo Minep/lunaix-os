@@ -75,7 +75,7 @@ kpt_set_ptes(struct ptw_state* state, ptr_t addr,
 static inline void must_inline
 kpt_mktable_at(struct ptw_state* state, ptr_t addr, unsigned long lsize)
 {
-    kpt_set_ptes(state, addr, null_pte, lsize >> _PAGE_BASE_SHIFT, 1);
+    kpt_set_ptes(state, addr, null_pte, lsize, 0);
 }
 
 #endif /* __LUNAIX_ARCH_GENERIC_INIT_PAGETABLE_H */

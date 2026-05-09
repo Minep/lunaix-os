@@ -1745,6 +1745,7 @@ __DEFINE_LXSYSCALL1(int, chroot, const char*, path)
 
     lock_dnode(dnode);
 
+    // FIXME [2026 QUALIFIER] enforce volatile
     errno = vfs_do_chdir_nolock(__current, dnode);
     if (errno) {
         unlock_dnode(dnode);

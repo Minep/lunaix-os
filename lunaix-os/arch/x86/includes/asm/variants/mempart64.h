@@ -9,7 +9,7 @@
 #define __ulong(val) val##UL
 #endif
 
-#define __kaddr(x)                (__ulong(x) | 0xffff000000000000)
+#define __kaddr(x)                (__ulong(x) | __ulong(0xffff000000000000))
 
 #define KSTACK_AREA             __ulong(0x0000000100000000)
 #define KSTACK_AREA_SIZE        __ulong(0x0000000040000000)
@@ -29,7 +29,6 @@
 #define USR_STACK_END           END_POINT(USR_STACK)
 
 
-// la casa del kernel
 
 #define KERNEL_RESIDENT         __kaddr(0xfb8000000000)     // -2.5T
 

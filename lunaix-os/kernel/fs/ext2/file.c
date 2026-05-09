@@ -1,5 +1,6 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/page.h>
+#include <lunaix/mm/pagetable.h>
 #include "ext2.h"
 
 #define blkpos(e_sb, fpos) ((fpos) / (e_sb)->block_size)
@@ -123,7 +124,7 @@ ext2_inode_read_page(struct v_inode *inode, void *buffer, size_t fpos)
     unsigned int blk_start, n, 
                  transfer_sz, total_sz = 0;
 
-    assert(!va_offset(fpos));
+    assert(!page_offset(fpos));
 
     e_sb = EXT2_SB(inode->sb);
     e_ino = EXT2_INO(inode);

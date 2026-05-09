@@ -148,6 +148,7 @@ __get_nr_indblks(struct ext2_sbinfo* sb, size_t fsblks)
     blks    = (ssize_t)fsblks;
     nr_ents = sb->block_size / sizeof(int);
     acc_nr  = 1;
+    nr_inds = 0;
 
     if (blks <= 12)
         return 0;

@@ -57,7 +57,7 @@ struct ptroot {
 static inline pte_t*
 vastm_ptroot_ptr(ptroot_t root)
 {
-    return (pte_t*)phy_to_virt(__sanitize_vaddr(root.v) & PAGE_MASK);
+    return (pte_t*)(sanitize_vaddr(root.v) & PAGE_MASK);
 }
 
 /**
@@ -90,12 +90,22 @@ vastm_ptep_at_resolution(pte_t* root, ptr_t va, int res)
 {
     if (res == RES_L0T)
         return ptep_at(root, va, L0T);
+
+#if has_ptlevel(L1T) 
     else if (res == RES_L1T)
         return ptep_at(root, va, L1T);
+#endif
+
+#if has_ptlevel(L2T)
     else if (res == RES_L2T)
         return ptep_at(root, va, L2T);
+#endif
+
+#if has_ptlevel(L3T)
     else if (res == RES_L3T)
         return ptep_at(root, va, L3T);
+#endif
+
     else if (res == RES_LFT)
         return ptep_at(root, va, LFT);
     else
@@ -117,18 +127,20 @@ static inline pte_t*
 vastm_table_get_or_make(pte_t* ptep, pte_t attr)
 {
     struct ppage* page;
+    pte_t* next_table;
 
     if (pte_huge(pte_at(ptep)))
         return NULL;
 
-    ptep = ptep_next_table(ptep);
-    if (ptep)
-        return ptep;
+    next_table = ptep_next_table(ptep);
+    if (next_table)
+        return next_table;
 
     page = alloc_page();
     if (!page)
         return NULL;
     
+    memset((void*)ppage_va(page), 0, PAGE_SIZE);
     set_pte(ptep, pte_setpaddr(attr, ppage_addr(page)));
     return (pte_t*)ppage_va(page);
 }
@@ -164,48 +176,49 @@ vastm_walk_along(ptroot_t root, ptr_t va, int resolution)
     pte_t* ptep = vastm_ptroot_ptr(root);
     pte_t* next_ptep;
 
-    if (cur_res < resolution && cur_res == RES_L0T) {
+    if (cur_res > resolution && cur_res == RES_L0T) {
         next_ptep = ptep_next_table(ptep_at(ptep, va, L0T));
         if (!next_ptep)
             goto done;
 
         ptep = next_ptep;
-        cur_res -= RES_L0T;
+        cur_res -= level_width(L0T);
     }
 
 #if has_ptlevel(L1T)
-    if (cur_res < resolution && cur_res == RES_L1T) {
+    if (cur_res > resolution && cur_res == RES_L1T) {
         next_ptep = ptep_next_table(ptep_at(ptep, va, L1T));
         if (!next_ptep)
             goto done;
 
         ptep = next_ptep;
-        cur_res -= RES_L1T;
+        cur_res -= level_width(L1T);
     }
 #endif
 
 #if has_ptlevel(L2T)
-    if (cur_res < resolution && cur_res == RES_L2T) {
+    if (cur_res > resolution && cur_res == RES_L2T) {
         next_ptep = ptep_next_table(ptep_at(ptep, va, L2T));
         if (!next_ptep)
             goto done;
 
         ptep = next_ptep;
-        cur_res -= RES_L2T;
+        cur_res -= level_width(L2T);
     }
 #endif
 
 #if has_ptlevel(L3T)
-    if (cur_res < resolution && cur_res == RES_L3T) {
+    if (cur_res > resolution && cur_res == RES_L3T) {
         next_ptep = ptep_next_table(ptep_at(ptep, va, L3T));
         if (!next_ptep)
             goto done;
 
         ptep = next_ptep;
-        cur_res -= RES_L3T;
+        cur_res -= level_width(L3T);
     }
 #endif
-
+    
+    assert(cur_res <= resolution);
 done:
     return vastm_ptroot_at(ptep, cur_res);
 }
@@ -219,40 +232,41 @@ vastm_make_along(ptroot_t root, ptr_t va, int resolution, pte_t attr)
 
     attr = pte_mkroot(attr);
 
-    if (cur_res < resolution && cur_res == RES_L0T) {
+    if (cur_res > resolution && cur_res == RES_L0T) {
         ptep = vastm_table_get_or_make(ptep_at(ptep, va, L0T), attr);
         if (!ptep)
             return NULL;
-        cur_res -= RES_L0T;
+        cur_res -= level_width(L0T);
     }
 
 #if has_ptlevel(L1T)
-    if (cur_res < resolution && cur_res == RES_L1T) {
+    if (cur_res > resolution && cur_res == RES_L1T) {
         ptep = vastm_table_get_or_make(ptep_at(ptep, va, L1T), attr);
         if (!ptep)
             return NULL;
-        cur_res -= RES_L1T;
+        cur_res -= level_width(L1T);
     }
 #endif
 
 #if has_ptlevel(L2T)
-    if (cur_res < resolution && cur_res == RES_L2T) {
+    if (cur_res > resolution && cur_res == RES_L2T) {
         ptep = vastm_table_get_or_make(ptep_at(ptep, va, L2T), attr);
         if (!ptep)
             return NULL;
-        cur_res -= RES_L2T;
+        cur_res -= level_width(L2T);
     }
 #endif
 
 #if has_ptlevel(L3T)
-    if (cur_res < resolution && cur_res == RES_L3T) {
+    if (cur_res > resolution && cur_res == RES_L3T) {
         ptep = vastm_table_get_or_make(ptep_at(ptep, va, L3T), attr);
         if (!ptep)
             return NULL;
-        cur_res -= RES_L3T;
+        cur_res -= level_width(L3T);
     }
 #endif
 
+    assert(cur_res <= resolution);
     return vastm_ptep_at_resolution(ptep, va, cur_res);
 }
 
@@ -275,23 +289,6 @@ vastm_walk_ptep_strict(ptroot_t root, ptr_t va, int resolution)
         return NULL;
 
     return vastm_ptep_from(r, va);
-}
-
-static inline int
-__vastm_resolution_level(int res)
-{
-    if (res == RES_L0T)
-        return ASTM_L0T;
-    else if (res == RES_L1T)
-        return ASTM_L1T;
-    else if (res == RES_L2T)
-        return ASTM_L2T;
-    else if (res == RES_L3T)
-        return ASTM_L3T;
-    else if (res == RES_LFT)
-        return ASTM_LFT;
-
-    fail("invalid translation tree resolution value.");
 }
 
 enum vastm_action

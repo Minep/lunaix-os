@@ -102,7 +102,7 @@ pmm_arch_init_pool(struct pmem* memory)
 ptr_t
 pmm_arch_init_remap(struct pmem* memory, struct boot_handoff* bctx)
 {
-    size_t ppfn_total = page_frame(bctx->mem.size);
+    size_t ppfn_total = count_pages(bctx->mem.size);
     size_t pool_size  = ppfn_total * sizeof(struct ppage);
     
     size_t i = 0;
@@ -151,13 +151,13 @@ found:;
 #ifdef CONFIG_ARCH_X86_64
     nhuge = ICEIL(pool_size, L2T_SIZE);
     ptep = vastm_walk_ptep(
-            vastm_current_root(), mempart(PHYPAGE_MAP), L2T_SIZE);
+            vastm_current_root(), mempart(PHYPAGE_MAP), RES_L2T);
     
     set_ptes_level(ptep, pte, aligned_pplist, nhuge, L2T_SIZE);
 #else
     nhuge = ICEIL(pool_size, L0T_SIZE);
     ptep = vastm_walk_ptep(
-            vastm_current_root(), mempart(PHYPAGE_MAP), L0T_SIZE);
+            vastm_current_root(), mempart(PHYPAGE_MAP), RES_L0T);
     
     set_ptes_level(ptep, pte, aligned_pplist, nhuge, L0T_SIZE);
 #endif

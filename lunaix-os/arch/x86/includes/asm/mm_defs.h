@@ -39,8 +39,8 @@
 #define to_kvirtual(k_pa)       ((ptr_t)(k_pa) + KERNEL_IMG)
 
 
-#define phy_to_virt(page)   ( (page) + PHYPAGE_POOL_START ) 
-#define virt_to_phy(va)     ( ( (va) & PAGE_MASK) - PHYPAGE_POOL_START )
+#define phy_to_virt(pa)     ( (pa) + PHYPAGE_POOL_START ) 
+#define virt_to_phy(va)     ( (va) - PHYPAGE_POOL_START )
 
 
 static inline unsigned long

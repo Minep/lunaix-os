@@ -1,3 +1,4 @@
+#include "lunaix/types.h"
 #include <asm/abi.h>
 #include <asm/mempart.h>
 
@@ -342,6 +343,7 @@ get_free_pid() {
     return i;
 }
 
+static tid_t tid_count = 0;
 struct thread*
 alloc_thread(struct proc_info* process) {
     if (process->thread_count >= MAX_THREAD_PP) {
@@ -354,8 +356,7 @@ alloc_thread(struct proc_info* process) {
     th->created = clock_systime();
 
     // FIXME we need a better tid allocation method!
-    th->tid = th->created;
-    th->tid = (th->created ^ ((ptr_t)th)) % MAX_THREAD_PP;
+    th->tid = tid_count++;
 
     th->state = PS_CREATED;
     

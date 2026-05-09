@@ -24,6 +24,9 @@ __prepare_fault_context(struct fault_context* fault)
     ptroot_t fault_vms;
     ptr_t  fault_va        = fault->fault_va;
     bool   kernel_vmfault  = kernel_addr(fault_va);
+
+    // FIXME [2026-QUALIFIER] enforce volatile modifiers.
+    fault->mm = vmspace(__current);
     
     if (kernel_vmfault) {
         fault_vms = vastm_current_root();
@@ -237,6 +240,7 @@ fault_resolving_failed(struct fault_context* fault)
 
     trace_printstack_isr(fault->hstate);
     
+    // FIXME [2026-QUALIFIER] enforce volatile modifiers.
     thread_setsignal(current_thread, _SIGSEGV);
 
     schedule();

@@ -74,13 +74,15 @@ static enum vastm_action
 __alloc_kstack_find_slot(struct vastm_state *state, pte_t *entry, void* data)
 {
     int i;
-    const int nr_pages = KERNEL_STACK_UNITSIZE / PAGE_SIZE;
+    int nr_pages;
     struct __kstack_alloc *result;
     
     result = (struct __kstack_alloc*)data;
     i = ptep_entry_index(entry);
+    // plus 1 to account for guardian
+    nr_pages = KERNEL_STACK_UNITSIZE / PAGE_SIZE + 1;
 
-    while (state->va < state->va_end && i < LFT_LENGTH)
+    while (state->va < state->va_end && i + nr_pages < LFT_LENGTH)
     {
         if (pte_isnull(pte_at(&entry[i]))) {
             result->ptep = &entry[i];
@@ -88,8 +90,8 @@ __alloc_kstack_find_slot(struct vastm_state *state, pte_t *entry, void* data)
             return vastm_walk_flag_complete(state);
         }
 
-        state->va += KERNEL_STACK_UNITSIZE;
         i += nr_pages;
+        state->va += nr_pages * PAGE_SIZE;
     }
 
     return VASTM_BREAK;
@@ -136,7 +138,7 @@ __alloc_kernel_thread_stack(struct proc_info* proc)
     set_ptes(result.ptep, mkpte_prot(KERNEL_DATA), 
             leaflet_addr(leaflet), 1 << po);
 
-    return align_stack(result.va + KERNEL_STACK_UNITSIZE - 1);
+    return align_stack(result.va + KERNEL_STACK_UNITSIZE + PAGE_SIZE - 1);
 }
 
 void
@@ -244,7 +246,7 @@ thread_stats_update(bool inbound, bool voluntary)
 {
     struct thread_stats* stats;
     time_t now;
-
+    
     now   = clock_systime();
     stats = &current_thread->stats;
 

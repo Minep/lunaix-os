@@ -207,7 +207,7 @@ pcache_read(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
 
     pcache = inode->pg_cache;
 
-    while (fpos < page_frame(end)) {
+    while (fpos < ROUNDUP(end, PAGE_SIZE)) {
         tag = page_index(fpos);
         off = page_offset(fpos);
 

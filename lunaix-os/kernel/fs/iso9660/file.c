@@ -1,10 +1,12 @@
 #include <lunaix/fs.h>
-#include "iso9660.h"
+#include <lunaix/mm/pagetable.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 
 #include <klibc/string.h>
 #include <asm/pagetable.h>
+
+#include "iso9660.h"
 
 int
 iso9660_open(struct v_inode* this, struct v_file* file)

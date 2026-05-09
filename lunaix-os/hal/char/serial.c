@@ -1,5 +1,6 @@
 #include <lunaix/device.h>
 #include <lunaix/mm/valloc.h>
+#include <lunaix/mm/pagetable.h>
 #include <lunaix/spike.h>
 #include <lunaix/owloysius.h>
 #include <lunaix/status.h>
@@ -118,6 +119,8 @@ serial_readbuf_nowait(struct serial_dev* sdev, u8_t* buf, size_t len)
 int
 serial_writebuf(struct serial_dev* sdev, u8_t* buf, size_t len)
 {
+    int rdlen;
+
     lock_sdev(sdev);
 
     mark_device_doing_write(sdev->dev);
@@ -129,7 +132,7 @@ serial_writebuf(struct serial_dev* sdev, u8_t* buf, size_t len)
     unlock_and_wait(sdev, wq_txdone);
 
 done:
-    int rdlen = sdev->wr_len;
+    rdlen = sdev->wr_len;
     unlock_sdev(sdev);
 
     return rdlen;

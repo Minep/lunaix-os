@@ -1,3 +1,5 @@
+#include "asm/pagetable.h"
+#include "asm/tlb.h"
 #include <lunaix/mm/procvm.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/region.h>
@@ -24,9 +26,10 @@ copy_leaf(struct __vmcpy* state, pte_t* dest, pte_t* src, pte_t pte)
 
     assert(pte_isnull(pte_at(dest)));
 
-    if (shared_readonly_region(state->vmr)) {
-        set_pte(src, pte_mkwprotect(pte_at(src)));
+    if (shared_readonly_region(state->vmr)) 
+    {
         pte = pte_mkwprotect(pte);
+        set_pte(src, pte);
     } else {
         // do not copy the private page;
         return;
@@ -181,7 +184,7 @@ __copy_l1t(struct __vmcpy* state, pte_t* dest, pte_t* src,
         }
 
         next = copy_root(state, dest, src, src_pte);
-        __copy_l1t(state, next, (pte_t*)pte_page_va(src_pte), va_from, va_to);
+        __copy_l2t(state, next, (pte_t*)pte_page_va(src_pte), va_from, va_to);
 cont:
         i++;
         dest++;
@@ -195,7 +198,7 @@ cont:
 
 
 static inline void
-__copy_l0t(struct __vmcpy* state, pte_t* dest, pte_t* src, 
+__copy_va_subspace(struct __vmcpy* state, pte_t* dest, pte_t* src, 
         ptr_t va_from, ptr_t va_to)
 {
     pte_t src_pte, *next;
@@ -232,23 +235,28 @@ vmscpy(struct proc_mm* dest_mm, struct proc_mm* src_mm)
     pte_t *dest, *src;
     struct __vmcpy state = {};
     
-    src = (pte_t*)phy_to_virt(src_mm->vmroot);
     dest = (pte_t*)leaflet_va(alloc_page_table());
 
     if (!dest)
         return ENOMEM;
 
-    if (!src_mm)
+    if (!src_mm) {
+        src = (pte_t*)phy_to_virt(current_vas());
         goto done;
+    }
+    
+    src = (pte_t*)phy_to_virt(src_mm->vmroot);
 
     struct mm_region *pos, *n;
     llist_for_each(pos, n, &src_mm->regions, head)
     {
         state.vmr = pos;
-        __copy_l0t(&state, dest, src, pos->start, pos->end);
+        __copy_va_subspace(&state, dest, src, pos->start, pos->end);
 
         if (state.err)
             return state.err;
+
+        tlb_flush_vmr_all(pos);
     }
 
 done:;
@@ -269,6 +277,8 @@ __free_mappings(struct vastm_state* state, pte_t* ptep, void* data)
     
     vastm_visit_next(*state, ptep_next_table(ptep));
     leaflet_return(pte_leaflet(pte));
+    set_pte(ptep, null_pte);
+
     return VASTM_CONTINUE;
 }
 
@@ -295,7 +305,7 @@ vmsfree(struct proc_mm* mm)
     }
 
     procvm_unlink_kernel();
-    leaflet_return(leaflet_from_va(mm->vmroot));
+    leaflet_return(leaflet_from_va(phy_to_virt(mm->vmroot)));
 }
 
 struct proc_mm*
@@ -315,9 +325,10 @@ procvm_create(struct proc_info* proc)
 void
 procvm_dupvms(struct proc_mm* mm) 
 {
-    struct proc_mm* mm_current
+    struct proc_mm* mm_current;
     assert(__current);
 
+    // FIXME [2026 QUALIFIER] enforce volatile
     mm_current = vmspace(__current);
     mm->heap = mm_current->heap;
     

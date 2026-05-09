@@ -7,10 +7,10 @@ src.c += (
     "page.c",
     "region.c",
     "pmalloc_simple.c",
-    "vmm.c",
     "mmio.c",
     "pmm.c",
     "cake_export.c",
     "vmap.c",
-    "dmm.c"
+    "dmm.c",
+    "vastm.c"
 )

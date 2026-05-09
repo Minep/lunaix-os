@@ -1,5 +1,6 @@
 #include <lunaix/boot_generic.h>
 #include <lunaix/mm/pagetable.h>
+#include <lunaix/mm/page.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/spike.h>
 #include <lunaix/sections.h>
@@ -22,8 +23,8 @@ boot_clean_arch_reserve(struct boot_handoff* bhctx)
 {
     pfn_t start;
 
-    start = leaf_count(__ptr(__kboot_start));
-    pmm_unhold_range(start, leaf_count(__ptr(__kboot_end)) - start);
+    start = count_pages(__ptr(__kboot_start));
+    pmm_unhold_range(start, count_pages(__ptr(__kboot_end)) - start);
 }
 
 #else

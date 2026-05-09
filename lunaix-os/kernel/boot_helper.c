@@ -2,6 +2,8 @@
 #include <lunaix/boot_generic.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/vmm.h>
+#include <lunaix/mm/page.h>
+#include <lunaix/mm/vastm.h>
 #include <lunaix/spike.h>
 #include <lunaix/kcmd.h>
 #include <lunaix/sections.h>
@@ -20,7 +22,7 @@ boot_begin(struct boot_handoff* bhctx)
     boot_begin_arch_reserve(bhctx);
     
     // 将内核占据的页，包括前1MB，hhk_init 设为已占用
-    size_t pg_count = leaf_count(to_kphysical(kernel_load_end));
+    size_t pg_count = count_pages(to_kphysical(kernel_load_end));
     pmm_onhold_range(0, pg_count);
 
     size_t i;
@@ -29,17 +31,17 @@ boot_begin(struct boot_handoff* bhctx)
         ent = &bhctx->mem.mmap[i];
 
         if (reserved_memregion(ent) || reclaimable_memregion(ent)) {
-            unsigned int counts = leaf_count(ent->size);
-            pmm_onhold_range(pfn(ent->start), counts);
+            unsigned int counts = count_pages(ent->size);
+            pmm_onhold_range(page_frame(ent->start), counts);
         }
     }
 
     /* Reserve region for all loaded modules */
     for (i = 0; i < bhctx->mods.mods_num; i++) {
         struct boot_modent* mod = &bhctx->mods.entries[i];
-        unsigned int counts = leaf_count(mod->end - mod->start);
+        unsigned int counts = count_pages(mod->end - mod->start);
 
-        pmm_onhold_range(pfn(mod->start), counts);
+        pmm_onhold_range(page_frame(mod->start), counts);
     }
 }
 
@@ -51,11 +53,11 @@ __free_reclaimable()
     pte_t* ptep;
 
     start = reclaimable_start;
-    pgs   = leaf_count(reclaimable_end - start);
-    ptep  = mkptep_va(VMS_SELF, start);
+    pgs   = count_pages(reclaimable_end - start);
+    ptep  = vastm_walk_ptep(vastm_current_root(), start, RES_LFT);
 
-    pmm_unhold_range(pfn(to_kphysical(start)), pgs);
-    vmm_unset_ptes(ptep, pgs);
+    pmm_unhold_range(page_frame(to_kphysical(start)), pgs);
+    fill_ptes(ptep, null_pte, pgs);
 }
 
 /**
@@ -71,8 +73,8 @@ boot_end(struct boot_handoff* bhctx)
         ent = &bhctx->mem.mmap[i];
 
         if (reclaimable_memregion(ent)) {
-            unsigned int counts = leaf_count(ent->size);
-            pmm_unhold_range(pfn(ent->start), counts);
+            unsigned int counts = count_pages(ent->size);
+            pmm_unhold_range(page_frame(ent->start), counts);
         }
     }
 

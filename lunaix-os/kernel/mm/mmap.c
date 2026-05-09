@@ -1,3 +1,4 @@
+#include "asm/mempart.h"
 #include <lunaix/mm/vastm.h>
 #include <lunaix/mm/mmap.h>
 #include <lunaix/mm/page.h>
@@ -7,6 +8,7 @@
 #include <lunaix/syscall_utils.h>
 
 #include <asm/mm_defs.h>
+#include <asm/tlb.h>
 
 #include <usr/lunaix/mman.h>
 
@@ -65,8 +67,8 @@ mmap_user(void** addr_out,
         struct v_file* file,
         struct mmap_param* param) 
 {
-    param->range_end = KERNEL_RESIDENT;
-    param->range_start = USR_EXEC;
+    param->range_end = mempart_end(USERLAND) + 1;
+    param->range_start = mempart(USERLAND);
 
     return mem_map(addr_out, created, addr, file, param);
 }
@@ -88,7 +90,7 @@ __mem_find_slot_backward(struct mm_region* lead, struct mmap_param* param, struc
             end = param->range_end;
         }
 
-        if (end - pos->end >= size) {
+        if ((long)(end - pos->end) >= (long)size) {
             return pos->end;
         }
 
@@ -319,7 +321,7 @@ mem_flush_pages(struct mm_region* region, ptr_t start, ptr_t end, int options)
     struct mem_sync_state ms;
     struct vastm param;
 
-    if (!region->mfile || !(region->attr & REGION_WSHARED)) {
+    if (!region->mfile) {
         return;
     }
 
@@ -441,7 +443,7 @@ __unmap_overlapped_cases(struct mm_region* vmr, ptr_t* addr, size_t* length)
         umps_start = vmr->start;
     }
 
-    mem_flush_pages(vmr, vmr->start, umps_len, MEM_FLUSH_UNMAP);
+    mem_flush_pages(vmr, vmr->start, vmr->start + umps_len, MEM_FLUSH_UNMAP);
 
     vmr->start += displ;
     vmr->end -= shrink;
@@ -538,6 +540,8 @@ __DEFINE_LXSYSCALL1(void*, sys_mmap, struct usr_mmap_param*, mparam)
     }
 
     length = ROUNDUP(length, PAGE_SIZE);
+
+    // FIXME [2026 QUALIFIER] enforce volatile
     struct mmap_param param = { .flags = options,
                                 .mlen = length,
                                 .flen = length,
@@ -555,6 +559,7 @@ done:
 
 __DEFINE_LXSYSCALL2(int, munmap, void*, addr, size_t, length)
 {
+    // FIXME [2026 QUALIFIER] enforce volatile
     return mem_unmap(vmregions(__current), (ptr_t)addr, length);
 }
 
@@ -564,6 +569,7 @@ __DEFINE_LXSYSCALL3(int, msync, void*, addr, size_t, length, int, flags)
         return DO_STATUS(EINVAL);
     }
 
+    // FIXME [2026 QUALIFIER] enforce volatile
     int status = mem_msync(vmregions(__current), (ptr_t)addr, length, flags);
 
     return DO_STATUS(status);

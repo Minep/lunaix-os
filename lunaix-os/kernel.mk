@@ -54,8 +54,6 @@ __do_relink: $(klinking) $(ksrc_objs) $(kautogen)
 
 	@$(CC) -T $(klinking) $(config_h) $(LDFLAGS) -o $(kbin) \
 			$(call all_linkable,$^)
-	
-	@rm $(tmp_kbin)
 
 
 .PHONY: all

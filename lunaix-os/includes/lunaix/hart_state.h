@@ -18,7 +18,7 @@ struct hart_transition
     } compact transfer;
 };
 
-bool
+void
 install_hart_transition(struct proc_mm* procvm, struct hart_transition* ht);
 
 void

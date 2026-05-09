@@ -1,5 +1,4 @@
 #include <lunaix/fs.h>
-#include "iso9660.h"
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
@@ -7,6 +6,8 @@
 #include <klibc/string.h>
 
 #include <usr/lunaix/dirent.h>
+
+#include "iso9660.h"
 
 extern struct cake_pile* drec_cache_pile;
 
@@ -143,6 +144,7 @@ iso9660_dir_lookup(struct v_inode* this, struct v_dnode* dnode)
 {
     struct iso_inode* isoino = this->data;
     struct iso_drecache *pos, *n;
+    struct v_inode* inode;
 
     llist_for_each(pos, n, &isoino->drecaches, caches)
     {
@@ -153,7 +155,7 @@ iso9660_dir_lookup(struct v_inode* this, struct v_dnode* dnode)
 
     return ENOENT;
 found:
-    struct v_inode* inode = vfs_i_find(dnode->super_block, pos->extent_addr);
+    inode = vfs_i_find(dnode->super_block, pos->extent_addr);
 
     if (!inode) {
         inode = vfs_i_alloc(dnode->super_block);

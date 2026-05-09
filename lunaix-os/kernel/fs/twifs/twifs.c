@@ -16,9 +16,8 @@
 #include <lunaix/fs/twimap.h>
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/valloc.h>
+#include <lunaix/mm/pagetable.h>
 #include <lunaix/spike.h>
-
-#include <asm/pagetable.h>
 
 static struct twifs_node* fs_root;
 static struct cake_pile* twi_pile;

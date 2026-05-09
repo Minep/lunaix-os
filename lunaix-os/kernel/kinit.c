@@ -49,28 +49,6 @@ spawn_lunad()
 static void
 kmem_init(struct boot_handoff* bhctx)
 {
-    pte_t* ptep = mkptep_va(VMS_SELF, KERNEL_RESIDENT);
-
-    ptep = mkl0tep(ptep);
-
-    unsigned int i = ptep_vfn(ptep);
-    do {
-        if (lntep_implie_vmnts(ptep, L0T_SIZE)) {
-            ptep++;
-            continue;
-        }
-
-#if   LnT_ENABLED(1)
-        assert(mkl1t(ptep++, 0, KERNEL_PGTAB));
-#elif LnT_ENABLED(2)
-        assert(mkl2t(ptep++, 0, KERNEL_PGTAB));
-#elif LnT_ENABLED(3)
-        assert(mkl3t(ptep++, 0, KERNEL_PGTAB));
-#else
-        assert(mklft(ptep++, 0, KERNEL_PGTAB));
-#endif
-    } while (++i < MAX_PTEN);
-
     // allocators
     cake_init();
     valloc_init();
@@ -95,17 +73,19 @@ __remap_and_load_dtb(struct boot_handoff* bhctx)
     size_t nr_pages;
     bool loaded;
     
-    pte  = mkpte(dtb, KERNEL_DATA);
-    ptep = mkptep_va(VMS_SELF, dtb_start);
-    nr_pages = leaf_count(CONFIG_DTB_MAXSIZE);
+    // FIXME [2026 DTB] rework the dtb loading
 
-    pmm_onhold_range(dtb, nr_pages);
-    vmm_set_ptes_contig(ptep, pte, PAGE_SIZE, nr_pages);
+    // pte  = mkpte(dtb, KERNEL_DATA);
+    // ptep = mkptep_va(VMS_SELF, dtb_start);
+    // nr_pages = count_pages(CONFIG_DTB_MAXSIZE);
 
-    loaded = dt_load(dtb_start);
-    if (!loaded) {
-        ERROR("dtb load failed");
-    }
+    // pmm_onhold_range(dtb, nr_pages);
+    // vmm_set_ptes_contig(ptep, pte, PAGE_SIZE, nr_pages);
+
+    // loaded = dt_load(dtb_start);
+    // if (!loaded) {
+    //     ERROR("dtb load failed");
+    // }
 #endif
 
     return;

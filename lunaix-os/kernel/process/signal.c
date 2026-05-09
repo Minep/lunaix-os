@@ -123,6 +123,7 @@ void
 thread_setsignal(struct thread* thread, signum_t signum)
 {
     if (unlikely(kernel_process(thread->process))) {
+        fail("kernel thread receive SIGSEGV. Assuming critical.");
         return;
     }
 

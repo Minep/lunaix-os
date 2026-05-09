@@ -1,5 +1,6 @@
 #include <lunaix/mm/vmtlb.h>
 #include "asm/mempart.h"
+#include "asm/pagetable.h"
 #include "lunaix/mm/vastm.h"
 #include <lunaix/mm/region.h>
 #include <lunaix/mm/valloc.h>
@@ -37,25 +38,30 @@ __dup_kernel_stack(struct thread* thread)
 
     kstack = (current_thread->kstack) - KERNEL_STACK_UNITSIZE;
 
-    dest = vastm_walk_ptep_strict(vastm_procvm_root(mm), kstack, RES_LFT);
+    // procvm_dupvms() do not copy kernel stacks, get the structure ready
+    dest = vastm_make_along(
+            vastm_procvm_root(mm), kstack, RES_LFT, mkpte_prot(KERNEL_PGTAB));
+
     src = vastm_walk_ptep_strict(
             vastm_procvm_root(__current->mm), kstack, RES_LFT);
 
     assert(dest && src);
 
-    for (size_t i = 0; i <= count_pages(KERNEL_STACK_UNITSIZE); i++) 
+    for (size_t i = 0; i <= count_pages(KERNEL_STACK_UNITSIZE); ) 
     {
         p = pte_at(&src[i]);
 
         if (pte_isguardian(p)) {
-            set_pte(&dest[i], guard_pte);
-        } else {
-            leaflet = dup_leaflet(pte_leaflet(p));
-            nr_pages = leaflet_nfold(leaflet);
-
-            set_ptes(&dest[i], p, leaflet_addr(leaflet), nr_pages);
-            i += nr_pages;
+            set_pte(&dest[i++], guard_pte);
+            continue;
         }
+
+        leaflet = dup_leaflet(pte_leaflet(p));
+        nr_pages = leaflet_nfold(leaflet);
+
+        set_ptes(&dest[i], p, leaflet_addr(leaflet), nr_pages);
+        i += nr_pages;
+    
     }
 
     tlb_flush_mm_range(

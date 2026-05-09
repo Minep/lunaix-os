@@ -27,7 +27,7 @@ cat << EOF > ${launch_script} && chmod +x ${launch_script}
     -v TTYS0_PORT=${tty_port} \\
     -v "KCMD=${default_cmd} rootfs=/dev/block/sda init=/bin/init" \\
     -- \\
-    -nographic -icount sleep=off,align=off,shift=0 || exit 1 &
+    -nographic -icount sleep=off,align=off,shift=10 || exit 1 &
 
 AUTOQEMU_DAEMON=\$!
 echo "autoqemu daemon launched (pid=\$AUTOQEMU_DAEMON)"

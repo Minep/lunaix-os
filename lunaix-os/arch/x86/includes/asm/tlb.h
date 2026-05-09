@@ -4,6 +4,7 @@
 #include <lunaix/compiler.h>
 #include <lunaix/mm/procvm.h>
 #include <lunaix/mm/physical.h>
+#include <lunaix/mm/pagetable.h>
 
 /**
  * @brief Invalidate an entry of all address space
