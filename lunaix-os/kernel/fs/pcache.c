@@ -243,7 +243,7 @@ pcache_read(struct v_inode* inode, void* data, u32_t len, u32_t fpos)
 void
 pcache_release(struct pcache* pcache)
 {
-    bcache_free(&pcache->cache);
+    bcache_destory(&pcache->cache);
 }
 
 int

@@ -196,7 +196,7 @@ bcache_flush(struct bcache* cache)
 }
 
 void
-bcache_free(struct bcache* cache)
+bcache_destory(struct bcache* cache)
 {
     lock(cache);
     
@@ -204,8 +204,6 @@ bcache_free(struct bcache* cache)
     btrie_release(&cache->root);
 
     unlock(cache);
-
-    vfree(cache);
 }
 
 void

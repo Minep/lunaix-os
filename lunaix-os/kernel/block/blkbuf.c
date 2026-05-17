@@ -234,7 +234,7 @@ blkbuf_syncall(struct blkbuf_cache* bc, bool async)
 void
 blkbuf_release(struct blkbuf_cache* bc)
 {
-    bcache_free(&bc->cached);
+    bcache_destory(&bc->cached);
     vfree(bc);
 }
 
