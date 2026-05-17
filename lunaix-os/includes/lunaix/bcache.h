@@ -147,7 +147,7 @@ void
 bcache_flush(struct bcache* cache);
 
 void
-bcache_free(struct bcache* cache);
+bcache_destory(struct bcache* cache);
 
 void
 bcache_zone_free(bcache_zone_t zone);

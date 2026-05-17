@@ -1,3 +1,4 @@
+#include "lunaix/bcache.h"
 #include <lunaix/blkbuf.h>
 #include <lunaix/mm/cake.h>
 #include <lunaix/mm/valloc.h>
@@ -234,7 +235,7 @@ blkbuf_syncall(struct blkbuf_cache* bc, bool async)
 void
 blkbuf_release(struct blkbuf_cache* bc)
 {
-    bcache_free(&bc->cached);
+    bcache_destory(&bc->cached);
     vfree(bc);
 }
 
