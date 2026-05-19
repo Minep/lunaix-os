@@ -36,7 +36,7 @@
             "class": "isa-serial",
             "io": {
                 "type": "telnet",
-                "port": "12345",
+                "port": "$TTYS0_PORT",
                 "logfile": "lunaix_ttyS0.log"
             }
         },

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 hmp_port=45454
-gdb_port=1234
+gdb_port=12345
+tty_port=22211
 default_cmd="console=/dev/ttyS0"
 
 if [[ -z "${ARCH}" ]]; then
@@ -23,21 +24,22 @@ cat << EOF > ${launch_script} && chmod +x ${launch_script}
     -v ROOTFS=lunaix_rootfs.ext2 \\
     -v ARCH=${ARCH} \\
     -v KBIN=build/bin/kernel.bin \\
+    -v TTYS0_PORT=${tty_port} \\
     -v "KCMD=${default_cmd} rootfs=/dev/block/sda init=/bin/init" \\
     -- \\
-    -nographic || exit 1 &
+    -nographic -icount sleep=off,align=off,shift=0 || exit 1 &
 
 AUTOQEMU_DAEMON=\$!
 echo "autoqemu daemon launched (pid=\$AUTOQEMU_DAEMON)"
 
-gdb-multiarch \\
-    build/bin/kernel.bin \\
-    -ex "target remote localhost:${gdb_port}"
+sleep 1
+./scripts/setup-gdb.sh build/bin/kernel.bin --gdb ${gdb_port} --serial ${tty_port} --hmp ${hmp_port}
 
 if ps -p \$AUTOQEMU_DAEMON > /dev/null
 then
    kill -9 \$AUTOQEMU_DAEMON
 fi
+
 EOF
 
 echo "debugger launch script written to: ${launch_script}"
