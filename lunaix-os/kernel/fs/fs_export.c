@@ -41,7 +41,7 @@ void
 __twimap_read_version(struct twimap* map)
 {
     twimap_printf(map,
-                  "Lunaix "
+                  "Lunaix version "
                   CONFIG_LUNAIX_VER
                   " (gnu-cc " __VERSION__ ") " __DATE__ " " __TIME__);
 }

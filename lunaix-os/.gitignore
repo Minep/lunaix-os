@@ -19,6 +19,7 @@
 !makefile
 !live_debug.sh
 !*.mk
+!VERSION
 
 *.[od]
 *.ld
