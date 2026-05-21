@@ -34,10 +34,10 @@ def read_version():
     version = Path("VERSION").read_text(encoding="utf-8").strip()
 
     if not version:
-        raise ValueError(f"{path} is empty")
+        raise ValueError(f"VERSION is empty")
 
     if not _SEMVER_RE.fullmatch(version):
-        raise ValueError(f"Invalid SemVer version: {version!r}")
+        raise ValueError(f"Invalid SemVer version: {version}")
 
     return version
 
