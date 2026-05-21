@@ -2,14 +2,44 @@ from datetime import datetime, date
 
 from . import kernel, arch, hal
 
+import re
+from pathlib import Path
+
+
 @native
-def get_patch_seq():
-    today = date.today()
-    year = today.year
-    start_of_year = datetime(year, 1, 1).date()
-    seq_num = (today - start_of_year).days
-    
-    return "%d%d"%(year - 2000, seq_num)
+def read_version():
+    _SEMVER_RE = re.compile(
+        r"""
+        ^
+        (0|[1-9]\d*)                           # major
+        \.
+        (0|[1-9]\d*)                           # minor
+        \.
+        (0|[1-9]\d*)                           # patch
+        (?:-                                   # pre-release
+            (?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)
+            (?:\.
+                (?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)
+            )*
+        )?
+        (?:\+                                  # build metadata
+            [0-9A-Za-z-]+
+            (?:\.[0-9A-Za-z-]+)*
+        )?
+        $
+        """,
+        re.VERBOSE,
+    )
+
+    version = Path("VERSION").read_text(encoding="utf-8").strip()
+
+    if not version:
+        raise ValueError(f"{path} is empty")
+
+    if not _SEMVER_RE.fullmatch(version):
+        raise ValueError(f"Invalid SemVer version: {version!r}")
+
+    return version
 
 @"Kernel Version"
 @readonly
@@ -18,7 +48,7 @@ def lunaix_ver() -> str:
     Lunaix kernel version
     """
     
-    return f"{arch.val} v0.0.{get_patch_seq()}"
+    return f"{read_version()}"
 
 @"Kernel Debug and Testing"
 def debug_and_testing():

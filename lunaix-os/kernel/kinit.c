@@ -114,7 +114,7 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     kmem_init(bhctx);
 
     INFO();
-    INFO("Lunaix " CONFIG_LUNAIX_VER " (c) Lunaixsky 2022-2025");
+    INFO("Lunaix " CONFIG_LUNAIX_VER " " CONFIG_ARCH " (c) Lunaixsky 2022-2025");
 
     boot_parse_cmdline(bhctx);
 
