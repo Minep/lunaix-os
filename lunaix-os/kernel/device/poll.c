@@ -153,7 +153,7 @@ __append_pollers(int* ds, int npoller)
 static void
 __wait_until_event()
 {
-    block_current_thread();
+    wait_current_thread();
     yield_current();
 }
 
@@ -190,7 +190,7 @@ iopoll_wake_pollers(poll_evt_q* pollers_q)
         struct thread* thread = pos->thread;
         assert(!proc_terminated(thread));
         
-        if (proc_hanged(thread)) {
+        if (proc_waiting(thread)) {
             resume_thread(thread);
         }
     }
@@ -260,6 +260,7 @@ __DEFINE_LXSYSCALL2(int, pollctl, int, action, sc_va_list, _ap)
         } break;
         case _SPOLL_RM: {
             int pld = va_arg(va, int);
+            // FIXME [2026-QUALIFIER] volatile
             retcode = iopoll_remove(current_thread, pld);
         } break;
         case _SPOLL_WAIT: {

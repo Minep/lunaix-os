@@ -63,6 +63,7 @@ preempt_handle_stalled(struct signpost_result* result)
     kprintf("+++++ ");
     kprintf(" stalling detected (pid: %d, tid: %d)", 
                 __current->pid, current_thread->tid);
+    // FIXME [2026-QUALIFIER] volatile
     kprintf(" (preempted: %d, elapsed: %dms)", 
                 current_thread->stats.kpreempt_count, 
                 thread_stats_kernel_elapse(current_thread));
@@ -77,6 +78,6 @@ preempt_handle_stalled(struct signpost_result* result)
 
     kprintf("thread is blocked");
 
-    block_current_thread();
+    pause_current_thread();
     giveup_switch(result);
 }
