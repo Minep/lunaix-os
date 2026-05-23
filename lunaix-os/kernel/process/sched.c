@@ -1,3 +1,4 @@
+#include "lunaix/syscall_utils.h"
 #include "lunaix/types.h"
 #include <asm/abi.h>
 #include <asm/mempart.h>
@@ -22,6 +23,12 @@
 #include <lunaix/kpreempt.h>
 
 #include <klibc/string.h>
+
+enum sched_check {
+    SCHED_PROCCED,
+    SCHED_DEFER,
+    SCHED_CHECK_NEXT
+};
 
 struct thread empty_thread_obj;
 
@@ -95,51 +102,113 @@ cleanup_detached_threads()
     cpu_enable_interrupt();
 }
 
+static inline enum sched_check
+__try_handle_stalled(struct thread* thread)
+{
+    if (!preempt_check_stalled(thread))
+        return SCHED_CHECK_NEXT;
+
+    thread_flags_set(thread, TH_STALLED);
+    return SCHED_PROCCED;
+}
+
+static inline enum sched_check
+__try_handle_paused(struct thread* thread)
+{
+    if (thread->state != PS_PAUSED)
+        return SCHED_CHECK_NEXT;
+    
+    if (pending_sigs(thread)){
+        return SCHED_PROCCED;
+    }
+
+    return SCHED_DEFER;
+}
+
+static inline enum sched_check
+__try_handle_onwait(struct thread* thread)
+{
+    if (thread->state != PS_ONWAIT)
+        return SCHED_CHECK_NEXT;
+
+    if (waitq_empty(&thread->waitqueue)) {
+        resume_thread(thread);
+        return SCHED_PROCCED;
+    }
+
+    struct sigctx* sh = &thread->sigctx;
+    if (sigset_test(sh->sig_pending, _SIGINT)) {
+        waitq_cancel_wait(&thread->waitqueue);
+        return SCHED_PROCCED;
+    }
+
+    return SCHED_DEFER;
+}
+
+static inline enum sched_check
+__try_handle_sigstop(struct thread* thread)
+{
+    struct sigctx* sh = &thread->sigctx;
+    if (!sigset_test(sh->sig_pending, _SIGSTOP)) {
+        return SCHED_CHECK_NEXT;
+    }
+
+    // If one thread is experiencing SIGSTOP, then we know
+    // all other threads are also SIGSTOP (as per POSIX-2008.1)
+    // In which case, the entire process is stopped.
+    thread->state = PS_STOPPED;
+    return SCHED_DEFER;
+}
+
+static inline enum sched_check
+__try_handle_sigcont(struct thread* thread)
+{
+    struct sigctx* sh = &thread->sigctx;
+    if (!sigset_test(sh->sig_pending, _SIGCONT)) {
+        return SCHED_CHECK_NEXT;
+    }
+
+    thread->state = PS_READY;
+    return SCHED_PROCCED;
+}
+
 bool
 can_schedule(struct thread* thread)
 {
-    if (!thread) {
-        return 0;
-    }
+    enum sched_check result;
+
+    assert(thread);
 
     if (proc_terminated(thread)) {
         return false;
     }
 
-    if (preempt_check_stalled(thread)) {
-        thread_flags_set(thread, TH_STALLED);
-        return true;
-    }
+    result = __try_handle_onwait(thread);
+    if (result != SCHED_CHECK_NEXT)
+        goto done;
 
-    if (unlikely(kernel_process(thread->process))) {
-        // a kernel process is always runnable
-        return thread->state == PS_READY;
-    }
+    result = __try_handle_stalled(thread);
+    if (result != SCHED_CHECK_NEXT)
+        goto done;
 
-    struct sigctx* sh = &thread->sigctx;
+    result = __try_handle_paused(thread);
+    if (result != SCHED_CHECK_NEXT)
+        goto done;
 
-    if ((thread->state & PS_PAUSED)) {
-        return !!(sh->sig_pending & ~1);
-    }
+    result = __try_handle_sigstop(thread);
+    if (result != SCHED_CHECK_NEXT)
+        goto done;
 
-    if ((thread->state & PS_BLOCKED)) {
-        return sigset_test(sh->sig_pending, _SIGINT);
-    }
-
-    if (sigset_test(sh->sig_pending, _SIGSTOP)) {
-        // If one thread is experiencing SIGSTOP, then we know
-        // all other threads are also SIGSTOP (as per POSIX-2008.1)
-        // In which case, the entire process is stopped.
-        thread->state = PS_STOPPED;
-        return false;
-    }
-    
-    if (sigset_test(sh->sig_pending, _SIGCONT)) {
-        thread->state = PS_READY;
-    }
+    result = __try_handle_sigcont(thread);
+    if (result != SCHED_CHECK_NEXT)
+        goto done;
 
     return (thread->state == PS_READY) \
-            && proc_runnable(thread->process);
+            && (thread->process->state == PS_RUNNING \
+                    || thread->process->state == PS_READY);
+
+done:
+    return result == SCHED_PROCCED;
 }
 
 void
@@ -225,6 +294,7 @@ __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
     }
 
     time_t systime = clock_systime() / 1000;
+    // FIXME [2026-QUALIFIER] volatile
     struct haybed* bed = &current_thread->sleep;
 
     if (bed->wakeup_time) {
@@ -239,14 +309,24 @@ __DEFINE_LXSYSCALL1(unsigned int, sleep, unsigned int, seconds)
 
     store_retval(seconds);
 
-    block_current_thread();
+    pause_current_thread();
     schedule();
+
+    if (current_thread->sleep.wakeup_time) {
+
+        // FIXME [2026-QUALIFIER] volatile
+        if (!current_thread->sleep.alarm_time)
+            llist_delete(&current_thread->sleep.sleepers);
+
+        return DO_STATUS(EINTR); 
+    }
 
     return 0;
 }
 
 __DEFINE_LXSYSCALL1(unsigned int, alarm, unsigned int, seconds)
 {
+    // FIXME [2026-QUALIFIER] volatile
     struct haybed* bed = &current_thread->sleep;
     time_t prev_ddl = bed->alarm_time;
     time_t now = clock_systime() / 1000;
@@ -295,6 +375,8 @@ _wait(pid_t wpid, int* status, int options)
     pid_t cur = __current->pid;
     int status_flags = 0;
     struct proc_info *proc, *n;
+
+    // FIXME [2026-QUALIFIER] volatile
     if (llist_empty(&__current->children)) {
         return -1;
     }
@@ -576,6 +658,7 @@ terminate_thread(struct thread* thread, ptr_t val) {
 
 void
 terminate_current_thread(ptr_t val) {
+    // FIXME [2026-QUALIFIER] volatile
     terminate_thread(current_thread, val);
 }
 
@@ -598,6 +681,7 @@ terminate_proccess(struct proc_info* proc, int exit_code) {
 void
 terminate_current(int exit_code)
 {
+    // FIXME [2026-QUALIFIER] volatile
     terminate_proccess(__current, exit_code);
 }
 

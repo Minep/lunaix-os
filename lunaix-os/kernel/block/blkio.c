@@ -104,31 +104,22 @@ blkio_commit(struct blkio_req* req, int options)
     llist_append(&ctx->queue, &req->reqs);
     
     blkio_unlock(ctx);
-    // if the pipeline is not running (e.g., stalling). Then we should schedule
-    // one immediately and kick it started.
-    // NOTE: Possible race condition between blkio_commit and pwait.
-    // Consider: what if scheduler complete the request before pwait even get
-    // called?
-    // Two possible work around:
-    //  #1. we disable the interrupt before schedule the request.
-    //  #2. we do scheduling within interrupt context (e.g., attach a timer)
-    // As we don't want to overwhelming the interrupt context and also keep the
-    // request RTT as small as possible, hence #1 is preferred.
 
+    /*
+     * By design, the blkio will schedule the next eligible item 
+     * from the pipeline right after the completion of current
+     * item (it will do so in the completion context of the item, 
+     * e.g., inside interrupt handler)
+     *
+     * A pipeline is stalled if such scheduling is failed (pipeline
+     * is empty). This happened when the request comes in low 
+     * frequence. In that case, a explicit call to blkio_schedule is
+     * required to get the pipeline tick again.
+     */
 
     if (blkio_stalled(ctx)) {
         if ((options & BLKIO_WAIT)) {
             blkio_schedule(ctx);
-
-            /* FIXME [2026-BLKIO] Race with wait()
-                A race between blkio request completion and wait() could happened
-                if there is no latency in the disk layer (e.g., functional model
-                like QEMU). Current workaround is to add temporary latency.
-
-                Proposed fix: introduce a new scheduler state: PS_WAIT and let
-                the scheduler check for awking eligibility.
-            */
-            for (int i = 0;i < 1000; i++);
             try_wait_check_stall();
             return;
         }

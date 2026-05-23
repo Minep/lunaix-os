@@ -21,40 +21,37 @@
 
 
 /*
-    |C|Sp|Bk|De|Tn|Pu|Rn|
-            \----/
-              Dt
+   Thread state transition
 
-    Group Dt: whether this process is terminated.
 
-    Rn: Running
-    Tn: Terminated
-    De: Destoryed
-    Pu: Paused
-    Bk: Blocked
-    Sp: Stopped
-    C : Created
+   +----> ONWAIT ---->+
+   |                  | - waitq empty
+   +----> STOPPED --->+
+   |                  | - sigcont
+   |                  v
+RUNNING <- sched -> READY <--- commit --- CREATED
+   |                 |
+   |                 |
+   +----> PASUED --->+ - sig*
+
+
+ANY STATE ----> TERMINAT
+ - thread are killable in any statet
+ - one thread killed, owning process will be killed as well.
 */
 
 #define PS_READY 0
 #define PS_RUNNING 1
 #define PS_TERMNAT 2
-#define PS_DESTROY 4
-#define PS_PAUSED 8
-#define PS_BLOCKED 16
-#define PS_STOPPED 32
-#define PS_CREATED 64
-
-#define PS_GrBP (PS_PAUSED | PS_BLOCKED | PS_STOPPED)
-#define PS_GrDT (PS_TERMNAT | PS_DESTROY)
-#define PS_Rn (PS_RUNNING | PS_CREATED)
+#define PS_PAUSED 3
+#define PS_ONWAIT 4
+#define PS_STOPPED 5
+#define PS_CREATED 6
 
 #define proc_terminated(proc) \
-            (!(proc) || ((proc)->state) & PS_GrDT)
-#define proc_hanged(proc) \
-            ((proc)  && ((proc)->state) & PS_BLOCKED)
-#define proc_runnable(proc) \
-            ((proc) && (!(proc)->state || !(((proc)->state) & ~PS_Rn)))
+            (!(proc) || (proc)->state == PS_TERMNAT)
+#define proc_waiting(proc) \
+            ((proc)  && (proc)->state == PS_ONWAIT)
 
 
 #define TH_DETACHED         0b00000001
@@ -204,9 +201,9 @@ extern volatile struct thread* current_thread;
  */
 #define kernel_process(proc) (!(proc)->pid)
 
-#define resume_thread(th) (th)->state = PS_READY
-#define pause_thread(th) (th)->state = PS_PAUSED
-#define block_thread(th) (th)->state = PS_BLOCKED
+#define resume_thread(th)       ((th)->state = PS_READY)
+#define pause_thread(th)        ((th)->state = PS_PAUSED)
+#define setwait_thread(th)      ((th)->state = PS_ONWAIT)
 
 static inline void must_inline
 set_current_executing(struct thread* thread)
@@ -241,9 +238,9 @@ procvm_asid(struct proc_mm* mm)
 }
 
 static inline void
-block_current_thread()
+wait_current_thread()
 {
-    block_thread(current_thread);
+    setwait_thread(current_thread);
 }
 
 static inline void
