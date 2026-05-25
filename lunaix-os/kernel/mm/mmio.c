@@ -1,3 +1,4 @@
+#include <lunaix/mm/pmm.h>
 #include <lunaix/mm/mmio.h>
 #include <lunaix/mm/page.h>
 #include <lunaix/spike.h>
@@ -11,8 +12,8 @@ ioremap(ptr_t paddr, u32_t size)
     pte_t pte;
     ptr_t addr;
 
-    // Ensure the range is reservable (not already in use)
-    assert(pmm_onhold_range(page_index(paddr), size / PAGE_SIZE));
+    // ensure mmio pages are taken out from any pool
+    pmm_onhold_range(page_index(paddr), size / PAGE_SIZE);
     
     addr = vmap_ptes_at(mkpte(paddr, KERNEL_DATA), size / PAGE_SIZE);
     return addr + page_offset(paddr);

@@ -1,3 +1,5 @@
+#include <lunaix/mm/pmm.h>
+#include <lunaix/mm/pmalloc.h>
 #include <lunaix/mm/vastm.h>
 #include <lunaix/spike.h>
 #include <lunaix/mm/page.h>
@@ -93,10 +95,26 @@ remap_phy_pages(struct boot_handoff* bctx)
     __map_to_l0t(ptep, mem_max);
 }
 
+static struct pmpool pool_store[2];
+
 void
-pmm_arch_init_pool(struct pmem* memory)
+pmm_arch_init_pool(struct pmem* memory, struct boot_handoff* bctx)
 {
-    pmm_declare_pool(POOL_UNIFIED, 1, memory->list_len);
+    struct pmpool_create_param param;
+    
+    param.manager = PMALLOC_SIMPLE;
+
+    param.start_addr = 0x100000;
+    param.span = memory->list_len - count_pages(0x100000);
+    param.container = &pool_store[0];
+    pmm_declare_pool(POOL_NORMAL, &param);
+    pmm_alias_pool(POOL_NORMAL, POOL_USER);
+   
+    // Lower 1MiB for legacy 82C37 style DMA pages
+    param.start_addr = PAGE_SIZE;
+    param.span = count_pages(0x100000) - 1;
+    param.container = &pool_store[1];
+    pmm_declare_pool(POOL_DMA, &param);
 }
 
 ptr_t

@@ -131,7 +131,7 @@ ahci_driver_init(struct ahci_driver_param* param)
         // make a route in mm/mmio.c to handle that
         if (!clbp) {
             // 每页最多4个命令队列
-            leaflet = alloc_leaflet(0);
+            leaflet = alloc_leaflet(PGPOL_NORMAL | PGPOL_PIN);
             clb_pa = leaflet_addr(leaflet);
             clb_pg_addr = leaflet_va(leaflet);
             memset((void*)clb_pg_addr, 0, 0x1000);
@@ -139,7 +139,7 @@ ahci_driver_init(struct ahci_driver_param* param)
 
         if (!fisp) {
             // 每页最多16个FIS
-            leaflet = alloc_leaflet(0);
+            leaflet = alloc_leaflet(PGPOL_NORMAL | PGPOL_PIN);
             fis_pa = leaflet_addr(leaflet);
             fis_pg_addr = leaflet_va(leaflet);
             memset((void*)fis_pg_addr, 0, 0x1000);

@@ -45,7 +45,9 @@ pcache_alloc_page()
 {
     int i = 0;
     ptr_t va = 0;
-    struct leaflet* leaflet = alloc_leaflet(0);
+    struct leaflet* leaflet;
+
+    leaflet = alloc_leaflet(PGPOL_PCACHE);
 
     if (!leaflet) {
         return NULL;

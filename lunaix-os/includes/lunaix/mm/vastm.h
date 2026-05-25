@@ -136,11 +136,10 @@ vastm_table_get_or_make(pte_t* ptep, pte_t attr)
     if (next_table)
         return next_table;
 
-    page = alloc_page();
+    page = get_ppage(alloc_leaflet(PGPOL_PGTABLE));
     if (!page)
         return NULL;
     
-    memset((void*)ppage_va(page), 0, PAGE_SIZE);
     set_pte(ptep, pte_setpaddr(attr, ppage_addr(page)));
     return (pte_t*)ppage_va(page);
 }
@@ -382,7 +381,7 @@ vastm_helper_create_intrim_table(struct vastm_state *state, pte_t* ptep, pte_att
     pte_t* next_table, pte;
     struct leaflet* leaflet;
     
-    leaflet = alloc_page_table();
+    leaflet = alloc_leaflet(PGPOL_PGTABLE);
     if (!leaflet) {
         vastm_walk_flag_err(state, ENOMEM);
         return false;

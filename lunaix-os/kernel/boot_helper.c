@@ -1,3 +1,4 @@
+#include <lunaix/mm/pagetable.h>
 #include <klibc/string.h>
 #include <lunaix/boot_generic.h>
 #include <lunaix/mm/pmm.h>
@@ -32,7 +33,7 @@ boot_begin(struct boot_handoff* bhctx)
 
         if (reserved_memregion(ent) || reclaimable_memregion(ent)) {
             unsigned int counts = count_pages(ent->size);
-            pmm_onhold_range(page_frame(ent->start), counts);
+            pmm_onhold_range(page_index(ent->start), counts);
         }
     }
 
@@ -41,7 +42,7 @@ boot_begin(struct boot_handoff* bhctx)
         struct boot_modent* mod = &bhctx->mods.entries[i];
         unsigned int counts = count_pages(mod->end - mod->start);
 
-        pmm_onhold_range(page_frame(mod->start), counts);
+        pmm_onhold_range(page_index(mod->start), counts);
     }
 }
 
@@ -56,7 +57,7 @@ __free_reclaimable()
     pgs   = count_pages(reclaimable_end - start);
     ptep  = vastm_walk_ptep(vastm_current_root(), start, RES_LFT);
 
-    pmm_unhold_range(page_frame(to_kphysical(start)), pgs);
+    pmm_unhold_range(page_index(to_kphysical(start)), pgs);
     fill_ptes(ptep, null_pte, pgs);
 }
 
@@ -72,10 +73,11 @@ boot_end(struct boot_handoff* bhctx)
     for (size_t i = 0; i < bhctx->mem.mmap_len; i++) {
         ent = &bhctx->mem.mmap[i];
 
-        if (reclaimable_memregion(ent)) {
-            unsigned int counts = count_pages(ent->size);
-            pmm_unhold_range(page_frame(ent->start), counts);
-        }
+        if (!reclaimable_memregion(ent)) 
+            continue;
+
+        unsigned int counts = count_pages(ent->size);
+        pmm_unhold_range(page_index(ent->start), counts);
     }
 
     bhctx->release(bhctx);

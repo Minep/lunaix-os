@@ -51,7 +51,7 @@ copy_root(struct __vmcpy* state, pte_t* dest, pte_t* src, pte_t pte)
     if (!pte_isnull(pte_at(dest)))
         return (pte_t*)pte_page_va(pte_at(dest));
 
-    page = alloc_page_table();
+    page = alloc_leaflet(PGPOL_PGTABLE);
     if (!page) {
         state->err = ENOMEM;
     }
@@ -235,7 +235,7 @@ vmscpy(struct proc_mm* dest_mm, struct proc_mm* src_mm)
     pte_t *dest, *src;
     struct __vmcpy state = {};
     
-    dest = (pte_t*)leaflet_va(alloc_page_table());
+    dest = (pte_t*)leaflet_va(alloc_leaflet(PGPOL_PGTABLE));
 
     if (!dest)
         return ENOMEM;

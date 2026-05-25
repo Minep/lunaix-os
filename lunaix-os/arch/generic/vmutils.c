@@ -8,7 +8,7 @@ dup_leaflet(struct leaflet* leaflet)
 }
 
 _default void
-pmm_arch_init_pool(struct pmem* memory)
+pmm_arch_init_pool(struct pmem* memory, struct boot_handoff* bctx)
 {
     fail("unimplemented");
 }

@@ -34,7 +34,9 @@ embedded_pile(struct cake_pile* pile)
 static void*
 __alloc_cake_pages(unsigned int cake_pg)
 {
-    struct leaflet* leaflet = alloc_leaflet(count_order(cake_pg));
+    struct leaflet* leaflet;
+
+    leaflet = leaflet_alloc_order(PGPOL_NORMAL, count_order(cake_pg));
     if (!leaflet) {
         return NULL;
     }
