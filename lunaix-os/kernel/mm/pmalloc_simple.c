@@ -1,11 +1,20 @@
 #include <lunaix/spike.h>
-#include "pmm_internal.h"
+#include <lunaix/mm/page.h>
+#include <lunaix/mm/pgpol.h>
+#include <lunaix/mm/physical.h>
+#include <lunaix/mm/pmalloc.h>
 
 #ifdef CONFIG_PMALLOC_METHOD_SIMPLE
 
 // Simple PM Allocator (segregated next fit)
 
-#define INIT_FLAG   0b10
+#define NR_PAGE_ORDERS 5
+
+struct pmalloc_simple {
+    struct llist_header idle_order[NR_PAGE_ORDERS];
+    int count[NR_PAGE_ORDERS];
+    pfn_t index;
+};
 
 static const int po_limit[] = {
     CONFIG_PMALLOC_SIMPLE_MAX_PO0,
@@ -14,98 +23,58 @@ static const int po_limit[] = {
     CONFIG_PMALLOC_SIMPLE_MAX_PO3,
     CONFIG_PMALLOC_SIMPLE_MAX_PO4,
     CONFIG_PMALLOC_SIMPLE_MAX_PO5,
-    CONFIG_PMALLOC_SIMPLE_MAX_PO6,
-    CONFIG_PMALLOC_SIMPLE_MAX_PO7,
-    CONFIG_PMALLOC_SIMPLE_MAX_PO8,
-    CONFIG_PMALLOC_SIMPLE_MAX_PO9,
 };
 
-static inline bool
-__uninitialized_page(struct ppage* page)
-{
-    return !(page->flags & INIT_FLAG);
+static inline struct pmalloc_simple*
+__get_allocator(struct pmpool* pool) {
+    return (struct pmalloc_simple*)pool->alloc_private;
 }
 
-static inline void
-__set_page_initialized(struct ppage* page)
+static void
+__free_one(struct pmpool* pool, struct ppage* page)
 {
-    page->flags |= INIT_FLAG;
-}
-
-static inline void
-__set_pages_uninitialized(struct ppage* lead)
-{
-    for (size_t i = 0; i < (1UL << lead->order); i++)
-    {
-        lead[i].flags &= ~INIT_FLAG;
-    }
-}
-
-void
-pmm_allocator_init(struct pmem* memory)
-{
-    // nothing todo
-}
-
-void
-pmm_allocator_init_pool(struct pmem_pool* pool)
-{
-    for (int i = 0; i < MAX_PAGE_ORDERS; i++) {
-        llist_init_head(&pool->idle_order[i]);
-        pool->count[i] = 0;
-    }
-
-    struct ppage* pooled_page = pool->pool_start;
-    for (; pooled_page <= pool->pool_end; pooled_page++) {
-        *pooled_page = (struct ppage){ };
-    }
-}
-
-void
-pmm_free_one(struct ppage* page, int type_mask)
-{
-    page = leading_page(page);
-
-    assert(page->refs);
-    assert(!reserved_page(page));
-    assert(!__uninitialized_page(page));
-
-    if (--page->refs) {
-        return;
-    }
+    struct pmalloc_simple* alloc;
+    struct llist_header* bucket;
+    struct ppage* pos;
 
     int order = page->order;
-    assert(order <= MAX_PAGE_ORDERS);
+    assert(order <= NR_PAGE_ORDERS);
+    
+    alloc = __get_allocator(pool);
+    bucket = &alloc->idle_order[order];
 
-    struct pmem_pool* pool = pmm_pool_lookup(page);
-    struct llist_header* bucket = &pool->idle_order[order];
-
-    if (pool->count[order] < po_limit[order]) {
-        llist_append(bucket, &page->sibs);
-        pool->count[order]++;
-        return;
+    foreach_page(page, pos) {
+        pos->pol = __PGPOL_NONE;
     }
 
-    __set_pages_uninitialized(page);
+    if (alloc->count[order] < po_limit[order]) {
+        llist_append(bucket, &page->sibs);
+        alloc->count[order]++;
+        return;
+    }
 }
 
-static pfn_t index = 0;
 
-struct ppage*
-pmm_looknext(struct pmem_pool* pool, size_t order)
+static struct ppage*
+__looknext(struct pmpool* pool, size_t order)
 {
+    struct pmalloc_simple* alloc;
     struct ppage *lead, *tail = NULL;
-    pfn_t working = index;
+    pfn_t working;
     size_t count, total;
-    size_t poolsz = ppfn_of(pool, pool->pool_end) + 1;
+    size_t poolsz;
+
+    alloc = __get_allocator(pool);
+    poolsz = ppfn_of(pool, pool->last) + 1;
+    working = alloc->index;
 
     total = 1 << order;
     count = total;
-    do
-    {
+
+    do {
         tail = ppage_of(pool, working);
 
-        if (__uninitialized_page(tail)) {
+        if (!tail->pol) {
             count--;
         }
         else {
@@ -113,94 +82,85 @@ pmm_looknext(struct pmem_pool* pool, size_t order)
         }
 
         working = (working + 1) % poolsz;
-    } while (count && working != index);
+    } while (count && working != alloc->index);
 
-    index = working;
-    if (count) {
+    alloc->index = working;
+
+    if (count)
         return NULL;
-    }
 
     lead = tail - total + 1;
     for (size_t i = 0; i < total; i++)
     {
         struct ppage* page = &lead[i];
+
         page->order = order;
         page->companion = i;
         page->pool = pool->type;
+
         llist_init_head(&page->sibs);
-        __set_page_initialized(page);
     }
 
     return lead;
 }
 
-struct ppage*
-pmm_alloc_napot_type(int pool, size_t order, ppage_type_t type)
+static struct ppage*
+__alloc_napot_type(struct pmpool* pool, size_t order)
 {
-    assert(order <= MAX_PAGE_ORDERS);
+    struct pmalloc_simple* alloc;
+    struct llist_header* bucket;
+    struct ppage* good_page;
 
-    struct pmem_pool* _pool = pmm_pool_get(pool);
-    struct llist_header* bucket = &_pool->idle_order[order];
+    assert(order <= NR_PAGE_ORDERS);
+    
+    alloc = __get_allocator(pool);
+    bucket = &alloc->idle_order[order];
 
-    struct ppage* good_page = NULL;
-    if (!llist_empty(bucket)) {
-        (_pool->count[order])--;
+    if (!llist_empty(bucket)) 
+    {
+        (alloc->count[order])--;
         good_page = list_entry(bucket->next, struct ppage, sibs);
         llist_delete(&good_page->sibs);
     }
     else {
-        good_page = pmm_looknext(_pool, order);
+        good_page = __looknext(pool, order);
     }
-
-    assert(good_page);
-    assert(!good_page->refs);
-    
-    good_page->refs = 1;
-    good_page->type = type;
 
     return good_page;
 }
 
-bool
-pmm_allocator_trymark_onhold(struct pmem_pool* pool, 
-                             struct ppage* start, struct ppage* end)
+
+static struct ppage*
+__do_alloc(int order, struct pmalloc_pol* pol)
 {
-    while (start <= end) {
-        if (__uninitialized_page(start)) {
-            set_reserved(start);
-            __set_page_initialized(start);
-        }
-        else if (!start->refs) {
-            struct ppage* lead = leading_page(start);
-            llist_delete(&lead->sibs);
-
-            __set_pages_uninitialized(lead);
-            
-            continue;
-        }
-        else if (!reserved_page(start)) {
-            return false;
-        }
-
-        start++;
-    }
-
-    return true;
+    if (pol->should_align)
+        return __alloc_napot_type(pol->src_pool, order);
+    return __looknext(pol->src_pool, order);
 }
 
-bool
-pmm_allocator_trymark_unhold(struct pmem_pool* pool, 
-                             struct ppage* start, struct ppage* end)
+void
+pmalloc_simple_initpool(struct pmpool* pool)
 {
-    while (start <= end) {
-        if (!__uninitialized_page(start) && reserved_page(start)) {
-            __set_pages_uninitialized(start);
-        }
+    struct pmalloc_simple* alloc;
+    
+    alloc = __get_allocator(pool);
 
-        start++;
+    for (int i = 0; i < NR_PAGE_ORDERS; i++) {
+        llist_init_head(&alloc->idle_order[i]);
+        alloc->count[i] = 0;
     }
 
-    return true;
+    struct ppage* pooled_page = pool->first;
+    for (; pooled_page <= pool->last; pooled_page++) {
+        pooled_page->pol = __PGPOL_NONE;
+    }
+
+    alloc->index = 0;
+    
+    pool->ops = (struct pmpool_ops) {
+        .alloc_page = __do_alloc,
+        .free_page = __free_one
+    };
 }
 
 #endif

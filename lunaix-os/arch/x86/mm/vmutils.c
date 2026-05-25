@@ -8,8 +8,13 @@ dup_leaflet(struct leaflet* leaflet)
 {
     ptr_t dest_va, src_va;
     struct leaflet* new_leaflet;
+    pgpol_t policy;
+    int order;
+
+    policy = leaflet_policy(leaflet);
+    order = leaflet_order(leaflet);
     
-    new_leaflet = alloc_leaflet(leaflet_order(leaflet));
+    new_leaflet = leaflet_alloc_order(policy, order);
 
     dest_va = leaflet_va(new_leaflet);
     src_va = leaflet_va(leaflet);

@@ -127,7 +127,7 @@ __alloc_kernel_thread_stack(struct proc_info* proc)
     }
 
     unsigned int po = count_order(KERNEL_STACK_UNITSIZE / PAGE_SIZE);
-    struct leaflet* leaflet = alloc_leaflet(po);
+    struct leaflet* leaflet = leaflet_alloc_order(PGPOL_NORMAL, po);
 
     if (!leaflet) {
         WARN("failed to create kernel stack: nomem\n");

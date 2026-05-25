@@ -1,9 +1,10 @@
 #ifndef __LUNAIX_PAGE_H
 #define __LUNAIX_PAGE_H
 
-#include "lunaix/mm/pagetable.h"
-#include "lunaix/spike.h"
+#include <lunaix/mm/pagetable.h>
+#include <lunaix/mm/pgpol.h>
 #include <lunaix/mm/pmm.h>
+#include <lunaix/spike.h>
 
 #include <klibc/string.h>
 
@@ -30,6 +31,66 @@ struct leaflet
     struct ppage lead_page;
 };
 
+#define foreach_page(head_page, _page) \
+    for (int i = 0; \
+             (_page = &head_page[i]) && i < (1 << ppage_order(head_page)); \
+             i++)
+
+#define foreach_page_in_leaflet(leaflet, page) \
+    foreach_page(get_ppage(leaflet), page)
+
+static inline bool
+reserved_page(struct ppage* page)
+{
+    return page->pol == __PGPOL_RESERVED;
+}
+
+static inline struct ppage*
+ppage(pfn_t pfn) 
+{
+    return (struct ppage*)(PPLIST_STARTVM) + pfn;
+}
+
+static inline struct ppage*
+leading_page(struct ppage* page) {
+    return page - page->companion;
+}
+
+static inline struct ppage*
+ppage_of(struct pmpool* pool, pfn_t pfn) 
+{
+    return pool->first + pfn;
+}
+
+static inline pfn_t
+ppfn(struct ppage* page) 
+{
+    return (pfn_t)((ptr_t)page - PPLIST_STARTVM) / sizeof(struct ppage);
+}
+
+static inline pfn_t
+ppfn_of(struct pmpool* pool, struct ppage* page) 
+{
+    return (pfn_t)((ptr_t)page - (ptr_t)pool->first) / sizeof(struct ppage);
+}
+
+static inline ptr_t
+ppage_addr(struct ppage* page) {
+    return ppfn(page) * PAGE_SIZE;
+}
+
+static inline unsigned int
+count_order(size_t page_count) {
+    unsigned int po = ilog2(page_count);
+    assert(!(page_count % (1 << po)));
+    return po;
+}
+
+static inline unsigned int
+ppage_order(struct ppage* page) {
+    return page->order;
+}
+
 static inline struct leaflet*
 get_leaflet(struct ppage* page)
 {
@@ -42,26 +103,6 @@ get_ppage(struct leaflet* leaflet)
     return (struct ppage*)leaflet;
 }
 
-static inline void
-leaflet_borrow(struct leaflet* leaflet)
-{
-    struct ppage* const page = get_ppage(leaflet);
-    assert(page->refs);
-    if (reserved_page(page)) {
-        return;
-    }
-    
-    page->refs++;
-}
-
-static inline void
-leaflet_return(struct leaflet* leaflet)
-{
-    struct ppage* const page = get_ppage(leaflet);
-    assert(page->refs);
-    pmm_free_one(page, 0);
-}
-
 static inline unsigned int
 leaflet_refcount(struct leaflet* leaflet)
 {
@@ -72,6 +113,12 @@ static inline int
 leaflet_order(struct leaflet* leaflet)
 {
     return ppage_order(get_ppage(leaflet));
+}
+
+static inline pgpol_t
+leaflet_policy(struct leaflet* leaflet)
+{
+    return leaflet->lead_page.pol;
 }
 
 static inline int
@@ -109,18 +156,6 @@ static inline ptr_t
 leaflet_addr(struct leaflet* leaflet)
 {
     return ppage_addr(get_ppage(leaflet));
-}
-
-static inline void
-unpin_leaflet(struct leaflet* leaflet)
-{
-    change_page_type(get_ppage(leaflet), 0);
-}
-
-static inline void
-pin_leaflet(struct leaflet* leaflet)
-{
-    change_page_type(get_ppage(leaflet), PP_FGLOCKED);
 }
 
 /**
@@ -189,39 +224,44 @@ leaflet_wipe(struct leaflet* leaflet)
     leaflet_fill(leaflet, 0);
 }
 
-static inline struct leaflet*
-alloc_leaflet(int order)
-{
-    return (struct leaflet*)pmm_alloc_napot_type(POOL_UNIFIED, order, 0);
-}
-
-// TODO [2026-PAGE_ALLOC_POLICY] allow specifying different allocation policy
-static inline struct ppage*
-alloc_page()
-{
-    return pmm_alloc_napot_type(POOL_UNIFIED, 0, 0);
-}
-
-static inline struct leaflet*
-alloc_leaflet_pinned(int order)
-{
-    return (struct leaflet*)pmm_alloc_napot_type(POOL_UNIFIED, order, PP_FGLOCKED);
-}
-
-static inline struct leaflet*
-alloc_page_table()
-{
-    struct leaflet* leaflet = alloc_leaflet_pinned(0);
-    if (!leaflet)
-        return NULL;
-
-    leaflet_wipe(leaflet);
-    return leaflet;
-}
-
 static inline size_t
 count_pages(size_t size) 
 {
     return CEIL(size, PAGE_SHIFT);
 }
+
+struct leaflet*
+leaflet_alloc_order(pgpol_t alloc_pol, int order);
+
+static inline struct leaflet*
+alloc_leaflet(pgpol_t alloc_pol)
+{
+    return leaflet_alloc_order(alloc_pol, 0);
+}
+
+static inline void
+leaflet_borrow(struct leaflet* leaflet)
+{
+    struct ppage* const page = get_ppage(leaflet);
+    assert(page->refs);
+    if (reserved_page(page)) {
+        return;
+    }
+    
+    page->refs++;
+}
+
+static inline void
+page_return(struct ppage* page)
+{
+    assert(page->refs);
+    pmm_free_one(page);
+}
+
+static inline void
+leaflet_return(struct leaflet* leaflet)
+{
+    page_return(get_ppage(leaflet));
+}
+
 #endif /* __LUNAIX_PAGE_H */

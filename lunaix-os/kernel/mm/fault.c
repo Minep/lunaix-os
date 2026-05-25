@@ -210,7 +210,7 @@ fault_prealloc_page(struct fault_context* fault)
 
     pte_t pte;
     
-    struct leaflet* leaflet = alloc_leaflet(0);
+    struct leaflet* leaflet = alloc_leaflet(PGPOL_NORMAL_USER);
     if (unlikely(!leaflet)) {
         return;
     }

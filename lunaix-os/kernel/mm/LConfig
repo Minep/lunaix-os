@@ -7,25 +7,19 @@ def memory_subsystem():
     def physical_mm():
         """ Physical memory manager  """
 
-        @flag
+        @"Enable Segregated Next-Fit (SNF) allocator backend"
         def pmalloc_method_simple() -> bool:
-            when (pmalloc_method is "simple")
+            return True
         
-        @flag
+        @"Enable buddy allocator backend"
         def pmalloc_method_buddy() -> bool:
-            when (pmalloc_method is "buddy")
+            return True
         
-        @flag
+        @"Enable N-Contig (NC) allocator backend"
         def pmalloc_method_ncontig() -> bool:
-            when (pmalloc_method is "ncontig")
+            return True
 
-        @"Allocation policy"
-        def pmalloc_method() -> "simple" | "buddy" | "ncontig":
-            """ Allocation policy for phiscal memory  """
-            
-            return "simple"
-
-        @"PMalloc Thresholds"
+        @"[SNF] Thresholds Configuration"
         def pmalloc_simple_po_thresholds():
 
             require  (pmalloc_method_simple)
@@ -65,27 +59,3 @@ def memory_subsystem():
                 """ free list capacity for order-5 pages  """
 
                 return 512
-            
-            @"Maximum cached order-6 free pages"
-            def pmalloc_simple_max_po6() -> int:
-                """ free list capacity for order-6 pages  """
-
-                return 128
-            
-            @"Maximum cached order-7 free pages"
-            def pmalloc_simple_max_po7() -> int:
-                """ free list capacity for order-7 pages  """
-
-                return 128
-            
-            @"Maximum cached order-8 free pages"
-            def pmalloc_simple_max_po8() -> int:
-                """ free list capacity for order-8 pages  """
-
-                return 64
-            
-            @"Maximum cached order-9 free pages"
-            def pmalloc_simple_max_po9() -> int:
-                """ free list capacity for order-9 pages  """
-
-                return 32

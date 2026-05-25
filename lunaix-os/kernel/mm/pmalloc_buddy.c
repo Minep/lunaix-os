@@ -1,4 +1,3 @@
-#include "pmm_internal.h"
 
 // Classic buddy allocator
 

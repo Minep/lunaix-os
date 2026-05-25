@@ -2,118 +2,37 @@
 #define __LUNAIX_PMM_H
 // Physical memory manager
 
-#include "lunaix/mm/pagetable.h"
-#include <lunaix/boot_generic.h>
+#include <lunaix/mm/pagetable.h>
+#include <lunaix/mm/pgpol.h>
+#include <lunaix/mm/pmalloc.h>
 #include <lunaix/mm/physical.h>
+#include <lunaix/boot_generic.h>
 #include <lunaix/types.h>
 #include <lunaix/spike.h>
 
-enum {
-    POOL_UNIFIED,
+enum pmpool_type {
+    POOL_NORMAL,
+    POOL_USER,
+    POOL_DMA,
     POOL_COUNT
-};
-
-typedef unsigned int ppage_type_t;
-
-// Maximum non-huge page order.
-
-#if has_ptlevel(L3T)
-#define MAX_PAGE_ORDERS ( level_page_shift(L3T) - PAGE_SHIFT - 1 )
-#elif has_ptlevel(L2T)
-#define MAX_PAGE_ORDERS ( level_page_shift(L2T) - PAGE_SHIFT - 1 )
-#elif has_ptlevel(L1T)
-#define MAX_PAGE_ORDERS ( level_page_shift(L1T) - PAGE_SHIFT - 1 )
-#else
-#define MAX_PAGE_ORDERS ( level_page_shift(L0T) - PAGE_SHIFT - 1 )
-#endif
-
-#define RESERVE_MARKER 0xf0f0f0f0
-
-struct pmem_pool
-{
-    int type;
-    struct ppage* pool_start;
-    struct ppage* pool_end;
-    
-#if defined(CONFIG_PMALLOC_METHOD_NCONTIG)
-
-    struct llist_header idle_page;
-    struct llist_header busy_page;
-    
-#elif defined(CONFIG_PMALLOC_METHOD_BUDDY)
-
-    struct llist_header idle_order[MAX_PAGE_ORDERS];
-    
-#elif defined(CONFIG_PMALLOC_METHOD_SIMPLE)
-
-    struct llist_header idle_order[MAX_PAGE_ORDERS];
-    int count[MAX_PAGE_ORDERS];
-
-#endif
 };
 
 struct pmem
 {
-    struct pmem_pool pool[POOL_COUNT];
+    struct pmpool* pool[POOL_COUNT];
 
     pfn_t list_len;
     struct ppage* pplist;
     struct llist_header reserved;
 };
 
-static inline struct ppage*
-ppage(pfn_t pfn) 
+struct pmpool_create_param
 {
-    return (struct ppage*)(PPLIST_STARTVM) + pfn;
-}
-
-static inline struct ppage*
-leading_page(struct ppage* page) {
-    return page - page->companion;
-}
-
-static inline struct ppage*
-ppage_of(struct pmem_pool* pool, pfn_t pfn) 
-{
-    return pool->pool_start + pfn;
-}
-
-static inline pfn_t
-ppfn(struct ppage* page) 
-{
-    return (pfn_t)((ptr_t)page - PPLIST_STARTVM) / sizeof(struct ppage);
-}
-
-static inline pfn_t
-ppfn_of(struct pmem_pool* pool, struct ppage* page) 
-{
-    return (pfn_t)((ptr_t)page - (ptr_t)pool->pool_start) / sizeof(struct ppage);
-}
-
-static inline ptr_t
-ppage_addr(struct ppage* page) {
-    return ppfn(page) * PAGE_SIZE;
-}
-
-static inline unsigned int
-count_order(size_t page_count) {
-    unsigned int po = ilog2(page_count);
-    assert(!(page_count % (1 << po)));
-    return po;
-}
-
-static inline unsigned int
-ppage_order(struct ppage* page) {
-    return page->order;
-}
-
-
-static inline bool
-reserved_page(struct ppage* page)
-{
-    return page->refs == RESERVE_MARKER && page->type == PP_RESERVED;
-}
-
+    struct pmpool* container;
+    ptr_t start_addr;
+    size_t span;
+    enum pmalloc_backend manager;
+};
 
 /**
  * @brief 初始化物理内存管理器
@@ -126,55 +45,36 @@ pmm_init(struct boot_handoff* bctx);
 ptr_t
 pmm_arch_init_remap(struct pmem* memory, struct boot_handoff* bctx);
 
-struct pmem_pool*
-pmm_pool_get(int pool_index);
+void
+pmm_arch_init_pool(struct pmem* memory, struct boot_handoff* bctx);
 
 void
-pmm_arch_init_pool(struct pmem* memory);
-
-bool
 pmm_onhold_range(pfn_t start, size_t npages);
 
-bool
+void
 pmm_unhold_range(pfn_t start, size_t npages);
 
+bool
+pmm_is_reserved_range(pfn_t start, size_t npages);
 
-struct pmem_pool*
-pmm_declare_pool(int pool, pfn_t start, pfn_t size);
+void
+pmm_declare_pool(enum pmpool_type type, struct pmpool_create_param* param);
+
+void
+pmm_alias_pool(enum pmpool_type src_pool, enum pmpool_type dest_pool);
+
+void
+pmm_explain_policy(struct pmalloc_pol* pol_out, pgpol_t pol);
 
 // ---- allocator specific ----
 
 void
-pmm_free_one(struct ppage* page, int type_mask);
-
-struct ppage*
-pmm_alloc_napot_type(int pool, size_t order, ppage_type_t type);
-
-// ---- 
+pmm_free_one(struct ppage* page);
 
 static inline struct ppage*
-pmm_alloc_normal(size_t order)
+pmm_try_alloc_one(int order, struct pmalloc_pol* policy)
 {
-    return pmm_alloc_napot_type(POOL_UNIFIED, order, 0);
+    struct pmpool* pool = policy->src_pool;
+    return pool->ops.alloc_page(order, policy);
 }
-
-static inline struct ppage*
-pmm_alloc_locked(size_t order)
-{
-    return pmm_alloc_napot_type(POOL_UNIFIED, order, PP_FGLOCKED);
-}
-
-static inline void
-change_page_type(struct ppage* page, ppage_type_t type)
-{
-    page->type = type;
-}
-
-static inline struct pmem_pool*
-pmm_pool_lookup(struct ppage* page)
-{
-    return pmm_pool_get(page->pool);
-}
-
-
 #endif /* __LUNAIX_PMM_H */
