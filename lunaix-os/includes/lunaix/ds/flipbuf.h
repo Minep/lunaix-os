@@ -19,9 +19,9 @@ flipbuf_under(struct flipbuf* fbuf)
 {
     ptr_t off;
 
-    off  = __ptr(fbuf->top);
+    off  = __ptr(fbuf->top) - __ptr(fbuf->buf);
     off += fbuf->half_size;
-    off %= fbuf->half_size;
+    off %= (fbuf->half_size * 2);
     off += __ptr(fbuf->buf);
     
     return (void*)off;
