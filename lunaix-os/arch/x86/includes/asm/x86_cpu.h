@@ -89,4 +89,31 @@ cpu_ldeaddr()
     return val;
 }
 
+static inline void
+cpu_save_irqflag(struct arch_irqflag* flag)
+{
+    unsigned long eflag;
+
+    eflag = cpu_ldstate();
+    flag->masked = !(eflag & (1UL << 8));
+}
+
+static inline void
+cpu_restore_irqflag(struct arch_irqflag* flag)
+{
+    unsigned long current_masked;
+
+    current_masked = !(cpu_ldstate() & (1UL << 8));
+
+    if (flag->masked == current_masked) {
+        return;
+    }
+
+    if (flag->masked) {
+        cpu_disable_interrupt();
+    }
+    else {
+        cpu_enable_interrupt();
+    }
+}
 #endif /* __LUNAIX_CPU_X86_H */

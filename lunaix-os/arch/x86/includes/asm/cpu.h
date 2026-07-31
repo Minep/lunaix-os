@@ -24,4 +24,9 @@ cpu_wait()
     asm("hlt");
 }
 
+struct arch_irqflag 
+{
+    unsigned int masked;
+};
+
 #endif /* __LUNAIX_CPU_H */
