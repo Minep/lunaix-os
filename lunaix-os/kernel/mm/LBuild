@@ -7,6 +7,7 @@ src.c += (
     "page.c",
     "region.c",
     "pmalloc_simple.c",
+    "pmalloc_buddy.c",
     "mmio.c",
     "pmm.c",
     "cake_export.c",

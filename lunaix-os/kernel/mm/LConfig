@@ -9,7 +9,7 @@ def memory_subsystem():
 
         @"Enable Segregated Next-Fit (SNF) allocator backend"
         def pmalloc_method_simple() -> bool:
-            return True
+            return False
         
         @"Enable buddy allocator backend"
         def pmalloc_method_buddy() -> bool:
@@ -17,7 +17,7 @@ def memory_subsystem():
         
         @"Enable N-Contig (NC) allocator backend"
         def pmalloc_method_ncontig() -> bool:
-            return True
+            return False
 
         @"[SNF] Thresholds Configuration"
         def pmalloc_simple_po_thresholds():

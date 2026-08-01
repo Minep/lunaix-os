@@ -15,19 +15,33 @@ struct pmpool_ops
 {
     struct ppage* (*alloc_page)(int order, struct pmalloc_pol* pol);
     void (*free_page)(struct pmpool* pool, struct ppage* page);
+    void (*log_boottime_summary)(struct pmpool* pool);
+
+    int (*reserve_range)(struct pmpool*, 
+                            unsigned long start, unsigned long span);
+    int (*unreserve_range)(struct pmpool*, 
+                            unsigned long start, unsigned long span);
 };
 
+#define PMPOOl_ALLOC_PRIVATE_RSVD       128
+#ifdef CONFIG_PMALLOC_METHOD_BUDDY
+#undef PMPOOl_ALLOC_PRIVATE_RSVD
+#define PMPOOl_ALLOC_PRIVATE_RSVD       512
+#endif
 
 struct pmpool
 {
-    int type;
+    union {
+        int type;
+        int id;
+    };
     struct ppage* first;
     struct ppage* last;
     struct pmpool_ops ops;
 
     union {
         struct pm_allocator alloc_private[0];
-        unsigned char __pad[128];
+        unsigned char __pad[PMPOOl_ALLOC_PRIVATE_RSVD];
     };
 };
 

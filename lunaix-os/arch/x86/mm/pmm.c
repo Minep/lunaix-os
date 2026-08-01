@@ -102,7 +102,7 @@ pmm_arch_init_pool(struct pmem* memory, struct boot_handoff* bctx)
 {
     struct pmpool_create_param param;
     
-    param.manager = PMALLOC_SIMPLE;
+    param.manager = PMALLOC_BUDDY;
 
     param.start_addr = 0x100000;
     param.span = memory->list_len - count_pages(0x100000);

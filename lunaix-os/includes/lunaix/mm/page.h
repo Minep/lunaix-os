@@ -39,21 +39,31 @@ struct leaflet
 #define foreach_page_in_leaflet(leaflet, page) \
     foreach_page(get_ppage(leaflet), page)
 
+
+struct ppage*
+leading_page_unaligned(struct ppage* maybe_head);
+
+
 static inline bool
 reserved_page(struct ppage* page)
 {
     return page->pol == __PGPOL_RESERVED;
 }
 
+static inline bool 
+head_page(struct ppage* page) {
+    return (page->pol & __PGPOL_HEAD_PAGE);
+}
+
+static inline bool
+unaligned_page(struct ppage* page) {
+    return (page->pol & __PGPOL_UNALIGNED);
+}
+
 static inline struct ppage*
 ppage(pfn_t pfn) 
 {
     return (struct ppage*)(PPLIST_STARTVM) + pfn;
-}
-
-static inline struct ppage*
-leading_page(struct ppage* page) {
-    return page - page->companion;
 }
 
 static inline struct ppage*
@@ -89,6 +99,14 @@ count_order(size_t page_count) {
 static inline unsigned int
 ppage_order(struct ppage* page) {
     return page->order;
+}
+
+static inline struct ppage*
+leading_page(struct ppage* page) {
+    if (unlikely(unaligned_page(page)))
+        return leading_page_unaligned(page);
+
+    return ppage(ppfn(page) & (-1UL << page->order));
 }
 
 static inline struct leaflet*
@@ -263,5 +281,4 @@ leaflet_return(struct leaflet* leaflet)
 {
     page_return(get_ppage(leaflet));
 }
-
 #endif /* __LUNAIX_PAGE_H */

@@ -1,3 +1,4 @@
+#include <lunaix/mm/pgpol.h>
 #include <lunaix/mm/pmm.h>
 #include <lunaix/mm/page.h>
 #include <lunaix/spike.h>
@@ -46,12 +47,23 @@ leaflet_alloc_order(pgpol_t alloc_pol, int order)
 
     struct ppage* pg;
     foreach_page_in_leaflet(allocated, pg) {
-        pg->pol = pol.policy;
+        pg->pol |= pol.policy;
         pg->pool = pol.src_pool->type;
     }
 
     assert(leaflet_refcount(allocated) == 0);
+
     allocated->lead_page.refs = 1;
+    allocated->lead_page.pol |= __PGPOL_HEAD_PAGE;
 
     return allocated;
+}
+
+struct ppage*
+leading_page_unaligned(struct ppage* maybe_head) 
+{
+    while (!head_page(maybe_head)) {
+        maybe_head--;
+    }
+    return maybe_head;
 }

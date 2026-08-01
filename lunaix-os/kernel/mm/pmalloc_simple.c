@@ -4,8 +4,6 @@
 #include <lunaix/mm/physical.h>
 #include <lunaix/mm/pmalloc.h>
 
-#ifdef CONFIG_PMALLOC_METHOD_SIMPLE
-
 // Simple PM Allocator (segregated next fit)
 
 #define NR_PAGE_ORDERS 5
@@ -95,7 +93,6 @@ __looknext(struct pmpool* pool, size_t order)
         struct ppage* page = &lead[i];
 
         page->order = order;
-        page->companion = i;
         page->pool = pool->type;
 
         llist_init_head(&page->sibs);
@@ -109,7 +106,7 @@ __alloc_napot_type(struct pmpool* pool, size_t order)
 {
     struct pmalloc_simple* alloc;
     struct llist_header* bucket;
-    struct ppage* good_page;
+    struct ppage *good_page, *pos;
 
     assert(order <= NR_PAGE_ORDERS);
     
@@ -125,6 +122,11 @@ __alloc_napot_type(struct pmpool* pool, size_t order)
     else {
         good_page = __looknext(pool, order);
     }
+    
+    // pages from pmalloc_simple are always unaligned
+    foreach_page(good_page, pos) {
+        pos->pol = __PGPOL_UNALIGNED;
+    }
 
     return good_page;
 }
@@ -133,10 +135,31 @@ __alloc_napot_type(struct pmpool* pool, size_t order)
 static struct ppage*
 __do_alloc(int order, struct pmalloc_pol* pol)
 {
-    if (pol->should_align)
-        return __alloc_napot_type(pol->src_pool, order);
-    return __looknext(pol->src_pool, order);
+    if (pol->should_align) {
+        // TODO warn about this
+    }
+
+    return __alloc_napot_type(pol->src_pool, order);
 }
+
+static void
+__do_reserve(struct pmpool* pool, unsigned long start, unsigned long span)
+{
+    // TODO
+
+    fail("not implemented");
+}
+
+
+static void
+__do_unreserve(struct pmpool* pool, unsigned long start, unsigned long span)
+{
+    // TODO
+    
+    fail("not implemented");
+}
+
+
 
 void
 pmalloc_simple_initpool(struct pmpool* pool)
@@ -162,5 +185,3 @@ pmalloc_simple_initpool(struct pmpool* pool)
         .free_page = __free_one
     };
 }
-
-#endif
