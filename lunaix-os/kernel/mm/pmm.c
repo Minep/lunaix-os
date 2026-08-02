@@ -24,7 +24,7 @@ pmm_init(struct boot_handoff* bctx)
     pplist_pa = pmm_arch_init_remap(&memory, bctx);
     
     if (!pplist_pa) {
-        spin();
+        PANIC("unable to reserve page list: out of memory");
     }
 
     pmm_arch_init_pool(&memory, bctx);

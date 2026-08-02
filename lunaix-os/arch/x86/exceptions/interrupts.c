@@ -23,7 +23,7 @@ apic_ack_interrupt(irq_t irq);
 static void noret
 __set_panic(const char* msg, const struct hart_state* state)
 {
-    ERROR("panic: %s", msg);
+    FATAL("panic: %s", msg);
     failsafe_diagnostic();
 }
 

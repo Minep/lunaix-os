@@ -15,7 +15,7 @@ setup_default_tty()
 {
     char* console_dev;
     if(!kcmd_get_option("console", &console_dev)) {
-        FATAL("I am expecting a console!");
+        PANIC("I am expecting a console!");
         // should not reach
     }
 
@@ -23,20 +23,20 @@ setup_default_tty()
     int err;
 
     if ((err = vfs_walk(NULL, console_dev, &dn, NULL, 0))) {
-        FATAL("unable to set console: %s, err=%d", console_dev, err);
+        PANIC("unable to set console: %s, err=%d", console_dev, err);
         // should not reach
     }
 
     struct device* dev = resolve_device(dn->inode->data);
     if (!dev) {
-        FATAL("not a device: %s", console_dev);
+        PANIC("not a device: %s", console_dev);
         // should not reach
     }
 
     assert(device_addalias(NULL, dev_meta(dev), "tty"));
     
     if (!device_get_potens(dev, potens(TERMPORT))) {
-        FATAL("not a terminal device: %s", console_dev);
+        PANIC("not a terminal device: %s", console_dev);
     }
 
     INFO("system console: %s", console_dev);

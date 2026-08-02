@@ -1,10 +1,10 @@
 #define __BOOT_CODE__
 
 #include <lunaix/boot_generic.h>
+#include <lunaix/mm/emrgmem.h>
 
 #include <asm/boot_stage.h>
 #include <sys/boot/multiboot.h>
-#include <sys-generic/bootmem.h>
 
 #include <asm/mempart.h>
 
@@ -23,7 +23,7 @@ mb_parse_cmdline(struct boot_handoff* bhctx, char* cmdline)
         return;
     }
 
-    cmd = bootmem_alloc(slen + 1);
+    cmd = emalloc(slen + 1);
     strncpy(cmd, cmdline, slen);
 
     bhctx->kexec.len = slen;
@@ -41,7 +41,7 @@ mb_parse_mmap(struct boot_handoff* bhctx,
     mb_mmap = (struct multiboot_mmap_entry*)__ptr(mb->mmap_addr);
     mmap_len = mb->mmap_length / sizeof(*mb_mmap);
 
-    bmmap = bootmem_alloc(sizeof(*bmmap) * mmap_len);
+    bmmap = emalloc(sizeof(*bmmap) * mmap_len);
     
     for (size_t i = 0; i < mmap_len; i++) {
         mb_mapent = &mb_mmap[i];
@@ -85,13 +85,13 @@ mb_parse_mods(struct boot_handoff* bhctx,
     char* mod_name, *cmd;
 
     mods = (struct multiboot_mod_list*)__ptr(mb->mods_addr);
-    modents = bootmem_alloc(sizeof(*modents) * mb->mods_count);
+    modents = emalloc(sizeof(*modents) * mb->mods_count);
 
     for (size_t i = 0; i < mb->mods_count; i++) {
         mod = &mods[i];
         cmd = (char*)__ptr(mod->cmdline);
         name_len = strlen(cmd);
-        mod_name = bootmem_alloc(name_len + 1);
+        mod_name = emalloc(name_len + 1);
 
         modents[i] = (struct boot_modent){ 
             .start = mod->mod_start,
@@ -115,7 +115,18 @@ mb_prepare_hook(struct boot_handoff* bhctx)
 static void
 mb_release_hook(struct boot_handoff* bhctx)
 {
-    // nothing to do
+    // TODO currently we free it in stack over, this
+    // is to ensure we can trigger merge forward and reduce
+    // the fragmentation. Need merge backword to losen up
+    // this requirement
+    //
+    for (size_t i = 0; i < bhctx->mods.mods_num; i++) {
+        emfree(bhctx->mods.entries[i].str);
+    }
+
+    emfree(bhctx->mods.entries);
+    emfree(bhctx->kexec.cmdline);
+    emfree(bhctx->mem.mmap);
 }
 
 void

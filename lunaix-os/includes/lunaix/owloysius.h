@@ -4,6 +4,18 @@
 #include <lunaix/ds/ldga.h>
 
 /**
+ * @brief stage before the boot handover, arch init.
+ * No memory management, clock, interrupt and some arch 
+ * feature even not completely initialised.
+ * This is the stage very close to baremetal you can get,
+ * it only ensure that Lunaix is properly mapped to memory.
+ *
+ * You should only hook to this stage if you have sufficient 
+ * reason.
+ */
+#define on_preboot c_preboot
+
+/**
  * @brief stage where only basic memory management service
  * is present
  */
@@ -34,6 +46,12 @@
     export_ldga_el_sfx(lunainit, func##_##call_stage, ptr_t, func, call_stage);
 
 #define invoke_init_function(stage) ldga_invoke_fn0(lunainit##_##stage)
+
+static inline void
+initfn_invoke_preboot()
+{
+    invoke_init_function(on_preboot);
+}
 
 static inline void
 initfn_invoke_sysconf()

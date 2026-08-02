@@ -83,6 +83,12 @@ SECTIONS {
         *(.bss.kstack)
         PROVIDE(__bsskstack_end = .);
 
+        /* emergency memory */
+        . = ALIGN(PAGE_GRAN);
+        PROVIDE(__bssemrgmem_start = .);
+        *(.bss.emrgmem)
+        PROVIDE(__bssemrgmem_end = .);
+
         /* reclaimable data  */
         . = ALIGN(PAGE_GRAN);
         PROVIDE(__bssreclaim_start = .);

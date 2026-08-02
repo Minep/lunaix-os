@@ -30,6 +30,6 @@ struct kp_records*
 kprec_create(int max_recs);
 
 struct kp_entry*
-kprec_put(struct kp_records*, int lvl, char* content, size_t len);
+kprec_put(struct kp_records*, int lvl, const char* content, size_t len);
 
 #endif /* __LUNAIX_KP_RECORDS_H */

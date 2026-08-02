@@ -31,12 +31,11 @@ struct trace_context
 };
 
 /**
- * @brief Init the trace service using loaded modksyms module
+ * @brief Init the trace service with builtin kernel symbols 
  *
- * @param bhctx
  */
 void
-trace_modksyms_init(struct boot_handoff* bhctx);
+trace_ksyms_init();
 
 /**
  * @brief Locate the symbol which is the closest to given pc.

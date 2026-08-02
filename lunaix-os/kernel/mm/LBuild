@@ -6,12 +6,17 @@ src.c += (
     "procvm.c",
     "page.c",
     "region.c",
-    "pmalloc_simple.c",
-    "pmalloc_buddy.c",
     "mmio.c",
     "pmm.c",
     "cake_export.c",
     "vmap.c",
     "dmm.c",
-    "vastm.c"
+    "vastm.c",
+    "emrgmem.c"
 )
+
+if config.pmalloc_method_simple:
+    src.c += "pmalloc_simple.c"
+
+if config.pmalloc_method_buddy:
+    src.c += "pmalloc_buddy.c"

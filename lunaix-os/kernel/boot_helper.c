@@ -96,6 +96,8 @@ boot_end(struct boot_handoff* bhctx)
 
     // reclaim the .bss.reclaimable
     __free_reclaimable();
+
+    boot_handoff_free(bhctx);
 }
 
 void

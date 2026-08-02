@@ -7,7 +7,6 @@
 
 #include <asm/mm_defs.h>
 #include <asm/boot_stage.h>
-#include <sys-generic/bootmem.h>
 
 #ifdef CONFIG_ARCH_X86_64
 
@@ -61,7 +60,7 @@ prepare_boot_handover()
 {
     struct boot_handoff* handoff;
 
-    handoff = bootmem_alloc(sizeof(*handoff));
+    handoff = boot_handoff_alloc();
 
     mb_parse(handoff);
 

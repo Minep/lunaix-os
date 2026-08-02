@@ -2,6 +2,7 @@
 #define __LUNAIX_BOOT_GENERIC_H
 
 #include <lunaix/types.h>
+#include <lunaix/mm/emrgmem.h>
 
 // Free memory region
 #define BOOT_MMAP_FREE 0
@@ -63,6 +64,19 @@ struct boot_handoff
          ___i++)
 
 #ifndef __BOOT_CODE__
+
+static inline struct boot_handoff*
+boot_handoff_alloc()
+{
+    return (struct boot_handoff*)emalloc(sizeof(struct boot_handoff));
+}
+
+static inline void 
+boot_handoff_free(struct boot_handoff* bhctx)
+{
+    emfree(bhctx);
+}
+
 void
 boot_begin(struct boot_handoff*);
 
