@@ -18,13 +18,23 @@
 void
 boot_begin(struct boot_handoff* bhctx)
 {
+    size_t pg_count;
+    ptr_t kstart;
+
     bhctx->prepare(bhctx);
 
     boot_begin_arch_reserve(bhctx);
-    
-    // 将内核占据的页，包括前1MB，hhk_init 设为已占用
-    size_t pg_count = count_pages(to_kphysical(kernel_load_end));
-    pmm_onhold_range(0, pg_count);
+   
+    // reserves all kernel occupied physical pages
+    // note: we will reclaim the .bss.reclaimable upon existing
+    // the boot context, which will essentially shrink the 
+    // (kstart, kend)
+    //
+    kstart = to_kphysical(kernel_start);
+    pg_count = to_kphysical(kernel_load_end) - kstart;
+    pg_count = count_pages(pg_count) + 1;
+
+    pmm_onhold_range(page_index(kstart), pg_count);
 
     size_t i;
     struct boot_mmapent* ent;
@@ -84,7 +94,10 @@ boot_end(struct boot_handoff* bhctx)
 
     boot_clean_arch_reserve(bhctx);
 
+    // reclaim the .bss.reclaimable
     __free_reclaimable();
+
+    boot_handoff_free(bhctx);
 }
 
 void

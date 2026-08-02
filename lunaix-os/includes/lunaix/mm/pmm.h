@@ -2,6 +2,7 @@
 #define __LUNAIX_PMM_H
 // Physical memory manager
 
+#include <lunaix/kpreempt.h>
 #include <lunaix/mm/pagetable.h>
 #include <lunaix/mm/pgpol.h>
 #include <lunaix/mm/pmalloc.h>
@@ -23,7 +24,6 @@ struct pmem
 
     pfn_t list_len;
     struct ppage* pplist;
-    struct llist_header reserved;
 };
 
 struct pmpool_create_param
@@ -48,14 +48,11 @@ pmm_arch_init_remap(struct pmem* memory, struct boot_handoff* bctx);
 void
 pmm_arch_init_pool(struct pmem* memory, struct boot_handoff* bctx);
 
-void
+int
 pmm_onhold_range(pfn_t start, size_t npages);
 
-void
+int
 pmm_unhold_range(pfn_t start, size_t npages);
-
-bool
-pmm_is_reserved_range(pfn_t start, size_t npages);
 
 void
 pmm_declare_pool(enum pmpool_type type, struct pmpool_create_param* param);
@@ -74,7 +71,14 @@ pmm_free_one(struct ppage* page);
 static inline struct ppage*
 pmm_try_alloc_one(int order, struct pmalloc_pol* policy)
 {
+    irqflag_t flag;
+    struct ppage* page;
     struct pmpool* pool = policy->src_pool;
-    return pool->ops.alloc_page(order, policy);
+
+    no_preemption_saved(&flag);
+    page = pool->ops.alloc_page(order, policy);
+    preempt_restore(&flag);
+
+    return page;
 }
 #endif /* __LUNAIX_PMM_H */

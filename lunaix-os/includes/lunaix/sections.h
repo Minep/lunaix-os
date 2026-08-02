@@ -27,6 +27,10 @@
 #define reclaimable_start   __section_mark(bssreclaim, start)
 #define reclaimable_end     __section_mark(bssreclaim, end)
 
+#define emrgmem             __section(".bss.emrgmem")
+#define emrgmem_start       __section_mark(bssemrgmem, start)
+#define emrgmem_end         __section_mark(bssemrgmem, end)
+
 #define kernel_start        __section_mark(kexec, start)
 #define kernel_load_end     __section_mark(kexec, end)
 #define kernel_end          __section_mark(kimg, end)

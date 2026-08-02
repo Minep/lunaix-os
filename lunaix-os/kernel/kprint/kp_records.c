@@ -3,6 +3,8 @@
 #include <lunaix/mm/valloc.h>
 #include <lunaix/spike.h>
 #include <lunaix/syslog.h>
+#include <lunaix/compiler.h>
+#include <lunaix/mm/emrgmem.h>
 
 #include "kp_records.h"
 
@@ -26,26 +28,54 @@ kprecs_full(struct kp_records* recs)
     return recs->cur_recs >= recs->max_recs;
 }
 
+static inline bool
+__require_emrgmem(int level) 
+{
+    return level == KLOG_FATAL;
+}
+
+static inline void*
+__alloc(int level, size_t size)
+{
+    if (likely(!__require_emrgmem(level)))
+        return vzalloc(size);
+
+    return emalloc(size);
+}
+
+static inline void
+__free(int level, void* data)
+{
+    if (unlikely(__require_emrgmem(level)))
+        vfree_safe(data);
+    else 
+        emfree(data);
+}
+
 struct kp_entry*
-kprec_put(struct kp_records* recs, int lvl, char* content, size_t len)
+kprec_put(struct kp_records* recs, int lvl, const char* content, size_t len)
 {
     assert(len < 256);
 
     struct kp_entry* ent;
+    char* _content;
+
     if (!kprecs_full(recs)) {
         assert(recs->kp_ent_wp == &recs->kp_ents.ents);
 
-        ent = (struct kp_entry*)vzalloc(KP_ENT_SIZE);
+        ent = (struct kp_entry*)__alloc(lvl, KP_ENT_SIZE);
         llist_append(&recs->kp_ents.ents, &ent->ents);
         recs->cur_recs++;
     } else {
         recs->kp_ent_wp = recs->kp_ent_wp->next;
-        ent = container_of(recs->kp_ent_wp, struct kp_entry, ents);
+        ent = container_of(recs->kp_ent_wp, struct kp_entry, ents);       
+        __free(ent->lvl, ent->content);
     }
+    
+    _content = __alloc(lvl, len);
+    if (!_content || !ent)
+        return NULL;
 
-    vfree_safe(ent->content);
-
-    char* _content = valloc(len);
     memcpy(_content, content, len);
 
     ent->lvl = lvl;

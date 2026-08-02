@@ -58,13 +58,15 @@ __try_wait(bool check_stall)
 static inline void must_inline
 __pwait(waitq_t* queue, bool check_stall)
 {
+    irqflag_t irq;
+
     // prevent race condition.
-    no_preemption();
+    no_preemption_saved(&irq);
 
     prepare_to_wait(queue);
     __try_wait(check_stall);
 
-    set_preemption();
+    preempt_restore(&irq);
 }
 
 void

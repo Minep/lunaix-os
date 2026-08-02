@@ -15,7 +15,7 @@ struct ppage
         };
         unsigned char attr;
     };
-    unsigned char companion;
+
     unsigned int pol;
     unsigned int refs;
     

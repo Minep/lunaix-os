@@ -1,6 +1,17 @@
 #ifndef __LUNAIX_PGPOL_H
 #define __LUNAIX_PGPOL_H
 
+/**
+ * Internal Page Policy - Reserved as Page Attribute
+ *
+ * __PGPOL_HEAD_PAGE:   Head page of a contiguous leaflet
+ * __PGPOL_UNALIGNED:   An un-aligned contiguous leaflet
+ *
+ */
+
+#define __PGPOL_HEAD_PAGE       (1 << 24)
+#define __PGPOL_UNALIGNED       (1 << 25)
+
 /*
  * Page Policy - Allocation Type
  *

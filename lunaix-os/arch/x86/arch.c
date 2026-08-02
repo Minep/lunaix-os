@@ -1,3 +1,4 @@
+#include <lunaix/owloysius.h>
 #include <hal/hwtimer.h>
 
 #include <lunaix/spike.h>
@@ -14,6 +15,7 @@ exception_init()
 void
 arch_preinit()
 {
+    initfn_invoke_preboot();
     exception_init();
 }
 

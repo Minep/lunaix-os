@@ -538,9 +538,14 @@ commit_process(struct proc_info* process)
 void
 destory_thread(struct thread* thread) 
 {
+    struct proc_info* proc;
+    irqflag_t irq;
+    
+    no_preemption_saved(&irq);
+
     cake_ensure_valid(thread);
     
-    struct proc_info* proc = thread->process;
+    proc = thread->process;
 
     llist_delete(&thread->sched_sibs);
     llist_delete(&thread->proc_sibs);
@@ -553,6 +558,8 @@ destory_thread(struct thread* thread)
     sched_ctx.ttable_len--;
 
     cake_release(thread_pile, thread);
+
+    preempt_restore(&irq);
 }
 
 static void

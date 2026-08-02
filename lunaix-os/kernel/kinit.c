@@ -9,6 +9,7 @@
 #include <lunaix/mm/page.h>
 #include <lunaix/mm/valloc.h>
 #include <lunaix/mm/vmm.h>
+#include <lunaix/mm/emrgmem.h>
 
 #include <lunaix/process.h>
 #include <lunaix/sched.h>
@@ -118,9 +119,6 @@ kernel_bootstrap(struct boot_handoff* bhctx)
 
     boot_parse_cmdline(bhctx);
 
-    /* Prepare stack trace environment */
-    trace_modksyms_init(bhctx);
-
     device_scan_drivers();
 
     initfn_invoke_sysconf();
@@ -160,3 +158,18 @@ kernel_bootstrap(struct boot_handoff* bhctx)
     spawn_lunad();
 }
 
+void
+kernel_preboot()
+{
+    /**
+     * Here we load the emergency services as early as possible
+     * which is the first thing Lunaix should do after mapped
+     * herself. 
+     *
+     * Hooked to preboot stage before any arch init.
+     */
+
+    trace_ksyms_init();
+    emrgmem_init();
+}
+owloysius_fetch_init(kernel_preboot, on_preboot);

@@ -130,7 +130,7 @@ hwrtc_init()
 
     int err = sysrtc->ops->calibrate(sysrtc);
     if (err) {
-        FATAL("failed to calibrate rtc. name='%s', err=%d", 
+        PANIC("failed to calibrate rtc. name='%s', err=%d", 
                 potens_dev(sysrtc)->name_val, err);
     }
 }

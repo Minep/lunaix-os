@@ -25,18 +25,18 @@ trace_log(const char* fmt, ...)
     va_list args;
     va_start(args, fmt);
 
-    kprintf_m("TRACE", fmt, args);
+    kprintf_fatal("TRACE", fmt, args);
 
     va_end(args);
 }
 
 void
-trace_modksyms_init(struct boot_handoff* bhctx)
+trace_ksyms_init()
 {
     trace_ctx.ksym_table = autogen(struct ksyms, ksymtable);
 
-    INFO("symbols loaded: %d @0x%lx", 
-            trace_ctx.ksym_table->ksym_count, trace_ctx.ksym_table->syms);
+//    INFO("symbols loaded: %d @0x%lx", 
+//            trace_ctx.ksym_table->ksym_count, trace_ctx.ksym_table->syms);
 }
 
 struct ksym_entry*

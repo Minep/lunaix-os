@@ -12,6 +12,7 @@
 #include <klibc/strfmt.h>
 
 #include "kp_records.h"
+#include "lunaix/compiler.h"
 
 #define MAX_BUFSZ_HLF 256
 #define MAX_KPENT_NUM 1024
@@ -27,7 +28,7 @@ static struct kp_records kprecs = {
 };
 export_symbol(debug, kprintf, kprecs);
 
-static char*
+static const char*
 shift_level(const char* str, int* level)
 {
     if (str[0] == KMSG_LVLSTART) {
@@ -47,9 +48,11 @@ __put_console(const struct kp_entry* ent)
     time_t s, ms;
     size_t sz;
 
-    if (unlikely(!sysconsole)) {
+    if (unlikely(!ent))
         return;
-    }
+
+    if (unlikely(!sysconsole))
+        return;
 
     s   = ent->time / 1000;
     ms  = ent->time % 1000;
@@ -78,6 +81,12 @@ kprintf_ml(const char* component, int level, const char* fmt, va_list args)
     sz = ksnprintfv(flipbuf_flip(&fmtbuf), buf, MAX_BUFSZ_HLF, args);
     
     kprintf_put(level, flipbuf_top(&fmtbuf), sz);
+}
+
+void
+kprintf_fatal(const char* component, const char* fmt, va_list args)
+{
+    kprintf_ml(component, KLOG_FATAL, fmt, args);
 }
 
 void

@@ -5,6 +5,8 @@
 #include <asm/cpu.h>
 #include <lunaix/process.h>
 
+typedef struct arch_irqflag irqflag_t;
+
 static inline void
 set_preemption() 
 {
@@ -15,6 +17,26 @@ static inline void
 no_preemption() 
 {
     cpu_disable_interrupt();
+}
+
+static inline void
+no_preemption_saved(irqflag_t* flag)
+{
+    cpu_save_irqflag(flag);
+    cpu_disable_interrupt();
+}
+
+static inline void
+set_preemption_saved(irqflag_t* flag)
+{
+    cpu_save_irqflag(flag);
+    cpu_enable_interrupt();
+}
+
+static inline void
+preempt_restore(irqflag_t* flag)
+{
+    cpu_restore_irqflag(flag);
 }
 
 static inline void

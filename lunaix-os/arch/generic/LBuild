@@ -1,7 +1,6 @@
 src.h += "includes"
 
 src.c += (
-    "bootmem.c",
     "trace.c",
     "vmutils.c",
     "procvm.c",

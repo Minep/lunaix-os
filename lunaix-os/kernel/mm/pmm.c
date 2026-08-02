@@ -1,3 +1,5 @@
+#include "lunaix/kpreempt.h"
+#include "lunaix/status.h"
 #include <lunaix/mm/pmm.h>
 #include <lunaix/status.h>
 #include <lunaix/mm/pagetable.h>
@@ -19,91 +21,69 @@ pmm_init(struct boot_handoff* bctx)
 
     memset(&memory, 0, sizeof(memory));
 
-    llist_init_head(&memory.reserved);
-
     pplist_pa = pmm_arch_init_remap(&memory, bctx);
     
     if (!pplist_pa) {
-        spin();
+        PANIC("unable to reserve page list: out of memory");
     }
 
     pmm_arch_init_pool(&memory, bctx);
 
     pfn_t pplist_size = memory.list_len * sizeof(struct ppage);
     pmm_onhold_range(page_index(pplist_pa), count_pages(pplist_size));
+
+    // TODO need to check for any overlapping in the pool.
 }
 
-static inline void  must_inline
-__reserve_memory_range(struct ppage* start, struct ppage* end)
-{
-    while (start <= end) {
-        start->pol = __PGPOL_RESERVED; 
-        start++;
-    }
-}
-
-static inline void must_inline
-__unreserve_memory_range(struct ppage* start, struct ppage* end)
-{
-    while (start <= end) {
-        start->pol = __PGPOL_NONE;
-        start++;
-    }
-}
-
-static inline void must_inline optimize("-fipa-cp-clone")
+static inline int 
 __pmm_mark_range(pfn_t start, size_t npages, const bool hold)
 {
-    struct ppage *_start, *_end;
+    struct pmpool *pool;
+    pfn_t end;
+    int i;
 
-    if (start >= memory.list_len)
-        return;
+    end = start + npages;
 
-    _start = ppage(start);
-    _end = ppage(start + npages - 1);
-    
-    if (hold) {
-        __reserve_memory_range(_start, _end);
-    } else {
-        __unreserve_memory_range(_start, _end);
+    for (i = 0; i < POOL_COUNT; i++)
+    {
+        pool = memory.pool[i];
+
+        if (ppfn(pool->first) > start)
+            continue;
+
+        if (ppfn(pool->last) < end)
+            continue;
+
+        break;
     }
+
+    // the requested range is not a allocatable page
+    // we treated it as "architecturally-reserved" page
+    if (i == POOL_COUNT)
+        return 0;
+    
+    if (hold)
+        return pool->ops.reserve_range(pool, start, npages);
+
+    return pool->ops.unreserve_range(pool, start, npages);
 }
 
-void
+int
 pmm_onhold_range(pfn_t start, size_t npages)
 {
-    __pmm_mark_range(start, npages, true);
+    return __pmm_mark_range(start, npages, true);
 }
 
-void
+int
 pmm_unhold_range(pfn_t start, size_t npages)
 {
-    __pmm_mark_range(start, npages, false);
-}
-
-bool
-pmm_is_reserved_range(pfn_t start, size_t npages)
-{
-    struct ppage *_start, *_end;
-
-    if (start >= memory.list_len)
-        return false;
-
-    _start = ppage(start);
-    _end = ppage(start + npages - 1);
-
-    while (_start <= _end) {
-        if (!reserved_page(_start))
-            return false;
-        _start++;
-    }
-
-    return true;
+    return __pmm_mark_range(start, npages, false);
 }
 
 void
 pmm_free_one(struct ppage* page)
 {
+    irqflag_t flag;
     struct pmpool* pool;
     assert(page->pool < POOL_COUNT);
 
@@ -116,8 +96,12 @@ pmm_free_one(struct ppage* page)
         return;
     }
 
+    no_preemption_saved(&flag);
+
     pool = memory.pool[page->pool];
     pool->ops.free_page(pool, page);
+
+    preempt_restore(&flag);
 }
 
 void
@@ -132,7 +116,7 @@ pmm_declare_pool(enum pmpool_type type, struct pmpool_create_param* param)
     start = page_index(param->start_addr);
 
     pool->first = ppage(start);
-    pool->last = ppage(start + param->span);
+    pool->last = ppage(start + param->span - 1);
 
     pool->type = type;
     
@@ -218,9 +202,17 @@ pmm_log_summary()
     {
         _pool = memory.pool[i];
         len   = ppfn(_pool->last) - ppfn(_pool->first) + 1;
+
+        if (i != _pool->id) {
+            INFO("pool 0x%x -> 0x%x (aliased)", i, _pool->id);
+            continue;
+        }
+
+        if (_pool->ops.log_boottime_summary)
+            _pool->ops.log_boottime_summary(_pool);
         
-        INFO("pool #%d (%d), 0x%lx..0x%lx (span: %ld pages)", 
-                i , _pool->type, 
+        INFO("pool 0x%x, 0x%lx..0x%lx (span: %ld pages)", 
+                _pool->type, 
                 ppfn(_pool->first) * PAGE_SIZE, ppfn(_pool->last) * PAGE_SIZE, len);
     }
 }

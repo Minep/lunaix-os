@@ -346,7 +346,6 @@ __DEFINE_LXSYSCALL2(int, th_join, tid_t, tid, void**, val_ptr)
         *val_ptr = (void*)th->exit_val;
     }
 
-    no_preemption();
     destory_thread(th);
 
     return 0;

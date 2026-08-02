@@ -13,7 +13,7 @@ __assert_fail(const char* expr, const char* file, unsigned int line)
     // Don't do another trap, print it right-away, allow
     //  the stack context being preserved
     cpu_disable_interrupt();
-    ERROR("assertion fail (%s:%u)\n\t%s", file, line, expr);
+    FATAL("assertion fail (%s:%u)\n\t%s", file, line, expr);
     
     failsafe_diagnostic();
 }

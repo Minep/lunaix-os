@@ -18,7 +18,7 @@ fdt_load(struct fdt_blob* fdt, ptr_t base)
 
     hdr = fdt->header;
     if (hdr->magic != FDT_MAGIC) {
-        FATAL("invalid dtb, unexpected magic: 0x%x, expect: 0x%x", 
+        PANIC("invalid dtb, unexpected magic: 0x%x, expect: 0x%x", 
                 hdr->magic, FDT_MAGIC);
     }
 
@@ -769,7 +769,7 @@ dtpx_compile_proplet(struct dtprop_def* proplet)
     }
 
     if (proplet[i - 1].type && i == 10) {
-        FATAL("invalid proplet: no terminator detected");
+        PANIC("invalid proplet: no terminator detected");
     }
 
     proplet[i].acc_sz = acc;

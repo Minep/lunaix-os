@@ -35,11 +35,16 @@
 #define INFO(fmt, ...) kprintf(KINFO fmt, ##__VA_ARGS__)
 #define WARN(fmt, ...) kprintf(KWARN fmt, ##__VA_ARGS__)
 #define ERROR(fmt, ...) kprintf(KERROR fmt, ##__VA_ARGS__)
-#define FATAL(fmt, ...)                                                        \
+#define FATAL(fmt, ...) kprintf(KFATAL fmt, ##__VA_ARGS__)
+
+#define PANIC(fmt, ...)                                                        \
     ({                                                                         \
         kprintf(KFATAL fmt, ##__VA_ARGS__);                                    \
         fail(fmt);                                                             \
     })
+
+void
+kprintf_fatal(const char* component, const char* fmt, va_list args);
 
 void
 kprintf_m(const char* component, const char* fmt, va_list args);

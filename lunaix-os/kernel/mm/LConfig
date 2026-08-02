@@ -3,13 +3,23 @@
 def memory_subsystem():
     """ Config the memory subsystem """
 
+    @"Emergency Memory Size"
+    def emrgmem_size() -> int:
+        """ 
+        sizes (KBs) to reserve for emergency memory.
+        this kind of memory will be managed by a dedicated and
+        yet simple enough subsystem to ensure that kernel can fail 
+        gracefully in case of the fatal error or oom of main memory.
+        """
+        return 256
+
     @"Physical Memory"
     def physical_mm():
         """ Physical memory manager  """
 
         @"Enable Segregated Next-Fit (SNF) allocator backend"
         def pmalloc_method_simple() -> bool:
-            return True
+            return False
         
         @"Enable buddy allocator backend"
         def pmalloc_method_buddy() -> bool:
@@ -17,7 +27,7 @@ def memory_subsystem():
         
         @"Enable N-Contig (NC) allocator backend"
         def pmalloc_method_ncontig() -> bool:
-            return True
+            return False
 
         @"[SNF] Thresholds Configuration"
         def pmalloc_simple_po_thresholds():

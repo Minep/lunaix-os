@@ -134,13 +134,14 @@ dup_proc()
 {
     struct thread* main_thread;
     struct proc_info* pcb;
+    irqflag_t irq;
     
-    no_preemption();
+    no_preemption_saved(&irq);
     
     pcb = alloc_process();
     if (!pcb) {
         syscall_result(ENOMEM);
-        return -1;
+        goto err;
     }
     
     pcb->parent = __current;
@@ -166,13 +167,18 @@ dup_proc()
     if (!main_thread) {
         syscall_result(ENOMEM);
         delete_process(pcb);
-        return -1;
+        goto err;
     }
 
     commit_process(pcb);
     commit_thread(main_thread);
-
+    
+    preempt_restore(&irq);
     return pcb->pid;
+
+err:
+    preempt_restore(&irq);
+    return -1;
 }
 
 __DEFINE_LXSYSCALL(pid_t, fork)
