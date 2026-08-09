@@ -7,5 +7,6 @@ src.c += (
     "mutex.c",
     "hstr.c",
     "fifo.c",
-    "rwlock.c"
+    "rwlock.c",
+    "rbtree.c"
 )

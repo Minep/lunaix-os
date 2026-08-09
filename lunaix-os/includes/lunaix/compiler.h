@@ -14,6 +14,9 @@
 #define unreachable             __builtin_unreachable()
 #define no_inline               __attribute__((noinline))
 
+// TODO rename must_inline to force_inline
+#define force_inline            inline __attribute__((always_inline))
+
 #define _be                     __attribute__((scalar_storage_order ("big-endian")))
 #define _le                     __attribute__((scalar_storage_order ("little-endian")))
 
