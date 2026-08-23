@@ -14,6 +14,7 @@ struct sub_interval {
 
 struct interval {
     struct sub_interval* root;
+    struct rbnode* root_ref;
     unsigned long min_bound;
     unsigned long max_bound;
 };
@@ -73,8 +74,7 @@ interval_query(struct interval* interval, unsigned long location);
 struct interval_iter 
 {
     struct interval* root;
-    struct sub_interval* this;
-    struct sub_interval* next;
+    struct rbnode** pivot_ref;
     unsigned long span_start;
     unsigned long span_end;
 };

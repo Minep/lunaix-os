@@ -133,6 +133,7 @@ __rebalance(struct interval* interval,
         rbtree_fixup_insert(__rb(interval->root), __rb(parent), __rb(node));
 
     interval->root = sub_interval(maybe_newroot);
+    interval->root_ref = &interval->root->rb;
 }
 
 
@@ -187,6 +188,7 @@ interval_delete(struct interval* interval, struct sub_interval* node)
     maybe_newroot = rbtree_delete(&interval->root->rb, &node->rb);
 
     interval->root = sub_interval(maybe_newroot);
+    interval->root_ref = &interval->root->rb;
 }
 
 struct sub_interval*
@@ -199,68 +201,55 @@ interval_query(struct interval* interval, unsigned long location)
 static force_inline bool
 __overlapped(struct sub_interval* node, unsigned long start, unsigned long end)
 {
-    if (node->start >= start && node->start <= end)
+    if (node->start >= start && node->start < end)
         return true;
 
-    if (node->end >= start && node->end <= end)
+    if (node->end >= start && node->end < end)
         return true;
 
     return false;
 }
 
 static struct sub_interval*
-__locate_first_overlaped(struct rbnode* node, unsigned long start, unsigned long end)
+__locate_pivot(struct rbnode* node, unsigned long start, unsigned long end)
 {
-    struct sub_interval* maybe_first;
+    struct sub_interval* si;
 
     if (!node)
         return NULL;
 
-    maybe_first = __locate_first_overlaped(node->left, start, end);
-    if (maybe_first)
-        return maybe_first;
-    
-    maybe_first = sub_interval(node);
-    if (__overlapped(maybe_first, start, end))
-        return maybe_first;
-    
-    return __locate_first_overlaped(node->right, start, end);
+    si = sub_interval(node);
+
+    if (start > si->end)
+        return __locate_pivot(node->right, start, end);
+
+    if (end < si->start)
+        return __locate_pivot(node->left, start, end);
+
+    return si;
 }
 
 static struct sub_interval*
-__locate_next(struct rbnode* node, unsigned long start, unsigned long end)
+__min_edge_of_pivot(struct rbnode* pivot, unsigned long start, unsigned long end)
 {
-    struct sub_interval *curr, *next;
+    struct sub_interval* si, *found;
 
-    while (node) {
-        curr = sub_interval(node);
+    if (!pivot)
+        return NULL;
 
-        next = __locate_first_overlaped(&curr->rb, start, end);
-        if (next)
-            return next;
+    si = sub_interval(pivot);
 
-        node = rbnode_parent(node);
+    if (si->start > start) {
+        found = __min_edge_of_pivot(pivot->left, start, end);
+    }
+    else {
+        found = __min_edge_of_pivot(pivot->right, start, end);
     }
 
-    return NULL;
-}
+    if (!found && __overlapped(si, start, end))
+        return si;
 
-static inline struct sub_interval*
-sub_interval_left(struct sub_interval* si)
-{
-    if (!si->rb.left)
-        return NULL;
-
-    return sub_interval(si->rb.left);
-}
-
-static inline struct sub_interval*
-sub_interval_right(struct sub_interval* si)
-{
-    if (!si->rb.right)
-        return NULL;
-
-    return sub_interval(si->rb.right);
+    return found;
 }
 
 void
@@ -268,16 +257,42 @@ interval_search_begin(struct interval* interval, struct interval_iter* it,
                       unsigned long span_start, unsigned long span_end) 
 {
     struct sub_interval* this;
+    struct rbnode *parent;
 
-    this = __locate_first_overlaped(&interval->root->rb, span_start, span_end);
+    /**
+     * pre-locate the pivot in case the range is bury deep in tree.
+     * so we can save some stack space.
+     * */
+    this = __locate_pivot(__rb(interval->root), span_start, span_end);
 
     *it = (struct interval_iter) {
         .root = interval,
         .span_start = span_start,
         .span_end = span_end,
-        .this = this,
-        .next = sub_interval_right(this) 
     };
+
+    /*
+     * we went extra trouble to save the reference of pivot,
+     * so we can allow deletion while in traversal.
+     * */
+    if (!this) {
+        it->pivot_ref = NULL;
+        return;
+    }
+
+    parent = rbnode_parent(&this->rb);
+
+    if (!parent) {
+        it->pivot_ref = &interval->root_ref;
+        return;
+    }
+
+    if (parent->right == &this->rb) {
+        it->pivot_ref = &parent->right;
+    }
+    else {
+        it->pivot_ref = &parent->left;
+    }
 }
 
 struct sub_interval*
@@ -285,12 +300,16 @@ interval_search_next(struct interval_iter* iter)
 {
     struct sub_interval* next;
 
-    if (unlikely(!iter->next))
+    if (unlikely(!iter->pivot_ref))
         return NULL;
 
-    next = __locate_next(&iter->next->rb, iter->span_start, iter->span_end);
-    iter->this = next;
-    iter->next = sub_interval_right(next);
+    if (unlikely(iter->span_start >= iter->span_end))
+        return NULL;
+
+    next = __min_edge_of_pivot(*iter->pivot_ref, iter->span_start, iter->span_end);
+    if (next) {
+        iter->span_start = next->end + 1;
+    }
 
     return next;
 }

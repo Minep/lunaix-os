@@ -237,15 +237,229 @@ test_should_not_fail_when_tiled()
 }
 
 static void
-test_range_query_should_result_one()
+test_range_query_full_cover_should_result_one()
 {
+    struct interval itree = {};
+    struct interval_iter iiter;
+    struct sub_interval* si;
 
+    interval_init(&itree, 0, 1000);
+
+    expect_notnull(PUT(itree, 0, 100));
+    expect_notnull(PUT(itree, 200, 20));
+    expect_notnull(PUT(itree, 455, 1));
+
+    interval_search_begin(&itree, &iiter, 100, 300);
+
+    si = interval_search_next(&iiter);
+    expect_notnull(si);
+    expect_ulong(si->start, 200);
+    
+    expect_null(interval_search_next(&iiter));
+
+    interval_search_end(&iiter);
+    
+    __tear_down(&itree.root->rb);
+}
+
+static void
+test_range_query_partial_cover_should_result_one()
+{
+    struct interval itree = {};
+    struct interval_iter iiter;
+    struct sub_interval* si;
+
+    interval_init(&itree, 0, 1000);
+
+    expect_notnull(PUT(itree, 0, 100));
+    expect_notnull(PUT(itree, 200, 20));
+    expect_notnull(PUT(itree, 455, 1));
+
+    interval_search_begin(&itree, &iiter, 150, 201);
+
+    si = interval_search_next(&iiter);
+    expect_notnull(si);
+    expect_ulong(si->start, 200);
+    
+    expect_null(interval_search_next(&iiter));
+
+    interval_search_end(&iiter);
+    
+    __tear_down(&itree.root->rb);
+}
+
+static void
+test_range_query_no_cover_should_result_none()
+{
+    struct interval itree = {};
+    struct interval_iter iiter;
+    struct sub_interval* si;
+
+    interval_init(&itree, 0, 1000);
+
+    expect_notnull(PUT(itree, 10, 100));
+    expect_notnull(PUT(itree, 200, 20));
+    expect_notnull(PUT(itree, 455, 1));
+
+    interval_search_begin(&itree, &iiter, 500, 500);
+    
+    expect_null(interval_search_next(&iiter));
+
+    interval_search_end(&iiter);
+
+    __tear_down(&itree.root->rb);
+}
+
+static void
+test_range_query_empty_should_result_none()
+{
+    struct interval itree = {};
+    struct interval_iter iiter;
+    struct sub_interval* si;
+
+    interval_init(&itree, 0, 1000);
+
+    interval_search_begin(&itree, &iiter, 500, 500);
+    
+    expect_null(interval_search_next(&iiter));
+
+    interval_search_end(&iiter);
+}
+
+static void
+test_range_query_malformed_range_should_result_none()
+{
+    struct interval itree = {};
+    struct interval_iter iiter;
+    struct sub_interval* si;
+
+    interval_init(&itree, 0, 1000);
+    expect_notnull(PUT(itree, 10, 100));
+    expect_notnull(PUT(itree, 200, 20));
+    expect_notnull(PUT(itree, 455, 1));
+
+    interval_search_begin(&itree, &iiter, 100, 10);
+    
+    expect_null(interval_search_next(&iiter));
+
+    interval_search_end(&iiter);
+    
+    __tear_down(&itree.root->rb);
+}
+
+static void
+test_range_query_end_point_inclusive_should_result_none()
+{
+    struct interval itree = {};
+    struct interval_iter iiter;
+    struct sub_interval* si;
+
+    interval_init(&itree, 0, 1000);
+    expect_notnull(PUT(itree, 10, 100));
+    expect_notnull(PUT(itree, 200, 20));
+    expect_notnull(PUT(itree, 455, 1));
+
+    interval_search_begin(&itree, &iiter, 0, 10);
+    
+    expect_null(interval_search_next(&iiter));
+
+    interval_search_end(&iiter);
+    
+    __tear_down(&itree.root->rb);
+}
+
+static void
+test_range_query_end_point_inclusive_should_result_one()
+{
+    struct interval itree = {};
+    struct interval_iter iiter;
+    struct sub_interval* si;
+
+    interval_init(&itree, 0, 1000);
+    expect_notnull(PUT(itree, 10, 100));
+    expect_notnull(PUT(itree, 200, 20));
+    expect_notnull(PUT(itree, 455, 1));
+
+    interval_search_begin(&itree, &iiter, 0, 11);
+    
+    expect_notnull(interval_search_next(&iiter));
+
+    interval_search_end(&iiter);
+    
+    __tear_down(&itree.root->rb);
 }
 
 static void
 test_range_query_should_result_all()
 {
+    struct interval itree = {};
+    struct interval_iter iiter;
+    struct sub_interval* si;
 
+    interval_init(&itree, 0, 1000);
+
+    expect_notnull(PUT(itree, 0, 100));
+    expect_notnull(PUT(itree, 455, 1));
+    expect_notnull(PUT(itree, 200, 20));
+
+    interval_search_begin(&itree, &iiter, 0, 1000);
+
+    si = interval_search_next(&iiter);
+    expect_notnull(si);
+    expect_ulong(si->start, 0);
+    
+    si = interval_search_next(&iiter);
+    expect_notnull(si);
+    expect_ulong(si->start, 200);
+
+    si = interval_search_next(&iiter);
+    expect_notnull(si);
+    expect_ulong(si->start, 455);
+    
+    expect_null(interval_search_next(&iiter));
+
+    interval_search_end(&iiter);
+    
+    __tear_down(&itree.root->rb);
+}
+
+static void
+test_range_query_with_on_fly_delete_at_root_should_work()
+{
+    struct interval itree = {};
+    struct interval_iter iiter;
+    struct sub_interval* si;
+
+    interval_init(&itree, 0, 1000);
+
+    expect_notnull(PUT(itree, 0, 100));
+    expect_notnull(PUT(itree, 200, 20));        // our root
+    expect_notnull(PUT(itree, 455, 1));
+
+    interval_search_begin(&itree, &iiter, 0, 1000);
+
+    si = interval_search_next(&iiter);
+    expect_notnull(si);
+    expect_ulong(si->start, 0);
+    
+    si = interval_search_next(&iiter);
+    expect_notnull(si);
+    expect_ulong(si->start, 200);
+
+    // delete the tree root as well as our iterator pivot,
+    // the iterator should go on just fine
+    interval_delete(&itree, si);
+    vfree(si);
+
+    si = interval_search_next(&iiter);
+    expect_notnull(si);
+    expect_ulong(si->start, 455);
+    
+    expect_null(interval_search_next(&iiter));
+
+    interval_search_end(&iiter);
+    
+    __tear_down(&itree.root->rb);
 }
 
 #define testcase_fn(fn) \
@@ -271,4 +485,13 @@ run_test(int argc, const char* argv[])
     testcase_fn(test_should_fail_when_no_room);
     testcase_fn(test_should_not_fail_when_tiled);
 
+    testcase_fn(test_range_query_full_cover_should_result_one);
+    testcase_fn(test_range_query_partial_cover_should_result_one);
+    testcase_fn(test_range_query_no_cover_should_result_none);
+    testcase_fn(test_range_query_empty_should_result_none);
+    testcase_fn(test_range_query_malformed_range_should_result_none);
+    testcase_fn(test_range_query_end_point_inclusive_should_result_one);
+    testcase_fn(test_range_query_end_point_inclusive_should_result_none);
+    testcase_fn(test_range_query_should_result_all);
+    testcase_fn(test_range_query_with_on_fly_delete_at_root_should_work);
 }
