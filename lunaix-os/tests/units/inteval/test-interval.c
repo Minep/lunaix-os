@@ -5,7 +5,8 @@
 
 
 static inline struct sub_interval*
-__insert_interval(struct interval* itree, unsigned long start, unsigned long length, bool fixed)
+__insert_interval(struct interval* itree, unsigned long start, unsigned long length, 
+                  bool fixed, int align)
 {
     struct sub_interval* subi;
     bool ok;
@@ -14,12 +15,7 @@ __insert_interval(struct interval* itree, unsigned long start, unsigned long len
     subi->start = start;
     subi->end = start + length - 1;
     
-    if (fixed) {
-        ok = interval_insert(itree, subi);
-    } else {
-        ok = interval_alloc_insert(itree, subi);
-    }
-
+    ok = interval_insert_node(itree, subi, fixed, align);
     if (!ok) {
         vfree(subi);
         return NULL;
@@ -31,10 +27,16 @@ __insert_interval(struct interval* itree, unsigned long start, unsigned long len
 }
 
 #define PUT(IT, start, len)     \
-    __insert_interval(&IT, start, len, false)
+    __insert_interval(&IT, start, len, false, 0)
 
 #define PUT_FIXED(IT, start, len)     \
-    __insert_interval(&IT, start, len, true)
+    __insert_interval(&IT, start, len, true, 0)
+
+#define PUT_ALIGN(IT, start, len, al)     \
+    __insert_interval(&IT, start, len, false, al)
+
+#define PUT_FIXED_ALIGN(IT, start, len, al)     \
+    __insert_interval(&IT, start, len, true, al)
 
 #define node_of(rbnode) \
     container_of(rbnode, struct sub_interval, rb)
@@ -462,6 +464,52 @@ test_range_query_with_on_fly_delete_at_root_should_work()
     __tear_down(&itree.root->rb);
 }
 
+static void
+test_insert_aligned_should_adjusted_to_boundary()
+{
+    struct interval itree = {};
+
+    interval_init(&itree, 0x0, 0x1000000);
+
+    expect_notnull(PUT(itree, 0x234, 20));
+
+    // this will goto 0x2000
+    expect_notnull(PUT_ALIGN(itree, 0x1234, 20, 12));
+
+    // because 0x2000 already taken, bailed to next slot
+    expect_notnull(PUT_ALIGN(itree, 0x1234, 20, 12));
+
+    expect_notnull(interval_query(&itree, 0x2004));
+    expect_notnull(interval_query(&itree, 0x3004));
+
+    __tear_down(&itree.root->rb);
+}
+
+static void
+test_insert_fixed_aligned_should_failed_for_unaligned_location()
+{
+    struct interval itree = {};
+
+    interval_init(&itree, 0x0, 0x1000000);
+    expect_null(PUT_FIXED_ALIGN(itree, 0x1234, 20, 12));
+}
+
+static void
+test_insert_should_search_forward_when_tail_is_full()
+{
+    struct interval itree = {};
+
+    interval_init(&itree, 0, 200);
+
+    expect_notnull(PUT(itree, 100, 50)); // =100
+    expect_notnull(PUT(itree, 150, 50)); // =150
+    expect_notnull(PUT(itree, 150, 50)); // bail to 50
+
+    expect_notnull(interval_query(&itree, 50));
+
+    __tear_down(&itree.root->rb);
+}
+
 #define testcase_fn(fn) \
     testcase(#fn, fn())
 
@@ -494,4 +542,8 @@ run_test(int argc, const char* argv[])
     testcase_fn(test_range_query_end_point_inclusive_should_result_none);
     testcase_fn(test_range_query_should_result_all);
     testcase_fn(test_range_query_with_on_fly_delete_at_root_should_work);
+
+    testcase_fn(test_insert_aligned_should_adjusted_to_boundary);
+    testcase_fn(test_insert_fixed_aligned_should_failed_for_unaligned_location);
+    testcase_fn(test_insert_should_search_forward_when_tail_is_full);
 }

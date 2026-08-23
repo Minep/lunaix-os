@@ -1,4 +1,3 @@
-#include "lunaix/compiler.h"
 #include <lunaix/ds/interval.h>
 
 struct search_param
@@ -11,6 +10,7 @@ struct search_param
     unsigned long hint_start;
     unsigned long size;
     bool retry_variant;
+    int align_mask;
 };
 
 #define RESTART_DEFAULT 0
@@ -40,6 +40,9 @@ __set_param_result_once(struct search_param* param, struct rbnode** leaf_ref,
 #define set_result_once(param, loc, node, direction) \
     __set_param_result_once(param, &(node)->rb.direction, node, loc)
 
+#define align_location(loc, mask)       \
+    (((loc) + (mask)) & ~(mask))
+
 static bool 
 __locate_slot(struct search_param* param, struct rbnode* root, 
               unsigned curr, unsigned long min, unsigned long max)
@@ -59,6 +62,8 @@ __locate_slot(struct search_param* param, struct rbnode* root,
     found = false;
 
 restart:
+    curr = align_location(curr, param->align_mask);
+
     if (curr < root_iv->start) {
         found = __locate_slot(param, root->left, curr, min, root_iv->start);
         if (found) {
@@ -137,16 +142,23 @@ __rebalance(struct interval* interval,
 }
 
 
-static inline bool
-__try_insert(struct interval* interval, struct sub_interval* node, bool fixed)
+bool
+interval_insert_node(struct interval* interval, 
+                     struct sub_interval* node, bool fixed, int align_bits)
 {
     struct search_param param;
     bool found;
 
-    param.hint_start = node->start;
     param.size = sub_interval_span(node);
     param.retry_variant = !fixed;
     param.result.node = NULL;
+    param.align_mask = ~(-1UL << align_bits);
+
+    if (fixed && (param.hint_start & param.align_mask)) {
+        return false;
+    }
+    
+    param.hint_start = align_location(node->start, param.align_mask);
 
     found = __search_for_slot(interval, &param);
     if (!found) {
@@ -166,18 +178,6 @@ __try_insert(struct interval* interval, struct sub_interval* node, bool fixed)
     __rebalance(interval, param.result.node, node);
 
     return true;
-}
-
-bool
-interval_alloc_insert(struct interval* interval, struct sub_interval* node) 
-{
-    return __try_insert(interval, node, false);
-}
-
-bool
-interval_insert(struct interval* interval, struct sub_interval* node) 
-{
-    return __try_insert(interval, node, true);
 }
 
 void

@@ -39,14 +39,21 @@ interval_init(struct interval* interval,
     interval->min_bound = min_bound;
 }
 
+bool
+interval_insert_node(struct interval* interval, 
+                     struct sub_interval* node, bool fixed, int align_bits);
+
 /**
  * Insert the given sub interval identified by [start, end] at the 
  * most suitable location somewhere near the `start`. 
  *
  * Return whether the insertion successful or not.
  */
-bool
-interval_alloc_insert(struct interval* interval, struct sub_interval* node);
+static inline bool
+interval_insert_alloc(struct interval* interval, struct sub_interval* node)
+{
+    return interval_insert_node(interval, node, false, 0);
+}
 
 
 /**
@@ -55,9 +62,37 @@ interval_alloc_insert(struct interval* interval, struct sub_interval* node);
  *
  * Return whether the insertion successful or not.
  */
-bool
-interval_insert(struct interval* interval, struct sub_interval* node);
+static inline bool
+interval_insert_fixed(struct interval* interval, struct sub_interval* node)
+{
+    return interval_insert_node(interval, node, true, 0);
+}
 
+/**
+ * Insert the given sub interval identified by [start, end] at the 
+ * most suitable location somewhere near the `start`. 
+ *
+ * Return whether the insertion successful or not.
+ */
+static inline bool
+interval_insert_alloc_aligned(struct interval* interval, 
+                              struct sub_interval* node, int align_bits)
+{
+    return interval_insert_node(interval, node, false, align_bits);
+}
+
+/**
+ * Insert the given sub interval identified by [start, end] at the 
+ * EXACT location given by `start` 
+ *
+ * Return whether the insertion successful or not.
+ */
+static inline bool
+interval_insert_fixed_aligned(struct interval* interval, 
+                        struct sub_interval* node, int align_bits)
+{
+    return interval_insert_node(interval, node, true, align_bits);
+}
 
 /**
  * Delete the given sub interval node from the interval.
