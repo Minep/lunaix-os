@@ -30,6 +30,14 @@ sub_interval_span(struct sub_interval* sinv)
     return sinv->end - sinv->start + 1;
 }
 
+static force_inline void
+interval_init(struct interval* interval, 
+              unsigned long min_bound, unsigned long max_bound)
+{
+    interval->max_bound = max_bound;
+    interval->min_bound = min_bound;
+}
+
 /**
  * Insert the given sub interval identified by [start, end] at the 
  * most suitable location somewhere near the `start`. 
@@ -65,7 +73,8 @@ interval_query(struct interval* interval, unsigned long location);
 struct interval_iter 
 {
     struct interval* root;
-    struct sub_interval* prev;
+    struct sub_interval* this;
+    struct sub_interval* next;
     unsigned long span_start;
     unsigned long span_end;
 };

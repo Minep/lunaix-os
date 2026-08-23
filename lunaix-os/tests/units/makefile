@@ -6,7 +6,8 @@ include $(LUNAIX_ROOT)/tests/shared/mkobj.mkinc
 MAKEFLAGS += --no-print-directory
 CFLAGS += -isystem $(unit-test-root)/stubs/includes
 
-__test-dir := device-tree btrie
+__test-dir := btrie rbtree inteval
+
 test-dir := $(addprefix test-,$(__test-dir))
 
 obj-stubs := 

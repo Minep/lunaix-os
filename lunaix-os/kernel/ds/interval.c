@@ -1,6 +1,4 @@
 #include "lunaix/compiler.h"
-#include "lunaix/ds/rbtree.h"
-#include "lunaix/types.h"
 #include <lunaix/ds/interval.h>
 
 struct search_param
@@ -20,58 +18,77 @@ struct search_param
 #define RESTART_RIGHT 2
 #define RESTART_END 3
 
+static force_inline struct rbnode*
+__rb(struct sub_interval* node)
+{
+    if (unlikely(!node))
+        return NULL;
+    return &node->rb;
+}
+
+static force_inline void
+__set_param_result_once(struct search_param* param, struct rbnode** leaf_ref, 
+                        struct sub_interval* node, unsigned long loc)
+{
+    if (likely(param->result.node))
+        return;
+
+    param->result.slot = leaf_ref;
+    param->result.node = node;
+    param->hint_start = loc;
+}
+#define set_result_once(param, loc, node, direction) \
+    __set_param_result_once(param, &(node)->rb.direction, node, loc)
+
 static bool 
-__locate_slot(struct search_param* slot, struct rbnode* root, 
+__locate_slot(struct search_param* param, struct rbnode* root, 
               unsigned curr, unsigned long min, unsigned long max)
 {
     struct sub_interval* root_iv;
     bool found;
     int state;
+    
+    if (unlikely(curr < min || curr + param->size > max))
+        return false;
 
-    if (!root) {
+    if (!root)
         return true;
-    }
 
     root_iv = sub_interval(root);
     state = RESTART_DEFAULT;
     found = false;
 
-    if (unlikely(curr < min || curr + slot->size >= max))
-        return false;
-
 restart:
     if (curr < root_iv->start) {
-        found = __locate_slot(slot, root->left, curr, min, root_iv->start);
+        found = __locate_slot(param, root->left, curr, min, root_iv->start);
         if (found) {
-            slot->result.slot = &root->left;
-            slot->result.node = root_iv;
-            slot->hint_start = curr;
+            set_result_once(param, curr, root_iv, left);
             goto done;
         }
     }
     
     if (curr > root_iv->end) {
-        found = __locate_slot(slot, root->right, curr, root_iv->end, max);
+        found = __locate_slot(param, root->right, curr, root_iv->end + 1, max);
         if (found) {
-            slot->result.slot = &root->left;
-            slot->result.node = root_iv;
-            slot->hint_start = curr;
+            set_result_once(param, curr, root_iv, right);
             goto done;
         }
     }
 
-    if (unlikely(!slot->retry_variant))
+    if (unlikely(!param->retry_variant))
         goto done;
 
     state++;
 
     if (state == RESTART_RIGHT) {
-        curr = (root_iv->end + max + 1) / 2;
+        curr = root_iv->end + 1;
         goto restart;
     }
 
     if (state == RESTART_LEFT) {
-        curr = (min + root_iv->start + 1) / 2;
+        if (root_iv->start >= param->size) {
+            curr = root_iv->start - param->size;
+        }
         goto restart;
     }
 
@@ -84,7 +101,7 @@ __query_for_hit(struct rbnode* root, unsigned long loc)
 {
     struct sub_interval* node;
 
-    if (!root)
+    if (unlikely(!root))
         return NULL;
 
     node = sub_interval(root);
@@ -101,7 +118,7 @@ __query_for_hit(struct rbnode* root, unsigned long loc)
 static inline bool
 __search_for_slot(struct interval* interval, struct search_param* param)
 {
-    return __locate_slot(param, &interval->root->rb,
+    return __locate_slot(param, __rb(interval->root),
                          param->hint_start,
                          interval->min_bound, interval->max_bound);
 }
@@ -113,7 +130,7 @@ __rebalance(struct interval* interval,
     struct rbnode* maybe_newroot;
 
     maybe_newroot = 
-        rbtree_fixup_insert(&interval->root->rb, &parent->rb, &node->rb);
+        rbtree_fixup_insert(__rb(interval->root), __rb(parent), __rb(node));
 
     interval->root = sub_interval(maybe_newroot);
 }
@@ -128,16 +145,22 @@ __try_insert(struct interval* interval, struct sub_interval* node, bool fixed)
     param.hint_start = node->start;
     param.size = sub_interval_span(node);
     param.retry_variant = !fixed;
+    param.result.node = NULL;
 
     found = __search_for_slot(interval, &param);
     if (!found) {
         return false;
     }
 
-    node->start = param.hint_start;
-    node->end = param.hint_start + param.size - 1;
+    if (likely(interval->root)) {
+        node->start = param.hint_start;
+        node->end = param.hint_start + param.size - 1;
 
-    *param.result.slot = &node->rb;
+        *param.result.slot = __rb(node);
+    }
+    else {
+        interval->root = node;
+    }
 
     __rebalance(interval, param.result.node, node);
 
@@ -169,7 +192,7 @@ interval_delete(struct interval* interval, struct sub_interval* node)
 struct sub_interval*
 interval_query(struct interval* interval, unsigned long location) 
 {
-    return __query_for_hit(&interval->root->rb, location);
+    return __query_for_hit(__rb(interval->root), location);
 }
 
 
@@ -186,14 +209,14 @@ __overlapped(struct sub_interval* node, unsigned long start, unsigned long end)
 }
 
 static struct sub_interval*
-__locate_first(struct rbnode* node, unsigned long start, unsigned long end)
+__locate_first_overlaped(struct rbnode* node, unsigned long start, unsigned long end)
 {
     struct sub_interval* maybe_first;
 
     if (!node)
         return NULL;
 
-    maybe_first = __locate_first(node->left, start, end);
+    maybe_first = __locate_first_overlaped(node->left, start, end);
     if (maybe_first)
         return maybe_first;
     
@@ -201,7 +224,7 @@ __locate_first(struct rbnode* node, unsigned long start, unsigned long end)
     if (__overlapped(maybe_first, start, end))
         return maybe_first;
     
-    return __locate_first(node->right, start, end);
+    return __locate_first_overlaped(node->right, start, end);
 }
 
 static struct sub_interval*
@@ -212,10 +235,7 @@ __locate_next(struct rbnode* node, unsigned long start, unsigned long end)
     while (node) {
         curr = sub_interval(node);
 
-        if (__overlapped(curr, start, end))
-            return NULL;
-
-        next = __locate_first(curr->rb.right, start, end);
+        next = __locate_first_overlaped(&curr->rb, start, end);
         if (next)
             return next;
 
@@ -225,15 +245,38 @@ __locate_next(struct rbnode* node, unsigned long start, unsigned long end)
     return NULL;
 }
 
+static inline struct sub_interval*
+sub_interval_left(struct sub_interval* si)
+{
+    if (!si->rb.left)
+        return NULL;
+
+    return sub_interval(si->rb.left);
+}
+
+static inline struct sub_interval*
+sub_interval_right(struct sub_interval* si)
+{
+    if (!si->rb.right)
+        return NULL;
+
+    return sub_interval(si->rb.right);
+}
+
 void
 interval_search_begin(struct interval* interval, struct interval_iter* it,
                       unsigned long span_start, unsigned long span_end) 
 {
+    struct sub_interval* this;
+
+    this = __locate_first_overlaped(&interval->root->rb, span_start, span_end);
+
     *it = (struct interval_iter) {
         .root = interval,
         .span_start = span_start,
         .span_end = span_end,
-        .prev = __locate_first(&interval->root->rb, span_start, span_end)
+        .this = this,
+        .next = sub_interval_right(this) 
     };
 }
 
@@ -242,11 +285,12 @@ interval_search_next(struct interval_iter* iter)
 {
     struct sub_interval* next;
 
-    if (unlikely(!iter->prev))
+    if (unlikely(!iter->next))
         return NULL;
 
-    next = __locate_next(&iter->prev->rb, iter->span_start, iter->span_end);
-    iter->prev = next;
+    next = __locate_next(&iter->next->rb, iter->span_start, iter->span_end);
+    iter->this = next;
+    iter->next = sub_interval_right(next);
 
     return next;
 }
